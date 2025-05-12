@@ -1,12 +1,14 @@
 # agent.py
 import os
 import yaml
-import openai
 import logging
-from typing import Dict, List
+from typing import Dict, List, Any, Optional
+
+# Import the OpenAIHandler we created
+from openai_handler import OpenAIHandler
 
 # Import default config utilities
-from default_config import load_config, merge_with_default_config, DEFAULT_CONFIG
+from default_config import load_config, merge_with_default_config, DEFAULT_CONFIG, get_action_llm_config
 
 
 class Agent:
@@ -16,75 +18,47 @@ class Agent:
         """Initialize the Agent with either a config path or a config dictionary"""
         # Load configuration
         if config_path:
-            # Load from file, creating default if it doesn't exist
-            loaded_config = load_config(config_path, create_if_missing=True)
-            self.config = loaded_config
+            self.config = load_config(config_path, create_if_missing=True)
         elif config_dict:
-            # Merge provided config with defaults
             self.config = merge_with_default_config(config_dict)
         else:
-            # Use default config
             self.config = DEFAULT_CONFIG
 
-        # Initialize context (holds runtime data)
+        # Initialize context
         self.context = {}
 
-        # Set up logging
+        # Set up components
         self._setup_logging()
-
-        # Initialize OpenAI client
-        self._setup_llm_client()
-
-        # Initialize the Finite State Machine
         self._setup_fsm()
+
+        # Initialize OpenAI handler with main LLM config
+        llm_config = self.config.get('llm', {})
+        self.openai_handler = OpenAIHandler(config=llm_config)
+        self.llm_client = self.openai_handler  # Backward compatibility
+
+        # Cache for action-specific configurations
+        self._action_configs_cache = {}
+
+        self.logger.info(f"Agent initialized with model: {llm_config.get('model', 'gpt-4')}")
 
     def _setup_logging(self):
         """Configure logging based on config"""
         log_config = self.config.get('logging', {})
-        log_level = log_config.get('level', 'INFO')
-        log_format = log_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        log_file = log_config.get('file', None)
-        console_output = log_config.get('console', True)
-
-        # Configure logging
         logging.basicConfig(
-            level=getattr(logging, log_level),
-            format=log_format,
-            filename=log_file,
-            filemode='a' if log_file else None
+            level=getattr(logging, log_config.get('level', 'INFO')),
+            format=log_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
+            filename=log_config.get('file', None),
+            filemode='a' if log_config.get('file') else None
         )
 
-        # Add console handler if enabled
         self.logger = logging.getLogger('Agent')
-        if console_output and log_file:
+
+        # Add console handler if both file and console output are enabled
+        if log_config.get('console', True) and log_config.get('file'):
             console = logging.StreamHandler()
-            console.setLevel(getattr(logging, log_level))
-            console.setFormatter(logging.Formatter(log_format))
+            console.setLevel(getattr(logging, log_config.get('level', 'INFO')))
+            console.setFormatter(logging.Formatter(log_config.get('format')))
             self.logger.addHandler(console)
-
-        self.logger.info("Logging initialized")
-
-    def _setup_llm_client(self):
-        """Initialize the OpenAI client"""
-        openai_config = self.config.get('openai', {})
-        api_key = openai_config.get('api_key') or os.environ.get('OPENAI_API_KEY')
-        api_base = openai_config.get('api_base')
-        timeout = openai_config.get('timeout', 120)
-
-        if not api_key:
-            raise ValueError("OpenAI API key is required. Set it in config or OPENAI_API_KEY env var.")
-
-        # Create OpenAI client with configuration
-        client_kwargs = {
-            'api_key': api_key,
-            'timeout': timeout
-        }
-
-        if api_base:
-            client_kwargs['base_url'] = api_base
-
-        self.llm_client = openai.OpenAI(**client_kwargs)
-        self.logger.info("LLM client initialized")
 
     def _setup_fsm(self):
         """Initialize the Finite State Machine"""
@@ -92,61 +66,185 @@ class Agent:
         self.fsm = setup_default_fsm(config=self.config)
         self.logger.info(f"FSM initialized with state: {self.fsm.current_state}")
 
+    # Action and state management
     def get_current_state(self):
         """Get the current state of the agent"""
-        return self.fsm.current_state
+        return self.fsm.current_state if self.fsm else None
 
     def get_available_actions(self) -> List[str]:
         """Get available actions from the current state"""
-        return self.fsm.get_available_actions()
+        return self.fsm.get_available_actions() if self.fsm else []
 
     def execute_action(self, action_name: str, **kwargs):
         """Execute an action and update the agent's state"""
         self.logger.info(f"Executing action: {action_name}")
-        return self.fsm.execute_action(action_name, self, **kwargs)
+        if self.fsm:
+            return self.fsm.execute_action(action_name, self, **kwargs)
+        else:
+            self.logger.warning("FSM not initialized, cannot execute action")
 
-    def search_repository(self, query: str = '', file_pattern: str = '*.py') -> List[Dict]:
-        """Search the repository for code files"""
-        self.logger.info(f"Searching repository for: {query} with pattern: {file_pattern}")
-        self.execute_action("search", query=query, file_pattern=file_pattern)
-        return self.context.get('search_results', [])
+    # LLM configuration management
+    def get_action_llm_config(self, action_name: str) -> Dict:
+        """
+        Get LLM configuration for a specific action, with action-specific overrides.
 
-    def analyze_code(self, prompt: str = None) -> List[Dict]:
-        """Analyze code files using LLM"""
-        from agent_fsm import AgentState
+        Args:
+            action_name: Name of the action
 
-        # Get prompt from config if not provided
-        custom_prompt = prompt or self.config.get('prompts', {}).get('analyze')
-        if not custom_prompt:
-            # Fall back to default prompt in analyze action config
-            custom_prompt = self.config.get('actions', {}).get('analyze', {}).get(
-                'default_prompt', "Analyze the following code:"
-            )
+        Returns:
+            Dict: OpenAI-compatible configuration with action-specific overrides
+        """
+        # Check cache first
+        if action_name in self._action_configs_cache:
+            return self._action_configs_cache[action_name].copy()
 
-        self.logger.info("Analyzing code")
-        self.execute_action("analyze", prompt=custom_prompt)
-        return self.context.get('analysis_results', [])
+        # Get merged LLM config for this action
+        action_llm_config = get_action_llm_config(self.config, action_name)
 
-    def update_file(self, file_path: str, instructions: str, preview_only: bool = False) -> Dict:
-        """Update a code file using LLM based on instructions"""
-        self.logger.info(f"Updating file: {file_path}")
-        self.execute_action("update", file_path=file_path, instructions=instructions, preview_only=preview_only)
-        return self.context.get('update_result', {})
+        # Convert to OpenAI-compatible format by removing None values
+        openai_config = {k: v for k, v in action_llm_config.items() if v is not None}
 
-    def load_file(self, file_path: str) -> Dict:
-        """Load a file's content"""
-        self.logger.info(f"Loading file: {file_path}")
-        self.execute_action("load_file", file_path=file_path)
-        return self.context.get('loaded_file', {})
+        # Rename api_base to base_url for OpenAI compatibility
+        if 'api_base' in openai_config:
+            openai_config['base_url'] = openai_config.pop('api_base')
 
-    def save_file(self, file_path: str, content: str) -> Dict:
-        """Save content to a file"""
-        self.logger.info(f"Saving file: {file_path}")
-        self.execute_action("save_file", file_path=file_path, content=content)
-        return self.context.get('save_result', {})
+        # Cache the result
+        self._action_configs_cache[action_name] = openai_config
 
-    def save_config(self, config_path: str) -> None:
-        """Save the current configuration to a YAML file"""
-        with open(config_path, 'w') as f:
-            yaml.dump(self.config, f, default_flow_style=False)
-        self.logger.info(f"Configuration saved to {config_path}")
+        return openai_config.copy()
+
+    # Chat completion methods
+    def chat_completion(self, prompt: str, system_message: str = None,
+                       action_type: str = None, override_config: Dict = None,
+                       response_format: Dict = None, extra_body: Dict = None) -> str:
+        """
+        Direct access to chat completion with configuration options
+
+        Args:
+            prompt: The user prompt
+            system_message: Optional system message
+            action_type: Use action-specific config
+            override_config: Dictionary to override any config parameters
+            response_format: Optional response format (e.g., {"type": "json_object"})
+            extra_body: Additional parameters to pass to the API
+
+        Returns:
+            The response content as string
+        """
+        # Get action-specific config if requested
+        config = {}
+        if action_type:
+            config = self.get_action_llm_config(action_type)
+
+            # Use action-specific system message if not provided
+            if system_message is None:
+                action_llm_config = get_action_llm_config(self.config, action_type)
+                system_message = action_llm_config.get('system_message')
+
+        # Merge with any overrides
+        if override_config:
+            config.update(override_config)
+
+        return self.openai_handler.chat_completion(
+            prompt=prompt,
+            system_message=system_message,
+            override_config=config,
+            response_format=response_format,
+            extra_body=extra_body
+        )
+
+    def execute_action_with_llm(self, action_name: str, prompt: str,
+                               system_message: str = None, **kwargs):
+        """
+        Execute a chat completion using action-specific LLM configuration.
+
+        Args:
+            action_name: The action whose LLM config to use
+            prompt: The user prompt
+            system_message: Optional system message
+            **kwargs: Additional arguments passed to chat_completion
+
+        Returns:
+            The response content as string
+        """
+        return self.chat_completion(
+            prompt=prompt,
+            system_message=system_message,
+            action_type=action_name,
+            **kwargs
+        )
+
+    # Utility methods
+    def parse_json_response(self, response: str) -> Dict:
+        """Parse JSON response using the handler"""
+        return self.openai_handler.parse_json_response(response)
+
+    def update_openai_config(self, config_updates: Dict):
+        """Update OpenAI handler configuration"""
+        self.openai_handler.update_config(config_updates)
+        self.config['llm'].update(config_updates)
+        self._action_configs_cache.clear()
+
+    def update_action_llm_config(self, action_name: str, config_updates: Dict):
+        """
+        Update LLM configuration for a specific action.
+
+        Args:
+            action_name: Name of the action
+            config_updates: Dictionary of config parameters to update
+        """
+        # Ensure the action config structure exists
+        if 'actions' not in self.config:
+            self.config['actions'] = {}
+        if action_name not in self.config['actions']:
+            self.config['actions'][action_name] = {}
+        if 'llm' not in self.config['actions'][action_name]:
+            self.config['actions'][action_name]['llm'] = {}
+
+        # Update the action's LLM config
+        self.config['actions'][action_name]['llm'].update(config_updates)
+
+        # Clear the cache for this action
+        if action_name in self._action_configs_cache:
+            del self._action_configs_cache[action_name]
+
+    def set_action_llm_config(self, action_name: str, config: Dict):
+        """
+        Set the entire LLM configuration for a specific action.
+        Temporarily updates the OpenAI handler's config for this action.
+
+        Args:
+            action_name: Name of the action
+            config: Complete LLM configuration dictionary
+        """
+        # Get action-specific config
+        action_config = self.get_action_llm_config(action_name)
+
+        # Temporarily update the OpenAI handler's config
+        original_config = self.openai_handler.get_config()
+
+        # Merge and apply action config
+        merged_config = original_config.copy()
+        merged_config.update(action_config)
+        self.openai_handler.update_config(merged_config)
+
+        # Store original config to restore later if needed
+        return original_config
+
+    def restore_base_llm_config(self):
+        """Restore the base LLM configuration to the OpenAI handler"""
+        self.openai_handler.update_config(self.config.get('llm', {}))
+
+    def get_openai_config(self) -> Dict:
+        """Get current OpenAI handler configuration"""
+        return self.openai_handler.get_config()
+
+    def print_usage_summary(self):
+        """Print usage summary - placeholder for compatibility"""
+        self.logger.info("Usage tracking not implemented in OpenAI Handler")
+
+    # Repository management
+    @property
+    def repo_dir(self) -> str:
+        """Get repository directory from config"""
+        return self.config.get('repository', {}).get('path', os.getcwd())

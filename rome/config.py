@@ -4,21 +4,30 @@ import os
 
 # Define the default configuration structure as a dictionary
 DEFAULT_CONFIG = {
-    # OpenAI API configuration
-    "openai": {
+    # LLM settings - includes all OpenAI API configuration
+    "llm": {
+        # OpenAI API configuration
         "api_key": None,  # Set to None, will use environment variable if not provided
         "api_base": "https://api.openai.com/v1",
-        "timeout": 120
-    },
+        "api_type": None,  # "openai" (default) or "azure" or other supported providers
+        "api_version": None,  # Required for Azure OpenAI
+        "timeout": 120,
+        "use_cache": False,
 
-    # LLM settings
-    "llm": {
+        # General LLM parameters
         "model": "gpt-4",
         "temperature": 0.2,
         "max_tokens": 4000,
         "top_p": 1.0,
         "frequency_penalty": 0.0,
-        "presence_penalty": 0.0
+        "presence_penalty": 0.0,
+
+        # Caching settings
+        "cache_enabled": False,
+        "cache_seed": 42,
+
+        # System message for chat completions
+        "system_message": "You are a helpful code assistant specializing in code analysis and improvement."
     },
 
     # Repository settings
@@ -56,43 +65,16 @@ DEFAULT_CONFIG = {
             "max_files": 100,
             "include_content": True,
             "depth": 3,
-            "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"]
-        },
-        "analyze": {
-            "default_prompt": "Analyze the following code and provide a summary of its functionality, potential issues, and improvement suggestions:",
-            "model": "gpt-4",
-            "temperature": 0.2,
-            "max_tokens": 2000,
-            "use_context": True
-        },
-        "update": {
-            "create_backup": True,
-            "model": "gpt-4",
-            "temperature": 0.1,
-            "max_tokens": 4000,
-            "preview_changes": True,
-            "update_prompt_template": """
-            You are tasked with updating the following {file_type} code according to these instructions:
-
-            INSTRUCTIONS:
-            {instructions}
-
-            ORIGINAL CODE:
-            ```
-            {original_content}
-            ```
-
-            Please provide ONLY the updated code without any explanations or markdown formatting.
-            """
+            "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"],
+            # Example LLM override for search action
+            "llm": {
+                "model": "gpt-3.5-turbo",
+                "temperature": 0.1,
+                "max_tokens": 1000,
+                "system_message": "You are a search assistant that helps find and analyze code files."
+            }
         }
     },
-
-    # Customization options
-    "prompts": {
-        "analyze": None,  # If None, default_prompt from actions.analyze will be used
-        "update": None,   # If None, update_prompt_template from actions.update will be used
-        "system_message": "You are a helpful code assistant specializing in code analysis and improvement."
-    }
 }
 
 def generate_default_config(output_path="config.yaml"):
@@ -117,11 +99,9 @@ def load_config(config_path="config.yaml", create_if_missing=True):
 
 def merge_with_default_config(custom_config):
     """Merge a custom config with the default config"""
-    # Create a deep copy of the default config
     import copy
     merged_config = copy.deepcopy(DEFAULT_CONFIG)
 
-    # Recursive function to update nested dictionaries
     def update_dict(d, u):
         for k, v in u.items():
             if isinstance(v, dict) and k in d and isinstance(d[k], dict):
@@ -130,9 +110,33 @@ def merge_with_default_config(custom_config):
                 d[k] = v
         return d
 
-    # Update the default config with custom values
-    merged_config = update_dict(merged_config, custom_config)
-    return merged_config
+    return update_dict(merged_config, custom_config)
+
+def get_action_llm_config(config, action_name):
+    """
+    Get the LLM configuration for a specific action, merging with the main LLM config.
+
+    Args:
+        config: The full configuration dictionary
+        action_name: Name of the action (e.g., 'search')
+
+    Returns:
+        Dict: LLM configuration with action-specific overrides applied
+    """
+    import copy
+
+    # Start with the main LLM config
+    base_llm_config = copy.deepcopy(config.get('llm', {}))
+
+    # Get action-specific config
+    action_config = config.get('actions', {}).get(action_name, {})
+    action_llm_config = action_config.get('llm', {})
+
+    # Merge action-specific LLM config over the base config
+    if action_llm_config:
+        base_llm_config.update(action_llm_config)
+
+    return base_llm_config
 
 if __name__ == "__main__":
     # Generate default config if script is run directly
