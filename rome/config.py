@@ -1,4 +1,4 @@
-# default_config.py
+# config.py
 import yaml
 import os
 

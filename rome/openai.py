@@ -1,26 +1,11 @@
 import openai
 import json
 import logging
+import os
 from typing import Dict, List, Any, Optional
 
 class OpenAIHandler:
     """Handler class for OpenAI API interactions with configuration dictionary"""
-
-    # Default configuration
-    DEFAULT_CONFIG = {
-        "api_key": None,
-        "model": "gpt-4o",
-        "temperature": 0.1,
-        "max_tokens": 4000,
-        "top_p": 1.0,
-        "seed": None,
-        "frequency_penalty": 0.0,
-        "presence_penalty": 0.0,
-        "timeout": 60,
-        "base_url": None,
-        "api_version": None,
-        "api_type": None
-    }
 
     def __init__(self, config: Dict = None):
         """
@@ -29,36 +14,26 @@ class OpenAIHandler:
         Args:
             config: Configuration dictionary containing OpenAI parameters
         """
-        # Merge provided config with defaults
-        self.config = self._merge_config(config or {})
+        # Use provided config or empty dict (defaults will come from config.py)
+        self.config = config or {}
+
+        # Get API key from config or environment
+        api_key = self.config.get("api_key") or os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OpenAI API key not found in config or environment variables")
 
         # Setup OpenAI client
         client_kwargs = {
-            "api_key": self.config["api_key"],
-            "timeout": self.config["timeout"]
+            "api_key": api_key,
+            "timeout": self.config.get("timeout", 60)
         }
 
         # Add optional parameters if provided
-        if self.config["base_url"]:
+        if self.config.get("base_url"):
             client_kwargs["base_url"] = self.config["base_url"]
 
         self.client = openai.OpenAI(**client_kwargs)
         self.logger = logging.getLogger(__name__)
-
-        # Extract commonly used parameters
-        self.model = self.config["model"]
-        self.temperature = self.config["temperature"]
-        self.max_tokens = self.config["max_tokens"]
-        self.top_p = self.config["top_p"]
-        self.seed = self.config["seed"]
-        self.frequency_penalty = self.config["frequency_penalty"]
-        self.presence_penalty = self.config["presence_penalty"]
-
-    def _merge_config(self, config: Dict) -> Dict:
-        """Merge provided config with default config"""
-        merged = self.DEFAULT_CONFIG.copy()
-        merged.update(config)
-        return merged
 
     def chat_completion(self, prompt: str, system_message: str = None,
                        override_config: Dict = None, response_format: Dict = None,
@@ -82,24 +57,24 @@ class OpenAIHandler:
                 messages.append({"role": "system", "content": system_message})
             messages.append({"role": "user", "content": prompt})
 
-            # Merge configs: default -> override
+            # Merge configs: current -> override
             effective_config = self.config.copy()
             if override_config:
                 effective_config.update(override_config)
 
-            # Build API parameters
+            # Build API parameters with safe defaults
             kwargs = {
-                "model": effective_config["model"],
+                "model": effective_config.get("model", "gpt-4o"),
                 "messages": messages,
-                "temperature": effective_config["temperature"],
-                "max_tokens": effective_config["max_tokens"],
-                "top_p": effective_config["top_p"],
-                "frequency_penalty": effective_config["frequency_penalty"],
-                "presence_penalty": effective_config["presence_penalty"],
+                "temperature": effective_config.get("temperature", 0.1),
+                "max_tokens": effective_config.get("max_tokens", 4000),
+                "top_p": effective_config.get("top_p", 1.0),
+                "frequency_penalty": effective_config.get("frequency_penalty", 0.0),
+                "presence_penalty": effective_config.get("presence_penalty", 0.0),
             }
 
             # Add seed if provided
-            if effective_config["seed"] is not None:
+            if effective_config.get("seed") is not None:
                 kwargs["seed"] = effective_config["seed"]
 
             # Add response format if provided
@@ -148,20 +123,10 @@ class OpenAIHandler:
         """
         self.config.update(config_updates)
 
-        # Update commonly accessed parameters
-        self.model = self.config["model"]
-        self.temperature = self.config["temperature"]
-        self.max_tokens = self.config["max_tokens"]
-        self.top_p = self.config["top_p"]
-        self.seed = self.config["seed"]
-        self.frequency_penalty = self.config["frequency_penalty"]
-        self.presence_penalty = self.config["presence_penalty"]
-
     def get_config(self) -> Dict:
         """Get current configuration"""
         return self.config.copy()
 
-    def reset_to_defaults(self):
-        """Reset configuration to defaults"""
-        self.config = self.DEFAULT_CONFIG.copy()
-        self.update_config({})  # Trigger parameter updates
+    def reset_config(self, new_config: Dict):
+        """Reset configuration to new config"""
+        self.config = new_config.copy()

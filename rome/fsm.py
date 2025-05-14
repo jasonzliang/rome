@@ -1,7 +1,9 @@
 import os
 import sys
 from typing import Dict, List, Optional, Callable
-from .action import *
+from .action import Action
+from .action import SearchAction
+from .action import RetryAction
 
 class State:
     """Simple state with entry/exit callbacks"""
@@ -18,7 +20,7 @@ class FSM:
     def __init__(self, initial_state: str = None):
         self.states: Dict[str, State] = {}  # nodes
         self.transitions: Dict[str, Dict[str, str]] = {}  # edges: from_state -> action -> to_state
-        self.actions: Dict[str, Callable] = {}  # action handlers
+        self.actions: Dict[str, Action] = {}  # action handlers
         self.current_state = initial_state
 
     def add_state(self, state_name: str, on_enter: Callable = None, on_exit: Callable = None):
@@ -28,7 +30,7 @@ class FSM:
         if state_name not in self.transitions:
             self.transitions[state_name] = {}
 
-    def add_action(self, from_state: str, to_state: str, action: Action):
+    def add_action(self, from_state: str, to_state: str, action_name: str, action: Action):
         """Add an action (edge) between two states"""
         # Ensure states exist
         if from_state not in self.states:
@@ -41,9 +43,8 @@ class FSM:
             self.transitions[from_state] = {}
         self.transitions[from_state][action_name] = to_state
 
-        # Add action handler if provided
-        if handler:
-            self.actions[action_name] = handler
+        # Add action handler
+        self.actions[action_name] = action
 
     def set_initial_state(self, state_name: str):
         """Set the starting state"""
@@ -69,7 +70,7 @@ class FSM:
         # Execute action if handler exists
         result = None
         if action_name in self.actions:
-            result = self.actions[action_name](agent, **kwargs)
+            result = self.actions[action_name].execute(agent, **kwargs)
 
         # Enter new state
         old_state = self.current_state
@@ -106,21 +107,35 @@ class FSM:
 
 
 # Create and configure FSM
-def create_simple_fsm():
+def create_simple_fsm(config=None):
+    """Create FSM with configuration support"""
     fsm = FSM()
 
     # Add states (nodes)
     fsm.add_state("IDLE", on_enter=None, on_exit=None)
     fsm.add_state("CODELOADED", on_enter=None, on_exit=None)
 
-    # Add actions (edges between states)
-    fsm.add_action("IDLE", "CODELOADED", SearchAction)
-    fsm.add_action("CODELOADED", "IDLE", RetryAction)
+    # Get action configurations from main config
+    search_config = {}
+    retry_config = {}
+
+    if config:
+        search_config = config.get('actions', {}).get('search', {})
+        retry_config = config.get('actions', {}).get('retry', {})
+
+    # Add actions (edges between states) with proper configuration
+    fsm.add_action("IDLE", "CODELOADED", "search", SearchAction(search_config))
+    fsm.add_action("CODELOADED", "IDLE", "retry", RetryAction(retry_config))
 
     # Set initial state
     fsm.set_initial_state("IDLE")
 
     return fsm
+
+
+def setup_default_fsm(config=None):
+    """Setup the default FSM using configuration"""
+    return create_simple_fsm(config)
 
 
 if __name__ == "__main__":

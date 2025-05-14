@@ -5,10 +5,10 @@ import logging
 from typing import Dict, List, Any, Optional
 
 # Import the OpenAIHandler we created
-from openai_handler import OpenAIHandler
-
+from .openai_handler import OpenAIHandler
 # Import default config utilities
-from default_config import load_config, merge_with_default_config, DEFAULT_CONFIG, get_action_llm_config
+from .config import DEFAULT_CONFIG
+from .config import load_config, merge_with_default_config, get_action_llm_config
 
 
 class Agent:
@@ -22,7 +22,7 @@ class Agent:
         elif config_dict:
             self.config = merge_with_default_config(config_dict)
         else:
-            self.config = DEFAULT_CONFIG
+            self.config = DEFAULT_CONFIG.copy()
 
         # Initialize context
         self.context = {}
@@ -39,7 +39,7 @@ class Agent:
         # Cache for action-specific configurations
         self._action_configs_cache = {}
 
-        self.logger.info(f"Agent initialized with model: {llm_config.get('model', 'gpt-4')}")
+        self.logger.info(f"Agent initialized with model: {llm_config.get('model', 'gpt-4o')}")
 
     def _setup_logging(self):
         """Configure logging based on config"""
@@ -101,17 +101,13 @@ class Agent:
         # Get merged LLM config for this action
         action_llm_config = get_action_llm_config(self.config, action_name)
 
-        # Convert to OpenAI-compatible format by removing None values
-        openai_config = {k: v for k, v in action_llm_config.items() if v is not None}
-
-        # Rename api_base to base_url for OpenAI compatibility
-        if 'api_base' in openai_config:
-            openai_config['base_url'] = openai_config.pop('api_base')
+        # Remove None values for cleaner config
+        clean_config = {k: v for k, v in action_llm_config.items() if v is not None}
 
         # Cache the result
-        self._action_configs_cache[action_name] = openai_config
+        self._action_configs_cache[action_name] = clean_config
 
-        return openai_config.copy()
+        return clean_config.copy()
 
     # Chat completion methods
     def chat_completion(self, prompt: str, system_message: str = None,
@@ -207,33 +203,6 @@ class Agent:
         # Clear the cache for this action
         if action_name in self._action_configs_cache:
             del self._action_configs_cache[action_name]
-
-    def set_action_llm_config(self, action_name: str, config: Dict):
-        """
-        Set the entire LLM configuration for a specific action.
-        Temporarily updates the OpenAI handler's config for this action.
-
-        Args:
-            action_name: Name of the action
-            config: Complete LLM configuration dictionary
-        """
-        # Get action-specific config
-        action_config = self.get_action_llm_config(action_name)
-
-        # Temporarily update the OpenAI handler's config
-        original_config = self.openai_handler.get_config()
-
-        # Merge and apply action config
-        merged_config = original_config.copy()
-        merged_config.update(action_config)
-        self.openai_handler.update_config(merged_config)
-
-        # Store original config to restore later if needed
-        return original_config
-
-    def restore_base_llm_config(self):
-        """Restore the base LLM configuration to the OpenAI handler"""
-        self.openai_handler.update_config(self.config.get('llm', {}))
 
     def get_openai_config(self) -> Dict:
         """Get current OpenAI handler configuration"""

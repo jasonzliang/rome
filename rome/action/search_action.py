@@ -3,15 +3,15 @@ import os
 import sys
 import traceback
 from typing import Dict, List, Any, Optional
-from action import Action
+from .action import Action
 
 class SearchAction(Action):
     """Action to search the repository for code files using OpenAI selection"""
 
-    def __init__(self, config: Dict):
+    def __init__(self, config: Dict = None):
         super().__init__(config)
-        # Set default configuration for search action
-        self.max_files = self.config.get('max_files', sys.maxsize)
+        # Set default configuration for search action with proper fallbacks
+        self.max_files = self.config.get('max_files', 100)
         self.file_type = self.config.get('file_type', '.py')
         self.depth = self.config.get('depth', sys.maxsize)
         self.exclude_dirs = self.config.get('exclude_dirs',
@@ -62,7 +62,7 @@ Please respond with a JSON object in the following format:
                 raise ValueError("Agent must have an openai_handler attribute initialized")
 
             # Get the repo root path from agent
-            search_path = os.path.join(agent.repo_dir, '**', self.file_type)
+            search_path = os.path.join(agent.repo_dir, '**/*' + self.file_type)
             # Find all files matching the pattern
             files = glob.glob(search_path, recursive=True)
 
@@ -87,6 +87,11 @@ Please respond with a JSON object in the following format:
             if self.max_files and len(filtered_files) > self.max_files:
                 agent.logger.warning(f"Limited search results to {self.max_files} files")
                 filtered_files = filtered_files[:self.max_files]
+
+            if not filtered_files:
+                agent.logger.warning("No files found matching search criteria")
+                agent.context['selected_file'] = None
+                return
 
             # Process files in batches of K until a file is selected
             current_index = 0
@@ -118,12 +123,19 @@ Please respond with a JSON object in the following format:
                 # Create prompt for OpenAI
                 prompt = self._create_selection_prompt(current_batch)
 
-                # Query OpenAI for file selection using agent's handler
+                # Query OpenAI for file selection using agent's handler with action-specific config
                 system_message = "You are a helpful assistant that analyzes code files and selects the most relevant one based on given criteria."
-                response = agent.openai_handler.chat_completion(prompt, system_message)
+
+                # Use action-specific LLM config if available
+                response = agent.chat_completion(
+                    prompt=prompt,
+                    system_message=system_message,
+                    action_type='search',
+                    response_format={"type": "json_object"}
+                )
 
                 # Parse OpenAI response
-                result = agent.openai_handler.parse_json_response(response)
+                result = agent.parse_json_response(response)
 
                 # Check for parsing errors
                 if "error" in result:
