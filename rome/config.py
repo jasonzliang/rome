@@ -19,12 +19,6 @@ DEFAULT_CONFIG = {
         "temperature": 0.2,
         "max_tokens": 4000,
         "top_p": 1.0,
-        "frequency_penalty": 0.0,
-        "presence_penalty": 0.0,
-
-        # Caching settings
-        "cache_enabled": False,
-        "cache_seed": 42,
 
         # System message for chat completions
         "system_message": "You are a helpful code assistant specializing in code analysis and improvement."
@@ -68,10 +62,10 @@ DEFAULT_CONFIG = {
             "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"],
             # Example LLM override for search action
             "llm": {
-                "model": "gpt-3.5-turbo",
-                "temperature": 0.1,
-                "max_tokens": 1000,
-                "system_message": "You are a search assistant that helps find and analyze code files."
+                # "model": "gpt-3.5-turbo",
+                # "temperature": 0.1,
+                # "max_tokens": 1000,
+                # "system_message": "You are a search assistant that helps find and analyze code files."
             }
         }
     },

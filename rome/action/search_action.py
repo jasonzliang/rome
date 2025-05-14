@@ -8,7 +8,7 @@ from action import Action
 class SearchAction(Action):
     """Action to search the repository for code files using OpenAI selection"""
 
-    def __init__(self, config: Dict = None):
+    def __init__(self, config: Dict):
         super().__init__(config)
         # Set default configuration for search action
         self.max_files = self.config.get('max_files', sys.maxsize)

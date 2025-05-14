@@ -9,9 +9,9 @@ class OpenAIHandler:
     # Default configuration
     DEFAULT_CONFIG = {
         "api_key": None,
-        "model": "gpt-3.5-turbo",
+        "model": "gpt-4o",
         "temperature": 0.1,
-        "max_tokens": 2000,
+        "max_tokens": 4000,
         "top_p": 1.0,
         "seed": None,
         "frequency_penalty": 0.0,
