@@ -1,9 +1,10 @@
-# agent_actions.py
+# action.py
 from abc import ABC, abstractmethod
 import glob
 import os
 import sys
 from typing import Dict, List, Any, Optional, Callable
+from .logger import get_logger
 
 
 class Action(ABC):
@@ -12,6 +13,7 @@ class Action(ABC):
     def __init__(self, config: Dict = None):
         """Initialize the action with a configuration dictionary"""
         self.config = config or {}
+        self.logger = get_logger()
 
     @abstractmethod
     def execute(self, agent, **kwargs):

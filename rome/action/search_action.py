@@ -4,12 +4,16 @@ import sys
 import traceback
 from typing import Dict, List, Any, Optional
 from .action import Action
+from .logger import get_logger
+
 
 class SearchAction(Action):
     """Action to search the repository for code files using OpenAI selection"""
 
     def __init__(self, config: Dict = None):
         super().__init__(config)
+        self.logger = get_logger()
+
         # Set default configuration for search action with proper fallbacks
         self.max_files = self.config.get('max_files', 100)
         self.file_type = self.config.get('file_type', '.py')
@@ -57,14 +61,21 @@ Please respond with a JSON object in the following format:
 
     def execute(self, agent, **kwargs):
         try:
+            self.logger.info("Starting SearchAction execution")
+
             # Ensure agent has OpenAI handler
             if not hasattr(agent, 'openai_handler') or agent.openai_handler is None:
-                raise ValueError("Agent must have an openai_handler attribute initialized")
+                error_msg = "Agent must have an openai_handler attribute initialized"
+                self.logger.error(error_msg)
+                raise ValueError(error_msg)
 
             # Get the repo root path from agent
             search_path = os.path.join(agent.repo_dir, '**/*' + self.file_type)
+            self.logger.info(f"Searching for files in: {search_path}")
+
             # Find all files matching the pattern
             files = glob.glob(search_path, recursive=True)
+            self.logger.info(f"Found {len(files)} files before filtering")
 
             # Filter out files from excluded directories
             filtered_files = []
@@ -83,13 +94,15 @@ Please respond with a JSON object in the following format:
                 if not exclude:
                     filtered_files.append(file_path)
 
+            self.logger.info(f"Found {len(filtered_files)} files after filtering")
+
             # Limit the number of files if specified
             if self.max_files and len(filtered_files) > self.max_files:
-                agent.logger.warning(f"Limited search results to {self.max_files} files")
+                self.logger.warning(f"Limited search results to {self.max_files} files")
                 filtered_files = filtered_files[:self.max_files]
 
             if not filtered_files:
-                agent.logger.warning("No files found matching search criteria")
+                self.logger.warning("No files found matching search criteria")
                 agent.context['selected_file'] = None
                 return
 
@@ -102,6 +115,8 @@ Please respond with a JSON object in the following format:
                 batch_end = min(current_index + self.batch_size, len(filtered_files))
                 current_batch_paths = filtered_files[current_index:batch_end]
 
+                self.logger.info(f"Processing batch {current_index//self.batch_size + 1}: files {current_index+1}-{batch_end}")
+
                 # Load content for current batch
                 current_batch = []
                 for file_path in current_batch_paths:
@@ -113,10 +128,11 @@ Please respond with a JSON object in the following format:
                                 'content': content
                             })
                     except Exception as e:
-                        agent.logger.error(f"Error reading file {file_path}: {str(e)}")
+                        self.logger.error(f"Error reading file {file_path}: {str(e)}")
                         continue
 
                 if not current_batch:
+                    self.logger.warning(f"No readable files in batch {current_index//self.batch_size + 1}")
                     current_index = batch_end
                     continue
 
@@ -127,6 +143,7 @@ Please respond with a JSON object in the following format:
                 system_message = "You are a helpful assistant that analyzes code files and selects the most relevant one based on given criteria."
 
                 # Use action-specific LLM config if available
+                self.logger.info("Querying OpenAI for file selection")
                 response = agent.chat_completion(
                     prompt=prompt,
                     system_message=system_message,
@@ -139,7 +156,7 @@ Please respond with a JSON object in the following format:
 
                 # Check for parsing errors
                 if "error" in result:
-                    agent.logger.error(f"Error parsing OpenAI response: {result['error']}")
+                    self.logger.error(f"Error parsing OpenAI response: {result['error']}")
                     current_index = batch_end
                     continue
 
@@ -159,27 +176,29 @@ Please respond with a JSON object in the following format:
                                 'content': file_info['content'],
                                 'reason': reason
                             }
-                            agent.logger.info(f"Selected file: {file_path} - {reason}")
+                            self.logger.info(f"Selected file: {file_path} - {reason}")
                             break
 
                 # If we have a file and shouldn't continue, break
                 if selected_file and not should_continue:
+                    self.logger.info("OpenAI indicated to stop searching")
                     break
 
                 # Move to next batch
                 current_index = batch_end
 
-                agent.logger.info(f"Processed batch {current_index//self.batch_size}: "
+                self.logger.info(f"Processed batch {current_index//self.batch_size}: "
                                 f"{'File selected' if selected_file else 'No file selected'}")
 
             # Add selected file to agent context
             if selected_file:
                 agent.context['selected_file'] = selected_file
-                agent.logger.info(f"Search completed. Selected file: {selected_file['path']}")
+                self.logger.info(f"Search completed. Selected file: {selected_file['path']}")
             else:
                 agent.context['selected_file'] = None
-                agent.logger.warning("Search completed. No file was selected.")
+                self.logger.warning("Search completed. No file was selected.")
 
         except Exception as e:
-            agent.logger.error(f"Search action failed: {str(e)}")
+            self.logger.error(f"Search action failed: {str(e)}")
+            self.logger.error(f"Traceback: {traceback.format_exc()}")
             agent.context['error'] = traceback.format_exc()

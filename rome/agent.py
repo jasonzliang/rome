@@ -1,14 +1,14 @@
 # agent.py
 import os
-import yaml
-import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List
 
 # Import the OpenAIHandler we created
 from .openai_handler import OpenAIHandler
 # Import default config utilities
 from .config import DEFAULT_CONFIG
 from .config import load_config, merge_with_default_config, get_action_llm_config
+# Import singleton logger
+from .logger import get_logger
 
 
 class Agent:
@@ -16,7 +16,7 @@ class Agent:
 
     def __init__(self, config_path: str = None, config_dict: Dict = None):
         """Initialize the Agent with either a config path or a config dictionary"""
-        # Load configuration
+        # Load configuration first
         if config_path:
             self.config = load_config(config_path, create_if_missing=True)
         elif config_dict:
@@ -24,45 +24,36 @@ class Agent:
         else:
             self.config = DEFAULT_CONFIG.copy()
 
+        # Configure logger immediately after loading config
+        self._setup_logging()
+
+        # Now get the configured logger
+        self.logger = get_logger()
+
         # Initialize context
         self.context = {}
 
-        # Set up components
-        self._setup_logging()
+        # Set up FSM
         self._setup_fsm()
 
         # Initialize OpenAI handler with main LLM config
         llm_config = self.config.get('llm', {})
         self.openai_handler = OpenAIHandler(config=llm_config)
-        self.llm_client = self.openai_handler  # Backward compatibility
 
         # Cache for action-specific configurations
         self._action_configs_cache = {}
 
-        self.logger.info(f"Agent initialized with model: {llm_config.get('model', 'gpt-4o')}")
+        self.logger.info(f"Agent initialized with model: {llm_config.get('model', 'gpt-4')}")
 
     def _setup_logging(self):
         """Configure logging based on config"""
         log_config = self.config.get('logging', {})
-        logging.basicConfig(
-            level=getattr(logging, log_config.get('level', 'INFO')),
-            format=log_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s'),
-            filename=log_config.get('file', None),
-            filemode='a' if log_config.get('file') else None
-        )
-
-        self.logger = logging.getLogger('Agent')
-
-        # Add console handler if both file and console output are enabled
-        if log_config.get('console', True) and log_config.get('file'):
-            console = logging.StreamHandler()
-            console.setLevel(getattr(logging, log_config.get('level', 'INFO')))
-            console.setFormatter(logging.Formatter(log_config.get('format')))
-            self.logger.addHandler(console)
+        # Configure the singleton logger with the loaded config
+        get_logger().configure(log_config)
 
     def _setup_fsm(self):
         """Initialize the Finite State Machine"""
-        from agent_fsm import setup_default_fsm
+        from .fsm import setup_default_fsm
         self.fsm = setup_default_fsm(config=self.config)
         self.logger.info(f"FSM initialized with state: {self.fsm.current_state}")
 
@@ -149,37 +140,10 @@ class Agent:
             extra_body=extra_body
         )
 
-    def execute_action_with_llm(self, action_name: str, prompt: str,
-                               system_message: str = None, **kwargs):
-        """
-        Execute a chat completion using action-specific LLM configuration.
-
-        Args:
-            action_name: The action whose LLM config to use
-            prompt: The user prompt
-            system_message: Optional system message
-            **kwargs: Additional arguments passed to chat_completion
-
-        Returns:
-            The response content as string
-        """
-        return self.chat_completion(
-            prompt=prompt,
-            system_message=system_message,
-            action_type=action_name,
-            **kwargs
-        )
-
     # Utility methods
     def parse_json_response(self, response: str) -> Dict:
         """Parse JSON response using the handler"""
         return self.openai_handler.parse_json_response(response)
-
-    def update_openai_config(self, config_updates: Dict):
-        """Update OpenAI handler configuration"""
-        self.openai_handler.update_config(config_updates)
-        self.config['llm'].update(config_updates)
-        self._action_configs_cache.clear()
 
     def update_action_llm_config(self, action_name: str, config_updates: Dict):
         """
@@ -204,13 +168,7 @@ class Agent:
         if action_name in self._action_configs_cache:
             del self._action_configs_cache[action_name]
 
-    def get_openai_config(self) -> Dict:
-        """Get current OpenAI handler configuration"""
-        return self.openai_handler.get_config()
-
-    def print_usage_summary(self):
-        """Print usage summary - placeholder for compatibility"""
-        self.logger.info("Usage tracking not implemented in OpenAI Handler")
+        self.logger.info(f"Updated LLM configuration for action '{action_name}': {config_updates}")
 
     # Repository management
     @property

@@ -1,6 +1,7 @@
 # config.py
 import yaml
 import os
+from .logger import get_logger
 
 # Define the default configuration structure as a dictionary
 DEFAULT_CONFIG = {
@@ -73,27 +74,38 @@ DEFAULT_CONFIG = {
 
 def generate_default_config(output_path="config.yaml"):
     """Generate a default configuration YAML file"""
+    logger = get_logger()
+
     with open(output_path, 'w') as f:
         yaml.dump(DEFAULT_CONFIG, f, default_flow_style=False, sort_keys=False)
+
+    logger.info(f"Default configuration saved to {output_path}")
     print(f"Default configuration saved to {output_path}")
 
 def load_config(config_path="config.yaml", create_if_missing=True):
     """Load configuration from a YAML file, creating it if it doesn't exist"""
+    logger = get_logger()
+
     if os.path.exists(config_path):
+        logger.info(f"Loading configuration from {config_path}")
         with open(config_path, 'r') as f:
             config = yaml.safe_load(f)
         return config
     elif create_if_missing:
+        logger.warning(f"Config file {config_path} not found. Creating default config...")
         print(f"Config file {config_path} not found. Creating default config...")
         generate_default_config(config_path)
         return DEFAULT_CONFIG
     else:
+        logger.error(f"Config file {config_path} not found.")
         print(f"Config file {config_path} not found.")
         return DEFAULT_CONFIG
 
 def merge_with_default_config(custom_config):
     """Merge a custom config with the default config"""
     import copy
+    logger = get_logger()
+
     merged_config = copy.deepcopy(DEFAULT_CONFIG)
 
     def update_dict(d, u):
@@ -104,7 +116,9 @@ def merge_with_default_config(custom_config):
                 d[k] = v
         return d
 
-    return update_dict(merged_config, custom_config)
+    result = update_dict(merged_config, custom_config)
+    logger.debug("Configuration merged with defaults")
+    return result
 
 def get_action_llm_config(config, action_name):
     """
@@ -118,6 +132,7 @@ def get_action_llm_config(config, action_name):
         Dict: LLM configuration with action-specific overrides applied
     """
     import copy
+    logger = get_logger()
 
     # Start with the main LLM config
     base_llm_config = copy.deepcopy(config.get('llm', {}))
@@ -129,6 +144,7 @@ def get_action_llm_config(config, action_name):
     # Merge action-specific LLM config over the base config
     if action_llm_config:
         base_llm_config.update(action_llm_config)
+        logger.debug(f"Merged LLM config for action '{action_name}'")
 
     return base_llm_config
 
