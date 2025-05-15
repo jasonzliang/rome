@@ -1,4 +1,3 @@
-# action.py
 from abc import ABC, abstractmethod
 import glob
 import os

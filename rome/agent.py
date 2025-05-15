@@ -1,4 +1,3 @@
-# agent.py
 import os
 from typing import Dict, List
 
@@ -14,8 +13,10 @@ from .logger import get_logger
 class Agent:
     """Agent class using OpenAI API, YAML config, and FSM architecture"""
 
-    def __init__(self, config_path: str = None, config_dict: Dict = None):
+    def __init__(self, role: str, config_path: str = None, config_dict: Dict = None):
         """Initialize the Agent with either a config path or a config dictionary"""
+        self.role = role
+
         # Load configuration first
         if config_path:
             self.config = load_config(config_path, create_if_missing=True)
@@ -123,10 +124,9 @@ class Agent:
         if action_type:
             config = self.get_action_llm_config(action_type)
 
-            # Use action-specific system message if not provided
-            if system_message is None:
-                action_llm_config = get_action_llm_config(self.config, action_type)
-                system_message = action_llm_config.get('system_message')
+        # Use action-specific system message if not provided
+        if system_message is None:
+            system_message = self.role
 
         # Merge with any overrides
         if override_config:
@@ -144,6 +144,10 @@ class Agent:
     def parse_json_response(self, response: str) -> Dict:
         """Parse JSON response using the handler"""
         return self.openai_handler.parse_json_response(response)
+
+    def parse_python_response(self, response: str) -> Dict:
+        """Parse JSON response using the handler"""
+        return self.openai_handler.parse_python_response(response)
 
     def update_action_llm_config(self, action_name: str, config_updates: Dict):
         """

@@ -43,7 +43,7 @@ Please analyze the following files and select the most relevant one:
             prompt += file_info['content'] + "\n"
 
         prompt += """
-Please respond with a JSON object in the following format:
+Please respond with a single JSON object in the following format:
 {
     "selected_file": {
         "file_number": 1,

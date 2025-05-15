@@ -23,9 +23,9 @@ class OpenAIHandler:
         self.logger = get_logger()
 
         # Get API key from config or environment
-        api_key = self.config.get("api_key") or os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
-            error_msg = "OpenAI API key not found in config or environment variables"
+            error_msg = "OpenAI API key not found in environment"
             self.logger.error(error_msg)
             raise ValueError(error_msg)
 
@@ -118,30 +118,93 @@ class OpenAIHandler:
             self.logger.error(f"Unexpected error in chat completion: {str(e)}")
             raise
 
-    def parse_json_response(self, response: str) -> Dict:
+    def parse_python_response(response: str) -> Optional[str]:
         """
-        Parse JSON response, handling code blocks
+        Extract the first Python code block from a response.
 
         Args:
-            response: Raw response string
+            response (str): The response text containing code blocks
 
         Returns:
-            Parsed JSON dictionary
+            Optional[str]: The first Python code block found, or None if no code found
         """
-        try:
-            # Clean up response if it contains code blocks
-            if response.startswith('```json'):
-                response = response[7:-3]
-            elif response.startswith('```'):
-                response = response[3:-3]
+        # Pattern to match Python code blocks
+        # Matches both ```python and ``` followed by python keywords
+        python_pattern = r'```(?:python)?\n(.*?)```'
 
-            parsed = json.loads(response)
-            return parsed
+        # Find all matches
+        matches = re.findall(python_pattern, response, re.DOTALL)
 
-        except json.JSONDecodeError as e:
-            error_msg = f"Failed to parse JSON: {str(e)}"
-            self.logger.error(error_msg)
-            return {"error": error_msg}
+        # Clean up the code blocks by stripping leading/trailing whitespace
+        python_blocks = [match.strip() for match in matches]
+
+        # Filter to find the first block that looks like Python code
+        for block in python_blocks:
+            if block:  # If there's any content, return it
+                # Simple validation - check for common Python patterns
+                if (any(keyword in block for keyword in ['def ', 'import ', 'from ', 'class ', 'if ', 'for ', 'while '])
+                    or '=' in block or 'print(' in block):
+                    return block
+                # If no specific markers found but has content, still return it
+                elif block.strip():
+                    return block
+
+        return None
+
+
+    def parse_json_response(response: str) -> Optional[Dict[Any, Any]]:
+        """
+        Extract and parse the first JSON object from a response.
+
+        Args:
+            response (str): The response text containing JSON blocks
+
+        Returns:
+            Optional[Dict[Any, Any]]: The first valid JSON object found, or None if no valid JSON found
+        """
+        # Pattern to match JSON code blocks
+        json_pattern = r'```(?:json)?\n(\{.*?\}|\[.*?\])```'
+
+        # Find all matches in code blocks first
+        matches = re.findall(json_pattern, response, re.DOTALL)
+
+        # Try to parse JSON from code blocks first
+        for match in matches:
+            try:
+                cleaned_match = match.strip()
+                parsed_json = json.loads(cleaned_match)
+                # Return only if it's a dictionary, skip arrays unless needed
+                if isinstance(parsed_json, dict):
+                    return parsed_json
+            except json.JSONDecodeError:
+                continue
+
+        # If no valid JSON in code blocks, try inline JSON
+        # Look for JSON-like structures outside of code blocks
+        inline_json_pattern = r'\{[^{}]*\}'
+        inline_matches = re.findall(inline_json_pattern, response)
+
+        for match in inline_matches:
+            try:
+                parsed_json = json.loads(match)
+                if isinstance(parsed_json, dict):
+                    return parsed_json
+            except json.JSONDecodeError:
+                continue
+
+        # If we found array-type JSON in code blocks but no dict, return the first array as dict
+        # This handles edge cases where the JSON might be an array
+        for match in re.findall(json_pattern, response, re.DOTALL):
+            try:
+                parsed_json = json.loads(match.strip())
+                # If it's an array of objects, return the first object
+                if isinstance(parsed_json, list) and parsed_json and isinstance(parsed_json[0], dict):
+                    return parsed_json[0]
+            except (json.JSONDecodeError, IndexError):
+                continue
+
+        return None
+
 
     def update_config(self, config_updates: Dict):
         """

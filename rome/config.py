@@ -8,7 +8,6 @@ DEFAULT_CONFIG = {
     # LLM settings - includes all OpenAI API configuration
     "llm": {
         # OpenAI API configuration
-        "api_key": None,  # Set to None, will use environment variable if not provided
         "api_base": "https://api.openai.com/v1",
         "api_type": None,  # "openai" (default) or "azure" or other supported providers
         "api_version": None,  # Required for Azure OpenAI
