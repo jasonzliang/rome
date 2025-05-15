@@ -2,98 +2,15 @@ from abc import ABC, abstractmethod
 import os
 import sys
 from typing import Dict, List, Optional, Callable
+
 from .action import Action
 from .action import SearchAction
 from .action import RetryAction
+from .state import state
+from .state import IdleState
+from .state import CodeLoadedState
+
 from .logger import get_logger
-
-
-class State(ABC):
-    """Abstract state"""
-    def __init__(self, name: str, required_context: list = None):
-        self.name = name
-        self.required_context = required_context or []
-        self.logger = get_logger()
-
-    @abstractmethod
-    def check_context(self, agent, **kwargs) -> bool:
-        """Return true if agent context has required values"""
-        pass
-
-    @abstractmethod
-    def get_state_prompt(self, agent) -> str:
-        """Returns prompt for state that is passed into llm when action is taken"""
-        pass
-
-
-class IdleState(State):
-    """Initial state where the agent waits for commands"""
-
-    def __init__(self):
-        super().__init__("IDLE", required_context=[])
-
-    def check_context(self, agent, **kwargs) -> bool:
-        """In idle state, clear any previous context and always return True"""
-        # Clear any previous context when entering idle state
-        agent.context.clear()
-        self.logger.info("Agent is now idle and ready for new tasks")
-        return True
-
-    def get_state_prompt(self, agent) -> str:
-        """Prompt for idle state"""
-        return """You are in an idle state, ready to begin code analysis.
-You can search for files in the repository to start analyzing code.
-Available actions: search"""
-
-
-class CodeLoadedState(State):
-    """State where code has been loaded and is ready for analysis"""
-
-    def __init__(self):
-        super().__init__("CODELOADED", required_context=["selected_file"])
-
-    def check_context(self, agent, **kwargs) -> bool:
-        """Check if we have a selected file in context"""
-        selected_file = agent.context.get('selected_file')
-        if not selected_file:
-            self.logger.warning("No file selected in context")
-            return False
-
-        # Validate that the selected file has required fields
-        required_fields = ['path', 'content']
-        for field in required_fields:
-            if field not in selected_file:
-                self.logger.warning(f"Selected file missing required field: {field}")
-                return False
-
-        # Log successful entry
-        file_path = selected_file.get('path', 'Unknown file')
-        self.logger.info(f"Code loaded successfully: {file_path}")
-
-        # Optional: Log file statistics
-        content = selected_file.get('content', '')
-        if content:
-            lines = len(content.split('\n'))
-            chars = len(content)
-            self.logger.info(f"File stats - Lines: {lines}, Characters: {chars}")
-
-        return True
-
-    def get_state_prompt(self, agent) -> str:
-        """Prompt for code loaded state"""
-        selected_file = agent.context.get('selected_file', {})
-        file_path = selected_file.get('path', 'Unknown')
-
-        return f"""Code has been loaded from: {file_path}
-
-You can now analyze the loaded code or search for different files.
-Available actions: retry (to load different code)
-
-Current file summary:
-- Path: {file_path}
-- Content available for analysis
-- Selection reason: {selected_file.get('reason', 'Not provided')}"""
-
 
 class FSM:
     """Finite State Machine as a directed graph"""
@@ -111,7 +28,7 @@ class FSM:
         # Initialize empty transitions for this state
         if state_name not in self.transitions:
             self.transitions[state_name] = {}
-        self.logger.debug(f"Added state: {state_name}")
+        self.logger.debug(f"Added state: {state_name} with actions: {state.actions}")
 
     def add_action(self, from_state: str, to_state: str, action_name: str, action: Action):
         """Add an action (edge) between two states"""
@@ -129,6 +46,11 @@ class FSM:
         # Add action handler
         self.actions[action_name] = action
 
+        # Update the state's actions list if not already present
+        if action_name not in self.states[from_state].actions:
+            self.states[from_state].actions.append(action_name)
+            self.logger.debug(f"Added action '{action_name}' to state '{from_state}' actions list")
+
         self.logger.debug(f"Added action: {from_state} --[{action_name}]--> {to_state}")
 
     def set_initial_state(self, state_name: str):
@@ -141,6 +63,11 @@ class FSM:
     def execute_action(self, action_name: str, agent, **kwargs):
         """Execute an action and transition to new state"""
         # Check if action is valid from current state
+        if action_name not in self.actions:
+            error_msg = f"Action '{action_name}' does not exist in FSM"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+
         if self.current_state not in self.transitions:
             error_msg = f"No transitions defined from state '{self.current_state}'"
             self.logger.error(error_msg)
@@ -154,26 +81,14 @@ class FSM:
 
         # Get the target state
         next_state = self.transitions[self.current_state][action_name]
-
         # Execute action if handler exists
-        result = None
-        if action_name in self.actions:
-            self.logger.info(f"Executing action: {action_name}")
-            try:
-                result = self.actions[action_name].execute(agent, **kwargs)
-            except Exception as e:
-                self.logger.error(f"Action execution failed: {str(e)}")
-                # Stay in current state if action fails
-                return None
+        self.logger.info(f"Executing action: {action_name}")
+        result = self.actions[action_name].execute(agent, **kwargs)
 
         # Check if context is valid for target state using check_context
         target_state_obj = self.states[next_state]
         self.logger.debug(f"Checking context for state transition to '{next_state}'")
-
-        if not target_state_obj.check_context(agent, **kwargs):
-            self.logger.warning(f"Context validation failed for state '{next_state}'. Staying in '{self.current_state}'")
-            # Stay in current state if context validation fails
-            return result
+        target_state_obj.check_context(agent, **kwargs)
 
         # Transition to new state
         old_state = self.current_state
@@ -192,7 +107,14 @@ class FSM:
 
     def get_available_actions(self) -> List[str]:
         """Get actions available from current state"""
-        actions = list(self.transitions.get(self.current_state, {}).keys())
+        # Now we can get actions from either the state object or the transitions
+        if self.current_state and self.current_state in self.states:
+            # Use the state's actions list for consistency
+            actions = self.states[self.current_state].get_available_actions()
+        else:
+            # Fallback to transitions if state not found
+            actions = list(self.transitions.get(self.current_state, {}).keys())
+
         self.logger.debug(f"Available actions from {self.current_state}: {actions}")
         return actions
 
@@ -207,8 +129,13 @@ class FSM:
         graph = {
             "states": list(self.states.keys()),
             "current_state": self.current_state,
-            "transitions": []
+            "transitions": [],
+            "state_actions": {}  # Add state actions mapping
         }
+
+        # Add state actions mapping
+        for state_name, state_obj in self.states.items():
+            graph["state_actions"][state_name] = state_obj.get_available_actions()
 
         for from_state, actions in self.transitions.items():
             for action, to_state in actions.items():
@@ -238,6 +165,21 @@ class FSM:
                 if action not in self.actions:
                     issues.append(f"Action '{action}' referenced but not defined")
 
+        # Validate state actions consistency with transitions
+        for state_name, state_obj in self.states.items():
+            state_actions = set(state_obj.get_available_actions())
+            transition_actions = set(self.transitions.get(state_name, {}).keys())
+
+            # Check if state has actions not in transitions
+            extra_actions = state_actions - transition_actions
+            if extra_actions:
+                issues.append(f"State '{state_name}' has actions not in transitions: {extra_actions}")
+
+            # Check if transitions have actions not in state
+            missing_actions = transition_actions - state_actions
+            if missing_actions:
+                issues.append(f"State '{state_name}' missing actions from transitions: {missing_actions}")
+
         # Check for unreachable states
         reachable = {self.current_state} if self.current_state else set()
         changed = True
@@ -255,7 +197,7 @@ class FSM:
 
         if issues:
             for issue in issues:
-                self.logger.warning(f"FSM validation issue: {issue}")
+                self.logger.info(f"FSM validation issue: {issue}")
             return False
 
         self.logger.info("FSM validation passed")
