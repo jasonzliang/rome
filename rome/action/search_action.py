@@ -15,7 +15,7 @@ class SearchAction(Action):
         self.logger = get_logger()
 
         # Set default configuration for search action with proper fallbacks
-        self.max_files = self.config.get('max_files', 100)
+        self.max_files = self.config.get('max_files', sys.maxsize)
         self.file_type = self.config.get('file_type', '.py')
         self.depth = self.config.get('depth', sys.maxsize)
         self.exclude_dirs = self.config.get('exclude_dirs',
@@ -119,16 +119,13 @@ Please respond with a single JSON object in the following format:
             # Load content for current batch
             current_batch = []
             for file_path in current_batch_paths:
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-                        current_batch.append({
-                            'path': file_path,
-                            'content': content
-                        })
-                except Exception as e:
-                    self.logger.error(f"Error reading file {file_path}: {str(e)}")
-                    continue
+                # Try to read file, skip if there are issues
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    current_batch.append({
+                        'path': file_path,
+                        'content': content
+                    })
 
             if not current_batch:
                 self.logger.info(f"No readable files in batch {current_index//self.batch_size + 1}")
@@ -138,14 +135,11 @@ Please respond with a single JSON object in the following format:
             # Create prompt for OpenAI
             prompt = self._create_selection_prompt(current_batch)
 
-            # Query OpenAI for file selection using agent's handler with action-specific config
-            system_message = "You are a helpful assistant that analyzes code files and selects the most relevant one based on given criteria."
-
             # Use action-specific LLM config if available
             self.logger.info("Querying OpenAI for file selection")
             response = agent.chat_completion(
                 prompt=prompt,
-                system_message=system_message,
+                system_message=agent.role,
                 action_type='search',
                 response_format={"type": "json_object"}
             )
@@ -180,7 +174,7 @@ Please respond with a single JSON object in the following format:
 
             # If we have a file and shouldn't continue, break
             if selected_file and not should_continue:
-                self.logger.info("OpenAI indicated to stop searching")
+                self.logger.info(f"Agent {agent.name} indicated to stop searching")
                 break
 
             # Move to next batch
@@ -195,4 +189,4 @@ Please respond with a single JSON object in the following format:
             self.logger.info(f"Search completed. Selected file: {selected_file['path']}")
         else:
             agent.context['selected_file'] = None
-            self.logger.warning("Search completed. No file was selected.")
+            self.logger.info("Search completed. No file was selected.")

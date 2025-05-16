@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Callable
 from .action import Action
 from .action import SearchAction
 from .action import RetryAction
-from .state import state
+from .state import State
 from .state import IdleState
 from .state import CodeLoadedState
 
@@ -15,11 +15,11 @@ from .logger import get_logger
 class FSM:
     """Finite State Machine as a directed graph"""
 
-    def __init__(self, initial_state: str = None):
+    def __init__(self, config: Dict = None):
+        self.config = config or {}
         self.states: Dict[str, State] = {}  # nodes
         self.transitions: Dict[str, Dict[str, str]] = {}  # edges: from_state -> action -> to_state
         self.actions: Dict[str, Action] = {}  # action handlers
-        self.current_state = initial_state
         self.logger = get_logger()
 
     def add_state(self, state_name: str, state: State):
@@ -28,7 +28,7 @@ class FSM:
         # Initialize empty transitions for this state
         if state_name not in self.transitions:
             self.transitions[state_name] = {}
-        self.logger.debug(f"Added state: {state_name} with actions: {state.actions}")
+        self.logger.info(f"Added state: {state_name} with actions: {state.actions}")
 
     def add_action(self, from_state: str, to_state: str, action_name: str, action: Action):
         """Add an action (edge) between two states"""
@@ -49,9 +49,9 @@ class FSM:
         # Update the state's actions list if not already present
         if action_name not in self.states[from_state].actions:
             self.states[from_state].actions.append(action_name)
-            self.logger.debug(f"Added action '{action_name}' to state '{from_state}' actions list")
+            self.logger.info(f"Added action '{action_name}' to state '{from_state}' actions list")
 
-        self.logger.debug(f"Added action: {from_state} --[{action_name}]--> {to_state}")
+        self.logger.info(f"Added action: {from_state} --[{action_name}]--> {to_state}")
 
     def set_initial_state(self, state_name: str):
         """Set the starting state"""
@@ -87,7 +87,7 @@ class FSM:
 
         # Check if context is valid for target state using check_context
         target_state_obj = self.states[next_state]
-        self.logger.debug(f"Checking context for state transition to '{next_state}'")
+        self.logger.info(f"Checking context for state transition to '{next_state}'")
         target_state_obj.check_context(agent, **kwargs)
 
         # Transition to new state
@@ -115,7 +115,7 @@ class FSM:
             # Fallback to transitions if state not found
             actions = list(self.transitions.get(self.current_state, {}).keys())
 
-        self.logger.debug(f"Available actions from {self.current_state}: {actions}")
+        self.logger.info(f"Available actions from {self.current_state}: {actions}")
         return actions
 
     def _get_state_prompt(self, agent) -> str:
@@ -222,7 +222,7 @@ Choose the most appropriate action based on the current state and context."""
 
         if issues:
             for issue in issues:
-                self.logger.info(f"FSM validation issue: {issue}")
+                self.logger.error(f"FSM validation issue: {issue}")
             return False
 
         self.logger.info("FSM validation passed")
@@ -261,14 +261,3 @@ def create_simple_fsm(config):
 
 if __name__ == "__main__":
     pass
-    # # Example usage for testing
-    # from .config import DEFAULT_CONFIG
-
-    # # Create and test FSM
-    # fsm = setup_default_fsm(DEFAULT_CONFIG)
-
-    # print("FSM Graph Structure:")
-    # print(fsm.get_graph())
-
-    # print(f"\nCurrent State: {fsm.get_current_state()}")
-    # print(f"Available Actions: {fsm.get_available_actions()}")

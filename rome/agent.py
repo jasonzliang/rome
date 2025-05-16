@@ -14,10 +14,12 @@ from .logger import get_logger
 class Agent:
     """Agent class using OpenAI API, YAML config, and FSM architecture"""
 
-    def __init__(self, role: str, config_path: str = None, config_dict: Dict = None):
+    def __init__(self,
+        name: str,
+        role: str,
+        config_path: str = None,
+        config_dict: Dict = None):
         """Initialize the Agent with either a config path or a config dictionary"""
-        self.role = role
-
         # Load configuration first
         if config_path:
             self.config = load_config(config_path, create_if_missing=True)
@@ -25,6 +27,12 @@ class Agent:
             self.config = merge_with_default_config(config_dict)
         else:
             self.config = DEFAULT_CONFIG.copy()
+
+        # Setup agent name and basic info
+        self.name = name
+        self.role = role
+        self.repository = self.config.get('repository').get('path')
+        assert self.repository is not None and os.path.exists(self.repository)
 
         # Configure logger immediately after loading config
         self._setup_logging()
@@ -43,12 +51,6 @@ class Agent:
         self.openai_handler = OpenAIHandler(config=llm_config)
 
         self.logger.info(f"Agent initialized with model: {llm_config.get('model', 'gpt-4')}")
-
-    # Repository management
-    @property
-    def repository(self) -> str:
-        """Get repository directory from config"""
-        return self.config.get('repository', {}).get('path', os.getcwd())
 
     def _setup_logging(self):
         """Configure logging based on config"""

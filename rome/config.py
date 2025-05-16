@@ -1,6 +1,7 @@
 # config.py
 import yaml
 import os
+import sys
 from .logger import get_logger
 
 # Define the default configuration structure as a dictionary
@@ -24,11 +25,8 @@ DEFAULT_CONFIG = {
         "system_message": "You are a helpful code assistant specializing in code analysis and improvement."
     },
 
-    # Repository settings
-    "repository": {
-        "path": "./",
-        "extensions": [".py", ".js", ".ts", ".java", ".rb", ".go", ".c", ".cpp", ".h", ".hpp"]
-    },
+    # Repository path
+    "repository": "./"
 
     # Logging configuration
     "logging": {
@@ -38,27 +36,15 @@ DEFAULT_CONFIG = {
         "console": True
     },
 
-    # Safety settings
-    "safety": {
-        "create_backup": True,
-        "backup_dir": "./backups",
-        "preview_changes": True,
-        "max_file_size": 5000000  # 5MB
-    },
-
     # FSM configuration
-    "fsm": {
-        "initial_state": "IDLE",
-        "strict_transitions": False,
-        "default_error_state": "ERROR"
-    },
+    "fsm": {},
 
     # Action-specific configurations
     "actions": {
         "search": {
-            "max_files": 100,
+            "max_files": sys.maxsize,
             "include_content": True,
-            "depth": 3,
+            "depth": sys.maxsize,
             "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"],
             # Example LLM override for search action
             "llm": {
@@ -116,7 +102,7 @@ def merge_with_default_config(custom_config):
         return d
 
     result = update_dict(merged_config, custom_config)
-    logger.debug("Configuration merged with defaults")
+    logger.info("Configuration merged with defaults")
     return result
 
 def get_action_llm_config(config, action_name):
@@ -143,7 +129,7 @@ def get_action_llm_config(config, action_name):
     # Merge action-specific LLM config over the base config
     if action_llm_config:
         base_llm_config.update(action_llm_config)
-        logger.debug(f"Merged LLM config for action '{action_name}'")
+        logger.info(f"Merged LLM config for action '{action_name}'")
 
     return base_llm_config
 
