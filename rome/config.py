@@ -91,7 +91,7 @@ def load_config(config_path="config.yaml", create_if_missing=True):
             config = yaml.safe_load(f)
         return config
     elif create_if_missing:
-        logger.warning(f"Config file {config_path} not found. Creating default config...")
+        logger.info(f"Config file {config_path} not found. Creating default config...")
         print(f"Config file {config_path} not found. Creating default config...")
         generate_default_config(config_path)
         return DEFAULT_CONFIG

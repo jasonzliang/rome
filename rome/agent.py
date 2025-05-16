@@ -1,4 +1,5 @@
 import os
+import json
 from typing import Dict, List
 
 # Import the OpenAIHandler we created
@@ -41,10 +42,13 @@ class Agent:
         llm_config = self.config.get('llm', {})
         self.openai_handler = OpenAIHandler(config=llm_config)
 
-        # Cache for action-specific configurations
-        self._action_configs_cache = {}
-
         self.logger.info(f"Agent initialized with model: {llm_config.get('model', 'gpt-4')}")
+
+    # Repository management
+    @property
+    def repository(self) -> str:
+        """Get repository directory from config"""
+        return self.config.get('repository', {}).get('path', os.getcwd())
 
     def _setup_logging(self):
         """Configure logging based on config"""
@@ -54,50 +58,20 @@ class Agent:
 
     def _setup_fsm(self):
         """Initialize the Finite State Machine"""
-        from .fsm import setup_default_fsm
-        self.fsm = setup_default_fsm(config=self.config)
+        from .fsm import create_simple_fsm
+        self.fsm = create_simple_fsm(config=self.config)
         self.logger.info(f"FSM initialized with state: {self.fsm.current_state}")
-
-    # Action and state management
-    def get_current_state(self):
-        """Get the current state of the agent"""
-        return self.fsm.current_state if self.fsm else None
-
-    def get_available_actions(self) -> List[str]:
-        """Get available actions from the current state"""
-        return self.fsm.get_available_actions() if self.fsm else []
-
-    def execute_action(self, action_name: str, **kwargs):
-        """Execute an action and update the agent's state"""
-        self.logger.info(f"Executing action: {action_name}")
-        if self.fsm:
-            return self.fsm.execute_action(action_name, self, **kwargs)
-        else:
-            self.logger.warning("FSM not initialized, cannot execute action")
 
     # LLM configuration management
     def get_action_llm_config(self, action_name: str) -> Dict:
         """
         Get LLM configuration for a specific action, with action-specific overrides.
-
-        Args:
-            action_name: Name of the action
-
-        Returns:
-            Dict: OpenAI-compatible configuration with action-specific overrides
         """
-        # Check cache first
-        if action_name in self._action_configs_cache:
-            return self._action_configs_cache[action_name].copy()
 
         # Get merged LLM config for this action
         action_llm_config = get_action_llm_config(self.config, action_name)
-
         # Remove None values for cleaner config
         clean_config = {k: v for k, v in action_llm_config.items() if v is not None}
-
-        # Cache the result
-        self._action_configs_cache[action_name] = clean_config
 
         return clean_config.copy()
 
@@ -149,33 +123,140 @@ class Agent:
         """Parse JSON response using the handler"""
         return self.openai_handler.parse_python_response(response)
 
-    def update_action_llm_config(self, action_name: str, config_updates: Dict):
+    def _extract_action_from_response(self, response: str) -> str:
         """
-        Update LLM configuration for a specific action.
+        Extract the action name from the LLM response
+        """
+        # Try to parse as JSON first
+        parsed_json = self.parse_json_response(response)
+
+        if parsed_json and 'action' in parsed_json:
+            action = parsed_json['action']
+            reasoning = parsed_json.get('reasoning', 'No reasoning provided')
+            self.logger.info(f"Selected action: {action} - {reasoning}")
+            return action
+
+        # Fallback: look for action names in the response text
+        available_actions = self.fsm.get_available_actions()
+        for action in available_actions:
+            if action.lower() in response.lower():
+                self.logger.info(f"Extracted action from text: {action}")
+                return action
+
+        # If no action found, log the issue and return None
+        self.logger.error(f"Could not extract valid action from response: {response}")
+        return None
+
+    def run_loop(self, max_iterations: int = 10, stop_on_error: bool = True) -> Dict:
+        """
+        Main execution loop that continuously executes actions based on FSM state
 
         Args:
-            action_name: Name of the action
-            config_updates: Dictionary of config parameters to update
+            max_iterations: Maximum number of iterations to prevent infinite loops
+            stop_on_error: Whether to stop the loop on errors or continue
+
+        Returns:
+            Dict containing loop execution results
         """
-        # Ensure the action config structure exists
-        if 'actions' not in self.config:
-            self.config['actions'] = {}
-        if action_name not in self.config['actions']:
-            self.config['actions'][action_name] = {}
-        if 'llm' not in self.config['actions'][action_name]:
-            self.config['actions'][action_name]['llm'] = {}
+        self.logger.info(f"Starting agent loop for {max_iterations} iterations")
 
-        # Update the action's LLM config
-        self.config['actions'][action_name]['llm'].update(config_updates)
+        results = {
+            'iterations': 0,
+            'actions_executed': [],
+            'states_visited': [self.fsm.current_state],
+            'errors': [],
+            'final_state': None,
+            'final_context': None
+        }
 
-        # Clear the cache for this action
-        if action_name in self._action_configs_cache:
-            del self._action_configs_cache[action_name]
+        for iteration in range(max_iterations):
+            try:
+                results['iterations'] = iteration + 1
+                self.logger.info(f"Loop iteration {iteration + 1}/{max_iterations}")
+                self.logger.info(f"Current state: {self.fsm.current_state}")
 
-        self.logger.info(f"Updated LLM configuration for action '{action_name}': {config_updates}")
+                # Check if there are available actions
+                available_actions = self.fsm.get_available_actions()
+                if not available_actions:
+                    self.logger.info("No available actions in current state. Stopping loop.")
+                    break
 
-    # Repository management
-    @property
-    def repo_dir(self) -> str:
-        """Get repository directory from config"""
-        return self.config.get('repository', {}).get('path', os.getcwd())
+                # Construct prompt combining role, state prompt, and available actions
+                prompt = self.fsm.get_action_prompt()
+
+                # Get action choice from LLM
+                self.logger.info("Requesting action selection from LLM")
+                response = self.chat_completion(
+                    prompt=prompt,
+                    system_message=self.role,
+                    response_format={"type": "json_object"}
+                )
+
+                # Extract action from response
+                chosen_action = self._extract_action_from_response(response)
+
+                if not chosen_action:
+                    error_msg = f"Could not determine action from LLM response: {response}"
+                    self.logger.error(error_msg)
+                    results['errors'].append({
+                        'iteration': iteration + 1,
+                        'error': error_msg,
+                        'state': self.fsm.current_state
+                    })
+                    if stop_on_error:
+                        break
+                    continue
+
+                # Validate action is available
+                if chosen_action not in available_actions:
+                    error_msg = f"Action '{chosen_action}' not available in state '{self.fsm.current_state}'. Available: {available_actions}"
+                    self.logger.error(error_msg)
+                    results['errors'].append({
+                        'iteration': iteration + 1,
+                        'error': error_msg,
+                        'state': self.fsm.current_state
+                    })
+                    if stop_on_error:
+                        break
+                    continue
+
+                # Execute the action through FSM
+                self.logger.info(f"Executing action: {chosen_action}")
+                self.fsm.execute_action(chosen_action, self)
+
+                # Record the execution
+                results['actions_executed'].append({
+                    'iteration': iteration + 1,
+                    'action': chosen_action,
+                    'previous_state': results['states_visited'][-1],
+                    'new_state': self.fsm.current_state
+                })
+                results['states_visited'].append(self.fsm.current_state)
+
+                self.logger.info(f"Action executed successfully. New state: {self.fsm.current_state}")
+
+            except Exception as e:
+                error_msg = f"Error in loop iteration {iteration + 1}: {str(e)}"
+                self.logger.error(error_msg)
+                self.logger.error(traceback.format_exc())
+                results['errors'].append({
+                    'iteration': iteration + 1,
+                    'error': error_msg,
+                    'state': self.fsm.current_state,
+                    'exception': str(e)
+                })
+                if stop_on_error:
+                    break
+
+        # Record final state and context
+        results['final_state'] = self.fsm.current_state
+        results['final_context'] = self.context.copy()
+
+        self.logger.info(f"Agent loop completed after {results['iterations']} iterations")
+        self.logger.info(f"Final state: {results['final_state']}")
+        self.logger.info(f"Actions executed: {[action['action'] for action in results['actions_executed']]}")
+
+        if results['errors']:
+            self.logger.info(f"Loop completed with {len(results['errors'])} errors")
+
+        return results

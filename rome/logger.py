@@ -1,12 +1,12 @@
-# logger.py
 import logging
 import threading
 from typing import Optional, Dict
-
+from rich.console import Console
+from rich.logging import RichHandler
+from rich.text import Text
 
 class SingletonLogger:
-    """Thread-safe singleton logger that can be configured once and accessed from any class"""
-
+    """Thread-safe singleton logger with Rich console output"""
     _instance: Optional['SingletonLogger'] = None
     _lock = threading.Lock()
     _logger = None
@@ -22,15 +22,12 @@ class SingletonLogger:
         # Only initialize once per instance
         if self._logger is not None:
             return
-
         with self._lock:
             if self._logger is not None:
                 return
-
             # Create logger with default settings
             self._logger = logging.getLogger('Agent')
             self._logger.setLevel(logging.INFO)
-
             # Prevent propagation to avoid duplicate logs
             self._logger.propagate = False
 
@@ -57,12 +54,18 @@ class SingletonLogger:
                 file_handler.setLevel(level)
                 self._logger.addHandler(file_handler)
 
-            # Add console handler if enabled (default: True)
+            # Add Rich console handler if enabled (default: True)
             if log_config.get('console', True):
-                console_handler = logging.StreamHandler()
-                console_handler.setFormatter(formatter)
-                console_handler.setLevel(level)
-                self._logger.addHandler(console_handler)
+                console = Console()
+                rich_handler = RichHandler(
+                    console=console,
+                    show_time=True,
+                    show_path=False,
+                    rich_tracebacks=True,
+                    markup=True
+                )
+                rich_handler.setLevel(level)
+                self._logger.addHandler(rich_handler)
 
     def info(self, message: str):
         """Log info message"""
@@ -84,10 +87,8 @@ class SingletonLogger:
         """Log critical message"""
         self._logger.critical(message)
 
-
 # Global instance and convenience functions
 _logger_instance = None
-
 
 def get_logger() -> SingletonLogger:
     """Get the singleton logger instance"""
@@ -95,3 +96,20 @@ def get_logger() -> SingletonLogger:
     if _logger_instance is None:
         _logger_instance = SingletonLogger()
     return _logger_instance
+
+# Example usage
+if __name__ == "__main__":
+    # Configure the logger
+    logger = get_logger()
+    logger.configure({
+        'level': 'DEBUG',
+        'console': True,
+        'format': '%(message)s'  # Rich handles the formatting
+    })
+
+    # Test all log levels
+    logger.debug("This is a debug message")
+    logger.info("This is an info message")
+    logger.warning("This is a warning message")
+    logger.error("This is an error message")
+    logger.critical("This is a critical message")

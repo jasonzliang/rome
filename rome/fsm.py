@@ -118,11 +118,36 @@ class FSM:
         self.logger.debug(f"Available actions from {self.current_state}: {actions}")
         return actions
 
-    def get_state_prompt(self, agent) -> str:
+    def _get_state_prompt(self, agent) -> str:
         """Get the prompt for the current state"""
         if self.current_state and self.current_state in self.states:
             return self.states[self.current_state].get_state_prompt(agent)
         return "FSM not properly initialized"
+
+    def get_action_prompt(self, agent) -> str:
+        """
+        Construct a prompt that combines state information and available actions
+        """
+        # Get current state prompt
+        state_prompt = self._get_state_prompt(agent)
+
+        # Get available actions
+        available_actions = self.get_available_actions()
+
+        # Construct the full prompt
+        prompt = f"""{state_prompt}
+
+Available actions: {', '.join(available_actions)}
+
+Please select one of the available actions to execute. Respond with a JSON object containing:
+{{
+    "action": "chosen_action_name",
+    "reasoning": "Brief explanation of why you chose this action"
+}}
+
+Choose the most appropriate action based on the current state and context."""
+
+        return prompt
 
     def get_graph(self) -> Dict:
         """Get the graph structure for visualization"""
