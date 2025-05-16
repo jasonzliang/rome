@@ -59,64 +59,50 @@ class OpenAIHandler:
         Returns:
             The response content as string
         """
-        try:
-            messages = []
-            if system_message:
-                messages.append({"role": "system", "content": system_message})
-            messages.append({"role": "user", "content": prompt})
+        messages = []
+        if system_message:
+            messages.append({"role": "system", "content": system_message})
+        messages.append({"role": "user", "content": prompt})
 
-            # Merge configs: current -> override
-            effective_config = self.config.copy()
-            if override_config:
-                effective_config.update(override_config)
+        # Merge configs: current -> override
+        effective_config = self.config.copy()
+        if override_config:
+            effective_config.update(override_config)
 
-            # Build API parameters with safe defaults
-            kwargs = {
-                "model": effective_config.get("model", "gpt-4o"),
-                "messages": messages,
-                "temperature": effective_config.get("temperature", 0.1),
-                "max_tokens": effective_config.get("max_tokens", 4000),
-                "top_p": effective_config.get("top_p", 1.0),
-                "frequency_penalty": effective_config.get("frequency_penalty", 0.0),
-                "presence_penalty": effective_config.get("presence_penalty", 0.0),
-            }
+        # Build API parameters with safe defaults
+        kwargs = {
+            "model": effective_config.get("model", "gpt-4o"),
+            "messages": messages,
+            "temperature": effective_config.get("temperature", 0.1),
+            "max_tokens": effective_config.get("max_tokens", 4000),
+            "top_p": effective_config.get("top_p", 1.0),
+            "frequency_penalty": effective_config.get("frequency_penalty", 0.0),
+            "presence_penalty": effective_config.get("presence_penalty", 0.0),
+        }
 
-            # Add seed if provided
-            if effective_config.get("seed") is not None:
-                kwargs["seed"] = effective_config["seed"]
+        # Add seed if provided
+        if effective_config.get("seed") is not None:
+            kwargs["seed"] = effective_config["seed"]
 
-            # Add response format if provided
-            if response_format is not None:
-                kwargs["response_format"] = response_format
+        # Add response format if provided
+        if response_format is not None:
+            kwargs["response_format"] = response_format
 
-            # Add any extra parameters
-            if extra_body:
-                kwargs.update(extra_body)
+        # Add any extra parameters
+        if extra_body:
+            kwargs.update(extra_body)
 
-            self.logger.info(f"API call: {kwargs['model']} (temp={kwargs['temperature']})")
+        self.logger.info(f"API call: {kwargs['model']} (temp={kwargs['temperature']})")
 
-            response = self.client.chat.completions.create(**kwargs)
+        response = self.client.chat.completions.create(**kwargs)
 
-            content = response.choices[0].message.content.strip()
+        content = response.choices[0].message.content.strip()
 
-            # Log token usage if available
-            if hasattr(response, 'usage') and response.usage:
-                self.logger.info(f"Tokens: {response.usage.prompt_tokens}→{response.usage.completion_tokens} (total: {response.usage.total_tokens})")
+        # Log token usage if available
+        if hasattr(response, 'usage') and response.usage:
+            self.logger.info(f"Tokens: {response.usage.prompt_tokens}→{response.usage.completion_tokens} (total: {response.usage.total_tokens})")
 
-            return content
-
-        except openai.APIError as e:
-            self.logger.error(f"OpenAI API error: {str(e)}")
-            raise
-        except openai.RateLimitError as e:
-            self.logger.error(f"Rate limit exceeded: {str(e)}")
-            raise
-        except openai.Timeout as e:
-            self.logger.error(f"Request timeout: {str(e)}")
-            raise
-        except Exception as e:
-            self.logger.error(f"Unexpected error in chat completion: {str(e)}")
-            raise
+        return content
 
     def parse_python_response(response: str) -> Optional[str]:
         """
@@ -150,7 +136,6 @@ class OpenAIHandler:
                     return block
 
         return None
-
 
     def parse_json_response(response: str) -> Optional[Dict[Any, Any]]:
         """
@@ -204,7 +189,6 @@ class OpenAIHandler:
                 continue
 
         return None
-
 
     def update_config(self, config_updates: Dict):
         """
