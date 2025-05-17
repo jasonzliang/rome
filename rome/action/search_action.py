@@ -48,7 +48,7 @@ class SearchAction(Action):
                 file_overviews.append({
                     "path": file_path,
                     "size_kb": round(size_kb, 2),
-                    "modified_age": round(modified_age, 2),  # Age in seconds
+                    "modified_age": round(modified_age, 1),  # Age in seconds
                     "definitions": definitions[:10]  # Limit to first 10 definitions
                 })
 

@@ -64,8 +64,16 @@ class Agent:
 
     def _validate_and_format_role(self, role: str) -> str:
         """
+        Validates and formats the agent's role string.
+
         Ensures that the role string contains 'your role' (case-insensitive)
         somewhere in the text. If not, it formats the role with a proper header.
+
+        Args:
+            role: The original role string
+
+        Returns:
+            A properly formatted role string
         """
         # Check if "your role" exists anywhere in the string (case insensitive)
         if "your role" in role.lower() or "you are" in role.lower():
@@ -131,9 +139,17 @@ class Agent:
         """Parse JSON response using the handler"""
         return self.openai_handler.parse_json_response(response)
 
-    def parse_python_response(self, response: str) -> Dict:
-        """Parse JSON response using the handler"""
-        return self.openai_handler.parse_python_response(response)
+    def parse_python_response(self, response: str) -> str:
+        """Parse Python code from response using the handler"""
+        result = self.openai_handler.parse_python_response(response)
+        return result or ""  # Return empty string instead of None to avoid errors
+
+    def parse_python_response(self, response: str) -> str:
+        """Parse Python code from response using the handler"""
+        result = self.openai_handler.parse_python_response(response)
+        if result is None:
+            self.logger.info("Failed to parse Python code from response")
+        return result or ""  # Return empty string instead of None to avoid errors
 
     def _extract_action_from_response(self, response: str) -> str:
         """
