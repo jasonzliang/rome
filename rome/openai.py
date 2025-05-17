@@ -32,7 +32,7 @@ class OpenAIHandler:
         for attr in required_attrs:
             assert hasattr(self, attr), f"{attr} not provided in OpenAIHandler config"
 
-        # Get API key from config or environment
+        # Get API key from environment
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
             error_msg = "OpenAI API key not found in environment"
@@ -101,7 +101,10 @@ class OpenAIHandler:
         if extra_body:
             kwargs.update(extra_body)
 
+        # Log request parameters and messages at debug level
         self.logger.info(f"API call: {kwargs['model']} (temp={kwargs['temperature']})")
+        self.logger.debug(f"OpenAI API request parameters: {json.dumps({k: v for k, v in kwargs.items() if k != 'messages'}, indent=4)}")
+        self.logger.debug(f"Request messages: {json.dumps(messages, indent=4)}")
 
         response = self.client.chat.completions.create(**kwargs)
 
@@ -110,6 +113,10 @@ class OpenAIHandler:
         # Log token usage if available
         if hasattr(response, 'usage') and response.usage:
             self.logger.info(f"Tokens: {response.usage.prompt_tokens}→{response.usage.completion_tokens} (total: {response.usage.total_tokens})")
+
+        # Log the full response at debug level
+        # self.logger.debug(f"OpenAI API response: {response}")
+        self.logger.debug(f"Response content: {content}")
 
         return content
 

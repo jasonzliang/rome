@@ -133,7 +133,6 @@ Please respond with a single JSON object in the following format:
             response = agent.chat_completion(
                 prompt=prompt,
                 system_message=agent.role,
-                action_type='search',
                 response_format={"type": "json_object"}
             )
 

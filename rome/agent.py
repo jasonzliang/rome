@@ -18,15 +18,17 @@ class Agent:
     def __init__(self,
         name: str,
         role: str,
-        config_path: str = None,
         config_dict: Dict = None):
         """Initialize the Agent with either a config path or a config dictionary"""
-        # Load configuration first
-        if config_path:
-            self.config = load_config(config_path, create_if_missing=True)
-        elif config_dict:
+
+        # Setup logging first
+        self.logger = get_logger()
+
+        # Load configuration next
+        if config_dict:
             self.config = merge_with_default_config(config_dict)
         else:
+            self.logger.info("Using DEFAULT_CONFIG, no config dict provided")
             self.config = DEFAULT_CONFIG.copy()
 
         # Setup agent name and basic info
@@ -35,9 +37,6 @@ class Agent:
 
         # Configure logger immediately after loading config
         self._setup_logging()
-
-        # Now get the configured logger
-        self.logger = get_logger()
 
         # Get the Agent-specific configuration
         agent_config = self.config.get('Agent', {})
@@ -74,9 +73,11 @@ class Agent:
         self.logger.info(f"FSM initialized with state: {self.fsm.current_state}")
 
     # Chat completion methods
-    def chat_completion(self, prompt: str, system_message: str = None,
-                       action_type: str = None, override_config: Dict = None,
-                       response_format: Dict = None, extra_body: Dict = None) -> str:
+    def chat_completion(self, prompt: str,
+        system_message: str = None,
+        override_config: Dict = None,
+        response_format: Dict = None,
+        extra_body: Dict = None) -> str:
         """
         Direct access to chat completion with configuration options
 

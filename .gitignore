@@ -173,9 +173,11 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+benchmark/result
 .DS_Store
 .tags*
-benchmark/results
+*.log
 *.jpg
-*.avif
 *.png
+*.avif
+*.heic

@@ -34,7 +34,7 @@ DEFAULT_CONFIG = {
 
     # Logging configuration
     "Logger": {
-        "level": "INFO",
+        "level": "ERROR",
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         "file": None,  # Set to a path to enable file logging
         "console": True
@@ -100,13 +100,11 @@ def load_config(config_path="config.yaml", create_if_missing=True):
         return config
     elif create_if_missing:
         logger.info(f"Config file {config_path} not found. Creating default config...")
-        print(f"Config file {config_path} not found. Creating default config...")
         generate_default_config(config_path)
         return DEFAULT_CONFIG
     else:
         logger.error(f"Config file {config_path} not found.")
-        print(f"Config file {config_path} not found.")
-        return DEFAULT_CONFIG
+        raise FileNotFoundError(f"Config file {config_path} not found.")
 
 
 def merge_with_default_config(custom_config):
