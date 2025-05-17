@@ -29,9 +29,6 @@ class Agent:
         else:
             self.config = DEFAULT_CONFIG.copy()
 
-        # Get the Agent-specific configuration
-        agent_config = self.config.get('Agent', {})
-
         # Setup agent name and basic info
         self.name = name
         self.role = role
@@ -42,12 +39,15 @@ class Agent:
         # Now get the configured logger
         self.logger = get_logger()
 
+        # Get the Agent-specific configuration
+        agent_config = self.config.get('Agent', {})
         # Automatically set attributes from Agent config
         set_attributes_from_config(self, agent_config)
 
         # Validate required attributes
         assert hasattr(self, 'repository'), "repository not provided in Agent config"
-        assert self.repository is not None and os.path.exists(self.repository), f"Repository path does not exist: {self.repository}"
+        assert self.repository is not None and os.path.exists(self.repository),
+            f"Repository path does not exist: {self.repository}"
 
         # Initialize context
         self.context = {}
@@ -59,7 +59,7 @@ class Agent:
         openai_config = self.config.get('OpenAIHandler', {})
         self.openai_handler = OpenAIHandler(config=openai_config)
 
-        self.logger.info(f"Agent initialized with model: {openai_config.get('model', 'gpt-4')}")
+        self.logger.info(f"Agent initialized with model: {openai_config.get('model')}")
 
     def _setup_logging(self):
         """Configure logging based on config"""
