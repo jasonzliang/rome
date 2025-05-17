@@ -98,7 +98,7 @@ def main():
         "Logger": {
             "level": "DEBUG",
             "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            "file": None,
+            "file": "test_single_agent.log",
             "console": True
         },
 
