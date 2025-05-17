@@ -194,7 +194,6 @@ Please respond with a single JSON object in the following format:
         self.logger.info("Starting simplified three-step SearchAction execution")
 
         # Ensure agent has an OpenAI handler (either openai_handler or self.openai_handler)
-        # Fix the attribute naming issue by checking for both potential attribute names
         has_openai_handler = hasattr(agent, 'openai_handler') and agent.openai_handler is not None
 
         if not has_openai_handler:
