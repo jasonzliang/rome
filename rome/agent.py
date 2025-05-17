@@ -33,7 +33,9 @@ class Agent:
 
         # Setup agent name and basic info
         self.name = name
-        self.role = role
+
+        # Validate and properly format the role string
+        self.role = self._validate_and_format_role(role)
 
         # Configure logger immediately after loading config
         self._setup_logging()
@@ -45,7 +47,7 @@ class Agent:
 
         # Validate required attributes
         assert hasattr(self, 'repository'), "repository not provided in Agent config"
-        assert self.repository is not None and os.path.exists(self.repository),
+        assert self.repository is not None and os.path.exists(self.repository), \
             f"Repository path does not exist: {self.repository}"
 
         # Initialize context
@@ -59,6 +61,19 @@ class Agent:
         self.openai_handler = OpenAIHandler(config=openai_config)
 
         self.logger.info(f"Agent initialized with model: {openai_config.get('model')}")
+
+    def _validate_and_format_role(self, role: str) -> str:
+        """
+        Ensures that the role string contains 'your role' (case-insensitive)
+        somewhere in the text. If not, it formats the role with a proper header.
+        """
+        # Check if "your role" exists anywhere in the string (case insensitive)
+        if "your role" in role.lower() or "you are" in role.lower():
+            return role
+
+        # If not found, add a properly formatted header
+        self.logger.info("Role string does not contain 'your role', reformatting")
+        return f"## Your role:\n{role}"
 
     def _setup_logging(self):
         """Configure logging based on config"""
