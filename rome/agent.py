@@ -3,7 +3,7 @@ import json
 from typing import Dict, List
 
 # Import the OpenAIHandler we created
-from .openai_handler import OpenAIHandler
+from .openai import OpenAIHandler
 # Import default config utilities
 from .config import DEFAULT_CONFIG
 from .config import load_config, merge_with_default_config, get_action_llm_config
@@ -251,7 +251,7 @@ class Agent:
                     break
 
         # Record final state and context
-        results['final_state'] = self.fsm.current_state
+        results['final_state'] = self.fsm.current_state.name
         results['final_context'] = self.context.copy()
 
         self.logger.info(f"Agent loop completed after {results['iterations']} iterations")

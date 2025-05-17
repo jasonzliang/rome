@@ -26,7 +26,7 @@ DEFAULT_CONFIG = {
     },
 
     # Repository path
-    "repository": "./"
+    "repository": "./",
 
     # Logging configuration
     "logging": {
@@ -46,6 +46,7 @@ DEFAULT_CONFIG = {
             "include_content": True,
             "depth": sys.maxsize,
             "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"],
+            "selection_criteria": "Select the most relevant file for the current task",
             # Example LLM override for search action
             "llm": {
                 # "model": "gpt-3.5-turbo",

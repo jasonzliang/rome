@@ -2,6 +2,7 @@
 import openai
 import json
 import os
+import re
 from typing import Dict, Optional
 from .logger import get_logger
 
@@ -104,7 +105,8 @@ class OpenAIHandler:
 
         return content
 
-    def parse_python_response(response: str) -> Optional[str]:
+    # Fix the methods to include self parameter
+    def parse_python_response(self, response: str) -> Optional[str]:
         """
         Extract the first Python code block from a response.
 
@@ -137,7 +139,7 @@ class OpenAIHandler:
 
         return None
 
-    def parse_json_response(response: str) -> Optional[Dict[Any, Any]]:
+    def parse_json_response(self, response: str) -> Optional[Dict]:
         """
         Extract and parse the first JSON object from a response.
 
@@ -145,7 +147,7 @@ class OpenAIHandler:
             response (str): The response text containing JSON blocks
 
         Returns:
-            Optional[Dict[Any, Any]]: The first valid JSON object found, or None if no valid JSON found
+            Optional[Dict]: The first valid JSON object found, or None if no valid JSON found
         """
         # Pattern to match JSON code blocks
         json_pattern = r'```(?:json)?\n(\{.*?\}|\[.*?\])```'

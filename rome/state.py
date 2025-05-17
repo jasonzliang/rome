@@ -57,10 +57,14 @@ class CodeLoadedState(State):
 
     def check_context(self, agent, **kwargs) -> bool:
         """Check if we have a selected file in context"""
-        assert 'selected_file' not in agent.context:
+        assert 'selected_file' in agent.context,
+            "Missing selected_file in agent context"
         selected_file = agent.context['selected_file']
-        assert 'path' not in selected_file and 'content' not in selected_file:
-        assert os.path.exists(selected_file['path'])
+        assert 'path' in selected_file and 'content' in selected_file,
+            "Missing path or content in selected file"
+        assert os.path.exists(selected_file['path']),
+            f"File path does not exist: {selected_file['path']}"
+        return True  # Return True if all assertions pass
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for code loaded state"""
