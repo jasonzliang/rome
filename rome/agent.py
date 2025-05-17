@@ -233,7 +233,9 @@ class Agent:
                     })
                     if stop_on_error:
                         break
-                    continue
+                    else:
+                        self.fsm.reset()
+                        continue
 
                 # Validate action is available
                 if chosen_action not in available_actions:
@@ -246,7 +248,9 @@ class Agent:
                     })
                     if stop_on_error:
                         break
-                    continue
+                    else:
+                        self.fsm.reset()
+                        continue
 
                 # Execute the action through FSM
                 self.logger.info(f"Executing action: {chosen_action}")
@@ -275,6 +279,8 @@ class Agent:
                 })
                 if stop_on_error:
                     break
+                else:
+                    self.fsm.reset()
 
         # Record final state and context
         results['final_state'] = self.fsm.current_state

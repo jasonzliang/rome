@@ -23,7 +23,7 @@ class State(ABC):
 
     @abstractmethod
     def check_context(self, agent, **kwargs) -> bool:
-        """Return true if agent context has required values"""
+        """Check if agent context has required values"""
         pass
 
     @abstractmethod
@@ -48,7 +48,6 @@ class IdleState(State):
         """In idle state, clear any previous context and always return True"""
         # Clear any previous context when entering idle state
         agent.context.clear()
-        return True
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for idle state"""
@@ -76,7 +75,6 @@ class CodeLoadedState(State):
             assert key in selected_file, f"Missing {key} in selected file"
 
         assert os.path.exists(selected_file['path']), f"File path does not exist: {selected_file['path']}"
-        return True  # Return True if all assertions pass
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for code loaded state"""

@@ -105,7 +105,7 @@ def main():
         # SearchAction specific configuration
         "SearchAction": {
             "file_type": ".py",
-            "batch_size": 3,  # Process all 3 files in a single batch
+            "batch_size": 1,  # Process all 3 files in a single batch
             "selection_criteria": "Select the most interesting code file to improve and complete.",
             "max_files": sys.maxsize,
             "depth": sys.maxsize,

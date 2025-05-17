@@ -17,14 +17,21 @@ class FSM:
 
     def __init__(self, config: Dict = None):
         self.config = config or {}
-        self.states: Dict[str, State] = {}  # nodes
-        self.transitions: Dict[str, Dict[str, str]] = {}  # edges: from_state -> action -> to_state
-        self.actions: Dict[str, Action] = {}  # action handlers
-        self.logger = get_logger()
-
         # Set attributes from FSM config
         fsm_config = self.config.get('FSM', {})
         set_attributes_from_config(self, fsm_config)
+
+        self.states: Dict[str, State] = {}  # nodes
+        self.transitions: Dict[str, Dict[str, str]] = {}  # edges: from_state -> action -> to_state
+        self.actions: Dict[str, Action] = {}  # action handlers
+        self.current_state = self.default_state = None
+        self.logger = get_logger()
+
+    def reset(self, agent):
+        agent.context.clear()
+        self.logger("Clearing agent context")
+        self.current_state = self.default_state
+        self.logger(f"Setting FSM current state to default: {self.current_state}")
 
     def add_state(self, state_name: str, state: State):
         """Add a state (node) to the FSM"""
@@ -62,6 +69,7 @@ class FSM:
         if state_name not in self.states:
             raise ValueError(f"State '{state_name}' doesn't exist")
         self.current_state = state_name
+        self.default_state = state_name
         self.logger.info(f"Set initial state: {state_name}")
 
     def execute_action(self, action_name: str, agent, **kwargs):
@@ -180,10 +188,12 @@ Choose the most appropriate action based on the current state and context."""
         """Validate the FSM structure"""
         issues = []
 
+        # Check default state is set
+        if not self.default_state:
+            issues.append("No default state set")
+
         # Check if initial state is set and exists
-        if not hasattr(self, 'current_state'):
-            issues.append("No initial state set")
-        elif self.current_state not in self.states:
+        if self.current_state not in self.states:
             issues.append(f"Initial state '{self.current_state}' not in states")
 
         # Check that all transition targets exist
@@ -210,7 +220,7 @@ Choose the most appropriate action based on the current state and context."""
                 issues.append(f"State '{state_name}' missing actions from transitions: {missing_actions}")
 
         # Check for unreachable states
-        reachable = {self.current_state} if hasattr(self, 'current_state') else set()
+        reachable = {self.current_state} if self.current_state else set()
         changed = True
         while changed:
             changed = False
