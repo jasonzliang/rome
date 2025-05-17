@@ -14,17 +14,10 @@ class SearchAction(Action):
         super().__init__(config)
         self.logger = get_logger()
 
-        # Set default configuration for search action with proper fallbacks
-        self.max_files = self.config.get('max_files', sys.maxsize)
-        self.file_type = self.config.get('file_type', '.py')
-        self.depth = self.config.get('depth', sys.maxsize)
-        self.exclude_dirs = self.config.get('exclude_dirs',
-           ['.git', 'node_modules', 'venv', '__pycache__', 'dist', 'build'])
-        # Parameter K for batch processing
-        self.batch_size = self.config.get('batch_size', 5)
-        # Selection criteria for OpenAI
-        self.selection_criteria = self.config.get('selection_criteria',
-            "Select the most relevant file for the current task")
+        # Assert required config parameters using a loop
+        required_attrs = ['max_files', 'file_type', 'exclude_dirs', 'selection_criteria', 'batch_size']
+        for attr in required_attrs:
+            assert hasattr(self, attr), f"{attr} not provided in SearchAction config"
 
     def _create_selection_prompt(self, files_batch: List[Dict]) -> str:
         """Create a prompt for OpenAI to evaluate file selection"""

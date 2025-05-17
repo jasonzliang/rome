@@ -4,10 +4,11 @@ from typing import Optional, Dict
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.text import Text
+from .config import set_attributes_from_config
 
-class SingletonLogger:
+class Logger:
     """Thread-safe singleton logger with Rich console output"""
-    _instance: Optional['SingletonLogger'] = None
+    _instance: Optional['Logger'] = None
     _lock = threading.Lock()
     _logger = None
 
@@ -15,7 +16,7 @@ class SingletonLogger:
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
-                    cls._instance = super(SingletonLogger, cls).__new__(cls)
+                    cls._instance = super(Logger, cls).__new__(cls)
         return cls._instance
 
     def __init__(self):
@@ -38,24 +39,30 @@ class SingletonLogger:
             for handler in self._logger.handlers[:]:
                 self._logger.removeHandler(handler)
 
+            # Set attributes from config
+            set_attributes_from_config(self, log_config)
+
+            # Validate required attributes with a more compact assertion
+            required_attrs = ['level', 'format', 'console']
+            for attr in required_attrs:
+                assert hasattr(self, attr), f"{attr} not provided in Logger config"
+
             # Set log level
-            level = getattr(logging, log_config.get('level', 'INFO').upper())
+            level = getattr(logging, self.level.upper())
             self._logger.setLevel(level)
 
             # Create formatter
-            formatter = logging.Formatter(
-                log_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            )
+            formatter = logging.Formatter(self.format)
 
             # Add file handler if specified
-            if log_config.get('file'):
-                file_handler = logging.FileHandler(log_config['file'], mode='a')
+            if hasattr(self, 'file') and self.file:
+                file_handler = logging.FileHandler(self.file, mode='a')
                 file_handler.setFormatter(formatter)
                 file_handler.setLevel(level)
                 self._logger.addHandler(file_handler)
 
-            # Add Rich console handler if enabled (default: True)
-            if log_config.get('console', True):
+            # Add Rich console handler if enabled
+            if self.console:
                 console = Console()
                 rich_handler = RichHandler(
                     console=console,
@@ -90,26 +97,9 @@ class SingletonLogger:
 # Global instance and convenience functions
 _logger_instance = None
 
-def get_logger() -> SingletonLogger:
+def get_logger() -> Logger:
     """Get the singleton logger instance"""
     global _logger_instance
     if _logger_instance is None:
-        _logger_instance = SingletonLogger()
+        _logger_instance = Logger()
     return _logger_instance
-
-# Example usage
-if __name__ == "__main__":
-    # Configure the logger
-    logger = get_logger()
-    logger.configure({
-        'level': 'DEBUG',
-        'console': True,
-        'format': '%(message)s'  # Rich handles the formatting
-    })
-
-    # Test all log levels
-    logger.debug("This is a debug message")
-    logger.info("This is an info message")
-    logger.warning("This is a warning message")
-    logger.error("This is an error message")
-    logger.critical("This is a critical message")

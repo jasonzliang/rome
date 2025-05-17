@@ -4,13 +4,13 @@ import sys
 from typing import Dict, List, Optional, Callable
 
 from .action import Action
-from .action import SearchAction
-from .action import RetryAction
+from .search_action import SearchAction
+from .retry_action import RetryAction
 from .state import State
 from .state import IdleState
 from .state import CodeLoadedState
-
 from .logger import get_logger
+from .config import set_attributes_from_config
 
 class FSM:
     """Finite State Machine as a directed graph"""
@@ -21,6 +21,10 @@ class FSM:
         self.transitions: Dict[str, Dict[str, str]] = {}  # edges: from_state -> action -> to_state
         self.actions: Dict[str, Action] = {}  # action handlers
         self.logger = get_logger()
+
+        # Set attributes from FSM config
+        fsm_config = self.config.get('FSM', {})
+        set_attributes_from_config(self, fsm_config)
 
     def add_state(self, state_name: str, state: State):
         """Add a state (node) to the FSM"""
@@ -177,7 +181,7 @@ Choose the most appropriate action based on the current state and context."""
         issues = []
 
         # Check if initial state is set and exists
-        if not self.current_state:
+        if not hasattr(self, 'current_state'):
             issues.append("No initial state set")
         elif self.current_state not in self.states:
             issues.append(f"Initial state '{self.current_state}' not in states")
@@ -206,7 +210,7 @@ Choose the most appropriate action based on the current state and context."""
                 issues.append(f"State '{state_name}' missing actions from transitions: {missing_actions}")
 
         # Check for unreachable states
-        reachable = {self.current_state} if self.current_state else set()
+        reachable = {self.current_state} if hasattr(self, 'current_state') else set()
         changed = True
         while changed:
             changed = False
@@ -235,19 +239,23 @@ def create_simple_fsm(config):
     logger = get_logger()
     logger.info("Creating FSM")
 
-    fsm = FSM()
+    fsm = FSM(config)
 
-    # Add states (nodes) with actual state objects
-    fsm.add_state("IDLE", IdleState())
-    fsm.add_state("CODELOADED", CodeLoadedState())
+    # Get state configurations (empty dicts if not present)
+    idle_state_config = config.get('IdleState', {})
+    code_loaded_state_config = config.get('CodeLoadedState', {})
+
+    # Add states (nodes) with actual state objects and their configs
+    fsm.add_state("IDLE", IdleState(idle_state_config))
+    fsm.add_state("CODELOADED", CodeLoadedState(code_loaded_state_config))
 
     # Get action configurations
-    search_config = config.get('actions', {}).get('search', {})
-    retry_config = config.get('actions', {}).get('retry', {})
+    search_config = config.get('SearchAction', {})
+    retry_config = config.get('RetryAction', {})
 
     # Add actions (edges between states) with proper configuration
-    fsm.add_action("IDLE", "CODELOADED", "search", SearchAction(search_config))
-    fsm.add_action("CODELOADED", "IDLE", "retry", RetryAction(retry_config))
+    fsm.add_action("IDLE", "CODELOADED", "SearchAction", SearchAction(search_config))
+    fsm.add_action("CODELOADED", "IDLE", "RetryAction", RetryAction(retry_config))
 
     # Set initial state
     fsm.set_initial_state("IDLE")
@@ -257,7 +265,3 @@ def create_simple_fsm(config):
 
     logger.info("FSM created successfully")
     return fsm
-
-
-if __name__ == "__main__":
-    pass

@@ -14,6 +14,9 @@ class RetryAction(Action):
         super().__init__(config)
         self.logger = get_logger()
 
+        # No specific config requirements for RetryAction, but we should still initialize
+        # with the config dict for consistency
+
     def execute(self, agent, **kwargs):
         self.logger.info("Executing RetryAction - resetting agent context")
         agent.context = {}

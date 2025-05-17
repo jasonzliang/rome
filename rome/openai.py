@@ -5,6 +5,7 @@ import os
 import re
 from typing import Dict, Optional
 from .logger import get_logger
+from .config import set_attributes_from_config
 
 
 class OpenAIHandler:
@@ -17,11 +18,19 @@ class OpenAIHandler:
         Args:
             config: Configuration dictionary containing OpenAI parameters
         """
-        # Use provided config or empty dict (defaults will come from config.py)
+        # Use provided config or empty dict
         self.config = config or {}
 
         # Initialize logger
         self.logger = get_logger()
+
+        # Automatically set attributes from config
+        set_attributes_from_config(self, self.config)
+
+        # Validate required attributes with a more compact assertion
+        required_attrs = ['model', 'temperature', 'max_tokens', 'timeout']
+        for attr in required_attrs:
+            assert hasattr(self, attr), f"{attr} not provided in OpenAIHandler config"
 
         # Get API key from config or environment
         api_key = os.getenv("OPENAI_API_KEY")
@@ -33,16 +42,16 @@ class OpenAIHandler:
         # Setup OpenAI client
         client_kwargs = {
             "api_key": api_key,
-            "timeout": self.config.get("timeout", 60)
+            "timeout": self.timeout
         }
 
         # Add optional parameters if provided
-        if self.config.get("base_url"):
-            client_kwargs["base_url"] = self.config["base_url"]
+        if hasattr(self, 'base_url') and self.base_url:
+            client_kwargs["base_url"] = self.base_url
 
         self.client = openai.OpenAI(**client_kwargs)
 
-        self.logger.info(f"OpenAI handler initialized with model: {self.config.get('model', 'gpt-4o')}")
+        self.logger.info(f"OpenAI handler initialized with model: {self.model}")
 
     def chat_completion(self, prompt: str, system_message: str = None,
                        override_config: Dict = None, response_format: Dict = None,
@@ -65,25 +74,24 @@ class OpenAIHandler:
             messages.append({"role": "system", "content": system_message})
         messages.append({"role": "user", "content": prompt})
 
-        # Merge configs: current -> override
-        effective_config = self.config.copy()
-        if override_config:
-            effective_config.update(override_config)
-
-        # Build API parameters with safe defaults
+        # Build API parameters using object attributes with overrides
         kwargs = {
-            "model": effective_config.get("model", "gpt-4o"),
+            "model": self.model,
             "messages": messages,
-            "temperature": effective_config.get("temperature", 0.1),
-            "max_tokens": effective_config.get("max_tokens", 4000),
-            "top_p": effective_config.get("top_p", 1.0),
-            "frequency_penalty": effective_config.get("frequency_penalty", 0.0),
-            "presence_penalty": effective_config.get("presence_penalty", 0.0),
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+            "top_p": getattr(self, 'top_p', 1.0),
+            "frequency_penalty": getattr(self, 'frequency_penalty', 0.0),
+            "presence_penalty": getattr(self, 'presence_penalty', 0.0),
         }
 
-        # Add seed if provided
-        if effective_config.get("seed") is not None:
-            kwargs["seed"] = effective_config["seed"]
+        # Apply any override config
+        if override_config:
+            kwargs.update(override_config)
+
+        # Add seed if available
+        if hasattr(self, 'seed') and self.seed is not None:
+            kwargs["seed"] = self.seed
 
         # Add response format if provided
         if response_format is not None:
@@ -105,7 +113,6 @@ class OpenAIHandler:
 
         return content
 
-    # Fix the methods to include self parameter
     def parse_python_response(self, response: str) -> Optional[str]:
         """
         Extract the first Python code block from a response.
@@ -202,6 +209,10 @@ class OpenAIHandler:
         self.logger.info(f"Updated OpenAI config: {list(config_updates.keys())}")
         self.config.update(config_updates)
 
+        # Update object attributes as well
+        for key, value in config_updates.items():
+            setattr(self, key, value)
+
     def get_config(self) -> Dict:
         """Get current configuration"""
         return self.config.copy()
@@ -210,3 +221,6 @@ class OpenAIHandler:
         """Reset configuration to new config"""
         self.logger.info("Reset OpenAI handler configuration")
         self.config = new_config.copy()
+
+        # Update all attributes from the new config
+        set_attributes_from_config(self, self.config)

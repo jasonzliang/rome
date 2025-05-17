@@ -2,12 +2,13 @@
 import yaml
 import os
 import sys
+from typing import Dict, Any
 from .logger import get_logger
 
 # Define the default configuration structure as a dictionary
 DEFAULT_CONFIG = {
-    # LLM settings - includes all OpenAI API configuration
-    "llm": {
+    # OpenAIHandler settings - includes all OpenAI API configuration
+    "OpenAIHandler": {
         # OpenAI API configuration
         "api_base": "https://api.openai.com/v1",
         "api_type": None,  # "openai" (default) or "azure" or other supported providers
@@ -25,11 +26,14 @@ DEFAULT_CONFIG = {
         "system_message": "You are a helpful code assistant specializing in code analysis and improvement."
     },
 
-    # Repository path
-    "repository": "./",
+    # Agent configuration
+    "Agent": {
+        # Repository path
+        "repository": "./",
+    },
 
     # Logging configuration
-    "logging": {
+    "Logger": {
         "level": "INFO",
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         "file": None,  # Set to a path to enable file logging
@@ -37,26 +41,42 @@ DEFAULT_CONFIG = {
     },
 
     # FSM configuration
-    "fsm": {},
+    "FSM": {},
 
-    # Action-specific configurations
-    "actions": {
-        "search": {
-            "max_files": sys.maxsize,
-            "include_content": True,
-            "depth": sys.maxsize,
-            "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"],
-            "selection_criteria": "Select the most relevant file for the current task",
-            # Example LLM override for search action
-            "llm": {
-                # "model": "gpt-3.5-turbo",
-                # "temperature": 0.1,
-                # "max_tokens": 1000,
-                # "system_message": "You are a search assistant that helps find and analyze code files."
-            }
-        }
+    # State configurations
+    "IdleState": {},
+    "CodeLoadedState": {},
+
+    # Action configuration
+    "SearchAction": {
+        "max_files": sys.maxsize,
+        "file_type": ".py",
+        "depth": sys.maxsize,
+        "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"],
+        "selection_criteria": "Select the most relevant file for the current task",
+        "batch_size": 5
     },
+
+    "RetryAction": {}
 }
+
+
+def set_attributes_from_config(obj, config):
+    """
+    Helper function to convert configuration dictionary entries to object attributes
+
+    Args:
+        obj: The object to set attributes on
+        config: The configuration dictionary
+    """
+    logger = get_logger()
+
+    # Set each config parameter as an attribute
+    for key, value in config.items():
+        setattr(obj, key, value)
+
+    logger.debug(f"Applied configuration to {obj.__class__.__name__} attributes")
+
 
 def generate_default_config(output_path="config.yaml"):
     """Generate a default configuration YAML file"""
@@ -67,6 +87,7 @@ def generate_default_config(output_path="config.yaml"):
 
     logger.info(f"Default configuration saved to {output_path}")
     print(f"Default configuration saved to {output_path}")
+
 
 def load_config(config_path="config.yaml", create_if_missing=True):
     """Load configuration from a YAML file, creating it if it doesn't exist"""
@@ -87,6 +108,7 @@ def load_config(config_path="config.yaml", create_if_missing=True):
         print(f"Config file {config_path} not found.")
         return DEFAULT_CONFIG
 
+
 def merge_with_default_config(custom_config):
     """Merge a custom config with the default config"""
     import copy
@@ -106,33 +128,6 @@ def merge_with_default_config(custom_config):
     logger.info("Configuration merged with defaults")
     return result
 
-def get_action_llm_config(config, action_name):
-    """
-    Get the LLM configuration for a specific action, merging with the main LLM config.
-
-    Args:
-        config: The full configuration dictionary
-        action_name: Name of the action (e.g., 'search')
-
-    Returns:
-        Dict: LLM configuration with action-specific overrides applied
-    """
-    import copy
-    logger = get_logger()
-
-    # Start with the main LLM config
-    base_llm_config = copy.deepcopy(config.get('llm', {}))
-
-    # Get action-specific config
-    action_config = config.get('actions', {}).get(action_name, {})
-    action_llm_config = action_config.get('llm', {})
-
-    # Merge action-specific LLM config over the base config
-    if action_llm_config:
-        base_llm_config.update(action_llm_config)
-        logger.info(f"Merged LLM config for action '{action_name}'")
-
-    return base_llm_config
 
 if __name__ == "__main__":
     # Generate default config if script is run directly

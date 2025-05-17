@@ -78,28 +78,49 @@ def main():
     logger.info(f"Test directory created at: {test_dir}")
 
     # Create a configuration dictionary for the agent
+    # Updated to use the new configuration format with class-specific sections
     config = {
-        "llm": {
-            "model": "gpt-4o",  # Updated to gpt-4o
+        # OpenAIHandler specific configuration
+        "OpenAIHandler": {
+            "model": "gpt-4o",
             "temperature": 0.1,
-            "max_tokens": 4000,  # Increased to 4000
+            "max_tokens": 4000,
+            "timeout": 120,
             "system_message": "You are a code analyzer agent that helps find and analyze Python functions."
         },
-        "repository": {
-            "path": str(test_dir.absolute())
+
+        # Agent specific configuration
+        "Agent": {
+            "repository": str(test_dir.absolute())
         },
-        "logging": {
-            "level": "DEBUG",  # Changed to DEBUG
+
+        # Logger specific configuration
+        "Logger": {
+            "level": "DEBUG",
             "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "file": None,
             "console": True
         },
-        "actions": {
-            "search": {
-                "file_type": ".py",
-                "batch_size": 3,  # Process all 3 files in a single batch
-                "selection_criteria": "Select the most interesting code file to improve and complete."
-            }
-        }
+
+        # SearchAction specific configuration
+        "SearchAction": {
+            "file_type": ".py",
+            "batch_size": 3,  # Process all 3 files in a single batch
+            "selection_criteria": "Select the most interesting code file to improve and complete.",
+            "max_files": sys.maxsize,
+            "depth": sys.maxsize,
+            "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"]
+        },
+
+        # RetryAction specific configuration
+        "RetryAction": {},
+
+        # State specific configurations
+        "IdleState": {},
+        "CodeLoadedState": {},
+
+        # FSM specific configuration
+        "FSM": {}
     }
 
     # Create and initialize the agent

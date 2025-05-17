@@ -1,12 +1,13 @@
 import os
 import json
+import traceback
 from typing import Dict, List
 
 # Import the OpenAIHandler we created
 from .openai import OpenAIHandler
 # Import default config utilities
-from .config import DEFAULT_CONFIG
-from .config import load_config, merge_with_default_config, get_action_llm_config
+from .config import DEFAULT_CONFIG, set_attributes_from_config
+from .config import load_config, merge_with_default_config
 # Import singleton logger
 from .logger import get_logger
 
@@ -28,11 +29,12 @@ class Agent:
         else:
             self.config = DEFAULT_CONFIG.copy()
 
+        # Get the Agent-specific configuration
+        agent_config = self.config.get('Agent', {})
+
         # Setup agent name and basic info
         self.name = name
         self.role = role
-        self.repository = self.config.get('repository').get('path')
-        assert self.repository is not None and os.path.exists(self.repository)
 
         # Configure logger immediately after loading config
         self._setup_logging()
@@ -40,21 +42,28 @@ class Agent:
         # Now get the configured logger
         self.logger = get_logger()
 
+        # Automatically set attributes from Agent config
+        set_attributes_from_config(self, agent_config)
+
+        # Validate required attributes
+        assert hasattr(self, 'repository'), "repository not provided in Agent config"
+        assert self.repository is not None and os.path.exists(self.repository), f"Repository path does not exist: {self.repository}"
+
         # Initialize context
         self.context = {}
 
         # Set up FSM
         self._setup_fsm()
 
-        # Initialize OpenAI handler with main LLM config
-        llm_config = self.config.get('llm', {})
-        self.openai_handler = OpenAIHandler(config=llm_config)
+        # Initialize OpenAI handler with OpenAIHandler config
+        openai_config = self.config.get('OpenAIHandler', {})
+        self.openai_handler = OpenAIHandler(config=openai_config)
 
-        self.logger.info(f"Agent initialized with model: {llm_config.get('model', 'gpt-4')}")
+        self.logger.info(f"Agent initialized with model: {openai_config.get('model', 'gpt-4')}")
 
     def _setup_logging(self):
         """Configure logging based on config"""
-        log_config = self.config.get('logging', {})
+        log_config = self.config.get('Logger', {})
         # Configure the singleton logger with the loaded config
         get_logger().configure(log_config)
 
@@ -63,19 +72,6 @@ class Agent:
         from .fsm import create_simple_fsm
         self.fsm = create_simple_fsm(config=self.config)
         self.logger.info(f"FSM initialized with state: {self.fsm.current_state}")
-
-    # LLM configuration management
-    def get_action_llm_config(self, action_name: str) -> Dict:
-        """
-        Get LLM configuration for a specific action, with action-specific overrides.
-        """
-
-        # Get merged LLM config for this action
-        action_llm_config = get_action_llm_config(self.config, action_name)
-        # Remove None values for cleaner config
-        clean_config = {k: v for k, v in action_llm_config.items() if v is not None}
-
-        return clean_config.copy()
 
     # Chat completion methods
     def chat_completion(self, prompt: str, system_message: str = None,
@@ -87,7 +83,7 @@ class Agent:
         Args:
             prompt: The user prompt
             system_message: Optional system message
-            action_type: Use action-specific config
+            action_type: Use action-specific config (not used anymore)
             override_config: Dictionary to override any config parameters
             response_format: Optional response format (e.g., {"type": "json_object"})
             extra_body: Additional parameters to pass to the API
@@ -95,10 +91,8 @@ class Agent:
         Returns:
             The response content as string
         """
-        # Get action-specific config if requested
+        # Set up base config
         config = {}
-        if action_type:
-            config = self.get_action_llm_config(action_type)
 
         # Use action-specific system message if not provided
         if system_message is None:
@@ -184,7 +178,7 @@ class Agent:
                     break
 
                 # Construct prompt combining role, state prompt, and available actions
-                prompt = self.fsm.get_action_prompt()
+                prompt = self.fsm.get_action_prompt(self)
 
                 # Get action choice from LLM
                 self.logger.info("Requesting action selection from LLM")
@@ -251,7 +245,7 @@ class Agent:
                     break
 
         # Record final state and context
-        results['final_state'] = self.fsm.current_state.name
+        results['final_state'] = self.fsm.current_state
         results['final_context'] = self.context.copy()
 
         self.logger.info(f"Agent loop completed after {results['iterations']} iterations")

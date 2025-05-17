@@ -4,6 +4,7 @@ import os
 import sys
 from typing import Dict, List, Any, Optional, Callable
 from .logger import get_logger
+from .config import set_attributes_from_config
 
 
 class Action(ABC):
@@ -13,6 +14,9 @@ class Action(ABC):
         """Initialize the action with a configuration dictionary"""
         self.config = config or {}
         self.logger = get_logger()
+
+        # Automatically set attributes from config
+        set_attributes_from_config(self, self.config)
 
     @abstractmethod
     def execute(self, agent, **kwargs):
