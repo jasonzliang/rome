@@ -135,7 +135,7 @@ def main():
     logger.info("Agent initialized. Starting execution loop...")
 
     # Run the agent's execution loop
-    results = agent.run_loop(max_iterations=6)
+    results = agent.run_loop(max_iterations=1)
 
     # Log and save the results
     logger.info(f"Agent execution completed with {len(results['actions_executed'])} actions")
