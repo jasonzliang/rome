@@ -128,7 +128,7 @@ def main():
         role="You are an expert code analyzer that can identify interesting algorithms and functions.",
         config_dict=config
     )
-    agent.draw_fsm_graph(); exit()
+    agent.draw_fsm_graph()
 
     # Run the agent's execution loop
     results = agent.run_loop(max_iterations=2)
