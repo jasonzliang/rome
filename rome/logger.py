@@ -4,7 +4,11 @@ from typing import Optional, Dict
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.text import Text
-from .config import set_attributes_from_config
+
+# Needed to prevent circular imports
+def set_attributes_from_config(obj, config):
+    for key, value in config.items():
+        setattr(obj, key, value)
 
 class Logger:
     """Thread-safe singleton logger with Rich console output"""

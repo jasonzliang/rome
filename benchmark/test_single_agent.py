@@ -70,7 +70,9 @@ def setup_test_dir():
 def main():
     """Main function to run the test"""
     logger = get_logger()
-    logger.configure({"level": "DEBUG", "console": True})
+    logger.configure({"level": "DEBUG",
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "console": True})
     logger.info("Starting agent test")
 
     # Setup test directory with HumanEval samples
@@ -133,7 +135,7 @@ def main():
     logger.info("Agent initialized. Starting execution loop...")
 
     # Run the agent's execution loop
-    results = agent.run_loop(max_iterations=5)
+    results = agent.run_loop(max_iterations=6)
 
     # Log and save the results
     logger.info(f"Agent execution completed with {len(results['actions_executed'])} actions")

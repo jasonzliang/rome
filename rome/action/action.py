@@ -3,8 +3,8 @@ import glob
 import os
 import sys
 from typing import Dict, List, Any, Optional, Callable
-from .logger import get_logger
-from .config import set_attributes_from_config
+from ..logger import get_logger
+from ..config import set_attributes_from_config
 
 
 class Action(ABC):

@@ -5,7 +5,7 @@ import time
 import traceback
 from typing import Dict, List, Any, Optional
 from .action import Action
-from .logger import get_logger
+from ..logger import get_logger
 
 
 class SearchAction(Action):

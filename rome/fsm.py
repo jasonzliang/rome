@@ -4,8 +4,8 @@ import sys
 from typing import Dict, List, Optional, Callable
 
 from .action import Action
-from .search_action import SearchAction
-from .retry_action import RetryAction
+from .action import SearchAction
+from .action import RetryAction
 from .state import State
 from .state import IdleState
 from .state import CodeLoadedState
