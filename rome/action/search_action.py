@@ -54,9 +54,9 @@ class SearchAction(Action):
                 })
 
             except Exception as e:
-                self.logger.warning(f"Error reading {file_path}: {e}")
+                self.logger.info(f"Error reading {file_path}: {e}")
 
-        self.logger.info(f"Collected overview data for {len(file_overviews)} files")
+        # self.logger.info(f"Collected overview data for {len(file_overviews)} files")
         return file_overviews
 
     def _prioritize_files(self, agent, file_overviews: List[Dict]) -> List[Dict]:
@@ -69,7 +69,7 @@ class SearchAction(Action):
 Assign a priority score (1-5, 5 being highest) to each file based on:
 1. File age (older files are more stable and likely more important)
 2. File size (smaller files are more focused and easier to analyze)
-3. Function/class definitions that match the selection criteria and your role
+3. Function/class definitions that match your role and selection criteria
 
 Selection criteria: {self.selection_criteria}
 
@@ -92,13 +92,13 @@ Files to prioritize:
 Return a JSON ARRAY with ALL {len(file_overviews)} files like this:
 [
   {{
-    "file_path": "{file_overviews[0]['path']}",
-    "priority": 5,
+    "file_path": "path/to/file1.py",
+    "priority": 1-5,
     "reason": "Brief reason"
   }},
   {{
-    "file_path": "{file_overviews[1]['path'] if len(file_overviews) > 1 else 'path/to/file2.py'}",
-    "priority": 3,
+    "file_path": "path/to/file2.py",
+    "priority": 1-5,
     "reason": "Brief reason"
   }}
   {', ...' if len(file_overviews) > 2 else ''}
@@ -127,7 +127,7 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
             prioritized_files = result
         elif isinstance(result, dict) and "file_path" in result:
             # Result is a single object - create array with all files
-            self.logger.warning("Received single object instead of array, creating array manually")
+            self.logger.info("Received single object instead of array, creating array manually")
             prioritized_files.append(result)
 
             # Add all other files with lower priority
@@ -154,7 +154,7 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
 
         # Add any missing files
         for path in all_paths - prioritized_paths:
-            self.logger.warning(f"File missing from prioritized list: {path}, adding with default priority")
+            self.logger.info(f"File missing from prioritized list: {path}, adding with default priority")
             prioritized_files.append({
                 "file_path": path,
                 "priority": 1,
@@ -188,39 +188,151 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
         if len(filtered_files) > self.max_files:
             random.shuffle(filtered_files)
             filtered_files = filtered_files[:self.max_files]
-            self.logger.info(f"Limiting filtering to max file limit: {self.max_files}")
+            self.logger.info(f"Reducing filtered files for exceeding max file limit: {self.max_files}")
         return filtered_files
 
-    def _create_selection_prompt(self, files_batch: List[Dict]) -> str:
-        """Create a prompt for OpenAI to evaluate file selection"""
-        prompt = f"""You are analyzing code files to select THE MOST RELEVANT file.
+    def _process_file_batches(self, agent, file_paths: List[str], prioritized_files: List[Dict]) -> Dict:
+        """
+        Process batches of files to find the most relevant match
 
-Selection criteria: {self.selection_criteria}
+        Args:
+            agent: The agent instance
+            file_paths: List of file paths to process
+            prioritized_files: List of prioritized files with metadata
 
-IMPORTANT: You must select EXACTLY ONE file from the batch below.
+        Returns:
+            Dictionary with selected file or None
+        """
+        self.logger.info("Processing file batches to find relevant match")
+        current_batch = 0
+        selected_file = None
 
-Please analyze the following files and select the most relevant one:
+        while current_batch * self.batch_size < len(file_paths) and selected_file is None:
+            start_idx = current_batch * self.batch_size
+            end_idx = min((current_batch + 1) * self.batch_size, len(file_paths))
+            batch_paths = file_paths[start_idx:end_idx]
 
+            self.logger.info(f"Processing batch {current_batch+1}: files {start_idx+1}-{end_idx}")
+
+            # Load full content for current batch
+            current_batch_data = []
+            for file_path in batch_paths:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        content = f.read()
+
+                        # Find the priority info for this file
+                        priority_info = next((f for f in prioritized_files if f["file_path"] == file_path), None)
+                        priority = priority_info.get("priority", 1) if priority_info else 1
+                        reason = priority_info.get("reason", "No reason provided") if priority_info else "No reason provided"
+
+                        current_batch_data.append({
+                            'path': file_path,
+                            'content': content,
+                            'priority': priority,
+                            'priority_reason': reason
+                        })
+                except Exception as e:
+                    self.logger.info(f"Error reading {file_path}: {e}")
+
+            if not current_batch_data:
+                self.logger.info(f"No readable files in batch {current_batch+1}")
+                current_batch += 1
+                continue
+
+            # Create a more concise selection prompt
+            prompt = self._create_selection_prompt(current_batch_data, current_batch,
+                                                 (len(file_paths) + self.batch_size - 1) // self.batch_size)
+
+            # Request LLM to select a file
+            self.logger.info("Querying OpenAI for file selection")
+            response = agent.chat_completion(
+                prompt=prompt,
+                system_message=agent.role,
+                response_format={"type": "json_object"}
+            )
+
+            # Parse OpenAI response
+            result = agent.parse_json_response(response)
+
+            # Check for parsing errors
+            if not result or "error" in result:
+                self.logger.error(f"Error parsing OpenAI response: {result.get('error', 'Unknown error')}")
+                current_batch += 1
+                continue
+
+            # Process OpenAI response
+            selected_file_info = result.get('selected_file')
+
+            if selected_file_info:
+                file_number = selected_file_info.get('file_number')
+                if file_number and 1 <= file_number <= len(current_batch_data):
+                    file_data = current_batch_data[file_number - 1]
+                    reason = selected_file_info.get('reason', 'Selected by LLM')
+
+                    selected_file = {
+                        'path': file_data['path'],
+                        'content': file_data['content'],
+                        'reason': reason,
+                        'priority': file_data['priority']
+                    }
+
+                    self.logger.info(f"Selected file: {file_data['path']} - {reason}")
+                else:
+                    self.logger.info(f"Invalid file_number in response: {file_number}")
+
+            # If perfect match found or explicitly directed to stop, break out of loop
+            if selected_file:
+                self.logger.info("Perfect match found, stopping search")
+                break
+
+            # Move to next batch
+            current_batch += 1
+
+        return selected_file
+
+    def _create_selection_prompt(self, batch_data: List[Dict], current_batch: int, total_batches: int) -> str:
+        """
+        Create a concise prompt for file selection
+
+        Args:
+            batch_data: List of file data for current batch
+            current_batch: Current batch number (1-indexed)
+            total_batches: Total number of batches
+
+        Returns:
+            Prompt string for LLM
+        """
+        # File list summary at the top
+        prompt = f"""Select the most relevant file based on your role and selection criteria: {self.selection_criteria}
+
+Current batch: {current_batch+1}/{total_batches}
+File list:
 """
-        for i, file_info in enumerate(files_batch):
-            prompt += f"\n--- File {i+1}: {file_info['path']} ---\n"
-            # Include full content (no truncation)
-            prompt += file_info['content'] + "\n"
+        # Add short file summaries
+        for i, file_info in enumerate(batch_data):
+            filename = os.path.basename(file_info['path'])
+            prompt += f"- File {i+1}: {filename} (Priority: {file_info['priority']}/5) - {file_info['priority_reason']}\n"
 
+        # Add full file contents
+        prompt += "\nDetailed file contents:"
+        for i, file_info in enumerate(batch_data):
+            prompt += f"\n\n--- File {i+1}: {file_info['path']} ---\n"
+            prompt += file_info['content']
+
+        # Add expected response format
         prompt += """
-Please respond with a single JSON object in the following format:
+
+Respond with a JSON object:
 {
     "selected_file": {
-        "file_number": 1,
-        "path": "path/to/file.py",
-        "reason": "Detailed reason for selection"
-    },
-    "should_continue": true/false
+        "file_number": <int>,
+        "path": "<file_path>",
+        "reason": "<rationale>"
+    }
 }
 
-- You MUST select exactly one file
-- Set "should_continue" to false if you found the perfect file, true otherwise
-- Provide a detailed reason for your selection
+- Set "selected_file" to null if no file meets the criteria
 """
         return prompt
 
@@ -253,129 +365,9 @@ Please respond with a single JSON object in the following format:
         # Step 2: Prioritize files based on overview data
         prioritized_files = self._prioritize_files(agent, file_overviews)
 
-        # Store prioritized files in agent context for reference (not needed)
-        # agent.context['prioritized_files'] = prioritized_files
-
         # Step 3: Process batches of files in priority order for detailed review
         file_paths = [file_info["file_path"] for file_info in prioritized_files]
-        current_batch = 0
-        selected_file = None
-
-        while current_batch * self.batch_size < len(file_paths) and selected_file is None:
-            start_idx = current_batch * self.batch_size
-            end_idx = min((current_batch + 1) * self.batch_size, len(file_paths))
-            batch_paths = file_paths[start_idx:end_idx]
-
-            self.logger.info(f"Processing batch {current_batch+1}: files {start_idx+1}-{end_idx}")
-
-            # Load full content for current batch
-            current_batch_data = []
-            for file_path in batch_paths:
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-
-                        # Find the priority info for this file
-                        priority_info = next((f for f in prioritized_files if f["file_path"] == file_path), None)
-                        priority = priority_info.get("priority", 1) if priority_info else 1
-                        reason = priority_info.get("reason", "No reason provided") if priority_info else "No reason provided"
-
-                        current_batch_data.append({
-                            'path': file_path,
-                            'content': content,
-                            'priority': priority,
-                            'priority_reason': reason
-                        })
-                except Exception as e:
-                    self.logger.warning(f"Error reading {file_path}: {e}")
-
-            if not current_batch_data:
-                self.logger.info(f"No readable files in batch {current_batch+1}")
-                current_batch += 1
-                continue
-
-            # Create selection prompt
-            prompt = f"""You are selecting the most relevant file based on full content.
-
-Selection criteria: {self.selection_criteria}
-
-IMPORTANT: You must select THE MOST RELEVANT file from the batch below OR explicitly indicate that none are sufficiently relevant.
-
-Current batch: {current_batch+1} of {(len(file_paths) + self.batch_size - 1) // self.batch_size}
-Files in this batch (with assigned priorities):
-"""
-
-            for i, file_info in enumerate(current_batch_data):
-                filename = os.path.basename(file_info['path'])
-                prompt += f"\n- File {i+1}: {filename} (Priority: {file_info['priority']}/5) - {file_info['priority_reason']}"
-
-            prompt += "\n\nDetailed file contents:"
-
-            for i, file_info in enumerate(current_batch_data):
-                prompt += f"\n\n--- File {i+1}: {file_info['path']} (Priority: {file_info['priority']}/5) ---\n"
-                prompt += file_info['content']
-
-            prompt += """
-
-Please respond with a single JSON object in the following format:
-{
-    "selected_file": {
-        "file_number": 1,
-        "path": "path/to/file.py",
-        "reason": "Detailed reason for selection"
-    },
-    "should_continue": true/false
-}
-
-- Set "selected_file" to null if no file meets the selection criteria
-- Set "should_continue" to false if you found the perfect file or true if we should continue searching
-"""
-
-            # Request LLM to select a file
-            self.logger.info("Querying OpenAI for file selection")
-            response = agent.chat_completion(
-                prompt=prompt,
-                system_message=agent.role,
-                response_format={"type": "json_object"}
-            )
-
-            # Parse OpenAI response
-            result = agent.parse_json_response(response)
-
-            # Check for parsing errors
-            if not result or "error" in result:
-                self.logger.error(f"Error parsing OpenAI response: {result.get('error', 'Unknown error')}")
-                current_batch += 1
-                continue
-
-            # Process OpenAI response
-            selected_file_info = result.get('selected_file')
-            should_continue = result.get('should_continue', True)
-
-            if selected_file_info:
-                file_number = selected_file_info.get('file_number')
-                if file_number and 1 <= file_number <= len(current_batch_data):
-                    file_data = current_batch_data[file_number - 1]
-                    reason = selected_file_info.get('reason', 'Selected by LLM')
-
-                    selected_file = {
-                        'path': file_data['path'],
-                        'content': file_data['content'],
-                        'reason': reason,
-                        'priority': file_data['priority']
-                    }
-
-                    self.logger.info(f"Selected file: {file_data['path']} - {reason}")
-                else:
-                    self.logger.warning(f"Invalid file_number in response: {file_number}")
-
-            # If perfect match found or explicitly directed to stop, break out of loop
-            if (selected_file and not should_continue):
-                self.logger.info("Perfect match found, stopping search")
-                break
-
-            # Move to next batch
-            current_batch += 1
+        selected_file = self._process_file_batches(agent, file_paths, prioritized_files)
 
         # Add selected file to agent context
         if selected_file:

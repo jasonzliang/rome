@@ -60,7 +60,7 @@ class Agent:
         openai_config = self.config.get('OpenAIHandler', {})
         self.openai_handler = OpenAIHandler(config=openai_config)
 
-        self.logger.info(f"Agent initialized with model: {openai_config.get('model')}")
+        self.logger.info(f"Agent {self.name} initialized with role:\n{self.role}")
 
     def _validate_and_format_role(self, role: str) -> str:
         """
@@ -76,12 +76,12 @@ class Agent:
             A properly formatted role string
         """
         # Check if "your role" exists anywhere in the string (case insensitive)
-        if "your role" in role.lower() or "you are" in role.lower():
+        if "your role" in role.lower():
             return role
 
         # If not found, add a properly formatted header
         self.logger.info("Role string does not contain 'your role', reformatting")
-        return f"## Your role:\n{role}"
+        return f"## Your role: {role}"
 
     def _setup_logging(self):
         """Configure logging based on config"""
