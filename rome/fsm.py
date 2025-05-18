@@ -182,6 +182,81 @@ Choose the most appropriate action based on the current state and context."""
 
         return graph
 
+    def draw_graph(self, output_path: str = None) -> str:
+        """
+        Draw the FSM graph to a PNG file
+
+        Args:
+            output_path: Path where to save the graph image. If None,
+                         a default path will be used.
+
+        Returns:
+            The path to the generated PNG file
+        """
+        try:
+            # Try to import graphviz
+            import graphviz
+        except ImportError:
+            error_msg = "Unable to draw FSM graph: graphviz package not installed. Please install with 'pip install graphviz'"
+            self.logger.error(error_msg)
+            raise ImportError(error_msg)
+
+        # Create a new directed graph
+        dot = graphviz.Digraph('FSM', format='png')
+        dot.attr(rankdir='LR', size='11,8')  # Left to right layout, 8x5 inch size
+
+        # Set the node styles
+        dot.attr('node', shape='circle', style='filled', color='lightblue2')
+
+        # Add states as nodes
+        for state_name in self.states.keys():
+            # Current state gets a special color
+            if state_name == self.current_state:
+                dot.node(state_name, style='filled', color='lightgreen')
+            else:
+                dot.node(state_name)
+
+        # Add transitions as edges
+        for from_state, actions in self.transitions.items():
+            for action, to_state in actions.items():
+                dot.edge(from_state, to_state, label=action)
+
+        # Determine output path if not provided
+        if output_path is None:
+            # Check if we have a base_dir from the logger that might be a good place to save
+            log_dir = get_logger().get_log_dir()
+            if log_dir:
+                output_path = os.path.join(log_dir, 'fsm_graph.png')
+            else:
+                # If no specific dir, just use current directory
+                output_path = 'fsm_graph.png'
+
+        # Ensure directory exists
+        output_dir = os.path.dirname(output_path)
+        if output_dir and not os.path.exists(output_dir):
+            os.makedirs(output_dir, exist_ok=True)
+
+        # Render the graph to a file
+        try:
+            # Use the directory and filename from output_path
+            output_dir = os.path.dirname(output_path)
+            output_filename = os.path.basename(output_path)
+
+            # Remove extension from filename for graphviz
+            if '.' in output_filename:
+                output_filename = output_filename.rsplit('.', 1)[0]
+
+            # Render the file - this will create output_filename.png
+            output_file = dot.render(filename=output_filename, directory=output_dir, cleanup=True)
+
+            self.logger.info(f"FSM graph rendered to: {output_file}")
+            return output_file
+
+        except Exception as e:
+            error_msg = f"Error rendering FSM graph: {str(e)}"
+            self.logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
     def validate_fsm(self) -> bool:
         """Validate the FSM structure"""
         issues = []

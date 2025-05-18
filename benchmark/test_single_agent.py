@@ -109,8 +109,6 @@ def main():
             "file_type": ".py",
             "batch_size": 3,  # Process all 3 files in a single batch
             "selection_criteria": "Select the most interesting code file to improve and complete.",
-            "max_files": sys.maxsize,
-            "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"]
         },
 
         # RetryAction specific configuration
@@ -130,16 +128,18 @@ def main():
         role="You are an expert code analyzer that can identify interesting algorithms and functions.",
         config_dict=config
     )
+    agent.draw_fsm_graph(); exit()
 
     # Run the agent's execution loop
-    results = agent.run_loop(max_iterations=6)
+    results = agent.run_loop(max_iterations=2)
 
     # Log and save the results
     logger.info(f"Agent execution completed with {len(results['actions_executed'])} actions")
     logger.info(f"Final state: {results['final_state']}")
 
     # Save the execution results to a file
-    with open(test_dir / "results.json", "w") as f:
+    log_dir = Path(logger.get_log_dir())
+    with open(log_dir / "results.json", "w") as f:
         # Convert any non-serializable objects to strings
         serializable_results = {}
         for key, value in results.items():
@@ -154,7 +154,7 @@ def main():
 
         json.dump(serializable_results, f, indent=2)
 
-    logger.info(f"Results saved to: {test_dir / 'results.json'}")
+    logger.info(f"Results saved to: {log_dir / 'results.json'}")
 
 if __name__ == "__main__":
     main()

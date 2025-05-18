@@ -1,5 +1,6 @@
 import logging
 import threading
+import os
 from typing import Optional, Dict
 from rich.console import Console
 from rich.logging import RichHandler
@@ -36,6 +37,10 @@ class Logger:
             # Prevent propagation to avoid duplicate logs
             self._logger.propagate = False
 
+            # Initialize the base_dir and filename attributes
+            self.base_dir = None
+            self.filename = None
+
     def configure(self, log_config: Dict):
         """Configure the logger with provided configuration"""
         with self._lock:
@@ -58,12 +63,20 @@ class Logger:
             # Create formatter
             formatter = logging.Formatter(self.format)
 
-            # Add file handler if specified
-            if hasattr(self, 'file') and self.file:
-                file_handler = logging.FileHandler(self.file, mode='a')
-                file_handler.setFormatter(formatter)
-                file_handler.setLevel(level)
-                self._logger.addHandler(file_handler)
+            # Add file handler if base_dir and filename are specified
+            if hasattr(self, 'base_dir') and self.base_dir:
+                # Create log directory if it doesn't exist
+                os.makedirs(self.base_dir, exist_ok=True)
+
+                if hasattr(self, 'filename') and self.filename:
+                    # Construct full log file path
+                    log_file_path = os.path.join(self.base_dir, self.filename)
+
+                    file_handler = logging.FileHandler(log_file_path, mode='a')
+                    file_handler.setFormatter(formatter)
+                    file_handler.setLevel(level)
+                    self._logger.addHandler(file_handler)
+                    self.info(f"Logging to file: {log_file_path}")
 
             # Add Rich console handler if enabled
             if self.console:
@@ -77,6 +90,12 @@ class Logger:
                 )
                 rich_handler.setLevel(level)
                 self._logger.addHandler(rich_handler)
+
+    def get_log_dir(self) -> Optional[str]:
+        """Get the current log directory"""
+        if not os.path.exists(self.base_dir):
+            os.makedirs(self.base_dir)
+        return self.base_dir
 
     def info(self, message: str):
         """Log info message"""

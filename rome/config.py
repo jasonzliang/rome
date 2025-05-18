@@ -5,6 +5,9 @@ import sys
 from typing import Dict, Any
 from .logger import get_logger
 
+# Default logging base directory name for agents
+DEFAULT_LOGDIR_NAME = "__rome__"
+
 # Define the default configuration structure as a dictionary
 DEFAULT_CONFIG = {
     # OpenAIHandler settings - includes all OpenAI API configuration
@@ -36,7 +39,8 @@ DEFAULT_CONFIG = {
     "Logger": {
         "level": "ERROR",
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        "file": None,  # Set to a path to enable file logging
+        "base_dir": None,  # Directory for log files (None disables file logging)
+        "filename": None,  # Log file name (None disables file logging)
         "console": True
     },
 
@@ -51,7 +55,7 @@ DEFAULT_CONFIG = {
     "SearchAction": {
         "max_files": sys.maxsize,
         "file_type": ".py",
-        "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"],
+        "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build", DEFAULT_LOGDIR_NAME],
         "selection_criteria": "Select the most relevant file for the current task",
         "batch_size": 5
     },

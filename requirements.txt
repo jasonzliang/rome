@@ -2,3 +2,5 @@ colorama
 numpy
 openai
 pyribs
+networkx
+plotly

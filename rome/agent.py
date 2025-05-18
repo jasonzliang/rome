@@ -6,8 +6,8 @@ from typing import Dict, List
 # Import the OpenAIHandler we created
 from .openai import OpenAIHandler
 # Import default config utilities
-from .config import DEFAULT_CONFIG, set_attributes_from_config
-from .config import load_config, merge_with_default_config
+from .config import DEFAULT_CONFIG, DEFAULT_LOGDIR_NAME
+from .config import set_attributes_from_config, load_config, merge_with_default_config
 # Import singleton logger
 from .logger import get_logger
 
@@ -24,6 +24,9 @@ class Agent:
         # Setup logging first
         self.logger = get_logger()
 
+        # Store the name for later use with logging
+        self.name = name
+
         # Load configuration next
         if config_dict:
             self.config = merge_with_default_config(config_dict)
@@ -31,24 +34,21 @@ class Agent:
             self.logger.info("Using DEFAULT_CONFIG, no config dict provided")
             self.config = DEFAULT_CONFIG.copy()
 
-        # Setup agent name and basic info
-        self.name = name
-
         # Validate and properly format the role string
         self.role = self._validate_and_format_role(role)
 
-        # Configure logger immediately after loading config
-        self._setup_logging()
-
-        # Get the Agent-specific configuration
+        # Set up agent configuration
         agent_config = self.config.get('Agent', {})
         # Automatically set attributes from Agent config
         set_attributes_from_config(self, agent_config)
 
-        # Validate required attributes
+        # Validate repository attribute
         assert hasattr(self, 'repository'), "repository not provided in Agent config"
         assert self.repository is not None and os.path.exists(self.repository), \
             f"Repository path does not exist: {self.repository}"
+
+        # Configure logging after repository is validated
+        self._setup_logging()
 
         # Initialize context
         self.context = {}
@@ -63,18 +63,8 @@ class Agent:
         self.logger.info(f"Agent {self.name} initialized with role:\n{self.role}")
 
     def _validate_and_format_role(self, role: str) -> str:
-        """
-        Validates and formats the agent's role string.
+        """Validates and formats the agent's role string. If not, it formats the role with a proper header."""
 
-        Ensures that the role string contains 'your role' (case-insensitive)
-        somewhere in the text. If not, it formats the role with a proper header.
-
-        Args:
-            role: The original role string
-
-        Returns:
-            A properly formatted role string
-        """
         # Check if "your role" exists anywhere in the string (case insensitive)
         if "your role" in role.lower():
             return role
@@ -83,17 +73,47 @@ class Agent:
         self.logger.info("Role string does not contain 'your role', reformatting")
         return f"## Your role: {role}"
 
+    def _get_safe_name(self):
+        """Safe name for naming file"""
+        return ''.join(c if c.isalnum() else '_' for c in self.name).lower()
+
     def _setup_logging(self):
         """Configure logging based on config"""
-        log_config = self.config.get('Logger', {})
+        # Get the logging configuration
+        log_config = self.config.get('Logger', {}).copy()
+
+        # Set base_dir and filename if not already set
+        if not log_config.get('base_dir'):
+            log_config['base_dir'] = os.path.join(self.repository, DEFAULT_LOGDIR_NAME)
+
+        if not log_config.get('filename'):
+            # Ensure agent name is suitable for a filename
+            log_config['filename'] = f"agent_{self._get_safe_name()}.log"
+
         # Configure the singleton logger with the loaded config
         get_logger().configure(log_config)
+
+        self.logger.info(f"Logging configured. Log directory: {log_config['base_dir']}")
 
     def _setup_fsm(self):
         """Initialize the Finite State Machine"""
         from .fsm import create_simple_fsm
         self.fsm = create_simple_fsm(config=self.config)
         self.logger.info(f"FSM initialized with state: {self.fsm.current_state}")
+
+    def draw_fsm_graph(self, output_path: str = None) -> str:
+        """
+        Draw the FSM graph to a PNG file
+        """
+        # If no output path specified, use the .rome directory
+        if output_path is None:
+            output_path = os.path.join(self.logger.get_log_dir(),
+                f"fsm_graph_{self._get_safe_name()}.png")
+
+        # Draw the graph using the FSM method
+        self.logger.info(f"Drawing FSM graph to {output_path}")
+        return self.fsm.draw_graph(output_path)
+
 
     # Chat completion methods
     def chat_completion(self, prompt: str,
