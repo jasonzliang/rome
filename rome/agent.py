@@ -137,19 +137,17 @@ class Agent:
     # Utility methods
     def parse_json_response(self, response: str) -> Dict:
         """Parse JSON response using the handler"""
-        return self.openai_handler.parse_json_response(response)
-
-    def parse_python_response(self, response: str) -> str:
-        """Parse Python code from response using the handler"""
-        result = self.openai_handler.parse_python_response(response)
-        return result or ""  # Return empty string instead of None to avoid errors
+        result = self.openai_handler.parse_json_response(response)
+        if result is None:
+            self.logger.error("Failed to parse JSON object from response")
+        return result
 
     def parse_python_response(self, response: str) -> str:
         """Parse Python code from response using the handler"""
         result = self.openai_handler.parse_python_response(response)
         if result is None:
-            self.logger.info("Failed to parse Python code from response")
-        return result or ""  # Return empty string instead of None to avoid errors
+            self.logger.error("Failed to parse Python code from response")
+        return result
 
     def _extract_action_from_response(self, response: str) -> str:
         """

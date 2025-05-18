@@ -279,7 +279,7 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
 
                     self.logger.info(f"Selected file: {file_data['path']} - {reason}")
                 else:
-                    self.logger.info(f"Invalid file_number in response: {file_number}")
+                    self.logger.error(f"Invalid file_number in response: {file_number}")
 
             # If perfect match found or explicitly directed to stop, break out of loop
             if selected_file:
