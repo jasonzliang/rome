@@ -126,8 +126,6 @@ class FSM:
         else:
             # Fallback to transitions if state not found
             actions = list(self.transitions.get(self.current_state, {}).keys())
-
-        self.logger.info(f"Available actions from {self.current_state}: {actions}")
         return actions
 
     def _get_state_prompt(self, agent) -> str:

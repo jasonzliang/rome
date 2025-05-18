@@ -51,7 +51,6 @@ DEFAULT_CONFIG = {
     "SearchAction": {
         "max_files": sys.maxsize,
         "file_type": ".py",
-        "depth": sys.maxsize,
         "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"],
         "selection_criteria": "Select the most relevant file for the current task",
         "batch_size": 5

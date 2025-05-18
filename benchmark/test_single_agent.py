@@ -110,7 +110,6 @@ def main():
             "batch_size": 1,  # Process all 3 files in a single batch
             "selection_criteria": "Select the most interesting code file to improve and complete.",
             "max_files": sys.maxsize,
-            "depth": sys.maxsize,
             "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build"]
         },
 

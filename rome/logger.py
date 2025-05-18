@@ -5,7 +5,7 @@ from rich.console import Console
 from rich.logging import RichHandler
 from rich.text import Text
 
-# Needed to prevent circular imports
+# Don't import from config, needed to prevent circular imports
 def set_attributes_from_config(obj, config):
     for key, value in config.items():
         setattr(obj, key, value)

@@ -1,9 +1,10 @@
 import glob
 import os
+import pprint
 import sys
 import time
 import traceback
-from typing import Dict, List, Any, Optional
+from typing import Dict, Optional, Any, Union, List
 from .action import Action
 from ..logger import get_logger
 
@@ -59,78 +60,106 @@ class SearchAction(Action):
         return file_overviews
 
     def _prioritize_files(self, agent, file_overviews: List[Dict]) -> List[Dict]:
-        """Use LLM to prioritize files based on size, age, and definitions"""
-        self.logger.info("Prioritizing files based on overview data")
+        """Use LLM to prioritize all files at once based on size, age, and definitions"""
+        self.logger.info(f"Prioritizing all {len(file_overviews)} files at once")
 
-        # Create batches for prioritization (to avoid token limits)
-        batch_size = 50  # Process 50 files at a time for prioritization
-        prioritized_files = []
+        # Create a clear and direct prompt
+        prompt = f"""Return a JSON ARRAY of ALL {len(file_overviews)} files with priority scores (1-5).
 
-        for i in range(0, len(file_overviews), batch_size):
-            batch = file_overviews[i:i+batch_size]
-            self.logger.info(f"Prioritizing batch {i//batch_size + 1} of {(len(file_overviews) + batch_size - 1)//batch_size}")
-
-            # Create prioritization prompt
-            prompt = f"""Assign a priority score (1-5, 5 being highest) to each file based on:
+Assign a priority score (1-5, 5 being highest) to each file based on:
 1. File age (older files are more stable and likely more important)
 2. File size (smaller files are more focused and easier to analyze)
 3. Function/class definitions that match the selection criteria and your role
 
 Selection criteria: {self.selection_criteria}
 
-Please review these files and assign a priority score to each:
-
+Files to prioritize:
 """
-            for j, file_info in enumerate(batch):
-                prompt += f"\n--- File {j+1}: {file_info['path']} ---\n"
-                prompt += f"Size: {file_info['size_kb']} KB\n"
-                prompt += f"Last modified: {file_info['modified_age']} seconds ago\n"
+        # Add file information to the prompt
+        for j, file_info in enumerate(file_overviews):
+            prompt += f"\n--- File {j+1}: {file_info['path']} ---\n"
+            prompt += f"Size: {file_info['size_kb']} KB\n"
+            prompt += f"Last modified: {file_info['modified_age']} seconds ago\n"
 
-                if file_info['definitions']:
-                    prompt += "Definitions:\n"
-                    for defn in file_info['definitions']:
-                        prompt += f"  {defn}\n"
-                else:
-                    prompt += "No function/class definitions found\n"
+            if file_info['definitions']:
+                prompt += "Definitions:\n"
+                for defn in file_info['definitions']:
+                    prompt += f"  {defn}\n"
+            else:
+                prompt += "No function/class definitions found\n"
 
-            prompt += """
-Respond with a JSON array of prioritized files in this format:
+        prompt += f"""
+Return a JSON ARRAY with ALL {len(file_overviews)} files like this:
 [
-  {
-    "file_path": "path/to/file.py",
+  {{
+    "file_path": "{file_overviews[0]['path']}",
     "priority": 5,
-    "reason": "Brief reason for this priority score"
-  },
-  ...
+    "reason": "Brief reason"
+  }},
+  {{
+    "file_path": "{file_overviews[1]['path'] if len(file_overviews) > 1 else 'path/to/file2.py'}",
+    "priority": 3,
+    "reason": "Brief reason"
+  }}
+  {', ...' if len(file_overviews) > 2 else ''}
 ]
 
-Assign higher priority (4-5) to files that:
-- Are older (more stable)
-- Are smaller (more focused)
-- Have function/class definitions relevant to the selection criteria/role
+IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending with ], not a single object.
 """
 
-            # Get priorities from LLM
-            response = agent.chat_completion(
-                prompt=prompt,
-                system_message=agent.role,
-                response_format={"type": "json_object"}
-            )
+        # Get priorities from LLM without specifying response_format
+        response = agent.chat_completion(
+            prompt=prompt,
+            system_message=agent.role
+            # No response_format parameter
+        )
 
-            # Parse response
-            result = agent.parse_json_response(response)
+        # Use parse_json_response to extract the result
+        result = agent.parse_json_response(response)
 
-            if result and isinstance(result, list):
-                prioritized_files.extend(result)
-            else:
-                self.logger.error(f"Error parsing file priorities: {result}")
-                # Assign default priority 1 to all files in this batch if parsing fails
-                for file_info in batch:
+        # Initialize prioritized_files list
+        prioritized_files = []
+
+        # Handle the result based on its type
+        if isinstance(result, list):
+            # Result is a list - use it directly
+            self.logger.info(f"Received array with {len(result)} files")
+            prioritized_files = result
+        elif isinstance(result, dict) and "file_path" in result:
+            # Result is a single object - create array with all files
+            self.logger.warning("Received single object instead of array, creating array manually")
+            prioritized_files.append(result)
+
+            # Add all other files with lower priority
+            for file_info in file_overviews:
+                if file_info["path"] != result["file_path"]:
                     prioritized_files.append({
                         "file_path": file_info["path"],
-                        "priority": 1,
-                        "reason": "Default priority (parsing error)"
+                        "priority": 1,  # Default priority for files not included
+                        "reason": "Added by default (not in LLM response)"
                     })
+        else:
+            # Invalid response - create default priorities for all files
+            self.logger.error("Invalid response format, using default priorities for all files")
+            for file_info in file_overviews:
+                prioritized_files.append({
+                    "file_path": file_info["path"],
+                    "priority": 1,
+                    "reason": "Default priority (LLM response format error)"
+                })
+
+        # Ensure all files from file_overviews are included
+        all_paths = {file_info["path"] for file_info in file_overviews}
+        prioritized_paths = {file_info.get("file_path") for file_info in prioritized_files}
+
+        # Add any missing files
+        for path in all_paths - prioritized_paths:
+            self.logger.warning(f"File missing from prioritized list: {path}, adding with default priority")
+            prioritized_files.append({
+                "file_path": path,
+                "priority": 1,
+                "reason": "Added by default (missing from LLM response)"
+            })
 
         # Sort by priority (higher first)
         prioritized_files.sort(key=lambda x: x.get("priority", 0), reverse=True)
@@ -155,6 +184,11 @@ Assign higher priority (4-5) to files that:
                     break
             if not exclude:
                 filtered_files.append(file_path)
+
+        if len(filtered_files) > self.max_files:
+            random.shuffle(filtered_files)
+            filtered_files = filtered_files[:self.max_files]
+            self.logger.info(f"Limiting filtering to max file limit: {self.max_files}")
         return filtered_files
 
     def _create_selection_prompt(self, files_batch: List[Dict]) -> str:

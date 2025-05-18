@@ -52,6 +52,28 @@ class OpenAIHandler:
 
         self.logger.info(f"OpenAI handler initialized with model: {self.model}")
 
+    def _log_messages_with_multiline_support(self, messages):
+        """Log messages with proper multiline string formatting"""
+        self.logger.debug("Request messages:")
+
+        for i, msg in enumerate(messages):
+            role = msg.get('role', 'unknown')
+            content = msg.get('content', '')
+
+            # Log the role and message number
+            self.logger.debug(f"[{i}] {role}:")
+
+            # Split content by newlines and log each line separately with proper indentation
+            if '\n' in content:
+                for line in content.split('\n'):
+                    self.logger.debug(f"    {line}")
+            else:
+                self.logger.debug(f"    {content}")
+
+            # Add a separator between messages
+            if i < len(messages) - 1:
+                self.logger.debug("----------")
+
     def chat_completion(self, prompt: str, system_message: str = None,
                        override_config: Dict = None, response_format: Dict = None,
                        extra_body: Dict = None) -> str:
@@ -101,9 +123,9 @@ class OpenAIHandler:
             kwargs.update(extra_body)
 
         # Log request parameters and messages at debug level
-        self.logger.info(f"API call: {kwargs['model']} (temp={kwargs['temperature']})")
+        # self.logger.info(f"API call: {kwargs['model']} (temp={kwargs['temperature']})")
         self.logger.debug(f"OpenAI API request parameters: {json.dumps({k: v for k, v in kwargs.items() if k != 'messages'}, indent=4)}")
-        self.logger.debug(f"Request messages: {json.dumps(messages, indent=4)}")
+        self._log_messages_with_multiline_support(messages)
 
         response = self.client.chat.completions.create(**kwargs)
 
@@ -168,7 +190,7 @@ class OpenAIHandler:
         # No valid Python code found
         return None
 
-    def parse_json_response(self, response: str) -> Dict[str, Any]:
+    def parse_json_response(self, response: str) -> Union[Dict[str, Any], List[Any]]:
         """
         Parse JSON response with optimized approach for both direct JSON and extraction.
 
@@ -179,7 +201,7 @@ class OpenAIHandler:
             response (str): The response text, either direct JSON or containing JSON fragments
 
         Returns:
-            Dict[str, Any]: The parsed JSON object or an empty dict if parsing failed
+            Union[Dict[str, Any], List[Any]]: The parsed JSON object/array or an empty dict if parsing failed
         """
         if not response or not response.strip():
             self.logger.debug("Empty response received for JSON parsing")
@@ -188,14 +210,8 @@ class OpenAIHandler:
         # STEP 1: Try direct JSON parsing first (for response_format="json_object" responses)
         try:
             parsed_json = json.loads(response)
-            if isinstance(parsed_json, dict):
-                return parsed_json
-            elif isinstance(parsed_json, list) and parsed_json and isinstance(parsed_json[0], dict):
-                self.logger.debug("JSON response was a list, returning first item")
-                return parsed_json[0]
-            else:
-                self.logger.info(f"Response was valid JSON but not a usable format: {type(parsed_json)}")
-                return {}
+            # Return the parsed JSON as is, whether it's a dict or a list
+            return parsed_json
         except json.JSONDecodeError:
             # Direct parsing failed, move to extraction methods
             self.logger.debug("Direct JSON parsing failed, trying extraction methods")
@@ -212,11 +228,8 @@ class OpenAIHandler:
                 try:
                     cleaned_match = match.strip()
                     parsed_json = json.loads(cleaned_match)
-
-                    if isinstance(parsed_json, dict):
-                        return parsed_json
-                    elif isinstance(parsed_json, list) and parsed_json and isinstance(parsed_json[0], dict):
-                        return parsed_json[0]
+                    # Return the parsed JSON as is, whether it's a dict or a list
+                    return parsed_json
                 except json.JSONDecodeError:
                     continue
 
@@ -235,13 +248,22 @@ class OpenAIHandler:
                 depth -= 1
                 if depth == 0 and start_indexes:
                     candidate_objects.append(response[start_indexes.pop():i+1])
+            # Also check for JSON arrays
+            elif char == '[':
+                if depth == 0:
+                    start_indexes.append(i)
+                depth += 1
+            elif char == ']':
+                depth -= 1
+                if depth == 0 and start_indexes:
+                    candidate_objects.append(response[start_indexes.pop():i+1])
 
-        # Try to parse each candidate JSON object
+        # Try to parse each candidate JSON object or array
         for candidate in candidate_objects:
             try:
                 parsed_json = json.loads(candidate)
-                if isinstance(parsed_json, dict):
-                    return parsed_json
+                # Return the parsed JSON regardless of type
+                return parsed_json
             except json.JSONDecodeError:
                 continue
 

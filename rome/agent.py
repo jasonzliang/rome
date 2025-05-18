@@ -206,8 +206,11 @@ class Agent:
                 # Check if there are available actions
                 available_actions = self.fsm.get_available_actions()
                 if not available_actions:
-                    self.logger.info("No available actions in current state. Stopping loop.")
-                    break
+                    self.logger.error("No available actions in current state. Stopping loop.")
+                    if stop_on_error: break
+                    else: self.fsm.reset(); continue
+                else:
+                    self.logger.info(f"Available actions from {self.fsm.get_current_state()}: {available_actions}")
 
                 # Construct prompt combining role, state prompt, and available actions
                 prompt = self.fsm.get_action_prompt(self)
@@ -231,11 +234,8 @@ class Agent:
                         'error': error_msg,
                         'state': self.fsm.current_state
                     })
-                    if stop_on_error:
-                        break
-                    else:
-                        self.fsm.reset()
-                        continue
+                    if stop_on_error: break
+                    else: self.fsm.reset(); continue
 
                 # Validate action is available
                 if chosen_action not in available_actions:
@@ -246,11 +246,8 @@ class Agent:
                         'error': error_msg,
                         'state': self.fsm.current_state
                     })
-                    if stop_on_error:
-                        break
-                    else:
-                        self.fsm.reset()
-                        continue
+                    if stop_on_error: break
+                    else: self.fsm.reset(); continue
 
                 # Execute the action through FSM
                 self.logger.info(f"Executing action: {chosen_action}")
@@ -277,10 +274,8 @@ class Agent:
                     'state': self.fsm.current_state,
                     'exception': str(e)
                 })
-                if stop_on_error:
-                    break
-                else:
-                    self.fsm.reset()
+                if stop_on_error: break
+                else: self.fsm.reset(); continue
 
         # Record final state and context
         results['final_state'] = self.fsm.current_state
