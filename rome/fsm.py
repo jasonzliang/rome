@@ -18,8 +18,7 @@ class FSM:
 
     def __init__(self, config: Dict = None):
         self.config = config or {}
-        fsm_config = self.config.get('FSM', {})
-        set_attributes_from_config(self, fsm_config)
+        set_attributes_from_config(self, self.config)
 
         self.states: Dict[str, State] = {}  # nodes
         self.transitions: Dict[str, Dict[str, Tuple[str, Optional[str]]]] = {}  # from_state -> action -> (target, fallback)
@@ -291,13 +290,12 @@ Choose the most appropriate action based on the current state and context.
         return True
 
 
-# Create and configure FSM
-def create_simple_fsm(config):
-    """Create FSM with configuration support including fallback states"""
+def create_minimal_fsm(config):
+    """Create minimal FSM just two states"""
     logger = get_logger()
     logger.info("Creating FSM")
 
-    fsm = FSM(config)
+    fsm = FSM(config.get("FSM", {}))
 
     # Create and add states
     idle_state = fsm.add_state(IdleState(config.get('IdleState', {})))
@@ -317,3 +315,34 @@ def create_simple_fsm(config):
 
     logger.info("FSM created successfully")
     return fsm
+
+def create_simple_fsm(config):
+    """Create simple FSM with code editing and writing tests"""
+    logger = get_logger()
+    logger.info("Creating FSM")
+
+    fsm = FSM(config.get("FSM", {}))
+
+    # Create and add states
+    idle_state = fsm.add_state(IdleState(config.get('IdleState', {})))
+    code_loaded_state = fsm.add_state(CodeLoadedState(config.get('CodeLoadedState', {})))
+
+    # Create actions and add them to FSM
+    fsm.add_action(idle_state, code_loaded_state,
+                 SearchAction(config.get('SearchAction', {})),
+                 fallback_state=idle_state)
+
+    fsm.add_action(code_loaded_state, idle_state,
+                 RetryAction(config.get('RetryAction', {})))
+
+    # Set initial state and validate
+    fsm.set_initial_state(idle_state)
+    fsm.validate_fsm()
+
+    logger.info("FSM created successfully")
+    return fsm
+
+FSM_FACTORY = {
+    'minimal': create_minimal_fsm,
+    'simple': create_simple_fsm,
+}

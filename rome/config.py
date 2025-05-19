@@ -33,6 +33,7 @@ DEFAULT_CONFIG = {
     "Agent": {
         # Repository path
         "repository": "./",
+        "fsm_type": "minimal"
     },
 
     # Logging configuration

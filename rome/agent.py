@@ -10,7 +10,7 @@ from .config import DEFAULT_CONFIG, DEFAULT_LOGDIR_NAME
 from .config import set_attributes_from_config, load_config, merge_with_default_config
 # Import singleton logger
 from .logger import get_logger
-
+from .fsm import FSM, FSM_FACTORY
 
 class Agent:
     """Agent class using OpenAI API, YAML config, and FSM architecture"""
@@ -54,7 +54,7 @@ class Agent:
         self.context = {}
 
         # Set up FSM
-        self._setup_fsm()
+        self.setup_fsm()
 
         # Initialize OpenAI handler with OpenAIHandler config
         openai_config = self.config.get('OpenAIHandler', {})
@@ -95,10 +95,16 @@ class Agent:
 
         self.logger.info(f"Logging configured. Log directory: {log_config['base_dir']}")
 
-    def _setup_fsm(self):
+    def setup_fsm(self, fsm: FSM = None):
         """Initialize the Finite State Machine"""
-        from .fsm import create_simple_fsm
-        self.fsm = create_simple_fsm(config=self.config)
+        if not fsm:
+            assert self.fsm_type in FSM_FACTORY, \
+                f"{self.fsm_type} FSM is not defined, cannot be loaded"
+            self.fsm = FSM_FACTORY[self.fsm_type](config=self.config)
+            self.logger.info(f"Loaded {self.fsm_type} FSM")
+        else:
+            self.fsm = fsm
+            self.logger.info(f"Loaded user provided FSM")
         self.logger.info(f"FSM initialized with state: {self.fsm.current_state}")
 
     def draw_fsm_graph(self, output_path: str = None) -> str:
