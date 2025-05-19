@@ -54,7 +54,10 @@ class Agent:
         self.context = {}
 
         # Set up FSM
-        self.setup_fsm()
+        if self.fsm_type:
+            self._setup_fsm()
+        else:
+            self.fsm = None
 
         # Initialize OpenAI handler with OpenAIHandler config
         openai_config = self.config.get('OpenAIHandler', {})
@@ -95,17 +98,16 @@ class Agent:
 
         self.logger.info(f"Logging configured. Log directory: {log_config['base_dir']}")
 
-    def setup_fsm(self, fsm: FSM = None):
+    def _setup_fsm(self):
         """Initialize the Finite State Machine"""
-        if not fsm:
-            assert self.fsm_type in FSM_FACTORY, \
-                f"{self.fsm_type} FSM is not defined, cannot be loaded"
-            self.fsm = FSM_FACTORY[self.fsm_type](config=self.config)
-            self.logger.info(f"Loaded {self.fsm_type} FSM")
-        else:
-            self.fsm = fsm
-            self.logger.info(f"Loaded user provided FSM")
-        self.logger.info(f"FSM initialized with state: {self.fsm.current_state}")
+        assert self.fsm_type in FSM_FACTORY, \
+            f"{self.fsm_type} FSM is not defined, cannot be loaded"
+        self.fsm = FSM_FACTORY[self.fsm_type](config=self.config)
+        self.logger.info(f"Initialized {self.fsm_type} FSM with state: {self.fsm.get_current_state()}")
+
+    def set_fsm(self, fsm: FSM):
+        self.fsm = fsm
+        self.logger.info(f"Initialized user FSM with state: {self.fsm.get_current_state()}")
 
     def draw_fsm_graph(self, output_path: str = None) -> str:
         """
@@ -210,8 +212,11 @@ class Agent:
         Returns:
             Dict containing loop execution results
         """
-        self.logger.info(f"Starting agent loop for {max_iterations} iterations")
+        self.fsm = None
+        assert self.fsm is not None, "FSM has not been properly initialized"
+        self.fsm.check_context(self)
 
+        self.logger.info(f"Starting agent loop for {max_iterations} iterations")
         results = {
             'iterations': 0,
             'actions_executed': [],

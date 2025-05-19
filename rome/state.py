@@ -71,7 +71,7 @@ class CodeLoadedState(State):
         assert agent.context.get('selected_file') is not None, "selected_file is None in agent context"
 
         # Check required keys in selected_file with a more compact assertion
-        required_keys = ['path', 'content']
+        required_keys = ['path', 'content', 'changes']
         for key in required_keys:
             assert key in selected_file, f"Missing {key} in selected file"
 
@@ -106,7 +106,7 @@ class CodeEditedState(State):
         assert agent.context.get('selected_file') is not None, "selected_file is None in agent context"
 
         # Check required keys in selected_file with a more compact assertion
-        required_keys = ['path', 'content']
+        required_keys = ['path', 'content', 'changes']
         for key in required_keys:
             assert key in selected_file, f"Missing {key} in selected file"
 
@@ -141,7 +141,7 @@ class TestEditedState(State):
         assert agent.context.get('selected_file') is not None, "selected_file is None in agent context"
 
         # Check required keys in selected_file with a more compact assertion
-        required_keys = ['path', 'content']
+        required_keys = ['path', 'content', 'changes', 'test_path', 'test_content', 'test_changes']
         for key in required_keys:
             assert key in selected_file, f"Missing {key} in selected file"
 
