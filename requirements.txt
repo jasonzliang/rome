@@ -1,6 +1,7 @@
 colorama
+graphviz
+networkx
 numpy
 openai
-pyribs
-networkx
 plotly
+pyribs

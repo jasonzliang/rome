@@ -77,7 +77,7 @@ class CodeLoadedState(State):
         for key in required_keys:
             assert key in selected_file, f"Missing {key} in selected file"
 
-        assert os.path.exists(selected_file['path']),
+        assert os.path.exists(selected_file['path']), \
             f"File path does not exist: {selected_file['path']}"
         return True
 

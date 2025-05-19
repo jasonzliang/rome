@@ -36,7 +36,7 @@ class FSM:
 
     def add_state(self, state: State, state_name: str = None) -> str:
         """Add a state (node) to the FSM"""
-        state_name = state_name or state.name
+        state_name = state_name or state.__class__.__name__
         self.states[state_name] = state
         if state_name not in self.transitions:
             self.transitions[state_name] = {}
