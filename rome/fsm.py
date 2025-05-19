@@ -95,10 +95,10 @@ class FSM:
         self.logger.info(f"Executing action: {action_name}")
         result = self.actions[action_name].execute(agent, **kwargs)
 
-        next_state = fallback_state if result is False and fallback_state else target_state
-
+        next_state = target_state
         if result is False and fallback_state:
-            self.logger.info(f"Action returned False, using fallback state: {fallback_state}")
+            next_state = fallback_state
+            self.logger.info(f"Action {action_name} failed, using fallback state: {fallback_state}")
 
         # Validate context for target state
         self.logger.info(f"Checking context for state transition to '{next_state}'")
@@ -126,8 +126,16 @@ class FSM:
         return list(self.transitions.get(self.current_state, {}).keys())
 
     def get_action_prompt(self, agent) -> str:
-        """Construct a prompt that combines state information and available actions"""
-        state_prompt = self.states[self.current_state].get_state_prompt(agent) if self.current_state in self.states else "FSM not properly initialized"
+        """
+        Construct a prompt that combines state information and available actions
+
+        Raises:
+            ValueError: If the current state is not properly initialized
+        """
+        if self.current_state not in self.states:
+            raise ValueError(f"Current state '{self.current_state}' is not a valid state in the FSM")
+
+        state_prompt = self.states[self.current_state].get_state_prompt(agent)
         available_actions = self.get_available_actions()
 
         prompt = f"""{state_prompt}
@@ -139,9 +147,8 @@ Please select one of the available actions to execute. Respond with a JSON objec
     "action": "chosen_action_name",
     "reasoning": "Brief explanation of why you chose this action"
 }}
-
-Choose the most appropriate action based on the current state and context."""
-
+Choose the most appropriate action based on the current state and context.
+"""
         return prompt
 
     def get_graph(self) -> Dict:
