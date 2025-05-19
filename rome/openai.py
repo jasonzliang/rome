@@ -41,7 +41,7 @@ class OpenAIHandler:
         # Setup OpenAI client
         client_kwargs = {
             "api_key": api_key,
-            "base_url": self.base_url
+            "base_url": self.base_url,
             "timeout": self.timeout,
         }
         self.client = openai.OpenAI(**client_kwargs)

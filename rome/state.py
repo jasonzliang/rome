@@ -73,7 +73,7 @@ class CodeLoadedState(State):
         selected_file = agent.context['selected_file']
 
         # Check required keys in selected_file with a more compact assertion
-        required_keys = ['path', 'content', 'changes']
+        required_keys = ['path', 'content', 'reason']
         for key in required_keys:
             assert key in selected_file, f"Missing {key} in selected file"
 
