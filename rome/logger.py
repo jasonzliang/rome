@@ -1,7 +1,8 @@
 import logging
 import threading
 import os
-from typing import Optional, Dict
+import traceback
+from typing import Optional, Dict, Any, Type, Callable
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.text import Text
@@ -42,7 +43,7 @@ class Logger:
             self.filename = None
 
     def configure(self, log_config: Dict):
-        """Configure the logger with provided configuration"""
+        """Configure logger with provided settings, sets up console and file handlers."""
         with self._lock:
             # Clear existing handlers to avoid duplicates
             for handler in self._logger.handlers[:]:
@@ -92,7 +93,7 @@ class Logger:
                 self._logger.addHandler(rich_handler)
 
     def get_log_dir(self) -> Optional[str]:
-        """Get the current log directory"""
+        """Get the current log directory, creating it if needed."""
         if not os.path.exists(self.base_dir):
             os.makedirs(self.base_dir)
         return self.base_dir
@@ -116,6 +117,57 @@ class Logger:
     def critical(self, message: str):
         """Log critical message"""
         self._logger.critical(message)
+
+    def assert_true(self, condition: bool, message: str,
+                    exception_type: Type[Exception] = ValueError,
+                    log_only: bool = True) -> None:
+        """
+        Assert condition is true, log error with traceback if false.
+
+        Args:
+            condition: The condition to check
+            message: Error message to log if condition is False
+            exception_type: Exception type to pass to the caller
+            log_only: If True, logs the error and exits program without raising exception
+        """
+        if condition:
+            return
+
+        # Condition failed - capture stack trace
+        stack = traceback.extract_stack()[:-1]  # Exclude this function from trace
+        stack_trace = ''.join(traceback.format_list(stack))
+
+        # Log the error with stack trace
+        self.error(f"{message}\nStack trace:\n{stack_trace}")
+
+        # If we're just logging, don't raise an exception but exit program
+        if log_only:
+            self.critical(f"Exiting program due to assertion failure: {message}")
+            exit(1)  # Exit with error code 1
+
+        # Raise the exception
+        try:
+            raise exception_type(message)
+        except exception_type as e:
+            # Re-raise with the original message but without a new traceback
+            # The caller will see the exception but Python won't print a duplicate stack trace
+            raise exception_type(str(e)) from None
+
+    def assert_attribute(self, obj: Any, attr_name: str,
+                         message: str = None,
+                         exception_type: Type[Exception] = ValueError) -> None:
+        """Assert object has specified attribute, generates default message if none provided."""
+        if message is None:
+            obj_name = obj.__class__.__name__
+            message = f"'{attr_name}' not provided in {obj_name} configuration"
+
+        self.assert_true(hasattr(obj, attr_name), message, exception_type)
+
+    def assert_condition(self, condition: Callable[[], bool],
+                      message: str,
+                      exception_type: Type[Exception] = ValueError) -> None:
+        """Assert callable returns True, useful for lazy evaluation of complex conditions."""
+        self.assert_true(condition(), message, exception_type)
 
 # Global instance and convenience functions
 _logger_instance = None

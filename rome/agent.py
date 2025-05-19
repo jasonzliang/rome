@@ -43,9 +43,11 @@ class Agent:
         set_attributes_from_config(self, agent_config)
 
         # Validate repository attribute
-        assert hasattr(self, 'repository'), "repository not provided in Agent config"
-        assert self.repository is not None and os.path.exists(self.repository), \
+        self.logger.assert_attribute(self, 'repository', "repository not provided in Agent config")
+        self.logger.assert_true(
+            self.repository is not None and os.path.exists(self.repository),
             f"Repository path does not exist: {self.repository}"
+        )
 
         # Configure logging after repository is validated
         self._setup_logging()
@@ -100,8 +102,11 @@ class Agent:
 
     def _setup_fsm(self):
         """Initialize the Finite State Machine"""
-        assert self.fsm_type in FSM_FACTORY, \
+        self.logger.assert_true(
+            self.fsm_type in FSM_FACTORY,
             f"{self.fsm_type} FSM is not defined, cannot be loaded"
+        )
+
         self.fsm = FSM_FACTORY[self.fsm_type](config=self.config)
         self.logger.info(f"Initialized {self.fsm_type} FSM with state: {self.fsm.get_current_state()}")
 
@@ -213,7 +218,11 @@ class Agent:
             Dict containing loop execution results
         """
         self.fsm = None
-        assert self.fsm is not None, "FSM has not been properly initialized"
+        self.logger.assert_true(
+            self.fsm is not None,
+            "FSM has not been properly initialized"
+        )
+
         self.fsm.check_context(self)
 
         self.logger.info(f"Starting agent loop for {max_iterations} iterations")
