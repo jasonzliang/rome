@@ -217,13 +217,10 @@ class Agent:
         Returns:
             Dict containing loop execution results
         """
-        self.fsm = None
         self.logger.assert_true(
             self.fsm is not None,
             "FSM has not been properly initialized"
         )
-
-        self.fsm.check_context(self)
 
         self.logger.info(f"Starting agent loop for {max_iterations} iterations")
         results = {
@@ -237,6 +234,9 @@ class Agent:
 
         for iteration in range(max_iterations):
             try:
+                # Check agent context on first iteration to make sure state is valid
+                if iteration == 0: self.fsm.check_context(self)
+
                 results['iterations'] = iteration + 1
                 self.logger.info(f"Loop iteration {iteration + 1}/{max_iterations}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
