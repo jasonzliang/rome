@@ -336,7 +336,7 @@ Respond with a JSON object:
 """
         return prompt
 
-    def execute(self, agent, **kwargs):
+    def execute(self, agent, **kwargs) -> bool:
         self.logger.info("Starting simplified three-step SearchAction execution")
 
         # Ensure agent has an OpenAI handler (either openai_handler or self.openai_handler)
@@ -373,6 +373,8 @@ Respond with a JSON object:
         if selected_file:
             agent.context['selected_file'] = selected_file
             self.logger.info(f"Search completed. Selected file: {selected_file['path']}")
+            return True
         else:
             agent.context['selected_file'] = None
             self.logger.info("Search completed. No file was selected.")
+            return False

@@ -107,7 +107,6 @@ class FSM:
         self.current_state = next_state
 
         self.logger.info(f"Transitioned: {old_state} --[{action_name}]--> {next_state}")
-        return result
 
     def get_current_state(self) -> str:
         """Get current state name"""

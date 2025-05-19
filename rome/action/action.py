@@ -19,6 +19,6 @@ class Action(ABC):
         set_attributes_from_config(self, self.config)
 
     @abstractmethod
-    def execute(self, agent, **kwargs):
-        """Execute the action and return the next state"""
+    def execute(self, agent, **kwargs) -> bool:
+        """Execute the action and return True if action succeeded otherwise False"""
         pass

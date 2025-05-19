@@ -17,7 +17,8 @@ class RetryAction(Action):
         # No specific config requirements for RetryAction, but we should still initialize
         # with the config dict for consistency
 
-    def execute(self, agent, **kwargs):
-        self.logger.info("Executing RetryAction - resetting agent context")
-        agent.context = {}
-        self.logger.info("Agent context has been reset")
+    def execute(self, agent, **kwargs) -> bool:
+        self.logger.info("Executing RetryAction - clearing agent context")
+        agent.context.clear()
+        self.logger.info("Agent context has been cleared")
+        return True
