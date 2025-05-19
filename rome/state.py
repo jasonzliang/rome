@@ -56,7 +56,7 @@ class IdleState(State):
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for idle state"""
-        return f"""You are in an idle state, ready to start coding. You can search for files in the repository to start analyzing code."""
+        return f"""You are in an idle state, ready to start on a new task."""
 
 
 class CodeLoadedState(State):
@@ -68,7 +68,9 @@ class CodeLoadedState(State):
 
     def check_context(self, agent, **kwargs) -> bool:
         """Check if we have a selected file in context"""
-        assert agent.context.get('selected_file') is not None, "selected_file is None in agent context"
+        assert agent.context.get('selected_file') is not None, \
+            "selected_file is None in agent context"
+        selected_file = agent.context['selected_file']
 
         # Check required keys in selected_file with a more compact assertion
         required_keys = ['path', 'content', 'changes']
@@ -81,17 +83,17 @@ class CodeLoadedState(State):
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for code loaded state"""
-        selected_file = agent.context.get('selected_file', {})
-        file_path = selected_file.get('path', 'Not provided')
-        file_content = selected_file.get('content', 'Not provided')
-        selection_reason = selected_file.get('reason', 'Not provided')
+        # selected_file = agent.context.get('selected_file', {})
+        # file_path = selected_file.get('path', 'Not provided')
+        # file_content = selected_file.get('content', 'Not provided')
+        # selection_reason = selected_file.get('reason', 'Not provided')
 
-        return f"""Code file has been selected and loaded.
+        return f"""You are in code loaded state, having selected a code file to edit."""
 
-Current code file summary:
-- File path: {file_path}
-- File content:\n{file_content}
-- Selection reason: {selection_reason}"""
+# Current code file summary:
+# - File path: {file_path}
+# - File content:\n{file_content}
+# - Selection reason: {selection_reason}"""
 
 
 class CodeEditedState(State):
@@ -103,7 +105,9 @@ class CodeEditedState(State):
 
     def check_context(self, agent, **kwargs) -> bool:
         """Check if we have a selected file in context"""
-        assert agent.context.get('selected_file') is not None, "selected_file is None in agent context"
+        assert agent.context.get('selected_file') is not None, \
+            "selected_file is None in agent context"
+        selected_file = agent.context['selected_file']
 
         # Check required keys in selected_file with a more compact assertion
         required_keys = ['path', 'content', 'changes']
@@ -116,17 +120,7 @@ class CodeEditedState(State):
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for code loaded state"""
-        selected_file = agent.context.get('selected_file', {})
-        file_path = selected_file.get('path', 'Not provided')
-        file_content = selected_file.get('content', 'Not provided')
-        changes = selected_file.get('changes', 'Not provided')
-
-        return f"""Code file has been edited and updated.
-
-Current code file summary:
-- File path: {file_path}
-- File content:\n{file_content}
-- Code changes: {changes}"""
+        return f"""You are in code edited state, having successfully edited and updated a code file."""
 
 
 class TestEditedState(State):
@@ -138,7 +132,9 @@ class TestEditedState(State):
 
     def check_context(self, agent, **kwargs) -> bool:
         """Check if we have a selected file in context"""
-        assert agent.context.get('selected_file') is not None, "selected_file is None in agent context"
+        assert agent.context.get('selected_file') is not None, \
+            "selected_file is None in agent context"
+        selected_file = agent.context['selected_file']
 
         # Check required keys in selected_file with a more compact assertion
         required_keys = ['path', 'content', 'changes', 'test_path', 'test_content', 'test_changes']
@@ -151,23 +147,23 @@ class TestEditedState(State):
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for code loaded state"""
-        selected_file = agent.context.get('selected_file', {})
-        code_path = selected_file.get('path', 'Not provided')
-        code_content = selected_file.get('content', 'Not provided')
-        code_changes = selected_file.get('changes', 'Not provided')
+        # selected_file = agent.context.get('selected_file', {})
+        # code_path = selected_file.get('path', 'Not provided')
+        # code_content = selected_file.get('content', 'Not provided')
+        # code_changes = selected_file.get('changes', 'Not provided')
 
-        test_path = selected_file.get('test_path', 'Not provided')
-        test_content = selected_file.get('test_content', 'Not provided')
-        test_changes = selected_file.get('test_changes', 'Not provided')
+        # test_path = selected_file.get('test_path', 'Not provided')
+        # test_content = selected_file.get('test_content', 'Not provided')
+        # test_changes = selected_file.get('test_changes', 'Not provided')
 
-        return f"""Tests for code file has been edited and updated.
+        return f"""You are in test edited state, having successfully created and updated tests for a code file."""
 
-Current code file summary:
-- File path: {code_path}
-- File content:\n{code_content}
-- Code changes: {code_changes}
+# Current code file summary:
+# - File path: {code_path}
+# - File content:\n{code_content}
+# - Code changes: {code_changes}
 
-Current code test file summary:
-- File path: {test_path}
-- File content:\n{test_content}
-- Code changes: {test_changes}"""
+# Current code test file summary:
+# - File path: {test_path}
+# - File content:\n{test_content}
+# - Code changes: {test_changes}"""

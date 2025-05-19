@@ -6,3 +6,4 @@ numpy
 openai
 psutil
 pyribs
+pytest

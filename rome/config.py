@@ -51,17 +51,24 @@ DEFAULT_CONFIG = {
     # State configurations
     "IdleState": {},
     "CodeLoadedState": {},
+    "CodeEditedState": {},
+    "TestEditedState": {},
 
     # Action configuration
     "SearchAction": {
         "max_files": sys.maxsize,
         "file_type": ".py",
-        "exclude_dirs": [".git", "node_modules", "venv", "__pycache__", "dist", "build", DEFAULT_LOGDIR_NAME],
+        "exclude_dirs": [".git", "venv", "__pycache__", DEFAULT_LOGDIR_NAME],
         "selection_criteria": "Select the most relevant file for the current task",
         "batch_size": 5
     },
-
-    "RetryAction": {}
+    "RetryAction": {},
+    "EditCodeAction": {
+        "custom_prompt": None
+    },
+    "EditTestAction": {
+        "custom_prompt": None
+    }
 }
 
 

@@ -322,27 +322,53 @@ def create_minimal_fsm(config):
 def create_simple_fsm(config):
     """Create simple FSM with code editing and writing tests"""
     logger = get_logger()
-    logger.info("Creating FSM")
+    logger.info("Creating FSM with code editing and test writing capabilities")
 
     fsm = FSM(config.get("FSM", {}))
 
     # Create and add states
     idle_state = fsm.add_state(IdleState(config.get('IdleState', {})))
     code_loaded_state = fsm.add_state(CodeLoadedState(config.get('CodeLoadedState', {})))
+    code_edited_state = fsm.add_state(CodeEditedState(config.get('CodeEditedState', {})))
+    test_edited_state = fsm.add_state(TestEditedState(config.get('TestEditedState', {})))
 
-    # Create actions and add them to FSM
+    # Create actions with their respective configurations
+    search_action = SearchAction(config.get('SearchAction', {}))
+    retry_action = RetryAction(config.get('RetryAction', {}))
+    edit_code_action = EditCodeAction(config.get('EditCodeAction', {}))
+    edit_test_action = EditTestAction(config.get('EditTestAction', {}))
+
+    # Add transitions from Idle state
     fsm.add_action(idle_state, code_loaded_state,
-                 SearchAction(config.get('SearchAction', {})),
+                 search_action,
                  fallback_state=idle_state)
 
+    # Add transitions from CodeLoaded state
+    fsm.add_action(code_loaded_state, code_edited_state,
+                 edit_code_action,
+                 fallback_state=code_loaded_state)
+    fsm.add_action(code_loaded_state, test_edited_state,
+                 edit_test_action,
+                 fallback_state=code_loaded_state)
     fsm.add_action(code_loaded_state, idle_state,
-                 RetryAction(config.get('RetryAction', {})))
+                 retry_action)
+
+    # Add transitions from CodeEdited state
+    fsm.add_action(code_edited_state, test_edited_state,
+                 edit_test_action,
+                 fallback_state=code_edited_state)
+    fsm.add_action(code_edited_state, idle_state,
+                 retry_action)
+
+    # Add transitions from TestEdited state
+    fsm.add_action(test_edited_state, idle_state,
+                 retry_action)
 
     # Set initial state and validate
     fsm.set_initial_state(idle_state)
     fsm.validate_fsm()
 
-    logger.info("FSM created successfully")
+    logger.info("FSM created successfully with code editing and test writing capabilities")
     return fsm
 
 FSM_FACTORY = {
