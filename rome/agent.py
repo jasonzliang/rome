@@ -78,9 +78,10 @@ class Agent:
         self.logger.info("Role string does not contain 'your role', reformatting")
         return f"## Your role: {role}"
 
-    def _get_safe_name(self):
-        """Safe name for naming file"""
-        return ''.join(c if c.isalnum() else '_' for c in self.name).lower()
+    def _get_agent_id(self):
+        """Unique id for identifying agent in file system"""
+        safe_name = ''.join(c if c.isalnum() else '_' for c in self.name).lower()
+        return f'agent_{safe_name}_{os.getpid()}'
 
     def _setup_logging(self):
         """Configure logging based on config"""
@@ -93,7 +94,7 @@ class Agent:
 
         if not log_config.get('filename'):
             # Ensure agent name is suitable for a filename
-            log_config['filename'] = f"agent_{self._get_safe_name()}.log"
+            log_config['filename'] = f"{self._get_agent_id()}.log"
 
         # Configure the singleton logger with the loaded config
         get_logger().configure(log_config)
@@ -121,7 +122,7 @@ class Agent:
         # If no output path specified, use the .rome directory
         if output_path is None:
             output_path = os.path.join(self.logger.get_log_dir(),
-                f"fsm_graph_{self._get_safe_name()}.png")
+                f"fsm_graph_{self._get_agent_id()}.png")
 
         # Draw the graph using the FSM method
         self.logger.info(f"Drawing FSM graph to {output_path}")

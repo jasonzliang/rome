@@ -1,7 +1,8 @@
 colorama
 graphviz
+matplotlib
 networkx
 numpy
 openai
-plotly
+psutil
 pyribs
