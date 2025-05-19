@@ -13,8 +13,6 @@ class State(ABC):
         actions: List[str] = None,
         config: Dict = None):
 
-        # Always use the class name as the state name
-        self.name = self.__class__.__name__
         self.config = config or {}
         # Initialize with empty actions list - will be populated by FSM
         self.actions = actions or []  # Store available actions for this state
