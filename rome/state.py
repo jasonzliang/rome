@@ -1,3 +1,4 @@
+# state.py
 from abc import ABC, abstractmethod
 import os
 import sys
@@ -9,17 +10,18 @@ from .config import set_attributes_from_config
 class State(ABC):
     """Abstract state"""
     def __init__(self,
-        name: str,
         actions: List[str] = None,
         config: Dict = None):
 
-        self.name = name
+        # Always use the class name as the state name
+        self.name = self.__class__.__name__
+        self.config = config or {}
+        # Initialize with empty actions list - will be populated by FSM
         self.actions = actions or []  # Store available actions for this state
         self.logger = get_logger()
 
         # Set attributes from config if provided
-        if config:
-            set_attributes_from_config(self, config)
+        set_attributes_from_config(self, self.config)
 
     @abstractmethod
     def check_context(self, agent, **kwargs) -> bool:
@@ -35,33 +37,36 @@ class State(ABC):
         """Get the list of available actions for this state"""
         return self.actions.copy()
 
+    def add_action(self, action_name: str) -> None:
+        """Add an action to this state if it doesn't already exist"""
+        if action_name not in self.actions:
+            self.actions.append(action_name)
+
 
 class IdleState(State):
     """Initial state where the agent waits for commands"""
 
     def __init__(self, config: Dict = None):
-        # Define available actions for the idle state
-        available_actions = ["SearchAction"]
-        super().__init__("IDLE", actions=available_actions, config=config)
+        # No more hardcoded available actions - let FSM manage this
+        super().__init__(actions=[], config=config)
 
     def check_context(self, agent, **kwargs) -> bool:
         """In idle state, clear any previous context and always return True"""
         # Clear any previous context when entering idle state
         agent.context.clear()
+        return True
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for idle state"""
-        return f"""You are in an idle state, ready to begin code analysis.
-You can search for files in the repository to start analyzing code."""
+        return f"""You are in an idle state, ready to start coding. You can search for files in the repository to start analyzing code."""
 
 
 class CodeLoadedState(State):
     """State where code has been loaded and is ready for analysis"""
 
     def __init__(self, config: Dict = None):
-        # Define available actions for the code loaded state
-        available_actions = ["RetryAction"]
-        super().__init__("CODELOADED", actions=available_actions, config=config)
+        # No more hardcoded available actions
+        super().__init__(actions=[], config=config)
 
     def check_context(self, agent, **kwargs) -> bool:
         """Check if we have a selected file in context"""
@@ -74,7 +79,9 @@ class CodeLoadedState(State):
         for key in required_keys:
             assert key in selected_file, f"Missing {key} in selected file"
 
-        assert os.path.exists(selected_file['path']), f"File path does not exist: {selected_file['path']}"
+        assert os.path.exists(selected_file['path']),
+            f"File path does not exist: {selected_file['path']}"
+        return True
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for code loaded state"""

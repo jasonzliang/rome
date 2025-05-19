@@ -1,3 +1,4 @@
+# fsm.py
 from abc import ABC, abstractmethod
 import os
 import sys
@@ -28,21 +29,43 @@ class FSM:
         self.logger = get_logger()
 
     def reset(self, agent):
+        """Reset FSM state and clear agent context"""
         agent.context.clear()
-        self.logger("Clearing agent context")
+        self.logger.info("Clearing agent context")
         self.current_state = self.default_state
-        self.logger(f"Setting FSM current state to default: {self.current_state}")
+        self.logger.info(f"Setting FSM current state to default: {self.current_state}")
 
-    def add_state(self, state_name: str, state: State):
-        """Add a state (node) to the FSM"""
+    def add_state(self, state: State, state_name: str = None):
+        """
+        Add a state (node) to the FSM
+
+        Args:
+            state: The State object to add
+            state_name: Optional name override. If not provided, uses the class name
+        """
+        # Use provided state_name or get from state object (which is the class name)
+        state_name = state_name or state.name
+
         self.states[state_name] = state
         # Initialize empty transitions for this state
         if state_name not in self.transitions:
             self.transitions[state_name] = {}
         self.logger.info(f"Added state: {state_name} with actions: {state.actions}")
+        return state_name
 
-    def add_action(self, from_state: str, to_state: str, action_name: str, action: Action):
-        """Add an action (edge) between two states"""
+    def add_action(self, from_state: str, to_state: str, action: Action, action_name: str = None):
+        """
+        Add an action (edge) between two states
+
+        Args:
+            from_state: Source state name
+            to_state: Target state name
+            action: The Action object to add
+            action_name: Optional name for the action. If not provided, uses action.__class__.__name__
+        """
+        # Use provided action_name or derive from action class name
+        action_name = action_name or action.__class__.__name__
+
         # Ensure states exist
         if from_state not in self.states:
             raise ValueError(f"State '{from_state}' doesn't exist")
@@ -57,12 +80,11 @@ class FSM:
         # Add action handler
         self.actions[action_name] = action
 
-        # Update the state's actions list if not already present
-        if action_name not in self.states[from_state].actions:
-            self.states[from_state].actions.append(action_name)
-            self.logger.info(f"Added action '{action_name}' to state '{from_state}' actions list")
+        # Update the state's actions list using state's add_action method
+        self.states[from_state].add_action(action_name)
 
         self.logger.info(f"Added action: {from_state} --[{action_name}]--> {to_state}")
+        return action_name
 
     def set_initial_state(self, state_name: str):
         """Set the starting state"""
@@ -118,14 +140,11 @@ class FSM:
 
     def get_available_actions(self) -> List[str]:
         """Get actions available from current state"""
-        # Now we can get actions from either the state object or the transitions
+        # Now we can get actions directly from the state object
         if self.current_state and self.current_state in self.states:
-            # Use the state's actions list for consistency
-            actions = self.states[self.current_state].get_available_actions()
-        else:
-            # Fallback to transitions if state not found
-            actions = list(self.transitions.get(self.current_state, {}).keys())
-        return actions
+            return self.states[self.current_state].get_available_actions()
+        # Fallback to transitions if state not found
+        return list(self.transitions.get(self.current_state, {}).keys())
 
     def _get_state_prompt(self, agent) -> str:
         """Get the prompt for the current state"""
@@ -323,21 +342,21 @@ def create_simple_fsm(config):
 
     fsm = FSM(config)
 
-    # Get state configurations (empty dicts if not present)
-    idle_state_config = config.get('IdleState', {})
-    code_loaded_state_config = config.get('CodeLoadedState', {})
+    # Create state objects first - names will be derived from class names
+    idle_state = IdleState(config.get('IdleState', {}))
+    code_loaded_state = CodeLoadedState(config.get('CodeLoadedState', {}))
 
-    # Add states (nodes) with actual state objects and their configs
-    fsm.add_state("IDLE", IdleState(idle_state_config))
-    fsm.add_state("CODELOADED", CodeLoadedState(code_loaded_state_config))
+    # Add states to FSM - using explicit names for backward compatibility
+    idle_state = fsm.add_state(idle_state)
+    code_loaded_state = fsm.add_state(code_loaded_state)
 
-    # Get action configurations
-    search_config = config.get('SearchAction', {})
-    retry_config = config.get('RetryAction', {})
+    # Create action objects
+    search_action = SearchAction(config.get('SearchAction', {}))
+    retry_action = RetryAction(config.get('RetryAction', {}))
 
-    # Add actions (edges between states) with proper configuration
-    fsm.add_action("IDLE", "CODELOADED", "SearchAction", SearchAction(search_config))
-    fsm.add_action("CODELOADED", "IDLE", "RetryAction", RetryAction(retry_config))
+    # Add actions to FSM - can use explicit names or let it use action class name
+    fsm.add_action(idle_state, code_loaded_state, search_action)
+    fsm.add_action(code_loaded_state, idle_state, retry_action)
 
     # Set initial state
     fsm.set_initial_state("IDLE")
