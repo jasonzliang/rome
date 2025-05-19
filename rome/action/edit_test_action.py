@@ -57,8 +57,7 @@ class EditTestAction(Action):
                     test_content = f.read()
                 self.logger.info(f"Existing test file found: {test_path}")
             except Exception as e:
-                self.logger.error(f"Error reading test file {test_path}: {e}")
-                return False
+                self.logger.error(f"Error reading test file {test_path}: {e}, overwriting")
         else:
             self.logger.info(f"No existing test file found. Will create new test file at: {test_path}")
 
@@ -105,6 +104,20 @@ class EditTestAction(Action):
             'changes': test_changes
         }
         selected_file['test_changes'].append(change_record)
+
+        # Write the test code to disk
+        try:
+            # Ensure the directory exists
+            os.makedirs(os.path.dirname(test_path), exist_ok=True)
+
+            # Write the test file
+            with open(test_path, 'w', encoding='utf-8') as f:
+                f.write(new_test_code)
+            self.logger.info(f"Successfully wrote test code to {test_path}")
+        except Exception as e:
+            self.logger.error(f"Failed to write test code to {test_path}: {str(e)}")
+            self.logger.error(traceback.format_exc())
+            return False
 
         self.logger.info(f"Test editing completed for {file_path}")
         self.logger.info(f"Test file: {test_path}")

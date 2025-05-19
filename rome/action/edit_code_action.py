@@ -82,6 +82,16 @@ class EditCodeAction(Action):
         }
         selected_file['changes'].append(change_record)
 
+        # Write the improved code back to the file
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(improved_code)
+            self.logger.info(f"Successfully wrote improved code to {file_path}")
+        except Exception as e:
+            self.logger.error(f"Failed to write improved code to {file_path}: {str(e)}")
+            self.logger.error(traceback.format_exc())
+            return False
+
         self.logger.info(f"Code editing completed for {file_path}")
         self.logger.info(f"Changes made: {changes}")
 
