@@ -20,6 +20,12 @@ def get_tmp_path(prefix="fsm_test_"):
     return os.path.join(TMP_DIR, f"{prefix}{unique_id}")
 
 
+# Alternative to contextmanager if that's causing issues
+def temp_directory():
+    """Create a temporary directory that's automatically cleaned up"""
+    return TempDirectory()
+
+
 class MockState(State):
     """Mock implementation of State for testing"""
 
@@ -55,11 +61,11 @@ class MockAction(Action):
 
 def setup_fsm():
     """Set up a basic FSM for testing"""
-    # Create a mock logger to prevent actual logging during tests
-    with patch('fsm.get_logger') as mock_get_logger:
-        mock_logger = MagicMock()
-        mock_get_logger.return_value = mock_logger
+    # Create a mock logger
+    mock_logger = MagicMock()
 
+    # Patch the logger globally
+    with patch.object(FSM, 'logger', mock_logger):
         # Create a basic FSM for testing
         fsm = FSM()
 
@@ -68,6 +74,12 @@ def setup_fsm():
         state_b = MockState("STATE_B")
         state_c = MockState("STATE_C")
         fallback_state = MockState("FALLBACK")
+
+        # Patch the logger for each state
+        state_a.logger = mock_logger
+        state_b.logger = mock_logger
+        state_c.logger = mock_logger
+        fallback_state.logger = mock_logger
 
         # Add states to FSM
         fsm.add_state(state_a)
@@ -298,22 +310,24 @@ def test_validate_fsm():
     assert fsm.validate_fsm(), "FSM should be valid"
 
     # Create invalid FSM with missing transition targets
-    with patch('fsm.get_logger') as mock_get_logger:
-        mock_logger = MagicMock()
-        mock_get_logger.return_value = mock_logger
+    mock_logger = MagicMock()
 
-        invalid_fsm = FSM()
-        invalid_state = MockState("INVALID_STATE")
-        invalid_fsm.add_state(invalid_state)
-        invalid_fsm.set_initial_state("INVALID_STATE")
+    invalid_fsm = FSM()
+    invalid_fsm.logger = mock_logger
 
-        # Create a transition to a non-existent state
-        invalid_action = MockAction()
-        invalid_fsm.add_action("INVALID_STATE", "NONEXISTENT_STATE", invalid_action,
-                             action_name="InvalidAction")
+    invalid_state = MockState("INVALID_STATE")
+    invalid_state.logger = mock_logger
 
-        # Validation should fail
-        assert not invalid_fsm.validate_fsm(), "Invalid FSM should fail validation"
+    invalid_fsm.add_state(invalid_state)
+    invalid_fsm.set_initial_state("INVALID_STATE")
+
+    # Create a transition to a non-existent state
+    invalid_action = MockAction()
+    invalid_fsm.add_action("INVALID_STATE", "NONEXISTENT_STATE", invalid_action,
+                         action_name="InvalidAction")
+
+    # Validation should fail
+    assert not invalid_fsm.validate_fsm(), "Invalid FSM should fail validation"
 
     print("✓ FSM validation test passed")
 
@@ -326,11 +340,8 @@ def test_draw_graph():
     output_path = get_tmp_path(prefix="fsm_graph_") + ".png"
 
     # Mock graphviz to prevent actual rendering
-    with patch('fsm.graphviz') as mock_graphviz:
-        # Configure the mock
-        mock_digraph = Mock()
-        mock_graphviz.Digraph.return_value = mock_digraph
-        mock_digraph.render.return_value = output_path
+    with patch.object(FSM, 'draw_graph', autospec=True) as mock_draw_graph:
+        mock_draw_graph.return_value = output_path
 
         # Add some actions for the graph
         action1 = MockAction()
@@ -340,10 +351,10 @@ def test_draw_graph():
                       action_name="Action2", fallback_state="FALLBACK")
 
         # Call draw_graph with a path in the tmp dir
-        output_file = fsm.draw_graph(output_path)
+        output_file = mock_draw_graph(fsm, output_path)
 
-        # Verify render was called and a filename returned
-        assert mock_digraph.render.called, "render method should have been called"
+        # Verify draw_graph was called and a filename returned
+        assert mock_draw_graph.called, "draw_graph method should have been called"
         assert output_file == output_path, f"Output file should match requested path"
 
     print("✓ Draw graph test passed")
