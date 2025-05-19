@@ -20,18 +20,18 @@ class EditCodeAction(Action):
         self.logger.info("Starting EditCodeAction execution")
 
         # Ensure agent has a valid selected file
-        if not agent.context.get('selected_file'):
-            self.logger.error("No selected file found in agent context")
-            return False
+        # if not agent.context.get('selected_file'):
+        #     self.logger.error("No selected file found in agent context")
+        #     return False
 
         selected_file = agent.context['selected_file']
 
         # Ensure the selected file has required attributes
-        required_keys = ['path', 'content']
-        for key in required_keys:
-            if key not in selected_file:
-                self.logger.error(f"Missing {key} in selected file")
-                return False
+        # required_keys = ['path', 'content']
+        # for key in required_keys:
+        #     if key not in selected_file:
+        #         self.logger.error(f"Missing {key} in selected file")
+        #         return False
 
         file_path = selected_file['path']
         original_content = selected_file['content']

@@ -27,7 +27,7 @@ class OpenAIHandler:
         set_attributes_from_config(self, self.config)
 
         # Validate required attributes with a more compact assertion
-        required_attrs = ['model', 'temperature', 'max_tokens', 'timeout']
+        required_attrs = ['model', 'temperature', 'max_tokens', 'timeout', 'top_p', 'base_url', 'system_message']
         for attr in required_attrs:
             assert hasattr(self, attr), f"{attr} not provided in OpenAIHandler config"
 
@@ -41,13 +41,9 @@ class OpenAIHandler:
         # Setup OpenAI client
         client_kwargs = {
             "api_key": api_key,
-            "timeout": self.timeout
+            "base_url": self.base_url
+            "timeout": self.timeout,
         }
-
-        # Add optional parameters if provided
-        if hasattr(self, 'base_url') and self.base_url:
-            client_kwargs["base_url"] = self.base_url
-
         self.client = openai.OpenAI(**client_kwargs)
 
         self.logger.info(f"OpenAI handler initialized with model: {self.model}")
@@ -91,6 +87,8 @@ class OpenAIHandler:
             The response content as string
         """
         messages = []
+        if not system_message:
+            system_message = self.system_message
         if system_message:
             messages.append({"role": "system", "content": system_message})
         messages.append({"role": "user", "content": prompt})
@@ -101,9 +99,9 @@ class OpenAIHandler:
             "messages": messages,
             "temperature": self.temperature,
             "max_tokens": self.max_tokens,
-            "top_p": getattr(self, 'top_p', 1.0),
-            "frequency_penalty": getattr(self, 'frequency_penalty', 0.0),
-            "presence_penalty": getattr(self, 'presence_penalty', 0.0),
+            "top_p": self.top_p,
+            # "frequency_penalty": getattr(self, 'frequency_penalty', 0.0),
+            # "presence_penalty": getattr(self, 'presence_penalty', 0.0),
         }
 
         # Apply any override config

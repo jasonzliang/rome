@@ -93,7 +93,8 @@ def main():
 
         # Agent specific configuration
         "Agent": {
-            "repository": str(test_dir.absolute())
+            "repository": str(test_dir.absolute()),
+            "fsm_type": "minimal"
         },
 
         # Logger specific configuration
@@ -110,16 +111,6 @@ def main():
             "batch_size": 3,  # Process all 3 files in a single batch
             "selection_criteria": "Select the most interesting code file to improve and complete.",
         },
-
-        # RetryAction specific configuration
-        "RetryAction": {},
-
-        # State specific configurations
-        "IdleState": {},
-        "CodeLoadedState": {},
-
-        # FSM specific configuration
-        "FSM": {}
     }
 
     # Create and initialize the agent

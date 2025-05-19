@@ -13,11 +13,8 @@ DEFAULT_CONFIG = {
     # OpenAIHandler settings - includes all OpenAI API configuration
     "OpenAIHandler": {
         # OpenAI API configuration
-        "api_base": "https://api.openai.com/v1",
-        "api_type": None,  # "openai" (default) or "azure" or other supported providers
-        "api_version": None,  # Required for Azure OpenAI
+        "base_url": "https://api.openai.com/v1",
         "timeout": 120,
-        "use_cache": False,
 
         # General LLM parameters
         "model": "gpt-4o",
@@ -25,7 +22,7 @@ DEFAULT_CONFIG = {
         "max_tokens": 4000,
         "top_p": 1.0,
 
-        # System message for chat completions
+        # Fall back system message for chat completions
         "system_message": "You are a helpful code assistant specializing in code analysis and improvement."
     },
 
@@ -59,7 +56,7 @@ DEFAULT_CONFIG = {
         "max_files": sys.maxsize,
         "file_type": ".py",
         "exclude_dirs": [".git", "venv", "__pycache__", DEFAULT_LOGDIR_NAME],
-        "selection_criteria": "Select the most relevant file for the current task",
+        "selection_criteria": None,
         "batch_size": 5
     },
     "RetryAction": {},

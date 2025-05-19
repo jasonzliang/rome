@@ -71,8 +71,6 @@ Assign a priority score (1-5, 5 being highest) to each file based on:
 2. File size (smaller files are more focused and easier to analyze)
 3. Function/class definitions that match your role and selection criteria
 
-Selection criteria: {self.selection_criteria}
-
 Files to prioritize:
 """
         # Add file information to the prompt
