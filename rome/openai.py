@@ -27,12 +27,12 @@ class OpenAIHandler:
         set_attributes_from_config(self, self.config)
 
         # Validate required attributes with a more compact assertion
-        required_attrs = ['model', 'temperature', 'max_tokens', 'timeout', 'top_p', 'base_url', 'system_message']
+        required_attrs = ['model', 'temperature', 'max_tokens', 'timeout', 'top_p', 'base_url', 'system_message', "key_name"]
         for attr in required_attrs:
             assert hasattr(self, attr), f"{attr} not provided in OpenAIHandler config"
 
         # Get API key from environment
-        api_key = os.getenv("OPENAI_API_KEY")
+        api_key = os.getenv(self.key_name or 'OPENAI_API_KEY')
         if not api_key:
             error_msg = "OpenAI API key not found in environment"
             self.logger.error(error_msg)

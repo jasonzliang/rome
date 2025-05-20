@@ -128,7 +128,6 @@ class Agent:
         self.logger.info(f"Drawing FSM graph to {output_path}")
         return self.fsm.draw_graph(output_path)
 
-
     # Chat completion methods
     def chat_completion(self, prompt: str,
         system_message: str = None,

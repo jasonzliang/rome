@@ -14,6 +14,7 @@ DEFAULT_CONFIG = {
     "OpenAIHandler": {
         # OpenAI API configuration
         "base_url": "https://api.openai.com/v1",
+        "key_name": "OPENAI_API_KEY",
         "timeout": 120,
 
         # General LLM parameters

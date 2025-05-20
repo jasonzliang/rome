@@ -16,13 +16,12 @@ from rome.logger import get_logger
 from rome.action import SearchAction, RetryAction
 from rome.config import DEFAULT_CONFIG
 
-TMP_DIR = "/tmp"
-
 
 def get_tmp_path(prefix="fsm_test_"):
     """Get a unique path in the /tmp directory"""
+    tmp_dir = "/tmp"
     unique_id = str(uuid.uuid4())[:8]
-    return os.path.join(TMP_DIR, f"{prefix}{unique_id}")
+    return os.path.join(tmp_dir, f"{prefix}{unique_id}")
 
 
 # Custom Action classes for testing
