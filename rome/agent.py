@@ -16,8 +16,8 @@ class Agent:
     """Agent class using OpenAI API, YAML config, and FSM architecture"""
 
     def __init__(self,
-        name: str,
-        role: str,
+        name: str = "CodingExpert",
+        role: str = "You are a Python coding expert",
         config_dict: Dict = None):
         """Initialize the Agent with either a config path or a config dictionary"""
 

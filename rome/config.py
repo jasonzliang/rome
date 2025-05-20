@@ -67,11 +67,24 @@ DEFAULT_CONFIG = {
     },
     "EditTestAction": {
         "custom_prompt": None
-    }
+    },
+
+    # Code executor configuration
+    "CodeExecutor": {
+        "timeout": 60,
+        "virtual_env_context": None,
+        "work_dir": "./"
+    },
 }
 
 
-def set_attributes_from_config(obj, config):
+def check_attrs(obj, required_attrs):
+    """Helper function to check if required attributes have been set"""
+    for attr in required_attrs:
+        assert hasattr(obj, attr), f"{attr} not provided in {obj.__class__.__name__} config"
+
+
+def set_attributes_from_config(obj, config=None, required_attrs=None):
     """
     Helper function to convert configuration dictionary entries to object attributes
 
@@ -82,8 +95,12 @@ def set_attributes_from_config(obj, config):
     logger = get_logger()
 
     # Set each config parameter as an attribute
-    for key, value in config.items():
-        setattr(obj, key, value)
+    if config:
+        for key, value in config.items():
+            setattr(obj, key, value)
+
+    if required_attrs:
+        check_attrs(required_attrs)
 
     logger.debug(f"Applied configuration to {obj.__class__.__name__} attributes")
 

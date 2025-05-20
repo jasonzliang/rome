@@ -8,6 +8,7 @@ import traceback
 from typing import Dict, Optional, Any, Union, List
 from .action import Action
 from ..logger import get_logger
+from ..config import check_attrs
 
 
 class SearchAction(Action):
@@ -17,10 +18,8 @@ class SearchAction(Action):
         super().__init__(config)
         self.logger = get_logger()
 
-        # Assert required config parameters using a loop
-        required_attrs = ['epilson_oldest', 'max_files', 'file_types', 'exclude_dirs', 'exclude_types', 'selection_criteria', 'batch_size']
-        for attr in required_attrs:
-            assert hasattr(self, attr), f"{attr} not provided in SearchAction config"
+        # Check required config parameters are set properly
+        check_attrs(['epilson_oldest', 'max_files', 'file_types', 'exclude_dirs', 'exclude_types', 'selection_criteria', 'batch_size'])
 
     def _create_global_overview(self, agent, files: List[str]) -> List[Dict]:
         """Create a high-level overview of all files in the repository"""
