@@ -141,29 +141,42 @@ class TestEditedState(State):
         for key in required_keys:
             assert key in selected_file, f"Missing {key} in selected file"
 
-        assert os.path.exists(selected_file['path']), \
-            f"File path does not exist: {selected_file['path']}"
+        for path in [selected_file['path'], selected_file['test_path']]:
+            assert os.path.exists(path), f"File path does not exist: {path}"
         return True
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for code loaded state"""
-        # selected_file = agent.context.get('selected_file', {})
-        # code_path = selected_file.get('path', 'Not provided')
-        # code_content = selected_file.get('content', 'Not provided')
-        # code_changes = selected_file.get('changes', 'Not provided')
-
-        # test_path = selected_file.get('test_path', 'Not provided')
-        # test_content = selected_file.get('test_content', 'Not provided')
-        # test_changes = selected_file.get('test_changes', 'Not provided')
-
         return f"""You are in test edited state, having successfully created and updated tests for a code file."""
 
-# Current code file summary:
-# - File path: {code_path}
-# - File content:\n{code_content}
-# - Code changes: {code_changes}
+class CodeExecutedState(State):
+    """State where code tests have been executed"""
 
-# Current code test file summary:
-# - File path: {test_path}
-# - File content:\n{test_content}
-# - Code changes: {test_changes}"""
+    def __init__(self, config: Dict = None):
+        # No more hardcoded available actions
+        super().__init__(actions=[], config=config)
+
+    def check_context(self, agent, **kwargs) -> bool:
+        """Check if we have a selected file in context"""
+        assert agent.context.get('selected_file') is not None, \
+            "selected_file is None in agent context"
+        selected_file = agent.context['selected_file']
+
+        # Check required keys in selected_file with a more compact assertion
+        required_keys = ['path', 'content', 'output', 'exit_code']
+        if 'test_path' in selected_file:
+            required_keys += ['test_path', 'test_content']
+        for key in required_keys:
+            assert key in selected_file, f"Missing {key} in selected file"
+
+        assert os.path.exists(selected_file['path']),
+            f"File path does not exist: {selected_file['path']}"
+        if 'test_path' in selected_file:
+        assert os.path.exists(selected_file['test_path']),
+            f"File path does not exist: {selected_file['test_path']}"
+
+        return True
+
+    def get_state_prompt(self, agent) -> str:
+        """Prompt for code executed state"""
+        return f"""You are in code executed state, having finished running the code file and/or test file."""

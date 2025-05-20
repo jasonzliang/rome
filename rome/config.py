@@ -91,6 +91,7 @@ def set_attributes_from_config(obj, config=None, required_attrs=None):
     Args:
         obj: The object to set attributes on
         config: The configuration dictionary
+        required_attrs: List of attributes that must be set from config
     """
     logger = get_logger()
 
