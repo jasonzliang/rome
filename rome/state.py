@@ -83,17 +83,7 @@ class CodeLoadedState(State):
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for code loaded state"""
-        # selected_file = agent.context.get('selected_file', {})
-        # file_path = selected_file.get('path', 'Not provided')
-        # file_content = selected_file.get('content', 'Not provided')
-        # selection_reason = selected_file.get('reason', 'Not provided')
-
         return f"""You are in code loaded state, having selected a code file to edit."""
-
-# Current code file summary:
-# - File path: {file_path}
-# - File content:\n{file_content}
-# - Selection reason: {selection_reason}"""
 
 
 class CodeEditedState(State):
@@ -149,6 +139,7 @@ class TestEditedState(State):
         """Prompt for code loaded state"""
         return f"""You are in test edited state, having successfully created and updated tests for a code file."""
 
+
 class CodeExecutedState(State):
     """State where code tests have been executed"""
 
@@ -172,9 +163,8 @@ class CodeExecutedState(State):
         assert os.path.exists(selected_file['path']),
             f"File path does not exist: {selected_file['path']}"
         if 'test_path' in selected_file:
-        assert os.path.exists(selected_file['test_path']),
-            f"File path does not exist: {selected_file['test_path']}"
-
+            assert os.path.exists(selected_file['test_path']),
+                f"File path does not exist: {selected_file['test_path']}"
         return True
 
     def get_state_prompt(self, agent) -> str:
