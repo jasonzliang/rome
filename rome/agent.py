@@ -76,7 +76,7 @@ class Agent:
 
         # If not found, add a properly formatted header
         self.logger.info("Role string does not contain 'your role', reformatting")
-        return f"## Your role: {role}"
+        return f"Your role:\n{role}"
 
     def _get_agent_id(self):
         """Unique id for identifying agent in file system"""
