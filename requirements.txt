@@ -4,6 +4,6 @@ matplotlib
 networkx
 numpy
 openai
+plotly
 psutil
 pyribs
-pytest
