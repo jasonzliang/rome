@@ -188,7 +188,7 @@ Include proper test setup, all necessary imports, and comprehensive test cases.
 
 IMPORTANT:
 - Make sure the test code is valid Python syntax
-- Tests should be compatible with pytest
+- Tests should be compatible with pytest and be sure to do "import pytest" first
 - Use RELATIVE IMPORTS to import the module being tested, like: `{import_statement}`
 - Avoid absolute imports that would break in different environments
 - Include all necessary imports that are required by the tests.

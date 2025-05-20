@@ -92,8 +92,9 @@ class FSM:
         # Get transition information
         target_state, fallback_state = self.transitions[self.current_state][action_name]
 
-        # Execute action and determine next state
+        # Check context, execute action, and determine next state
         self.logger.info(f"Executing action: {action_name}")
+        self.check_context(agent)
         result = self.actions[action_name].execute(agent)
 
         next_state = target_state
