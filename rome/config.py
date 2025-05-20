@@ -29,9 +29,8 @@ DEFAULT_CONFIG = {
 
     # Agent configuration
     "Agent": {
-        # Repository path
-        "repository": "./",
-        "fsm_type": "minimal"
+        "repository": "./", # Code repository base directory
+        "fsm_type": "minimal" # Which FSM to load (see fsm.py)
     },
 
     # Logging configuration
