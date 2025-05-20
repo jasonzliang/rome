@@ -37,8 +37,8 @@ DEFAULT_CONFIG = {
     "Logger": {
         "level": "ERROR",
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        "base_dir": None,  # Directory for log files (None disables file logging)
-        "filename": None,  # Log file name (None disables file logging)
+        "base_dir": None,  # Directory for log files (Agent sets it if None)
+        "filename": None,  # Log file name (Agent sets it if None)
         "console": True
     },
 
@@ -54,10 +54,12 @@ DEFAULT_CONFIG = {
     # Action configuration
     "SearchAction": {
         "max_files": sys.maxsize,
-        "file_type": ".py",
+        "file_types": [".py"],
+        "exclude_types": [".test.py", ".orig.py"]
         "exclude_dirs": [".git", "venv", "__pycache__", DEFAULT_LOGDIR_NAME],
         "selection_criteria": None,
-        "batch_size": 5
+        "batch_size": 5,
+        "epilson_oldest": 0.0 # Prob to choose the oldest file for editing
     },
     "RetryAction": {},
     "EditCodeAction": {

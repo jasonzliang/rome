@@ -1,6 +1,7 @@
 import glob
 import os
 import pprint
+import random  # Added for probability selection
 import sys
 import time
 import traceback
@@ -17,7 +18,7 @@ class SearchAction(Action):
         self.logger = get_logger()
 
         # Assert required config parameters using a loop
-        required_attrs = ['max_files', 'file_type', 'exclude_dirs', 'selection_criteria', 'batch_size']
+        required_attrs = ['epilson_oldest', 'max_files', 'file_types', 'exclude_dirs', 'exclude_types', 'selection_criteria', 'batch_size']
         for attr in required_attrs:
             assert hasattr(self, attr), f"{attr} not provided in SearchAction config"
 
@@ -182,12 +183,30 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
                     break
             if not exclude:
                 filtered_files.append(file_path)
-
-        if len(filtered_files) > self.max_files:
-            random.shuffle(filtered_files)
-            filtered_files = filtered_files[:self.max_files]
-            self.logger.info(f"Reducing filtered files for exceeding max file limit: {self.max_files}")
         return filtered_files
+
+    def _filter_excluded_types(self, files: List[str]) -> List[str]:
+        """Filter out files with excluded file types"""
+        if not hasattr(self, 'exclude_types') or not self.exclude_types:
+            return files
+
+        filtered_files = []
+        for file_path in files:
+            # Get file extension
+            _, ext = os.path.splitext(file_path)
+            # Remove leading dot from extension if present
+            ext = ext[1:] if ext.startswith('.') else ext
+
+            # Check if file type is excluded
+            if ext not in self.exclude_types:
+                filtered_files.append(file_path)
+        return filtered_files
+
+    def _filter_max_limit(self, files: List[str]) -> List[str]:
+        if len(files) > self.max_files:
+            random.shuffle(files)
+            files = files[:self.max_files]
+        return files
 
     def _process_file_batches(self, agent, file_paths: List[str], prioritized_files: List[Dict]) -> Dict:
         """
@@ -334,8 +353,31 @@ Respond with a JSON object:
 """
         return prompt
 
+    def _find_oldest_file(self, file_overviews: List[Dict]) -> Dict:
+        """Find the oldest file based on modification age"""
+        if not file_overviews:
+            return None
+
+        oldest_file = max(file_overviews, key=lambda x: x.get("modified_age", 0))
+        self.logger.info(f"Oldest file found: {oldest_file['path']} (age: {oldest_file['modified_age']} seconds)")
+
+        # Get file content
+        try:
+            with open(oldest_file['path'], 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            return {
+                'path': oldest_file['path'],
+                'content': content,
+                'reason': "Selected as oldest file based on epilson_oldest probability",
+                'priority': 5  # Give it highest priority since it was selected by age
+            }
+        except Exception as e:
+            self.logger.error(f"Error reading oldest file {oldest_file['path']}: {e}")
+            return None
+
     def execute(self, agent, **kwargs) -> bool:
-        self.logger.info("Starting simplified three-step SearchAction execution")
+        self.logger.info("Starting SearchAction execution with file type list and oldest file probability")
 
         # Ensure agent has an OpenAI handler (either openai_handler or self.openai_handler)
         has_openai_handler = hasattr(agent, 'openai_handler') and agent.openai_handler is not None
@@ -346,19 +388,51 @@ Respond with a JSON object:
             raise ValueError(error_msg)
 
         # Get the repo root path from agent
-        search_path = os.path.join(agent.repository, '**/*' + self.file_type)
-        self.logger.info(f"Searching for files in: {search_path}")
+        all_files = []
 
-        # Find all files matching the pattern
-        files = glob.glob(search_path, recursive=True)
-        self.logger.info(f"Found {len(files)} files before filtering")
+        # Handle multiple file types
+        for file_type in self.file_types:
+            # Ensure file_type has a leading dot if needed
+            if not file_type.startswith('.'):
+                file_type = '.' + file_type
+
+            search_path = os.path.join(agent.repository, f'**/*{file_type}')
+            self.logger.info(f"Searching for files in: {search_path}")
+
+            # Find all files matching the pattern
+            files = glob.glob(search_path, recursive=True)
+            self.logger.info(f"Found {len(files)} {file_type} files")
+            all_files.extend(files)
+
+        self.logger.info(f"Found {len(all_files)} total files before filtering")
 
         # Filter out files from excluded directories
-        filtered_files = self._filter_excluded_dirs(files)
+        filtered_files = self._filter_excluded_dirs(all_files)
         self.logger.info(f"Found {len(filtered_files)} files after directory filtering")
+
+        # Filter out files with excluded types
+        filtered_files = self._filter_excluded_types(filtered_files)
+        self.logger.info(f"Found {len(filtered_files)} files after type filtering")
+
+        # Filter out files if they exceed max limit
+        filtered_files = self._filter_max_limit(filtered_files)
+        self.logger.info(f"Found {len(filtered_files)} files after max-limit filtering")
 
         # Step 1: Create global overview of all files
         file_overviews = self._create_global_overview(agent, filtered_files)
+
+        # Check if we should select the oldest file based on probability
+        if self.epilson_oldest > 0 and random.random() < self.epilson_oldest:
+            self.logger.info(f"Using epilson_oldest probability ({self.epilson_oldest}) to select oldest file")
+            oldest_file = self._find_oldest_file(file_overviews)
+
+            if oldest_file:
+                agent.context['selected_file'] = oldest_file
+                self.logger.info(f"Selected oldest file: {oldest_file['path']}")
+                return True
+            else:
+                # If oldest file wasn't selected, continue with normal process
+                self.logger.error("Failed to read oldest file, continuing with normal selection process")
 
         # Step 2: Prioritize files based on overview data
         prioritized_files = self._prioritize_files(agent, file_overviews)
