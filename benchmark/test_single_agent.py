@@ -94,7 +94,7 @@ def main():
         # Agent specific configuration
         "Agent": {
             "repository": str(test_dir.absolute()),
-            "fsm_type": "minimal"
+            "fsm_type": "simple"
         },
 
         # Logger specific configuration
@@ -107,7 +107,7 @@ def main():
 
         # SearchAction specific configuration
         "SearchAction": {
-            "file_type": ".py",
+            "file_types": [".py"],
             "batch_size": 3,  # Process all 3 files in a single batch
             "selection_criteria": "Select the most interesting code file to improve and complete.",
         },
@@ -119,7 +119,7 @@ def main():
         role="You are an expert code analyzer that can identify interesting algorithms and functions.",
         config_dict=config
     )
-    # agent.draw_fsm_graph()
+    agent.draw_fsm_graph()
 
     # Run the agent's execution loop
     results = agent.run_loop(max_iterations=2)

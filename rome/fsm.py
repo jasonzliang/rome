@@ -350,15 +350,15 @@ def create_simple_fsm(config):
     fsm.add_action(code_loaded_state, test_edited_state,
                  edit_test_action,
                  fallback_state=code_loaded_state)
-    fsm.add_action(code_loaded_state, idle_state,
-                 retry_action)
+    # fsm.add_action(code_loaded_state, idle_state,
+    #              retry_action)
 
     # Add transitions from CodeEdited state
     fsm.add_action(code_edited_state, test_edited_state,
                  edit_test_action,
                  fallback_state=code_edited_state)
-    fsm.add_action(code_edited_state, idle_state,
-                 retry_action)
+    # fsm.add_action(code_edited_state, idle_state,
+    #              retry_action)
 
     # Add transitions from TestEdited state
     fsm.add_action(test_edited_state, idle_state,

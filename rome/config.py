@@ -55,7 +55,7 @@ DEFAULT_CONFIG = {
     "SearchAction": {
         "max_files": sys.maxsize,
         "file_types": [".py"],
-        "exclude_types": [".test.py", ".orig.py"]
+        "exclude_types": [".test.py", ".orig.py"],
         "exclude_dirs": [".git", "venv", "__pycache__", DEFAULT_LOGDIR_NAME],
         "selection_criteria": None,
         "batch_size": 5,
