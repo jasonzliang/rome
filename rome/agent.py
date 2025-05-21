@@ -319,7 +319,7 @@ class Agent:
         results['final_state'] = self.fsm.current_state
         results['final_context'] = self.context.copy()
 
-        self.logger.info(f"Agent loop completed after {results['iterations']} iterations")
+        self.logger.info(f"\n\nAgent loop completed after {results['iterations']} iterations")
         self.logger.info(f"Final state: {results['final_state']}")
         self.logger.info(f"Actions executed: {[action['action'] for action in results['actions_executed']]}")
 

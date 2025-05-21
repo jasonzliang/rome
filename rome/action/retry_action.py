@@ -18,7 +18,7 @@ class RetryAction(Action):
         # with the config dict for consistency
 
     def execute(self, agent, **kwargs) -> bool:
-        self.logger.info("Executing RetryAction - clearing agent context")
+        self.logger.info("Starting RetryAction execution")
         agent.context.clear()
         self.logger.info("Agent context has been cleared")
         return True

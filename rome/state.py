@@ -160,10 +160,10 @@ class CodeExecutedState(State):
         for key in required_keys:
             assert key in selected_file, f"Missing {key} in selected file"
 
-        assert os.path.exists(selected_file['path']),
+        assert os.path.exists(selected_file['path']), \
             f"File path does not exist: {selected_file['path']}"
         if 'test_path' in selected_file:
-            assert os.path.exists(selected_file['test_path']),
+            assert os.path.exists(selected_file['test_path']), \
                 f"File path does not exist: {selected_file['test_path']}"
         return True
 

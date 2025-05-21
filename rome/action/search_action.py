@@ -9,7 +9,7 @@ from typing import Dict, Optional, Any, Union, List
 from .action import Action
 from ..logger import get_logger
 from ..config import check_attrs
-
+from ..versioning import save_original
 
 class SearchAction(Action):
     """Action to search the repository for code files using OpenAI selection"""
@@ -19,7 +19,7 @@ class SearchAction(Action):
         self.logger = get_logger()
 
         # Check required config parameters are set properly
-        check_attrs(['epilson_oldest', 'max_files', 'file_types', 'exclude_dirs', 'exclude_types', 'selection_criteria', 'batch_size'])
+        check_attrs(self, ['epilson_oldest', 'max_files', 'file_types', 'exclude_dirs', 'exclude_types', 'selection_criteria', 'batch_size'])
 
     def _create_global_overview(self, agent, files: List[str]) -> List[Dict]:
         """Create a high-level overview of all files in the repository"""
@@ -376,7 +376,7 @@ Respond with a JSON object:
             return None
 
     def execute(self, agent, **kwargs) -> bool:
-        self.logger.info("Starting SearchAction execution with file type list and oldest file probability")
+        self.logger.info("Starting SearchAction execution")
 
         # Ensure agent has an OpenAI handler (either openai_handler or self.openai_handler)
         has_openai_handler = hasattr(agent, 'openai_handler') and agent.openai_handler is not None
@@ -439,6 +439,8 @@ Respond with a JSON object:
         # Step 3: Process batches of files in priority order for detailed review
         file_paths = [file_info["file_path"] for file_info in prioritized_files]
         selected_file = self._process_file_batches(agent, file_paths, prioritized_files)
+
+        save_original(selected_file['path'], selected_file['content'])
 
         # Add selected file to agent context
         if selected_file:

@@ -3,7 +3,34 @@ import json
 import datetime
 import hashlib
 from typing import List, Dict, Any, Optional
+from .logger import get_logger
 
+def save_original(file_path: str, content: str) -> int:
+    """
+    Save the original unedited file into the .meta directory.
+    This is a convenience function that calls save_version with
+    an appropriate explanation.
+
+    Args:
+        file_path: Path to the original file being versioned
+        content: Content of the original file to save
+
+    Returns:
+        The version number assigned to the original file (typically 1)
+    """
+    logger = get_logger()
+    logger.info(f"Saving original version for file: {file_path}")
+
+    # If .meta dir already exists you can assume original has already been saved
+    if os.path.exists(f"{file_path}.meta"):
+        return
+
+    return save_version(
+        file_path=file_path,
+        content=content,
+        changes=[{"type": "initial", "description": "Original file content"}],
+        explanation="Initial version: Original unedited file"
+    )
 
 def save_version(file_path: str, content: str,
                  changes: Optional[List[Dict[str, str]]] = None,
@@ -23,7 +50,6 @@ def save_version(file_path: str, content: str,
         The version number assigned to this save, or existing version if content hasn't changed
     """
     # Get the logger
-    from ..logger import get_logger
     logger = get_logger()
 
     logger.info(f"Saving version for file: {file_path}")
@@ -40,8 +66,8 @@ def save_version(file_path: str, content: str,
     # Create the versions directory - same as file_path with .meta appended
     versions_dir = f"{file_path}.meta"
 
-    if not.os.path.exists(versions_dir):
-        logger.debug(f"Creating metadata directory: {versions_dir}")
+    if not os.path.exists(versions_dir):
+        # logger.debug(f"Creating metadata directory: {versions_dir}")
         os.makedirs(versions_dir)
 
     # Path to the index file that contains all metadata
@@ -52,7 +78,7 @@ def save_version(file_path: str, content: str,
         try:
             with open(index_file_path, 'r', encoding='utf-8') as f:
                 index = json.load(f)
-                logger.debug(f"Loaded existing index with {len(index.get('versions', []))} versions")
+                # logger.debug(f"Loaded existing index with {len(index.get('versions', []))} versions")
         except Exception as e:
             logger.error(f"Error loading index file: {str(e)}")
             index = {'versions': []}
@@ -64,16 +90,16 @@ def save_version(file_path: str, content: str,
     for version in index.get('versions', []):
         if version.get('hash') == content_hash:
             existing_version = version.get('version')
-            logger.info(f"Content already exists in version {existing_version}. Skipping save.")
+            logger.error(f"Content already exists in version {existing_version}. Skipping save.")
             return existing_version
 
     # Get the next version number
     if index.get('versions'):
         version_number = max(v.get('version', 0) for v in index['versions']) + 1
-        logger.debug(f"Found existing versions. New version will be: {version_number}")
+        # logger.debug(f"Found existing versions. New version will be: {version_number}")
     else:
         version_number = 1
-        logger.debug("No existing versions found. Starting with version 1.")
+        # logger.debug("No existing versions found. Starting with version 1.")
 
     # Create version file path
     version_file_name = f"{file_base}_v{version_number}{file_ext}"
@@ -96,7 +122,7 @@ def save_version(file_path: str, content: str,
     try:
         with open(version_file_path, 'w', encoding='utf-8') as f:
             f.write(content)
-        logger.info(f"Saved version {version_number} content to {version_file_path}")
+        # logger.info(f"Saved version {version_number} content to {version_file_path}")
     except Exception as e:
         logger.error(f"Failed to save version file: {str(e)}")
         raise
@@ -110,7 +136,7 @@ def save_version(file_path: str, content: str,
 
         with open(index_file_path, 'w', encoding='utf-8') as f:
             json.dump(index, f, indent=2)
-        logger.info(f"Updated index file with version {version_number} metadata")
+        # logger.info(f"Updated index file with version {version_number} metadata")
     except Exception as e:
         logger.error(f"Failed to update index file: {str(e)}")
         raise
