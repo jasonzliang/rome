@@ -119,13 +119,13 @@ class EditTestAction(Action):
         module_name, _ = os.path.splitext(file_name)
 
         # Get directory structure for proper relative import
-        file_dir = os.path.dirname(file_path)
-        rel_path = os.path.relpath(file_dir, os.path.dirname(test_path))
-        import_path = rel_path.replace(os.sep, '.') if rel_path != '.' else ''
-        if import_path:
-            import_statement = f"from {import_path} import {module_name}"
-        else:
-            import_statement = f"from . import {module_name}"
+        # file_dir = os.path.dirname(file_path)
+        # rel_path = os.path.relpath(file_dir, os.path.dirname(test_path))
+        # import_path = rel_path.replace(os.sep, '.') if rel_path != '.' else ''
+        # if import_path:
+        #     import_statement = f"from {import_path} import {module_name}"
+        # else:
+        #     import_statement = f"from . import {module_name}"
 
         # Use custom prompt if provided in config
         if self.custom_prompt is not None:
@@ -176,10 +176,10 @@ Include proper test setup, all necessary imports, and comprehensive test cases.
 IMPORTANT:
 - Make sure the test code is valid Python syntax
 - Tests should be compatible with pytest and be sure to do "import pytest" first
-- Use RELATIVE IMPORTS to import the module being tested, like: `{import_statement}`
-- Avoid absolute imports that would break in different environments
-- Include all necessary imports that are required by the tests.
-- Avoid external dependencies other than standard test libraries
+- Make sure to import the module being tested from the code file
+- Assume the code file and test file are both located in the root of the current working directory
+- Include all necessary imports that are required by the tests
+- Avoid external dependencies that are unnecessary for testing
 """
 
         return prompt

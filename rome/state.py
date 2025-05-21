@@ -141,7 +141,7 @@ class TestEditedState(State):
 
 
 class CodeExecutedState(State):
-    """State where code tests have been executed"""
+    """State where code or test file has been executed"""
 
     def __init__(self, config: Dict = None):
         # No more hardcoded available actions
@@ -169,4 +169,4 @@ class CodeExecutedState(State):
 
     def get_state_prompt(self, agent) -> str:
         """Prompt for code executed state"""
-        return f"""You are in code executed state, having finished running the code file and/or test file."""
+        return f"""You are in code executed state, having finished running the code or test file."""
