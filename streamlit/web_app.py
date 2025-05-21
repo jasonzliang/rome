@@ -203,13 +203,13 @@ def visualize_fsm(fsm_data):
                 # Add the edge with the unique identifier
                 G.add_edge(from_state, to_state, key=i)
                 edge_labels[edge_key] = action
-                edge_colors[edge_key] = "red" if "failed" in action.lower() else "green"
+                edge_colors[edge_key] = "red" if "failed" in action.lower() else "blue"
             else:
                 # Add a new edge
                 G.add_edge(from_state, to_state)
                 edge_labels[edge_key] = action
                 # Set color based on 'failed' in action text
-                edge_colors[edge_key] = "red" if "failed" in action.lower() else "green"
+                edge_colors[edge_key] = "red" if "failed" in action.lower() else "blue"
 
         # Create the figure
         plt.figure(figsize=(12, 8))
@@ -217,7 +217,31 @@ def visualize_fsm(fsm_data):
         # Use the original spring layout as in the source file
         pos = nx.spring_layout(G, seed=42)  # Position nodes using spring layout
 
-        # First draw edges (to put them behind nodes)
+        ### First draw nodes ###
+        node_colors = ["lightgreen" if node == current_state else "lightblue" for node in G.nodes]
+        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2000, alpha=0.8)
+
+        # Draw node labels BELOW the nodes
+        label_pos = {node: (pos[node][0], pos[node][1] - 0.1) for node in G.nodes}
+        nx.draw_networkx_labels(G, label_pos, labels={node: node for node in G.nodes},
+                              font_size=10, font_weight="bold", verticalalignment="top")
+
+        # Highlight current state
+        if current_state in G.nodes:
+            nx.draw_networkx_nodes(G, pos, nodelist=[current_state],
+                                  node_color="green", node_size=2200, alpha=0.9)
+
+            # Add a marker to the current state
+            current_pos = pos[current_state]
+            plt.plot(current_pos[0], current_pos[1], 'ro', markersize=15, alpha=0.7)
+            plt.plot(current_pos[0], current_pos[1], 'ko', markersize=8)
+
+            # Add a "Current" text label (positioned above the node)
+            text = plt.text(current_pos[0], current_pos[1] - 0.1, "CURRENT",
+                          horizontalalignment='center', fontsize=9, fontweight='bold')
+            text.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='white')])
+
+        ### Then draw edges ###
         drawn_edges = set()  # Track which edges we've drawn
 
         # First pass to calculate edge curvatures to avoid label overlap
@@ -254,17 +278,8 @@ def visualize_fsm(fsm_data):
             if edge_id not in drawn_edges:
                 nx.draw_networkx_edges(G, pos, edgelist=edge, width=2, alpha=0.7,
                                       edge_color=color, connectionstyle=f"arc3,rad={rad}",
-                                      arrowsize=20, min_target_margin=15)
+                                      arrowsize=20, min_target_margin=20, min_source_margin=20)
                 drawn_edges.add(edge_id)
-
-        # Then draw nodes (to put them on top of edges)
-        node_colors = ["lightgreen" if node == current_state else "lightblue" for node in G.nodes]
-        nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2000, alpha=0.8)
-
-        # Draw node labels BELOW the nodes
-        label_pos = {node: (pos[node][0], pos[node][1] - 0.1) for node in G.nodes}
-        nx.draw_networkx_labels(G, label_pos, labels={node: node for node in G.nodes},
-                              font_size=10, font_weight="bold", verticalalignment="top")
 
         # Draw edge labels with appropriate colors and ensure they don't overlap
         for edge_key, label in edge_labels.items():
@@ -289,21 +304,6 @@ def visualize_fsm(fsm_data):
                                         bbox=dict(facecolor="white", edgecolor="none",
                                                  alpha=0.7, boxstyle="round,pad=0.2"),
                                         connectionstyle=f"arc3,rad={rad}")
-
-        # Highlight current state
-        if current_state in G.nodes:
-            nx.draw_networkx_nodes(G, pos, nodelist=[current_state],
-                                  node_color="green", node_size=2200, alpha=0.9)
-
-            # Add a marker to the current state
-            current_pos = pos[current_state]
-            plt.plot(current_pos[0], current_pos[1], 'ro', markersize=15, alpha=0.7)
-            plt.plot(current_pos[0], current_pos[1], 'ko', markersize=8)
-
-            # Add a "Current" text label (positioned above the node)
-            text = plt.text(current_pos[0], current_pos[1] - 0.1, "CURRENT",
-                          horizontalalignment='center', fontsize=9, fontweight='bold')
-            text.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='white')])
 
         plt.title("Agent Finite State Machine", fontsize=16, fontweight='bold')
         plt.axis('off')
