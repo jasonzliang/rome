@@ -4,7 +4,7 @@ from typing import Dict, List, Any, Optional
 
 from .action import Action
 from ..logger import get_logger
-
+from ..versioning import save_version
 
 class EditTestAction(Action):
     """Action to create or edit tests for the selected file"""
@@ -93,18 +93,15 @@ class EditTestAction(Action):
         selected_file['test_changes'].append(change_record)
 
         # Write the test code to disk
-        try:
-            # Ensure the directory exists
-            os.makedirs(os.path.dirname(test_path), exist_ok=True)
+        with open(test_path, 'w', encoding='utf-8') as f:
+            f.write(new_test_code)
+        self.logger.info(f"Successfully wrote test code to {test_path}")
 
-            # Write the test file
-            with open(test_path, 'w', encoding='utf-8') as f:
-                f.write(new_test_code)
-            self.logger.info(f"Successfully wrote test code to {test_path}")
-        except Exception as e:
-            self.logger.error(f"Failed to write test code to {test_path}: {str(e)}")
-            self.logger.error(traceback.format_exc())
-            return False
+        version_number = save_version(
+            file_path=test_path,
+            content=test_content,
+            changes=test_changes,
+            explanation=explanation)
 
         self.logger.info(f"Test editing completed for {file_path}")
         self.logger.info(f"Test file: {test_path}")

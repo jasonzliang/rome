@@ -4,7 +4,7 @@ from typing import Dict, List, Any, Optional
 
 from .action import Action
 from ..logger import get_logger
-
+from ..versioning import save_version
 
 class EditCodeAction(Action):
     """Action to edit and improve code in the selected file"""
@@ -20,7 +20,6 @@ class EditCodeAction(Action):
         self.logger.info("Starting EditCodeAction execution")
 
         selected_file = agent.context['selected_file']
-
         file_path = selected_file['path']
         original_content = selected_file['content']
 
@@ -71,14 +70,15 @@ class EditCodeAction(Action):
         selected_file['changes'].append(change_record)
 
         # Write the improved code back to the file
-        try:
-            with open(file_path, 'w', encoding='utf-8') as f:
-                f.write(improved_code)
-            self.logger.info(f"Successfully wrote improved code to {file_path}")
-        except Exception as e:
-            self.logger.error(f"Failed to write improved code to {file_path}: {str(e)}")
-            self.logger.error(traceback.format_exc())
-            return False
+        with open(file_path, 'w', encoding='utf-8') as f:
+            f.write(improved_code)
+        self.logger.info(f"Successfully wrote improved code to {file_path}")
+
+        version_number = save_version(
+            file_path=file_path,
+            content=improved_code,
+            changes=changes,
+            explanation=explanation)
 
         self.logger.info(f"Code editing completed for {file_path}")
         self.logger.info(f"Changes made: {changes}")
