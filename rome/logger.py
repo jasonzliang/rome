@@ -98,7 +98,8 @@ class Logger:
                     show_path=self.include_caller_info,  # Shows file path
                     show_level=self.include_caller_info,  # Shows log level
                     rich_tracebacks=True,
-                    markup=True
+                    markup=True,
+                    log_time_format="[%H:%M:%S]"
                 )
                 rich_handler.setLevel(level)
                 self._logger.addHandler(rich_handler)
