@@ -15,12 +15,12 @@ DEFAULT_CONFIG = {
         # OpenAI API configuration
         "base_url": "https://api.openai.com/v1",
         "key_name": "OPENAI_API_KEY",
-        "timeout": 120,
+        "timeout": 30,
 
         # General LLM parameters
         "model": "gpt-4o",
-        "temperature": 0.2,
-        "max_tokens": 4000,
+        "temperature": 0.1,
+        "max_tokens": 4096,
         "top_p": 1.0,
 
         # Fall back system message for chat completions
@@ -71,7 +71,7 @@ DEFAULT_CONFIG = {
 
     # Code executor configuration
     "CodeExecutor": {
-        "timeout": 60,
+        "timeout": 10,
         "virtual_env_context": None,
         "work_dir": "./"
     },

@@ -109,7 +109,6 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
         response = agent.chat_completion(
             prompt=prompt,
             system_message=agent.role
-            # No response_format parameter
         )
 
         # Use parse_json_response to extract the result

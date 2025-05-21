@@ -86,8 +86,8 @@ def main():
         "OpenAIHandler": {
             "model": "gpt-4o",
             "temperature": 0.1,
-            "max_tokens": 4000,
-            "timeout": 120,
+            "max_tokens": 4096,
+            "timeout": 30,
             "system_message": "You are a code analyzer agent that helps find and analyze Python functions."
         },
 

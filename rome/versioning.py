@@ -5,9 +5,11 @@ import hashlib
 from typing import List, Dict, Any, Optional
 from .logger import get_logger
 
+META_DIR_EXT = 'rome'
+
 def save_original(file_path: str, content: str) -> int:
     """
-    Save the original unedited file into the .meta directory.
+    Save the original unedited file into the meta directory.
     This is a convenience function that calls save_version with
     an appropriate explanation.
 
@@ -21,8 +23,8 @@ def save_original(file_path: str, content: str) -> int:
     logger = get_logger()
     logger.info(f"Saving original version for file: {file_path}")
 
-    # If .meta dir already exists you can assume original has already been saved
-    if os.path.exists(f"{file_path}.meta"):
+    # If meta dir already exists you can assume original has already been saved
+    if os.path.exists(f"{file_path}.{META_DIR_EXT}"):
         return
 
     return save_version(
@@ -38,7 +40,7 @@ def save_version(file_path: str, content: str,
     """
     Save a versioned snapshot of a file with incremental version numbers.
     Version files are stored in a directory with the same name as the file
-    but with ".meta" appended. All metadata is stored in a single index.json file.
+    but with meta dir ext appended. All metadata is stored in a index.json file.
 
     Args:
         file_path: Path to the original file being versioned
@@ -58,13 +60,13 @@ def save_version(file_path: str, content: str,
     content_hash = hashlib.sha256(content.encode()).hexdigest()
     logger.debug(f"File content hash: {content_hash}")
 
-    # Create versions directory with the .meta suffix
+    # Create versions directory with the meta dir ext
     base_dir = os.path.dirname(file_path)
     file_name = os.path.basename(file_path)
     file_base, file_ext = os.path.splitext(file_name)
 
-    # Create the versions directory - same as file_path with .meta appended
-    versions_dir = f"{file_path}.meta"
+    # Create the versions directory - same as file_path with meta dir ext appended
+    versions_dir = f"{file_path}.{META_DIR_EXT}"
 
     if not os.path.exists(versions_dir):
         # logger.debug(f"Creating metadata directory: {versions_dir}")
