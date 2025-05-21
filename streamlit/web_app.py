@@ -72,7 +72,7 @@ with st.sidebar:
     with col2:
         api_port = st.text_input("Port", value="8000")
 
-    api_url = f"http://{api_host}:{api_port}/state"
+    api_url = f"http://{api_host}:{api_port}/agent"
     st.text(f"API URL: {api_url}")
 
     # Polling configuration
@@ -181,39 +181,114 @@ def visualize_fsm(fsm_data):
 
         # Add edges (transitions)
         edge_labels = {}
+        edge_colors = {}  # Store colors for edges based on action text
+
         for t in transitions:
             from_state = t.get("from")
             to_state = t.get("to")
             action = t.get("action")
 
-            # Add the edge
-            if (from_state, to_state) not in G.edges:
-                G.add_edge(from_state, to_state)
-                edge_labels[(from_state, to_state)] = action
+            # Check if we need a new edge or need to update an existing one
+            edge_key = (from_state, to_state)
+
+            # Create a unique edge identifier if this is a multi-edge
+            if edge_key in edge_labels:
+                # Use a different radius for each parallel edge to avoid overlap
+                # We'll modify the key slightly to create multiple edges in visualization
+                i = 0
+                while (from_state, to_state, i) in edge_colors:
+                    i += 1
+                edge_key = (from_state, to_state, i)
+
+                # Add the edge with the unique identifier
+                G.add_edge(from_state, to_state, key=i)
+                edge_labels[edge_key] = action
+                edge_colors[edge_key] = "red" if "failed" in action.lower() else "green"
             else:
-                # If multiple actions between same states, combine them
-                existing_label = edge_labels.get((from_state, to_state), "")
-                edge_labels[(from_state, to_state)] = f"{existing_label}\n{action}" if existing_label else action
+                # Add a new edge
+                G.add_edge(from_state, to_state)
+                edge_labels[edge_key] = action
+                # Set color based on 'failed' in action text
+                edge_colors[edge_key] = "red" if "failed" in action.lower() else "green"
 
         # Create the figure
         plt.figure(figsize=(12, 8))
+
+        # Use the original spring layout as in the source file
         pos = nx.spring_layout(G, seed=42)  # Position nodes using spring layout
 
-        # Draw nodes
+        # First draw edges (to put them behind nodes)
+        drawn_edges = set()  # Track which edges we've drawn
+
+        # First pass to calculate edge curvatures to avoid label overlap
+        edge_curves = {}
+        for edge_key in edge_colors:
+            if len(edge_key) == 2:  # Standard edge
+                from_state, to_state = edge_key
+                key = 0
+                rad = 0.1  # Default curvature
+            else:  # Multi-edge with key
+                from_state, to_state, key = edge_key
+                # Use different curvatures for parallel edges
+                rad = 0.1 + (key * 0.08)  # Increase curvature for each parallel edge
+
+            edge_curves[(from_state, to_state, key)] = rad
+
+        # Draw the edges using the calculated curvatures
+        for edge_key in edge_colors:
+            if len(edge_key) == 2:  # Standard edge
+                from_state, to_state = edge_key
+                key = 0
+            else:  # Multi-edge with key
+                from_state, to_state, key = edge_key
+
+            # Get the curvature
+            rad = edge_curves.get((from_state, to_state, key), 0.1)
+
+            # Draw the edge with appropriate color and curvature
+            color = edge_colors[edge_key]
+            edge = [(from_state, to_state)]
+
+            # Only draw each physical edge once
+            edge_id = (from_state, to_state, key)
+            if edge_id not in drawn_edges:
+                nx.draw_networkx_edges(G, pos, edgelist=edge, width=2, alpha=0.7,
+                                      edge_color=color, connectionstyle=f"arc3,rad={rad}",
+                                      arrowsize=20, min_target_margin=15)
+                drawn_edges.add(edge_id)
+
+        # Then draw nodes (to put them on top of edges)
         node_colors = ["lightgreen" if node == current_state else "lightblue" for node in G.nodes]
         nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2000, alpha=0.8)
 
-        # Draw node labels
-        node_labels = {node: node for node in G.nodes}
-        nx.draw_networkx_labels(G, pos, labels=node_labels, font_size=10, font_weight="bold")
+        # Draw node labels BELOW the nodes
+        label_pos = {node: (pos[node][0], pos[node][1] - 0.1) for node in G.nodes}
+        nx.draw_networkx_labels(G, label_pos, labels={node: node for node in G.nodes},
+                              font_size=10, font_weight="bold", verticalalignment="top")
 
-        # Draw edges
-        nx.draw_networkx_edges(G, pos, width=2, alpha=0.7, edge_color="gray",
-                               connectionstyle="arc3,rad=0.1", arrowsize=20)
+        # Draw edge labels with appropriate colors and ensure they don't overlap
+        for edge_key, label in edge_labels.items():
+            if len(edge_key) == 2:  # Standard edge
+                from_state, to_state = edge_key
+                key = 0
+            else:  # Multi-edge with key
+                from_state, to_state, key = edge_key
 
-        # Draw edge labels
-        nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, font_size=8,
-                                    font_color="red", label_pos=0.3, alpha=0.7)
+            # Get the previously calculated curvature
+            rad = edge_curves.get((from_state, to_state, key), 0.1)
+
+            # Calculate label position - adjust based on the curvature to avoid overlap
+            label_pos = 0.5 + (key * 0.05)  # Slightly offset each label
+
+            # Create a dictionary with just this edge for drawing
+            this_edge_label = {(from_state, to_state): label}
+
+            # Draw the individual edge label
+            nx.draw_networkx_edge_labels(G, pos, edge_labels=this_edge_label, font_size=8,
+                                        font_color="black", label_pos=label_pos, alpha=0.7,
+                                        bbox=dict(facecolor="white", edgecolor="none",
+                                                 alpha=0.7, boxstyle="round,pad=0.2"),
+                                        connectionstyle=f"arc3,rad={rad}")
 
         # Highlight current state
         if current_state in G.nodes:
@@ -225,7 +300,7 @@ def visualize_fsm(fsm_data):
             plt.plot(current_pos[0], current_pos[1], 'ro', markersize=15, alpha=0.7)
             plt.plot(current_pos[0], current_pos[1], 'ko', markersize=8)
 
-            # Add a "Current" text label
+            # Add a "Current" text label (positioned above the node)
             text = plt.text(current_pos[0], current_pos[1] - 0.1, "CURRENT",
                           horizontalalignment='center', fontsize=9, fontweight='bold')
             text.set_path_effects([PathEffects.withStroke(linewidth=3, foreground='white')])
@@ -247,7 +322,7 @@ def visualize_fsm(fsm_data):
         return None
 
 def display_agent_info(data):
-    """Display agent information including state, action, and context"""
+    """Display agent information including state, action, and context in a compact format"""
     if not data:
         agent_info_container.info("No agent information available.")
         return
@@ -259,46 +334,149 @@ def display_agent_info(data):
         fsm_data = data.get("fsm", {})
         context_data = data.get("context", {})
 
-        # Display agent name and basic info
-        agent_info_container.subheader(f"Agent: {agent_name}")
+        # Create tabs for different sections to save space
+        tabs = agent_info_container.tabs(["Agent State", "Context", "Raw Data"])
 
-        # Create columns for state and context
-        col1, col2 = agent_info_container.columns(2)
+        # Tab 1: Agent State
+        with tabs[0]:
+            col1, col2 = st.columns([1, 2])
+            with col1:
+                # Basic agent info in a more compact format
+                st.markdown(f"**Agent:** {agent_name}")
+                st.markdown(f"**Role:** {agent_role}")
 
-        # Display current state and action
-        with col1:
-            st.markdown("### Current State")
-            current_state = fsm_data.get("current_state", "Unknown")
-            current_action = fsm_data.get("current_action", "None")
-            st.markdown(f"**State:** {current_state}")
-            st.markdown(f"**Action:** {current_action}")
+                # Current state and action
+                current_state = fsm_data.get("current_state", "Unknown")
+                current_action = fsm_data.get("current_action", "None")
+                st.markdown(f"**State:** {current_state}")
+                st.markdown(f"**Action:** {current_action}")
 
-            # Display available actions
-            graph_data = fsm_data.get("graph", {})
-            state_actions = graph_data.get("state_actions", {})
-            if current_state in state_actions:
-                actions = state_actions[current_state]
-                if actions:
-                    st.markdown("**Available Actions:**")
-                    for action in actions:
-                        st.markdown(f"- {action}")
+            with col2:
+                # Display available actions in a compact format
+                graph_data = fsm_data.get("graph", {})
+                state_actions = graph_data.get("state_actions", {})
+                if current_state in state_actions:
+                    actions = state_actions[current_state]
+                    if actions:
+                        st.markdown("**Available Actions:**")
+                        # Display actions as chips/pills in a more compact visual layout
+                        action_html = '<div style="display: flex; flex-wrap: wrap; gap: 5px;">'
+                        for action in actions:
+                            # Color-code the actions (green if no "failed" in name)
+                            color = "#e0f7ea" if "failed" not in action.lower() else "#ffebee"
+                            text_color = "#1b5e20" if "failed" not in action.lower() else "#c62828"
+                            action_html += f'<div style="background-color: {color}; color: {text_color}; padding: 4px 8px; border-radius: 12px; font-size: 0.8em; margin-bottom: 5px;">{action}</div>'
+                        action_html += '</div>'
+                        st.markdown(action_html, unsafe_allow_html=True)
 
-        # Display agent context
-        with col2:
-            st.markdown("### Context")
+        # Tab 2: Context - processed to be more compact
+        with tabs[1]:
+            # Process context data to make it more compact
+            display_context_recursive(context_data)
 
-            # Make a copy and truncate large content for display
-            context_copy = json.loads(json.dumps(context_data))
-            if 'selected_file' in context_copy and 'content' in context_copy['selected_file']:
-                content = context_copy['selected_file']['content']
-                if len(content) > 300:
-                    context_copy['selected_file']['content'] = content[:300] + "... [truncated]"
-
-            # Display the context
-            st.json(context_copy)
+        # Tab 3: Raw data
+        with tabs[2]:
+            st.json(data)
 
     except Exception as e:
         agent_info_container.error(f"Error displaying agent info: {str(e)}")
+
+def display_context_recursive(data, path="", depth=0):
+    """
+    Recursively display context data with collapsible sections for long text
+    and nested dictionaries at any depth
+
+    Parameters:
+        data: The data to display
+        path: Current path in the data structure (for unique keys)
+        depth: Current recursion depth
+    """
+    # Base case - if not a dictionary or we've gone too deep, just show as is
+    if not isinstance(data, dict) or depth > 10:  # Prevent infinite recursion
+        st.json(data)
+        return
+
+    # For deeper levels, display in a single column
+    for key, value in data.items():
+        display_context_key(key, value, path + key + "_", depth)
+
+def display_context_key(key, value, path, depth):
+    """Display a single key-value pair with appropriate formatting for the value type"""
+    # Generate a unique key for Streamlit widgets
+    widget_key = f"{path}{key}_{depth}"
+
+    # Handle various data types
+    if isinstance(value, dict):
+        # For dictionaries, create an expander and recurse
+        with st.expander(f"**{key}**"):
+            display_context_recursive(value, path, depth + 1)
+
+    elif isinstance(value, list):
+        # For lists, check the length and also contents for truncation
+        list_preview = truncate_list(value)
+
+        if len(value) > 5 or list_preview != str(value):
+            # If list is long or contains long strings that were truncated
+            st.markdown(f"**{key}:** *List with {len(value)} items*")
+            st.markdown(f"*Preview:* {list_preview}")
+            if st.checkbox(f"Show full list", key=widget_key):
+                st.json(value)
+        else:
+            # Short list with simple values
+            st.markdown(f"**{key}:** {str(value)}")
+
+    elif isinstance(value, str):
+        # For strings, check if it's long
+        if len(value) > 150:
+            st.markdown(f"**{key}:** *Preview:* {truncate(value)}")
+            if st.checkbox(f"Show full content ({len(value)} chars)", key=widget_key):
+                st.text_area("", value=value, height=150, disabled=True, key=widget_key+"_area")
+        else:
+            st.markdown(f"**{key}:** {value}")
+
+    else:
+        # For other types (numbers, booleans, None)
+        st.markdown(f"**{key}:** {str(value)}")
+
+def truncate(s, max_length=150):
+    """Helper function to truncate long strings"""
+    if isinstance(s, str) and len(s) > max_length:
+        return s[:max_length] + "..."
+    return s
+
+def truncate_list(lst, max_items=5, max_str_length=50):
+    """
+    Helper function to truncate lists:
+    - Limits number of displayed items
+    - Truncates long strings within the list
+    """
+    if not isinstance(lst, list):
+        return str(lst)
+
+    # If list is empty or very short, just return it as is
+    if len(lst) <= 3 and all(len(str(item)) <= max_str_length for item in lst):
+        return str(lst)
+
+    # Truncate the list
+    preview_items = []
+    for i, item in enumerate(lst[:max_items]):
+        if isinstance(item, str) and len(item) > max_str_length:
+            preview_items.append(f"'{item[:max_str_length]}...'")
+        elif isinstance(item, dict):
+            preview_items.append("{...}")
+        elif isinstance(item, list):
+            if len(item) > 3:
+                preview_items.append(f"[{len(item)} items]")
+            else:
+                preview_items.append(str(item))
+        else:
+            preview_items.append(str(item))
+
+    # Add ellipsis if list was truncated
+    if len(lst) > max_items:
+        preview_items.append(f"... ({len(lst) - max_items} more)")
+
+    return f"[{', '.join(preview_items)}]"
 
 # ======== Update the visualization ========
 # Update the display with current data
@@ -369,9 +547,9 @@ if not st.session_state.polling_active:
 
 # Footer
 st.markdown("---")
-show_raw_data = st.checkbox("Show Raw API Data", value=False)
-if show_raw_data and st.session_state.api_data:
-    st.subheader("Raw API Data")
-    st.json(st.session_state.api_data)
-
 st.markdown("Agent State Visualizer | Made with Streamlit")
+# show_raw_data = st.checkbox("Show Raw API Data", value=False)
+# if show_raw_data and st.session_state.api_data:
+#     st.subheader("Raw API Data")
+#     st.json(st.session_state.api_data)
+

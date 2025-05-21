@@ -101,7 +101,6 @@ def main():
         "Logger": {
             "level": "DEBUG",
             "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            "file": "test_single_agent.log",
             "console": True
         },
 
@@ -120,10 +119,18 @@ def main():
         config_dict=config
     )
     agent.draw_fsm_graph()
-    # while True: pass
 
-    # Run the agent's execution loop
-    results = agent.run_loop(max_iterations=4)
+    # Get user input for number of iterations
+    results = None
+    while True:
+        try:
+            iterations = int(input("Enter number of iterations to run (0 to quit): "))
+            if iterations == 0: raise
+        except:
+            logger.info("Exiting loop"); break
+        results = agent.run_loop(max_iterations=iterations)
+
+    if not results: results = agent.run_loop(max_iterations=0)
 
     # Shutdown agent
     agent.shutdown()
@@ -134,22 +141,13 @@ def main():
 
     # Save the execution results to a file
     log_dir = Path(logger.get_log_dir())
-    with open(log_dir / "results.json", "w") as f:
-        # Convert any non-serializable objects to strings
-        serializable_results = {}
-        for key, value in results.items():
-            if isinstance(value, dict):
-                serializable_results[key] = {k: str(v) if not isinstance(v, (str, int, float, bool, list, dict, type(None))) else v
-                                            for k, v in value.items()}
-            elif isinstance(value, list):
-                serializable_results[key] = [str(item) if not isinstance(item, (str, int, float, bool, list, dict, type(None))) else item
-                                             for item in value]
-            else:
-                serializable_results[key] = str(value) if not isinstance(value, (str, int, float, bool, list, dict, type(None))) else value
+    try:
+        with open(log_dir / "results.json", "w") as f:
+            json.dump(results, f, indent=4)
 
-        json.dump(serializable_results, f, indent=2)
-
-    logger.info(f"Results saved to: {log_dir / 'results.json'}")
+        logger.info(f"Results saved to: {log_dir / 'results.json'}")
+    except:
+        logger.error(f"Results not serializable: {results}")
 
 if __name__ == "__main__":
     main()

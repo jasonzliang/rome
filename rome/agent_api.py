@@ -52,7 +52,7 @@ class AgentApi:
     def _add_routes(self):
         """Add API routes to the FastAPI app"""
         from fastapi.responses import JSONResponse
-        @self.app.get("/state", response_class=JSONResponse)
+        @self.app.get("/agent", response_class=JSONResponse)
         async def get_state():
             try:
                 fsm = self.agent.fsm
