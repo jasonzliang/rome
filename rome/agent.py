@@ -40,7 +40,7 @@ class Agent:
         # Set up agent configuration
         agent_config = self.config.get('Agent', {})
         # Automatically set attributes from Agent config
-        set_attributes_from_config(self, agent_config)
+        set_attributes_from_config(self, agent_config, ['repository', 'fsm_type', 'agent_api'])
 
         # Validate repository attribute
         self.logger.assert_attribute(self, 'repository', "repository not provided in Agent config")
@@ -65,7 +65,21 @@ class Agent:
         openai_config = self.config.get('OpenAIHandler', {})
         self.openai_handler = OpenAIHandler(config=openai_config)
 
+        if self.agent_api:
+            from .agent_api import AgentApi
+            api_config = self.config.get('AgentApi', {})
+            self.api = AgentApi(agent=self, config=api_config)
+            self.api.run()
+
         self.logger.info(f"Agent {self.name} initialized with role:\n{self.role}")
+
+
+    def shutdown(self):
+        """Clean up resources before termination"""
+        self.logger.info("Cleaning up agent resources")
+        if self.api:
+            self.api.shutdown()
+
 
     def _validate_and_format_role(self, role: str) -> str:
         """Validates and formats the agent's role string. If not, it formats the role with a proper header."""

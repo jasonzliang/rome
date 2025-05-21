@@ -30,16 +30,23 @@ DEFAULT_CONFIG = {
     # Agent configuration
     "Agent": {
         "repository": "./", # Code repository base directory
-        "fsm_type": "minimal" # Which FSM to load (see fsm.py)
+        "fsm_type": "minimal", # Which FSM to load (see fsm.py)
+        "agent_api": True # Launch an REST API server for agent's internal state
+    },
+
+    "AgentApi": {
+        "host": "0.0.0.0",
+        "port": 8000
     },
 
     # Logging configuration
     "Logger": {
         "level": "ERROR",
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "console": True,
+        "include_caller_info": True,
         "base_dir": None,  # Directory for log files (Agent sets it if None)
-        "filename": None,  # Log file name (Agent sets it if None)
-        "console": True
+        "filename": None  # Log file name (Agent sets it if None)
     },
 
     # FSM configuration

@@ -1,6 +1,7 @@
 import logging
 import threading
 import os
+import inspect
 import traceback
 from typing import Optional, Dict, Any, Type, Callable
 from rich.console import Console
@@ -9,11 +10,16 @@ from rich.text import Text
 
 # Don't import from config, needed to prevent circular imports
 def set_attributes_from_config(obj, config):
-    for key, value in config.items():
-        setattr(obj, key, value)
+    if config:
+        for key, value in config.items():
+            setattr(obj, key, value)
+
+def check_attrs(obj, attrs):
+    for attr in attrs:
+        assert hasattr(obj, attr), f"{attr} not provided in {obj.__class__.__name__} config"
 
 class Logger:
-    """Thread-safe singleton logger with Rich console output"""
+    """Thread-safe singleton logger with Rich console output and caller information"""
     _instance: Optional['Logger'] = None
     _lock = threading.Lock()
     _logger = None
@@ -41,6 +47,7 @@ class Logger:
             # Initialize the base_dir and filename attributes
             self.base_dir = None
             self.filename = None
+            self.include_caller_info = True  # Default to including caller info
 
     def configure(self, log_config: Dict):
         """Configure logger with provided settings, sets up console and file handlers."""
@@ -51,15 +58,15 @@ class Logger:
 
             # Set attributes from config
             set_attributes_from_config(self, log_config)
-
-            # Validate required attributes with a more compact assertion
-            required_attrs = ['level', 'format', 'console']
-            for attr in required_attrs:
-                assert hasattr(self, attr), f"{attr} not provided in Logger config"
+            check_attrs(self, ['level', 'format', 'console'])
 
             # Set log level
             level = getattr(logging, self.level.upper())
             self._logger.setLevel(level)
+
+            # Ensure 'include_caller_info' is set
+            if not hasattr(self, 'include_caller_info'):
+                self.include_caller_info = False
 
             # Create formatter
             formatter = logging.Formatter(self.format)
@@ -98,25 +105,51 @@ class Logger:
             os.makedirs(self.base_dir)
         return self.base_dir
 
+    def _get_caller_info(self):
+        """Get information about the caller of the logging method."""
+        if not self.include_caller_info:
+            return ""
+
+        # Get the stack frame of the caller
+        frame = inspect.currentframe()
+        try:
+            # Go back 3 frames to get the actual caller (1: _get_caller_info, 2: log method, 3: actual caller)
+            frame = inspect.getouterframes(frame)[3]
+            file_path = os.path.abspath(frame.filename)
+            file_name = os.path.basename(file_path)
+            line_num = frame.lineno
+            function_name = frame.function
+            return f"[{file_name}:{line_num} in {function_name}]"
+        except (IndexError, AttributeError):
+            return "[unknown caller]"
+        finally:
+            # Always delete frame references to avoid reference cycles
+            del frame
+
     def info(self, message: str):
-        """Log info message"""
-        self._logger.info(message)
+        """Log info message with caller information"""
+        caller_info = self._get_caller_info()
+        self._logger.info(f"{caller_info} {message}" if caller_info else message)
 
     def warning(self, message: str):
-        """Log warning message"""
-        self._logger.warning(message)
+        """Log warning message with caller information"""
+        caller_info = self._get_caller_info()
+        self._logger.warning(f"{caller_info} {message}" if caller_info else message)
 
     def error(self, message: str):
-        """Log error message"""
-        self._logger.error(message)
+        """Log error message with caller information"""
+        caller_info = self._get_caller_info()
+        self._logger.error(f"{caller_info} {message}" if caller_info else message)
 
     def debug(self, message: str):
-        """Log debug message"""
-        self._logger.debug(message)
+        """Log debug message with caller information"""
+        caller_info = self._get_caller_info()
+        self._logger.debug(f"{caller_info} {message}" if caller_info else message)
 
     def critical(self, message: str):
-        """Log critical message"""
-        self._logger.critical(message)
+        """Log critical message with caller information"""
+        caller_info = self._get_caller_info()
+        self._logger.critical(f"{caller_info} {message}" if caller_info else message)
 
     def assert_true(self, condition: bool, message: str,
                     exception_type: Type[Exception] = ValueError,
@@ -138,7 +171,9 @@ class Logger:
         stack_trace = ''.join(traceback.format_list(stack))
 
         # Log the error with stack trace
-        self.error(f"{message}\nStack trace:\n{stack_trace}")
+        caller_info = self._get_caller_info()
+        error_msg = f"{caller_info} {message}" if caller_info else message
+        self.error(f"{error_msg}\nStack trace:\n{stack_trace}")
 
         # If we're just logging, don't raise an exception but exit program
         if log_only:

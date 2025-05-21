@@ -1,8 +1,18 @@
+# For rome library
 colorama
 graphviz
-networkx
 numpy
 openai
 psutil
 pyribs
 pytest
+
+# For web app
+fastapi
+matplotlib
+networkx
+pandas
+pillow
+requests
+streamlit
+uvicorn

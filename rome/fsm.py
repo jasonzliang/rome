@@ -20,6 +20,7 @@ class FSM:
         self.transitions: Dict[str, Dict[str, Tuple[str, Optional[str]]]] = {}  # from_state -> action -> (target, fallback)
         self.actions: Dict[str, Action] = {}  # action handlers
         self.current_state = self.default_state = None
+        self.current_action = None
         self.logger = get_logger()
 
     def reset(self, agent):
@@ -88,6 +89,8 @@ class FSM:
         if action_name not in self.transitions[self.current_state]:
             available = list(self.transitions[self.current_state].keys())
             raise ValueError(f"Action '{action_name}' not available from '{self.current_state}'. Available: {available}")
+
+        self.current_action = action_name
 
         # Get transition information
         target_state, fallback_state = self.transitions[self.current_state][action_name]
