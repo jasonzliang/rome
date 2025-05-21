@@ -1,16 +1,23 @@
 # Rome
 
-Rome is a Python library for building intelligent agents with Finite State Machine (FSM) architecture. This library provides a structured way to create AI-powered agents that can analyze, edit, and test code with LLM assistance.
+**Rome** is a simple, multi-agent library designed for large language models (LLMs) to collaboratively generate, analyze, and improve Python code. It facilitates intelligent automation of software development tasks such as code completion, optimization, test generation, and documentation enhancement.
 
-## Overview
+## Features
 
-Rome is designed around a Finite State Machine architecture that allows AI agents to navigate through different states while performing operations on code. The library includes components for:
+- 🧠 **Multi-Agent Collaboration**: Utilize multiple LLM agents to review and enhance different aspects of your codebase.
+- 🛠 **Code Analysis and Improvement**: Automatically detect missing implementations, bugs, and performance bottlenecks.
+- ✅ **Test Generation**: Generate comprehensive unit tests focusing on functionality, edge cases, and integration points.
+- 📄 **Documentation Suggestions**: Receive suggestions for improving inline documentation and README content.
+- 🔄 **Execution Feedback Loop**: Analyze execution output and provide fixes based on test results or runtime errors.
 
-- State management
-- Code analysis and editing
-- Test creation and execution
-- Visualization of agent state
-- Versioning of code changes
+## How It Works
+
+Rome takes in a Python code file and performs the following:
+
+1. **Analyzes the code structure**: Identifies function stubs, incomplete logic, and poor practices.
+2. **Creates LLM prompts**: Generates structured prompts for agents to improve code quality.
+3. **Executes & Evaluates**: Optionally runs the code or tests, gathers output, and suggests fixes.
+4. **Generates unit tests**: Focuses on complete coverage including edge cases and error handling.
 
 ## Key Components
 
