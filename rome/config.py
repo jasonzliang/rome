@@ -55,7 +55,7 @@ DEFAULT_CONFIG = {
     "SearchAction": {
         "max_files": sys.maxsize,
         "file_types": [".py"],
-        "exclude_types": [".test.py", ".orig.py"],
+        "exclude_types": ["_test.py", ".orig.py"],
         "exclude_dirs": [".git", "venv", "__pycache__", DEFAULT_LOGDIR_NAME],
         "selection_criteria": None,
         "batch_size": 5,
@@ -68,13 +68,14 @@ DEFAULT_CONFIG = {
     "EditTestAction": {
         "custom_prompt": None
     },
-
-    # Code executor configuration
-    "CodeExecutor": {
-        "timeout": 10,
-        "virtual_env_context": None,
-        "work_dir": "./"
-    },
+    "ExecuteCodeAction": {
+        # Code executor configuration
+        "executor_config": {
+            "timeout": 10,
+            "virtual_env_context": None,
+            "work_dir": "./"
+        }
+    }
 }
 
 
@@ -101,7 +102,7 @@ def set_attributes_from_config(obj, config=None, required_attrs=None):
             setattr(obj, key, value)
 
     if required_attrs:
-        check_attrs(required_attrs)
+        check_attrs(obj, required_attrs)
 
     logger.debug(f"Applied configuration to {obj.__class__.__name__} attributes")
 

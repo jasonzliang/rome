@@ -166,6 +166,9 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
 
     def _filter_excluded_dirs(self, files: List[str]) -> List[str]:
         """Filter out files from excluded directories"""
+        if not self.exclude_dirs:
+            return files
+
         filtered_files = []
         for file_path in files:
             # Check if file is in an excluded directory
@@ -185,18 +188,19 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
 
     def _filter_excluded_types(self, files: List[str]) -> List[str]:
         """Filter out files with excluded file types"""
-        if not hasattr(self, 'exclude_types') or not self.exclude_types:
+        if not self.exclude_types:
             return files
 
         filtered_files = []
         for file_path in files:
             # Get file extension
-            _, ext = os.path.splitext(file_path)
-            # Remove leading dot from extension if present
-            ext = ext[1:] if ext.startswith('.') else ext
+            exclude = False
+            for exclude_type in self.exclude_types:
+                if file_path.endswith(exclude_type):
+                    exclude = True; break
 
             # Check if file type is excluded
-            if ext not in self.exclude_types:
+            if not exclude:
                 filtered_files.append(file_path)
         return filtered_files
 

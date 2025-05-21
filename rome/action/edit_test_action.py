@@ -25,7 +25,7 @@ class EditTestAction(Action):
 
         # Determine test file path
         base_path, extension = os.path.splitext(file_path)
-        test_path = f"{base_path}.test.py"
+        test_path = f"{base_path}_test.py"
 
         # Initialize changes and test-related fields if they don't exist
         if 'changes' not in selected_file:

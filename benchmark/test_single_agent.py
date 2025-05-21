@@ -120,9 +120,10 @@ def main():
         config_dict=config
     )
     agent.draw_fsm_graph()
+    # exit()
 
     # Run the agent's execution loop
-    results = agent.run_loop(max_iterations=3)
+    results = agent.run_loop(max_iterations=4)
 
     # Log and save the results
     logger.info(f"Agent execution completed with {len(results['actions_executed'])} actions")

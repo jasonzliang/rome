@@ -3,6 +3,7 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 from .action import Action
+from ..config import check_attrs
 from ..logger import get_logger
 from ..executor import CodeExecutor, CodeBlock
 
@@ -12,12 +13,9 @@ class ExecuteCodeAction(Action):
     def __init__(self, config: Dict = None):
         super().__init__(config)
         self.logger = get_logger()
+        check_attrs(self, ['executor_config'])
 
         # Initialize code executor
-        # Config will be automatically set from parent class
-        if not hasattr(self, 'executor_config'):
-            self.executor_config = {}
-
         self.executor = CodeExecutor(self.executor_config)
 
     def execute(self, agent, **kwargs) -> bool:
@@ -38,30 +36,8 @@ class ExecuteCodeAction(Action):
         try:
             # Determine the language based on file extension
             _, ext = os.path.splitext(test_path)
-            language = 'pytest' if ext.lower() == '.py' else ext.lower().lstrip('.')
-
             # Execute the test file
-            result = self.executor.execute_file(test_path, language)
-
-            # Add execution results to selected_file context
-            selected_file['exec_output'] = result.output
-            selected_file['exec_exit_code'] = result.exit_code
-
-            # Generate execution analysis
-            analysis = self._analyze_execution_results(
-                original_file_content=selected_file['content'],
-                test_file_content=selected_file['test_content'],
-                output=result.output,
-                exit_code=result.exit_code
-            )
-
-            selected_file['exec_analysis'] = analysis
-
-            self.logger.info(f"Test execution completed with exit code: {result.exit_code}")
-            self.logger.info(f"Execution analysis: {analysis[:100]}...")  # Log first 100 chars
-
-            # Return True if tests passed (exit code 0), False otherwise
-            return result.exit_code == 0
+            result = self.executor.execute_file(test_path)
 
         except Exception as e:
             error_msg = f"Error executing test file {test_path}: {str(e)}"
@@ -74,6 +50,27 @@ class ExecuteCodeAction(Action):
             selected_file['exec_analysis'] = f"Test execution failed due to an error: {str(e)}"
 
             return False
+
+        # Add execution results to selected_file context
+        selected_file['exec_output'] = result.output
+        selected_file['exec_exit_code'] = result.exit_code
+
+        # Generate execution analysis
+        analysis = self._analyze_execution_results(
+            original_file_content=selected_file['content'],
+            test_file_content=selected_file['test_content'],
+            output=result.output,
+            exit_code=result.exit_code
+        )
+
+        selected_file['exec_analysis'] = analysis
+
+        self.logger.info(f"Test execution completed with exit code: {result.exit_code}")
+        self.logger.info(f"Execution analysis: {analysis[:100]}...")  # Log first 100 chars
+
+        # Return True if tests passed (exit code 0), False otherwise
+        return result.exit_code == 0
+
 
     def _analyze_execution_results(self, agent,
                                   original_file_content: str,
