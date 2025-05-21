@@ -348,8 +348,8 @@ def display_agent_info(data):
                 # Current state and action
                 current_state = fsm_data.get("current_state", "Unknown")
                 current_action = fsm_data.get("current_action", "None")
-                st.markdown(f"**State:** {current_state}")
-                st.markdown(f"**Action:** {current_action}")
+                st.markdown(f"**Current State:** {current_state}")
+                st.markdown(f"**Last Action:** {current_action}")
 
             with col2:
                 # Display available actions in a compact format
