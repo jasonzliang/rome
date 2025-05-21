@@ -73,7 +73,8 @@ DEFAULT_CONFIG = {
         "executor_config": {
             "timeout": 10,
             "virtual_env_context": None,
-            "work_dir": "./"
+            "work_dir": "./",
+            "cmd_args": {"pytest": "-vvs"}
         }
     }
 }

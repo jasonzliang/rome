@@ -159,7 +159,8 @@ class CodeExecutor:
         self.config = config or {}
 
         # Update with provided config if any
-        set_attributes_from_config(self, self.config, ['timeout', 'virtual_env_context', 'work_dir'])
+        set_attributes_from_config(self, self.config,
+            ['timeout', 'virtual_env_context', 'work_dir', 'cmd_args'])
 
         # Create a custom execution_policies dict merging defaults with any provided in config
         self.execution_policies = self.DEFAULT_EXEC_POLICIES.copy()
@@ -273,7 +274,7 @@ class CodeExecutor:
 
             if lang not in self.SUPPORTED_LANGUAGES:
                 exitcode = 1
-                logs_all += f"\nUnknown language: {lang}"
+                logs_all += f"Unknown language: {lang}"
                 self.logger.error(f"Unknown language: {lang}")
                 break
 
@@ -333,7 +334,8 @@ class CodeExecutor:
 
             # If execution is disabled, just log that the file was saved
             if not execute_code:
-                logs_all += f"Code saved to {written_file!s}\n"
+                logs_all += f"\nCannot execute {written_file!s}"
+                self.logger.error(f"Cannot execute {written_file!s}")
                 continue
 
             # Prepare execution command
@@ -344,8 +346,8 @@ class CodeExecutor:
                 return CommandLineCodeResult(exit_code=1, output=error_msg)
 
             # Add additional argument if running pytest
-            if program == "pytest":
-                cmd = [program, '-vs', str(written_file.absolute())]
+            if self.cmd_args and self.cmd_args.get(program):
+                cmd = [program, self.cmd_args.get(program), str(written_file.absolute())]
             else:
                 cmd = [program, str(written_file.absolute())]
 
@@ -381,8 +383,7 @@ class CodeExecutor:
                     encoding="utf-8",
                     shell=WIN32,  # Use shell on Windows for better compatibility
                 )
-                logs_all += result.stderr
-                logs_all += result.stdout
+                logs_all += "\n" + result.stdout + result.stderr
                 exitcode = result.returncode
 
                 if exitcode != 0:
