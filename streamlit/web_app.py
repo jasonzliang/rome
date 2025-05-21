@@ -430,7 +430,7 @@ def display_context_key(key, value, path, depth):
         if len(value) > 150:
             st.markdown(f"**{key}:** *Preview:* {truncate(value)}")
             if st.checkbox(f"Show full content ({len(value)} chars)", key=widget_key):
-                st.text_area("", value=value, height=150, disabled=True, key=widget_key+"_area")
+                st.text_area("", value=value, height=300, disabled=True, key=widget_key+"_area")
         else:
             st.markdown(f"**{key}:** {value}")
 
