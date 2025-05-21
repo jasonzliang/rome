@@ -376,14 +376,15 @@ class CodeExecutor:
                 result = subprocess.run(
                     cmd,
                     cwd=work_dir,
-                    capture_output=True,
+                    stdout=subprocess.PIPE,     # Instead of capture_output=True
+                    stderr=subprocess.STDOUT,   # Redirect stderr to stdout
                     text=True,
                     timeout=float(self.timeout),
                     env=os.environ.copy(),
                     encoding="utf-8",
                     shell=WIN32,  # Use shell on Windows for better compatibility
                 )
-                logs_all += "\n" + result.stdout + result.stderr
+                logs_all += "\n" + result.stdout
                 exitcode = result.returncode
 
                 if exitcode != 0:
