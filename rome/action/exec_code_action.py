@@ -57,6 +57,7 @@ class ExecuteCodeAction(Action):
 
         # Generate execution analysis
         analysis = self._analyze_execution_results(
+            agent,
             original_file_content=selected_file['content'],
             test_file_content=selected_file['test_content'],
             output=result.output,
@@ -119,7 +120,7 @@ Your analysis:
 """
         # Get feedback from LLM
         # try:
-        response = self.agent.chat_completion(
+        response = agent.chat_completion(
             prompt=prompt,
             system_message=agent.role
         )
