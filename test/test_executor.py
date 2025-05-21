@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from rome.executor import CodeExecutor, CodeBlock, CommandLineCodeResult
 from rome.logger import get_logger
 
@@ -31,7 +32,8 @@ class TestCodeExecutor(unittest.TestCase):
         self.executor_config = {
             "timeout": 5,
             "virtual_env_context": None,
-            "work_dir": self.temp_dir
+            "work_dir": self.temp_dir,
+            "cmd_args": None,
         }
         self.executor = CodeExecutor(self.executor_config)
 
@@ -96,7 +98,8 @@ class TestCodeExecutor(unittest.TestCase):
         short_timeout_config = {
             "timeout": 1,
             "virtual_env_context": None,
-            "work_dir": self.temp_dir
+            "work_dir": self.temp_dir,
+            "cmd_args": None,
         }
         short_executor = CodeExecutor(short_timeout_config)
 
@@ -183,6 +186,7 @@ class TestCodeExecutor(unittest.TestCase):
             "timeout": 5,
             "virtual_env_context": None,
             "work_dir": self.temp_dir,
+            "cmd_args": None,
             "execution_policies": {
                 "python": False  # Set Python execution to False
             }
@@ -196,7 +200,7 @@ class TestCodeExecutor(unittest.TestCase):
 
         # The code shouldn't execute, instead it should just save the file
         assert result.exit_code == 0
-        assert "Code saved to" in result.output
+        assert "Cannot run due to execution policy" in result.output
         assert "This should not execute" not in result.output
 
     # New tests that create and execute files in /tmp directory

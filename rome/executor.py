@@ -334,8 +334,8 @@ class CodeExecutor:
 
             # If execution is disabled, just log that the file was saved
             if not execute_code:
-                logs_all += f"\nCannot execute {written_file!s}"
-                self.logger.error(f"Cannot execute {written_file!s}")
+                logs_all += f"\nCannot run due to execution policy: {written_file!s}"
+                self.logger.error(f"Cannot run due to execution policy: {written_file!s}")
                 continue
 
             # Prepare execution command

@@ -89,11 +89,21 @@ DEFAULT_CONFIG = {
 
 def check_attrs(obj, required_attrs):
     """Helper function to check if required attributes have been set"""
+    logger = get_logger()
     for attr in required_attrs:
-        assert hasattr(obj, attr), f"{attr} not provided in {obj.__class__.__name__} config"
+        logger.assert_attribute(obj, attr)
 
 
-def set_attributes_from_config(obj, config=None, required_attrs=None):
+def check_opt_attrs(obj, optional_attrs):
+    """Helper function to check if optional attributes have been set"""
+    logger = get_logger()
+    for attr in optional_attrs:
+        if not hasattr(obj, attr):
+            setattr(obj, attr, None)
+            logger.debug(f"'{attr}' (optional) not provided in {obj.__class__.__name__} config")
+
+
+def set_attributes_from_config(obj, config=None, required_attrs=None, optional_attrs=None):
     """
     Helper function to convert configuration dictionary entries to object attributes
 
@@ -101,6 +111,7 @@ def set_attributes_from_config(obj, config=None, required_attrs=None):
         obj: The object to set attributes on
         config: The configuration dictionary
         required_attrs: List of attributes that must be set from config
+        optional_attrs: List of attributes that are optional
     """
     logger = get_logger()
 
@@ -111,6 +122,9 @@ def set_attributes_from_config(obj, config=None, required_attrs=None):
 
     if required_attrs:
         check_attrs(obj, required_attrs)
+
+    if optional_attrs:
+        check_opt_attrs(obj, optional_attrs)
 
     logger.debug(f"Applied configuration to {obj.__class__.__name__} attributes")
 
