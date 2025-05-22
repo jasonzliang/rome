@@ -29,6 +29,47 @@ def set_attributes_from_config(obj, config=None, required_attrs=None, optional_a
             setattr(obj, key, value)
 
 
+class ParentPathRichHandler(RichHandler):
+    """Custom RichHandler that shows the path of the parent function (1 level above caller)."""
+
+    def __init__(self, *args, **kwargs):
+        kwargs['show_path'] = False  # Disable default path
+        super().__init__(*args, **kwargs)
+
+    def emit(self, record):
+        """Add parent path info before emitting."""
+        # Get the current call stack
+        stack = inspect.stack()
+
+        # Find the parent caller (1 level above the logging call)
+        parent_info = None
+
+        # Look through stack to find user code frames
+        user_frames = []
+        for frame in stack:
+            frame_file = frame.filename
+
+            # Skip logging internals and this handler file
+            if ('__init__.py' not in frame_file and
+                'logging' not in frame_file and
+                frame.function not in ['emit', 'handle', 'callHandlers', '_log']):
+                user_frames.append({
+                    'filename': os.path.basename(frame_file),
+                    'lineno': frame.lineno
+                })
+
+        # If we have at least 2 user frames, the second one is the parent
+        if len(user_frames) >= 2:
+            parent_info = user_frames[1]  # Parent of the logging caller
+
+        # Add parent path to the message (file:line format only)
+        if parent_info:
+            parent_path = f"({parent_info['filename']}:{parent_info['lineno']})"
+            record.msg = f"{parent_path} {record.msg}"
+
+        super().emit(record)
+
+
 class Logger:
     """Thread-safe singleton logger with Rich console output and caller information"""
     _instance: Optional['Logger'] = None
@@ -92,15 +133,44 @@ class Logger:
             # Add Rich console handler if enabled
             if self.console:
                 console = Console()
-                rich_handler = RichHandler(
-                    console=console,
-                    show_time=True,
-                    show_path=self.include_caller_info,  # Shows file path
-                    show_level=self.include_caller_info,  # Shows log level
-                    rich_tracebacks=True,
-                    markup=True,
-                    log_time_format="[%H:%M:%S]"
-                )
+
+                # Determine handler type based on include_caller_info setting
+                caller_info = self.include_caller_info
+
+                if caller_info == "rome":
+                    # Use custom handler that shows parent caller path
+                    rich_handler = ParentPathRichHandler(
+                        console=console,
+                        show_time=True,
+                        show_path=False,  # We handle path info ourselves
+                        show_level=True,
+                        rich_tracebacks=True,
+                        markup=True,
+                        log_time_format="[%H:%M:%S]"
+                    )
+                elif caller_info == "rich" or caller_info == True:
+                    # Use standard RichHandler with built-in path display
+                    rich_handler = RichHandler(
+                        console=console,
+                        show_time=True,
+                        show_path=True,  # Show Rich's default path info
+                        show_level=True,
+                        rich_tracebacks=True,
+                        markup=True,
+                        log_time_format="[%H:%M:%S]"
+                    )
+                else:
+                    # include_caller_info is None or other values - no caller info
+                    rich_handler = RichHandler(
+                        console=console,
+                        show_time=True,
+                        show_path=False,  # No path info
+                        show_level=True,
+                        rich_tracebacks=True,
+                        markup=True,
+                        log_time_format="[%H:%M:%S]"
+                    )
+
                 rich_handler.setLevel(level)
                 self._logger.addHandler(rich_handler)
 
@@ -181,6 +251,7 @@ class Logger:
         """Assert callable returns True, useful for lazy evaluation of complex conditions."""
         self.assert_true(condition(), message, exception_type)
 
+
 # Global instance and convenience functions
 _logger_instance = None
 
@@ -190,3 +261,8 @@ def get_logger() -> Logger:
     if _logger_instance is None:
         _logger_instance = Logger()
     return _logger_instance
+
+
+# Example usage
+if __name__ == "__main__":
+    pass

@@ -73,7 +73,7 @@ def main():
     logger.configure({"level": "DEBUG",
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         "console": True,
-        "include_caller_info": True})
+        "include_caller_info": "rome"})
     logger.info("Starting agent test")
 
     # Setup test directory with HumanEval samples

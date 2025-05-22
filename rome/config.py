@@ -44,7 +44,7 @@ DEFAULT_CONFIG = {
         "level": "ERROR",
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         "console": True,
-        "include_caller_info": True,
+        "include_caller_info": "rome",
         "base_dir": None,  # Directory for log files (Agent sets it if None)
         "filename": None  # Log file name (Agent sets it if None)
     },
