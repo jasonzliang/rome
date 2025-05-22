@@ -64,7 +64,7 @@ class ParentPathRichHandler(RichHandler):
 
         # Add parent path to the message (file:line format only)
         if parent_info:
-            parent_path = f"({parent_info['filename']}:{parent_info['lineno']})"
+            parent_path = f"\\[{parent_info['filename']}:{parent_info['lineno']}]"
             record.msg = f"{parent_path} {record.msg}"
 
         super().emit(record)
