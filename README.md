@@ -1,6 +1,6 @@
 # Rome
 
-<p align="center"><img src="https://image.cdn2.seaart.me/2024-09-10/crg9uvle878c73cansn0/af22c8e52bb422f09e6813670d8b8166_high.webp" width="50%" alt="Rome"></p>
+<p align="center"><img src="https://image.cdn2.seaart.me/2024-09-10/crg9uvle878c73cansn0/af22c8e52bb422f09e6813670d8b8166_high.webp" width="40%" alt="Rome"></p>
 
 Rome is a Python library for building intelligent agents with Finite State Machine (FSM) architecture. This library provides a structured way to create AI-powered agents that can analyze, edit, and test code with LLM assistance.
 
