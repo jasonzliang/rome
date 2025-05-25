@@ -22,9 +22,16 @@ DEFAULT_CONFIG = {
         "temperature": 0.1,
         "max_tokens": 4096,
         "top_p": 1.0,
+        "seed": None,
 
         # Fall back system message for chat completions
-        "system_message": "You are a helpful code assistant specializing in code analysis and improvement."
+        "system_message": "You are a helpful code assistant specializing in code analysis and improvement.",
+
+        # Context management parameters
+        "manage_context": True, # Prevent messages from overfilling context window
+        "max_input_tokens": None, # Set to manually override auto-calculated input token limit
+        "token_count_thres": 0.8, # Threshold when to use slow method to count number of tokens
+        "chars_per_token": 4 # Used for fast calculation of number of tokens
     },
 
     # Agent configuration

@@ -4,8 +4,8 @@ graphviz
 numpy
 openai
 psutil
-pyribs
 pytest
+ribs
 
 # For web app
 fastapi
@@ -15,4 +15,5 @@ pandas
 pillow
 requests
 streamlit
+tiktoken
 uvicorn
