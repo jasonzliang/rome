@@ -58,17 +58,17 @@ class OpenAIHandler:
         except Exception:
             pass
 
-        return 128000
+        return 128000 # Default for most OpenAI models
 
     def get_max_input_tokens(self) -> int:
         """Get max input tokens, with manual override or auto-calculation."""
         # Check if max_input_tokens is manually set in config
         if self.max_input_tokens:
-            return self.max_input_tokens
+            _max_input_tokens = self.max_input_tokens
         else:
-            # Auto-calculate: context length minus max_tokens (reserve for response)
-            context_length = self._get_model_context_length()
-            return context_length - self.max_tokens
+            # Auto-calculate: context length minus max_tokens
+            _max_input_tokens = self._get_model_context_length() - self.max_tokens
+        return max(_max_input_tokens, 0)
 
     @lru_cache(maxsize=1)
     def _get_encoding(self):
@@ -255,7 +255,7 @@ class OpenAIHandler:
             response = self.client.chat.completions.create(**kwargs)
         except openai.BadRequestError as e:
             if "maximum context length" in str(e).lower():
-                self.logger.error("Context length exceeded, applying emergency truncation")
+                self.logger.error("Context length exceeded, recheck OpenAI API config")
             raise
 
         content = response.choices[0].message.content.strip()

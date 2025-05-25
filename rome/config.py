@@ -20,7 +20,7 @@ DEFAULT_CONFIG = {
         # General LLM parameters
         "model": "gpt-4o",
         "temperature": 0.1,
-        "max_tokens": 4096,
+        "max_tokens": 8192,
         "top_p": 1.0,
         "seed": None,
 
