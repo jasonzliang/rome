@@ -11,6 +11,8 @@ from .config import set_attributes_from_config, load_config, merge_with_default_
 # Import singleton logger
 from .logger import get_logger
 from .fsm import FSM, FSM_FACTORY
+# Import the new AgentHistory class
+from .history import AgentHistory
 
 class Agent:
     """Agent class using OpenAI API, YAML config, and FSM architecture"""
@@ -40,7 +42,7 @@ class Agent:
         # Set up agent configuration
         agent_config = self.config.get('Agent', {})
         # Automatically set attributes from Agent config
-        set_attributes_from_config(self, agent_config, ['repository', 'fsm_type', 'agent_api'])
+        set_attributes_from_config(self, agent_config, ['repository', 'fsm_type', 'agent_api', 'history_context_len'])
 
         # Validate repository attribute
         self.logger.assert_attribute(self, 'repository', "repository not provided in Agent config")
@@ -52,22 +54,19 @@ class Agent:
         # Configure logging after repository is validated
         self._setup_logging()
 
-        # Initialize context
-        self.context = {}
-        self.history = {
-            'iterations': 0,
-            'actions_executed': [],
-            'states_visited': [self.fsm.current_state],
-            'errors': [],
-            'final_state': None,
-            'final_context': None
-        }
-
         # Set up FSM
         if self.fsm_type:
             self._setup_fsm()
         else:
             self.fsm = None
+
+        # Initialize context and history using the new AgentHistory class
+        self.context = {}
+        self.history = AgentHistory()
+
+        # Add initial state to history if FSM is set up
+        if self.fsm and self.fsm.current_state:
+            self.history.add_initial_state(self.fsm.current_state)
 
         # Initialize OpenAI handler with OpenAIHandler config
         openai_config = self.config.get('OpenAIHandler', {})
@@ -136,6 +135,9 @@ class Agent:
     def set_fsm(self, fsm: FSM):
         self.fsm = fsm
         self.logger.info(f"Initialized user FSM with state: {self.fsm.get_current_state()}")
+        # Add initial state to history
+        if self.fsm.current_state:
+            self.history.add_initial_state(self.fsm.current_state)
 
     def draw_fsm_graph(self, output_path: str = None) -> str:
         """
@@ -249,98 +251,114 @@ class Agent:
         for iteration in range(max_iterations):
             try:
                 # Check agent context on first iteration to make sure state is valid
-                if iteration == 0: self.fsm.check_context(self)
+                if iteration == 0:
+                    self.fsm.check_context(self)
 
-                self.history['iterations'] = iteration + 1
-                self.logger.info(f"Loop iteration {iteration + 1}/{max_iterations}")
+                # Increment iteration counter in history
+                self.history.increment_iteration()
+                current_iteration = self.history.iterations
+
+                self.logger.info(f"Loop iteration {current_iteration}/{max_iterations}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
 
                 # Check if there are available actions
                 available_actions = self.fsm.get_available_actions()
                 if not available_actions:
                     self.logger.error("No available actions in current state. Stopping loop.")
-                    if stop_on_error: break
-                    else: self.fsm.reset(); continue
+                    if stop_on_error:
+                        break
+                    else:
+                        self.fsm.reset(self)
+                        self.history.reset()
+                        continue
                 else:
                     self.logger.info(f"Available actions from {self.fsm.get_current_state()}: {available_actions}")
 
-                # Construct prompt combining role, state prompt, and available actions
-                prompt = self.fsm.get_action_selection_prompt(self)
+                # If only one action available, select it directly without LLM call
+                if len(available_actions) == 1:
+                    chosen_action = available_actions[0]
+                    reasoning = "only one action available - auto-selected"
+                    self.logger.info(f"Auto-selecting single available action: {chosen_action}")
+                else:
+                    # Construct prompt combining role, state prompt, and available actions
+                    prompt = self.fsm.get_action_selection_prompt(self)
 
-                # Get action choice from LLM
-                self.logger.info("Requesting action selection from LLM")
-                response = self.chat_completion(
-                    prompt=prompt,
-                    system_message=self.role,
-                    response_format={"type": "json_object"}
-                )
+                    # Get action choice from LLM
+                    self.logger.info("Requesting action selection from LLM")
+                    response = self.chat_completion(
+                        prompt=prompt,
+                        system_message=self.role,
+                        response_format={"type": "json_object"}
+                    )
 
-                # Extract action from response
-                chosen_action, reasoning = self._extract_action_from_response(response)
+                    # Extract action from response
+                    chosen_action, reasoning = self._extract_action_from_response(response)
 
-                if not chosen_action:
-                    error_msg = f"Could not determine action from LLM response: {response}"
-                    self.logger.error(error_msg)
-                    self.history['errors'].append({
-                        'iteration': iteration + 1,
-                        'error': error_msg,
-                        'state': self.fsm.current_state
-                    })
-                    if stop_on_error: break
-                    else: self.fsm.reset(); continue
+                    if not chosen_action:
+                        error_msg = f"Could not determine action from LLM response: {response}"
+                        self.logger.error(error_msg)
+                        self.history.add_error(current_iteration, error_msg, self.fsm.current_state)
+                        if stop_on_error:
+                            break
+                        else:
+                            self.fsm.reset(self)
+                            self.history.reset()
+                            continue
 
-                # Validate action is available
-                if chosen_action not in available_actions:
-                    error_msg = f"Action '{chosen_action}' not available in state '{self.fsm.current_state}'. Available: {available_actions}"
-                    self.logger.error(error_msg)
-                    self.history['errors'].append({
-                        'iteration': iteration + 1,
-                        'error': error_msg,
-                        'state': self.fsm.current_state
-                    })
-                    if stop_on_error: break
-                    else: self.fsm.reset(); continue
+                    # Validate action is available
+                    if chosen_action not in available_actions:
+                        error_msg = f"Action '{chosen_action}' not available in state '{self.fsm.current_state}'. Available: {available_actions}"
+                        self.logger.error(error_msg)
+                        self.history.add_error(current_iteration, error_msg, self.fsm.current_state)
+                        if stop_on_error:
+                            break
+                        else:
+                            self.fsm.reset(self)
+                            self.history.reset()
+                            continue
+
+                # Store previous state for history
+                prev_state = self.fsm.current_state
 
                 # Execute the action through FSM
                 self.logger.info(f"Executing action: {chosen_action}")
                 success = self.fsm.execute_action(chosen_action, self)
-                success = "succeeded" if success else "failed"
 
-                # Record the execution
-                self.history['actions_executed'].append({
-                    'iteration': iteration + 1,
-                    'action': chosen_action,
-                    'action_result': success,
-                    'action_reason': reasoning,
-                    'prev_state': self.history['states_visited'][-1],
-                    'curr_state': self.fsm.current_state,
-                })
-                self.history['states_visited'].append(self.fsm.current_state)
+                # Record the execution in history
+                self.history.add_action_execution(
+                    iteration=current_iteration,
+                    action=chosen_action,
+                    result=success,
+                    reasoning=reasoning,
+                    prev_state=prev_state,
+                    curr_state=self.fsm.current_state
+                )
 
                 self.logger.info(f"Action executed successfully. New state: {self.fsm.current_state}")
 
             except Exception as e:
-                error_msg = f"Error in loop iteration {iteration + 1}: {str(e)}"
+                error_msg = f"Error in loop iteration {current_iteration}: {str(e)}"
                 self.logger.error(error_msg)
                 self.logger.error(traceback.format_exc())
-                self.history['errors'].append({
-                    'iteration': iteration + 1,
-                    'error': error_msg,
-                    'state': self.fsm.current_state,
-                    'exception': str(e)
-                })
-                if stop_on_error: break
-                else: self.fsm.reset(); continue
+                self.history.add_error(current_iteration, error_msg, self.fsm.current_state, str(e))
+                if stop_on_error:
+                    break
+                else:
+                    self.fsm.reset(self)
+                    self.history.reset()
+                    continue
 
         # Record final state and context
-        self.history['final_state'] = self.fsm.current_state
-        self.history['final_context'] = self.context
+        self.history.set_final_state(self.fsm.current_state, self.context)
 
-        self.logger.info(f"\n\nAgent loop completed after {self.history['iterations']} iterations")
-        self.logger.info(f"Final state: {self.history['final_state']}")
-        self.logger.info(f"Actions executed: {[action['action'] for action in self.history['actions_executed']]}")
+        self.logger.info(f"\n\nAgent loop completed after {self.history.iterations} iterations")
+        self.logger.info(f"Final state: {self.history.final_state}")
 
-        if self.history['errors']:
-            self.logger.info(f"Loop completed with {len(self.history['errors'])} errors")
+        action_sequence = [action['action'] for action in self.history.actions_executed]
+        self.logger.info(f"Actions executed: {action_sequence}")
 
-        return self.history
+        if self.history.has_errors():
+            self.logger.info(f"Loop completed with {len(self.history.errors)} errors")
+
+        # Return dictionary format for backward compatibility
+        return self.history.to_dict()

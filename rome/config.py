@@ -24,7 +24,7 @@ DEFAULT_CONFIG = {
         "top_p": 1.0,
         "seed": None,
 
-        # Fall back system message for chat completions
+        # Fall back system message for chat completions if none given
         "system_message": "You are a helpful code assistant specializing in code analysis and improvement.",
 
         # Context management parameters
@@ -38,7 +38,8 @@ DEFAULT_CONFIG = {
     "Agent": {
         "repository": "./", # Code repository base directory
         "fsm_type": "minimal", # Which FSM to load (see fsm.py)
-        "agent_api": True # Launch an REST API server for agent's internal state
+        "agent_api": True, # Launch an REST API server for agent's internal state
+        "history_context_len": 10, # Length of history to use when selecting action
     },
 
     "AgentApi": {

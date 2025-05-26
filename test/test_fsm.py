@@ -38,6 +38,9 @@ class TestSuccessAction(Action):
         agent.context['test_success_executed'] = True
         return True
 
+    def summary(self, agent):
+        "This action is successful"
+
 
 class TestFailAction(Action):
     """Action that always fails"""
@@ -54,6 +57,9 @@ class TestFailAction(Action):
         # that implement context clearing, so we need to be careful about this
         return False
 
+    def summary(self, agent):
+        "This action has failed"
+
 
 class TestExceptionAction(Action):
     """Action that raises an exception"""
@@ -68,6 +74,9 @@ class TestExceptionAction(Action):
         agent.context['test_exception_executed'] = True
         raise RuntimeError("Action execution failed")
 
+    def summary(self, agent):
+        "This action has exception"
+
 
 # Custom State for testing
 class TestErrorState(State):
@@ -79,7 +88,7 @@ class TestErrorState(State):
     def check_context(self, agent, **kwargs):
         raise AssertionError("Context validation failed")
 
-    def get_state_prompt(self, agent):
+    def summary(self, agent):
         return "This is an error state prompt"
 
 
@@ -92,7 +101,7 @@ class TestExceptionState(State):
     def check_context(self, agent, **kwargs):
         raise RuntimeError("Context check failed")
 
-    def get_state_prompt(self, agent):
+    def summary(self, agent):
         return "This is an exception state prompt"
 
 
@@ -133,25 +142,25 @@ def setup_fsm():
     class TestStateA(State):
         def check_context(self, agent, **kwargs):
             return True
-        def get_state_prompt(self, agent):
+        def summary(self, agent):
             return "This is state A prompt"
 
     class TestStateB(State):
         def check_context(self, agent, **kwargs):
             return True
-        def get_state_prompt(self, agent):
+        def summary(self, agent):
             return "This is state B prompt"
 
     class TestStateC(State):
         def check_context(self, agent, **kwargs):
             return True
-        def get_state_prompt(self, agent):
+        def summary(self, agent):
             return "This is state C prompt"
 
     class TestFallbackState(State):
         def check_context(self, agent, **kwargs):
             return True
-        def get_state_prompt(self, agent):
+        def summary(self, agent):
             return "This is fallback state prompt"
 
     # Create states that don't clear context on transition
@@ -350,7 +359,7 @@ def test_get_action_prompt_invalid_state():
 
         # Attempt to get action prompt and expect ValueError
         try:
-            fsm.get_action_prompt(agent)
+            fsm.get_action_selection_prompt(agent)
             assert False, "Should have raised ValueError"
         except ValueError as e:
             assert "not a valid state" in str(e), f"Expected 'not a valid state' in exception message but got: {str(e)}"
@@ -449,7 +458,7 @@ def test_validate_fsm():
         class InvalidTestState(State):
             def check_context(self, agent, **kwargs):
                 return True
-            def get_state_prompt(self, agent):
+            def summary(self, agent):
                 return "This is an invalid test state prompt"
 
         invalid_state = InvalidTestState()

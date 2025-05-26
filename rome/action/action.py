@@ -12,6 +12,7 @@ class Action(ABC):
 
     def __init__(self, config: Dict = None):
         """Initialize the action with a configuration dictionary"""
+        self.name = self.__class__.__name__
         self.config = config or {}
         self.logger = get_logger()
 
@@ -24,6 +25,6 @@ class Action(ABC):
         pass
 
     @abstractmethod
-    def summary(self, agent) --> str:
+    def summary(self, agent) -> str:
         """Return a short summary that describes the current action"""
         pass

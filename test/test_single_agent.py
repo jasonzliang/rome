@@ -89,7 +89,6 @@ def main():
             "temperature": 0.1,
             "max_tokens": 4096,
             "timeout": 30,
-            "system_message": "You are a code analyzer agent that helps find and analyze Python functions."
         },
 
         # Agent specific configuration
@@ -109,14 +108,14 @@ def main():
         "SearchAction": {
             "file_types": [".py"],
             "batch_size": 3,  # Process all 3 files in a single batch
-            "selection_criteria": "Select the most interesting code file to improve and complete.",
+            "selection_criteria": "Select the most interesting code file to improve and complete",
         },
     }
 
     # Create and initialize the agent
     agent = Agent(
         name="CodeAnalyzer",
-        role="You are an expert code analyzer that can identify interesting algorithms and functions.",
+        role="You are an expert code analyzer that can identify interesting algorithms and functions",
         config_dict=config
     )
     agent.draw_fsm_graph()

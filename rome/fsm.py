@@ -32,7 +32,7 @@ class FSM:
 
     def add_state(self, state: State, state_name: str = None) -> str:
         """Add a state (node) to the FSM"""
-        state_name = state_name or state.__class__.__name__
+        state_name = state_name or state.name
         self.states[state_name] = state
         if state_name not in self.transitions:
             self.transitions[state_name] = {}
@@ -42,7 +42,7 @@ class FSM:
     def add_action(self, from_state: str, to_state: str, action: Action,
                   action_name: str = None, fallback_state: str = None) -> str:
         """Add an action (edge) between states with optional fallback state"""
-        action_name = action_name or action.__class__.__name__
+        action_name = action_name or action.name
 
         # Validate states
         for state in (from_state, to_state, fallback_state):
@@ -133,12 +133,8 @@ class FSM:
         return list(self.transitions.get(self.current_state, {}).keys())
 
     def get_action_selection_prompt(self, agent) -> str:
-        """
-        Construct a prompt that combines state information and available actions with their summaries
-
-        Raises:
-            ValueError: If the current state is not properly initialized
-        """
+        """Construct a prompt that combines state information, available actions with their summaries,
+        and a summary of recent state/action transitions"""
         if self.current_state not in self.states:
             raise ValueError(f"Current state '{self.current_state}' is not a valid state in the FSM")
 
@@ -156,20 +152,26 @@ class FSM:
 
         actions_text = "\n".join(action_details)
 
-        prompt = f"""Current agent state:
-{state_summary}
+        # Get history summary based on config
+        history_summary = agent.history.get_history_summary(agent.history_context_len)
 
-Available actions:
-{actions_text}
+        prompt_parts = [
+            f"## Current agent state ##\n{state_summary}",
+            f"## Available actions ##\n{actions_text}"
+        ]
 
-Please select one of the available actions to execute. Respond with a JSON object containing:
-{{
+        # Add history summary if available
+        if history_summary:
+            prompt_parts.insert(0, f"## Recent agent history ##\n{history_summary}")
+
+        prompt_parts.append("""Please select one of the available actions to execute. Respond with a JSON object containing:
+{
     "action": "chosen_action_name",
     "reasoning": "Brief explanation of why you chose this action"
-}}
-Choose the most appropriate action based on the current state and context.
-"""
-        return prompt
+}
+Choose the most appropriate action based on the current state and context.""")
+
+        return "\n\n".join(prompt_parts)
 
     def get_graph(self) -> Dict:
         """Get the graph structure for visualization including fallback transitions"""

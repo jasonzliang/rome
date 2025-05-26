@@ -14,6 +14,7 @@ class State(ABC):
         actions: List[str] = None,
         config: Dict = None):
 
+        self.name = self.__class__.__name__
         self.config = config or {}
         # Initialize with empty actions list - will be populated by FSM
         self.actions = actions or []  # Store available actions for this state
@@ -57,7 +58,7 @@ class IdleState(State):
 
     def summary(self, agent) -> str:
         """Enhanced summary for idle state"""
-        return f"Agent is idle and ready to start a new task"
+        return f"{self.name}: Agent is idle and ready to start a new task"
 
 
 class CodeLoadedState(State):
@@ -96,7 +97,7 @@ class CodeLoadedState(State):
         except:
             size_info = ""
 
-        return f"Selected file {filename}{size_info} for editing. Selection reason: {reason}"
+        return f"{self.name}: Agent selected file {filename}{size_info} for editing, selection reason: {reason}"
 
 
 class CodeEditedState(State):
@@ -136,7 +137,7 @@ class CodeEditedState(State):
         explanation = change_record['explanation']
 
         # Get last change explanation if available
-        return f"Modified {filename} with {num_changes} change(s) with explanation: {explanation[:SUMMARY_LENGTH]}{'...' if len(explanation) > SUMMARY_LENGTH else ''}"
+        return f"{self.name}: Agent edited {filename} with {num_changes} change(s) with explanation: {explanation[:SUMMARY_LENGTH]}{'...' if len(explanation) > SUMMARY_LENGTH else ''}"
 
 
 class TestEditedState(State):
@@ -174,9 +175,9 @@ class TestEditedState(State):
         num_test_changes = len(test_changes)
 
         # Check if test file was created or updated
-        action_type = "Created" if not os.path.exists(test_path) else "Updated"
+        action_type = "created" if not os.path.exists(test_path) else "updated"
 
-        return f"{action_type} tests in {test_filename} for {filename} with {num_test_changes} change(s)."
+        return f"{self.name}: Agent {action_type} tests in {test_filename} for {filename} with {num_test_changes} change(s)"
 
 
 class CodeExecutedState(State):
@@ -228,4 +229,4 @@ class CodeExecutedState(State):
         if len(output_summary) > SUMMARY_LENGTH:
             output_summary = output_summary[:SUMMARY_LENGTH] + '...'
 
-        return f"Executed {test_filename}: {status} (exit code: {exit_code}). Output: {output_summary}"
+        return f"{self.name}: Agent executed {test_filename}: {status} (exit code: {exit_code}), output: {output_summary}"
