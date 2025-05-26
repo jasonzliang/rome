@@ -19,7 +19,7 @@ class SearchAction(Action):
         self.logger = get_logger()
 
         # Check required config parameters are set properly
-        check_attrs(self, ['epilson_oldest', 'max_files', 'file_types', 'exclude_dirs', 'exclude_types', 'selection_criteria', 'batch_size'])
+        check_attrs(self, ['max_files', 'file_types', 'exclude_dirs', 'exclude_types', 'selection_criteria', 'batch_size'])
 
     def summary(self, agent) -> str:
         """Return a short summary of the search action"""
@@ -359,28 +359,28 @@ Respond with a JSON object:
 """
         return prompt
 
-    def _find_oldest_file(self, file_overviews: List[Dict]) -> Dict:
-        """Find the oldest file based on modification age"""
-        if not file_overviews:
-            return None
+    # def _find_oldest_file(self, file_overviews: List[Dict]) -> Dict:
+    #     """Find the oldest file based on modification age"""
+    #     if not file_overviews:
+    #         return None
 
-        oldest_file = max(file_overviews, key=lambda x: x.get("modified_age", 0))
-        self.logger.info(f"Oldest file found: {oldest_file['path']} (age: {oldest_file['modified_age']} seconds)")
+    #     oldest_file = max(file_overviews, key=lambda x: x.get("modified_age", 0))
+    #     self.logger.info(f"Oldest file found: {oldest_file['path']} (age: {oldest_file['modified_age']} seconds)")
 
-        # Get file content
-        try:
-            with open(oldest_file['path'], 'r', encoding='utf-8') as f:
-                content = f.read()
+    #     # Get file content
+    #     try:
+    #         with open(oldest_file['path'], 'r', encoding='utf-8') as f:
+    #             content = f.read()
 
-            return {
-                'path': oldest_file['path'],
-                'content': content,
-                'reason': "Selected as oldest file based on epilson_oldest probability",
-                'priority': 5  # Give it highest priority since it was selected by age
-            }
-        except Exception as e:
-            self.logger.error(f"Error reading oldest file {oldest_file['path']}: {e}")
-            return None
+    #         return {
+    #             'path': oldest_file['path'],
+    #             'content': content,
+    #             'reason': "Selected as oldest file based on epilson_oldest probability",
+    #             'priority': 5  # Give it highest priority since it was selected by age
+    #         }
+    #     except Exception as e:
+    #         self.logger.error(f"Error reading oldest file {oldest_file['path']}: {e}")
+    #         return None
 
     def execute(self, agent, **kwargs) -> bool:
         self.logger.info("Starting SearchAction execution")
@@ -428,17 +428,17 @@ Respond with a JSON object:
         file_overviews = self._create_global_overview(agent, filtered_files)
 
         # Check if we should select the oldest file based on probability
-        if self.epilson_oldest > 0 and random.random() < self.epilson_oldest:
-            self.logger.info(f"Using epilson_oldest probability ({self.epilson_oldest}) to select oldest file")
-            oldest_file = self._find_oldest_file(file_overviews)
+        # if self.epilson_oldest > 0 and random.random() < self.epilson_oldest:
+        #     self.logger.info(f"Using epilson_oldest probability ({self.epilson_oldest}) to select oldest file")
+        #     oldest_file = self._find_oldest_file(file_overviews)
 
-            if oldest_file:
-                agent.context['selected_file'] = oldest_file
-                self.logger.info(f"Selected oldest file: {oldest_file['path']}")
-                return True
-            else:
-                # If oldest file wasn't selected, continue with normal process
-                self.logger.error("Failed to read oldest file, continuing with normal selection process")
+        #     if oldest_file:
+        #         agent.context['selected_file'] = oldest_file
+        #         self.logger.info(f"Selected oldest file: {oldest_file['path']}")
+        #         return True
+        #     else:
+        #         # If oldest file wasn't selected, continue with normal process
+        #         self.logger.error("Failed to read oldest file, continuing with normal selection process")
 
         # Step 2: Prioritize files based on overview data
         prioritized_files = self._prioritize_files(agent, file_overviews)

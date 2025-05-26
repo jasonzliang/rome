@@ -350,7 +350,7 @@ class Agent:
         # Record final state and context
         self.history.set_final_state(self.fsm.current_state, self.context)
 
-        self.logger.info(f"\n\nAgent loop completed after {self.history.iterations} iterations")
+        self.logger.info(f"\n\nAgent loop completed after {self.history.get_iteration()} iterations")
         self.logger.info(f"Final state: {self.history.final_state}")
 
         action_sequence = [action['action'] for action in self.history.actions_executed]

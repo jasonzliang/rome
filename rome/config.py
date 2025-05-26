@@ -74,7 +74,12 @@ DEFAULT_CONFIG = {
         "exclude_dirs": [".git", "venv", "__pycache__", DEFAULT_LOGDIR_NAME],
         "selection_criteria": None,
         "batch_size": 5,
-        "epilson_oldest": 0.0 # Prob to choose the oldest file for editing
+        # "epsilon_oldest": 0.0, # Prob to choose the oldest file for editing
+        # 'exploration_strategy': 'adaptive',  # or 'breadth_first', 'depth_first', 'novelty_seeking'
+        # 'diversity_weight': 1.5,
+        # 'novelty_bonus': 2.0,
+        # 'dependency_analysis': True,
+        # 'semantic_clustering': True,
     },
     "RetryAction": {},
     "EditCodeAction": {

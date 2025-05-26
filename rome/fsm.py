@@ -156,7 +156,7 @@ class FSM:
         history_summary = agent.history.get_history_summary(agent.history_context_len)
 
         prompt_parts = [
-            f"## Current agent state ##\n{state_summary}",
+            f"## Current state ##\n{state_summary}",
             f"## Available actions ##\n{actions_text}"
         ]
 
@@ -170,7 +170,7 @@ class FSM:
     "reasoning": "Brief explanation of why you chose this action"
 }
 
-Choose the most appropriate action using the agent's role as a guide. If same state and action are getting repeated recently, consider trying a different approach or exploring alternative actions to avoid getting stuck in cycles. Diversity in action selection often leads to better outcomes.""")
+Choose the most appropriate action using your role as a guide. If same state and action are getting repeated recently, consider trying a different approach or exploring alternative actions to avoid getting stuck in cycles. Diversity in action selection often leads to better outcomes.""")
 
         return "\n\n".join(prompt_parts)
 
