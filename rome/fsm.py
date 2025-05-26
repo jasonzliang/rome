@@ -169,7 +169,8 @@ class FSM:
     "action": "chosen_action_name",
     "reasoning": "Brief explanation of why you chose this action"
 }
-Choose the most appropriate action based on the current state and context.""")
+
+Choose the most appropriate action using the agent's role as a guide. If same state and action are getting repeated recently, consider trying a different approach or exploring alternative actions to avoid getting stuck in cycles. Diversity in action selection often leads to better outcomes.""")
 
         return "\n\n".join(prompt_parts)
 
