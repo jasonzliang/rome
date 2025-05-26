@@ -4,7 +4,6 @@ from typing import Dict, List, Any, Optional
 
 from .action import Action
 from ..logger import get_logger
-from ..versioning import save_version
 
 class EditCodeAction(Action):
     """Action to edit and improve code in the selected file"""
@@ -33,7 +32,7 @@ class EditCodeAction(Action):
             selected_file['changes'] = []
 
         # Prepare prompt for code improvement
-        prompt = self._create_improvement_prompt(file_path, original_content)
+        prompt = self._create_improvement_prompt(agent, file_path, original_content)
 
         # Get improved code from LLM
         self.logger.info(f"Requesting code improvements for {file_path}")
@@ -79,7 +78,8 @@ class EditCodeAction(Action):
             f.write(improved_code)
         self.logger.info(f"Successfully wrote improved code to {file_path}")
 
-        version_number = save_version(
+        # Save version using agent's version manager
+        version_number = agent.version_manager.save_version(
             file_path=file_path,
             content=improved_code,
             changes=changes,
@@ -90,7 +90,7 @@ class EditCodeAction(Action):
 
         return True
 
-    def _create_improvement_prompt(self, file_path: str, content: str) -> str:
+    def _create_improvement_prompt(self, agent, file_path: str, content: str) -> str:
         """Create a prompt for the LLM to improve the code"""
 
         # Use custom prompt if provided in config
@@ -105,6 +105,11 @@ class EditCodeAction(Action):
 4. Performance optimizations
 5. Documentation improvements
 """
+
+        # Get analysis context from agent's version manager
+        analysis_context = agent.version_manager.get_analysis_context_for_code_editing(file_path)
+        if analysis_context:
+            prompt += analysis_context
 
         # Add file info and original code
         prompt += f"""Code file path: {file_path}
@@ -131,5 +136,8 @@ IMPORTANT:
 - Make sure the improved code is valid Python syntax
 - Be conservative with changes - prioritize correctness over style
 """
+
+        if analysis_context:
+            prompt += "- Pay special attention to addressing any issues identified in the previous analysis"
 
         return prompt

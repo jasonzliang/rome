@@ -8,7 +8,7 @@ import traceback
 from typing import Dict, Optional, Any, Union, List
 from .action import Action
 from ..logger import get_logger
-from ..config import check_attrs
+from ..config import LOG_DIR_NAME, check_attrs
 from ..versioning import save_original
 
 class SearchAction(Action):
@@ -20,6 +20,8 @@ class SearchAction(Action):
 
         # Check required config parameters are set properly
         check_attrs(self, ['max_files', 'file_types', 'exclude_dirs', 'exclude_types', 'selection_criteria', 'batch_size'])
+        if LOG_DIR_NAME not in self.exclude_dirs:
+            self.exclude_dirs.append(LOG_DIR_NAME)
 
     def summary(self, agent) -> str:
         """Return a short summary of the search action"""

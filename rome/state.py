@@ -3,10 +3,9 @@ from abc import ABC, abstractmethod
 import os
 import sys
 from typing import Dict, List, Optional, Callable
-from .logger import get_logger
-from .config import set_attributes_from_config
 
-SUMMARY_LENGTH = 100
+from .config import SUMMARY_LENGTH, set_attributes_from_config
+from .logger import get_logger
 
 class State(ABC):
     """Abstract state"""

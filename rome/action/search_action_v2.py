@@ -10,7 +10,7 @@ from collections import defaultdict
 import hashlib
 from .action import Action
 from ..logger import get_logger
-from ..config import check_attrs
+from ..config import LOG_DIR_NAME, check_attrs
 from ..versioning import save_original
 
 class SearchActionV2(Action):
@@ -32,6 +32,9 @@ class SearchActionV2(Action):
             'exploration_strategy', 'diversity_weight', 'novelty_bonus',
             'dependency_analysis', 'semantic_clustering'
         ])
+
+        if LOG_DIR_NAME not in self.exclude_dirs:
+            self.exclude_dirs.append(LOG_DIR_NAME)
 
     def summary(self, agent) -> str:
         """Return a detailed summary of the search action"""

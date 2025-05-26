@@ -5,8 +5,14 @@ import sys
 from typing import Dict, Any
 from .logger import get_logger
 
+# How long to display long strings for console output
+SUMMARY_LENGTH = 100
+
+# Meta directory for file specific information
+META_DIR_EXT = 'rome'
+
 # Default logging base directory name for agents
-DEFAULT_LOGDIR_NAME = "__rome__"
+LOG_DIR_NAME = "__rome__"
 
 # Define the default configuration structure as a dictionary
 DEFAULT_CONFIG = {
@@ -71,7 +77,7 @@ DEFAULT_CONFIG = {
         "max_files": sys.maxsize,
         "file_types": [".py"],
         "exclude_types": ["_test.py", ".orig.py"],
-        "exclude_dirs": [".git", "venv", "__pycache__", DEFAULT_LOGDIR_NAME],
+        "exclude_dirs": [".git", "venv", "__pycache__"],
         "selection_criteria": None,
         "batch_size": 5,
         # "epsilon_oldest": 0.0, # Prob to choose the oldest file for editing
@@ -96,7 +102,10 @@ DEFAULT_CONFIG = {
             "work_dir": "./",
             "cmd_args": {"pytest": "-vvs"}
         }
-    }
+    },
+
+    # Version manager configuration
+    "VersionManager": {},
 }
 
 

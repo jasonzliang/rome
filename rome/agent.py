@@ -6,13 +6,15 @@ from typing import Dict, List
 # Import the OpenAIHandler we created
 from .openai import OpenAIHandler
 # Import default config utilities
-from .config import DEFAULT_CONFIG, DEFAULT_LOGDIR_NAME
+from .config import DEFAULT_CONFIG, LOG_DIR_NAME
 from .config import set_attributes_from_config, load_config, merge_with_default_config
 # Import singleton logger
 from .logger import get_logger
 from .fsm import FSM, FSM_FACTORY
 # Import the new AgentHistory class
 from .history import AgentHistory
+# Import the VersionManager class
+from .versioning import VersionManager
 
 class Agent:
     """Agent class using OpenAI API, YAML config, and FSM architecture"""
@@ -64,6 +66,10 @@ class Agent:
         self.context = {}
         self.history = AgentHistory()
 
+        # Initialize VersionManager
+        version_config = self.config.get('VersionManager', {})
+        self.version_manager = VersionManager(config=version_config)
+
         # Add initial state to history if FSM is set up
         if self.fsm and self.fsm.current_state:
             self.history.add_initial_state(self.fsm.current_state)
@@ -111,7 +117,7 @@ class Agent:
 
         # Set base_dir and filename if not already set
         if not log_config.get('base_dir'):
-            log_config['base_dir'] = os.path.join(self.repository, DEFAULT_LOGDIR_NAME)
+            log_config['base_dir'] = os.path.join(self.repository, LOG_DIR_NAME)
 
         if not log_config.get('filename'):
             # Ensure agent name is suitable for a filename

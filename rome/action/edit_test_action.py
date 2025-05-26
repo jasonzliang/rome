@@ -4,7 +4,6 @@ from typing import Dict, List, Any, Optional
 
 from .action import Action
 from ..logger import get_logger
-from ..versioning import save_version
 
 class EditTestAction(Action):
     """Action to create or edit tests for the selected file"""
@@ -59,7 +58,7 @@ class EditTestAction(Action):
             self.logger.info(f"No existing test file found. Will create new test file at: {test_path}")
 
         # Prepare prompt for test creation/improvement
-        prompt = self._create_test_prompt(file_path, file_content, test_path,
+        prompt = self._create_test_prompt(agent, file_path, file_content, test_path,
             test_content, test_exists)
 
         # Get improved tests from LLM
@@ -107,9 +106,10 @@ class EditTestAction(Action):
             f.write(new_test_code)
         self.logger.info(f"Successfully wrote test code to {test_path}")
 
-        version_number = save_version(
+        # Save version using agent's version manager
+        version_number = agent.version_manager.save_version(
             file_path=test_path,
-            content=test_content,
+            content=new_test_code,
             changes=test_changes,
             explanation=explanation)
 
@@ -118,21 +118,13 @@ class EditTestAction(Action):
 
         return True
 
-    def _create_test_prompt(self, file_path: str, file_content: str, test_path: str, test_content: str, test_exists: bool) -> str:
+    def _create_test_prompt(self, agent, file_path: str, file_content: str, test_path: str,
+                           test_content: str, test_exists: bool) -> str:
         """Create a prompt for the LLM to create or improve tests"""
 
         # Extract file and module information for proper imports
         file_name = os.path.basename(file_path)
         module_name, _ = os.path.splitext(file_name)
-
-        # Get directory structure for proper relative import
-        # file_dir = os.path.dirname(file_path)
-        # rel_path = os.path.relpath(file_dir, os.path.dirname(test_path))
-        # import_path = rel_path.replace(os.sep, '.') if rel_path != '.' else ''
-        # if import_path:
-        #     import_statement = f"from {import_path} import {module_name}"
-        # else:
-        #     import_statement = f"from . import {module_name}"
 
         # Use custom prompt if provided in config
         if self.custom_prompt is not None:
@@ -156,6 +148,12 @@ Code to test:
 {file_content}
 ```
 """
+
+        # Get analysis context from agent's version manager
+        analysis_context = agent.version_manager.get_analysis_context_for_test_editing(file_path)
+        if analysis_context:
+            prompt += analysis_context
+
         if test_exists:
             prompt += f"""Current test file ({test_path}):
 ```python
@@ -188,5 +186,8 @@ IMPORTANT:
 - Include all necessary imports that are required by the tests
 - Avoid external dependencies that are unnecessary for testing
 """
+
+        if analysis_context:
+            prompt += "- Pay special attention to addressing any test failures or issues identified in the previous analysis"
 
         return prompt
