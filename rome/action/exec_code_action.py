@@ -33,11 +33,6 @@ class ExecuteCodeAction(Action):
         file_path = selected_file['path']
         test_path = selected_file['test_path']
 
-        # Ensure the test file exists
-        # if not os.path.exists(test_path):
-        #     self.logger.error(f"Test file does not exist: {test_path}")
-        #     return False
-
         self.logger.info(f"Executing test file: {test_path}")
 
         try:
