@@ -54,6 +54,14 @@ class Agent:
 
         # Initialize context
         self.context = {}
+        self.history = {
+            'iterations': 0,
+            'actions_executed': [],
+            'states_visited': [self.fsm.current_state],
+            'errors': [],
+            'final_state': None,
+            'final_context': None
+        }
 
         # Set up FSM
         if self.fsm_type:
@@ -207,18 +215,18 @@ class Agent:
             action = parsed_json['action']
             reasoning = parsed_json.get('reasoning', 'No reasoning provided')
             self.logger.info(f"Selected action: {action} - {reasoning}")
-            return action
+            return action, reasoning
 
         # Fallback: look for action names in the response text
         available_actions = self.fsm.get_available_actions()
         for action in available_actions:
             if action.lower() in response.lower():
                 self.logger.info(f"Extracted action from text: {action}")
-                return action
+                return action, reasoning
 
         # If no action found, log the issue and return None
         self.logger.error(f"Could not extract valid action from response: {response}")
-        return None
+        raise
 
     def run_loop(self, max_iterations: int = 10, stop_on_error: bool = True) -> Dict:
         """
@@ -237,21 +245,13 @@ class Agent:
         )
 
         self.logger.info(f"Starting agent loop for {max_iterations} iterations")
-        results = {
-            'iterations': 0,
-            'actions_executed': [],
-            'states_visited': [self.fsm.current_state],
-            'errors': [],
-            'final_state': None,
-            'final_context': None
-        }
 
         for iteration in range(max_iterations):
             try:
                 # Check agent context on first iteration to make sure state is valid
                 if iteration == 0: self.fsm.check_context(self)
 
-                results['iterations'] = iteration + 1
+                self.history['iterations'] = iteration + 1
                 self.logger.info(f"Loop iteration {iteration + 1}/{max_iterations}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
 
@@ -276,12 +276,12 @@ class Agent:
                 )
 
                 # Extract action from response
-                chosen_action = self._extract_action_from_response(response)
+                chosen_action, reasoning = self._extract_action_from_response(response)
 
                 if not chosen_action:
                     error_msg = f"Could not determine action from LLM response: {response}"
                     self.logger.error(error_msg)
-                    results['errors'].append({
+                    self.history['errors'].append({
                         'iteration': iteration + 1,
                         'error': error_msg,
                         'state': self.fsm.current_state
@@ -293,7 +293,7 @@ class Agent:
                 if chosen_action not in available_actions:
                     error_msg = f"Action '{chosen_action}' not available in state '{self.fsm.current_state}'. Available: {available_actions}"
                     self.logger.error(error_msg)
-                    results['errors'].append({
+                    self.history['errors'].append({
                         'iteration': iteration + 1,
                         'error': error_msg,
                         'state': self.fsm.current_state
@@ -303,16 +303,19 @@ class Agent:
 
                 # Execute the action through FSM
                 self.logger.info(f"Executing action: {chosen_action}")
-                self.fsm.execute_action(chosen_action, self)
+                success = self.fsm.execute_action(chosen_action, self)
+                success = "succeeded" if success else "failed"
 
                 # Record the execution
-                results['actions_executed'].append({
+                self.history['actions_executed'].append({
                     'iteration': iteration + 1,
                     'action': chosen_action,
-                    'previous_state': results['states_visited'][-1],
-                    'new_state': self.fsm.current_state
+                    'action_result': success,
+                    'action_reason': reasoning,
+                    'prev_state': self.history['states_visited'][-1],
+                    'curr_state': self.fsm.current_state,
                 })
-                results['states_visited'].append(self.fsm.current_state)
+                self.history['states_visited'].append(self.fsm.current_state)
 
                 self.logger.info(f"Action executed successfully. New state: {self.fsm.current_state}")
 
@@ -320,7 +323,7 @@ class Agent:
                 error_msg = f"Error in loop iteration {iteration + 1}: {str(e)}"
                 self.logger.error(error_msg)
                 self.logger.error(traceback.format_exc())
-                results['errors'].append({
+                self.history['errors'].append({
                     'iteration': iteration + 1,
                     'error': error_msg,
                     'state': self.fsm.current_state,
@@ -330,14 +333,14 @@ class Agent:
                 else: self.fsm.reset(); continue
 
         # Record final state and context
-        results['final_state'] = self.fsm.current_state
-        results['final_context'] = self.context
+        self.history['final_state'] = self.fsm.current_state
+        self.history['final_context'] = self.context
 
-        self.logger.info(f"\n\nAgent loop completed after {results['iterations']} iterations")
-        self.logger.info(f"Final state: {results['final_state']}")
-        self.logger.info(f"Actions executed: {[action['action'] for action in results['actions_executed']]}")
+        self.logger.info(f"\n\nAgent loop completed after {self.history['iterations']} iterations")
+        self.logger.info(f"Final state: {self.history['final_state']}")
+        self.logger.info(f"Actions executed: {[action['action'] for action in self.history['actions_executed']]}")
 
-        if results['errors']:
-            self.logger.info(f"Loop completed with {len(results['errors'])} errors")
+        if self.history['errors']:
+            self.logger.info(f"Loop completed with {len(self.history['errors'])} errors")
 
-        return results
+        return self.history

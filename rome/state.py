@@ -117,6 +117,9 @@ class CodeEditedState(State):
         for key in required_keys:
             assert key in selected_file, f"Missing {key} in selected file"
 
+        assert 'changes' in selected_file['change_record'], f"Missing changes in change record"
+        assert 'explanation' in selected_file['change_record'], f"Missing explanation in change record"
+
         assert os.path.exists(selected_file['path']), \
             f"File path does not exist: {selected_file['path']}"
         return True
@@ -129,11 +132,11 @@ class CodeEditedState(State):
 
         # Get changes info
         change_record = selected_file['change_record']
-        num_changes = len(change_record.get('changes', []))
+        num_changes = len(change_record['changes'])
         explanation = change_record['explanation']
 
         # Get last change explanation if available
-        return f"Modified {filename} with {num_changes} change(s) with explanation: {last_explanation[:SUMMARY_LENGTH]}{'...' if len(last_explanation) > SUMMARY_LENGTH else ''}"
+        return f"Modified {filename} with {num_changes} change(s) with explanation: {explanation[:SUMMARY_LENGTH]}{'...' if len(explanation) > SUMMARY_LENGTH else ''}"
 
 
 class TestEditedState(State):

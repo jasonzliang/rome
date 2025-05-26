@@ -77,7 +77,7 @@ class FSM:
         else:
             self.states[self.current_state].check_context(agent)
 
-    def execute_action(self, action_name: str, agent):
+    def execute_action(self, action_name: str, agent) -> bool:
         """Execute an action and transition to new state based on execution result"""
         # Validate action
         if action_name not in self.actions:
@@ -116,6 +116,7 @@ class FSM:
         transition_type = " (FAILED)" if result is False and fallback_state else ""
         self.logger.info(
             f"Transitioned: {old_state} --[{action_name}{transition_type}]--> {next_state}")
+        return result is True
 
     def get_current_state(self) -> str:
         """Get current state name"""
