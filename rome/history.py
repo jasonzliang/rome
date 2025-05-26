@@ -6,7 +6,7 @@ class AgentHistory:
     """Manages agent execution history and provides summary functionality"""
 
     def __init__(self):
-        self.iterations = 0
+        self.iteration = 0
         self.actions_executed: List[Dict] = []
         self.states_visited: List[str] = []
         self.errors: List[Dict] = []
@@ -54,7 +54,15 @@ class AgentHistory:
 
     def increment_iteration(self):
         """Increment the iteration counter"""
-        self.iterations += 1
+        self.iteration += 1
+
+    def set_iteration(self, iteration):
+        """Set current iteration"""
+        self.iteration = iteration
+
+    def get_iteration(self):
+        """Get current iteration"""
+        return self.iteration
 
     def set_final_state(self, state: str, context: Dict):
         """Set the final state and context when execution completes"""
@@ -105,7 +113,7 @@ class AgentHistory:
     def get_execution_summary(self) -> str:
         """Get a high-level summary of the entire execution"""
         summary_lines = [
-            f"Total iterations: {self.iterations}",
+            f"Total iterations: {self.iteration}",
             f"Actions executed: {len(self.actions_executed)}",
             f"Errors encountered: {len(self.errors)}",
             f"Final state: {self.final_state or 'Unknown'}"
@@ -136,7 +144,7 @@ class AgentHistory:
 
     def reset(self):
         """Reset the history to initial state"""
-        self.iterations = 0
+        self.iteration = 0
         self.actions_executed.clear()
         self.states_visited.clear()
         self.errors.clear()
@@ -147,7 +155,7 @@ class AgentHistory:
     def to_dict(self) -> Dict[str, Any]:
         """Convert history to dictionary format for backward compatibility"""
         return {
-            'iterations': self.iterations,
+            'iterations': self.iteration,
             'actions_executed': self.actions_executed.copy(),
             'states_visited': self.states_visited.copy(),
             'errors': self.errors.copy(),

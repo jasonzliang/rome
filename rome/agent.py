@@ -248,17 +248,16 @@ class Agent:
 
         self.logger.info(f"Starting agent loop for {max_iterations} iterations")
 
-        for iteration in range(max_iterations):
+        for iteration in range(1, max_iterations+1):
             try:
                 # Check agent context on first iteration to make sure state is valid
-                if iteration == 0:
+                if iteration == 1:
                     self.fsm.check_context(self)
 
                 # Increment iteration counter in history
-                self.history.increment_iteration()
-                current_iteration = self.history.iterations
+                self.history.set_iteration(iteration)
 
-                self.logger.info(f"Loop iteration {current_iteration}/{max_iterations}")
+                self.logger.info(f"Loop iteration {iteration}/{max_iterations}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
 
                 # Check if there are available actions
@@ -297,7 +296,7 @@ class Agent:
                     if not chosen_action:
                         error_msg = f"Could not determine action from LLM response: {response}"
                         self.logger.error(error_msg)
-                        self.history.add_error(current_iteration, error_msg, self.fsm.current_state)
+                        self.history.add_error(iteration, error_msg, self.fsm.current_state)
                         if stop_on_error:
                             break
                         else:
@@ -309,7 +308,7 @@ class Agent:
                     if chosen_action not in available_actions:
                         error_msg = f"Action '{chosen_action}' not available in state '{self.fsm.current_state}'. Available: {available_actions}"
                         self.logger.error(error_msg)
-                        self.history.add_error(current_iteration, error_msg, self.fsm.current_state)
+                        self.history.add_error(iteration, error_msg, self.fsm.current_state)
                         if stop_on_error:
                             break
                         else:
@@ -326,7 +325,7 @@ class Agent:
 
                 # Record the execution in history
                 self.history.add_action_execution(
-                    iteration=current_iteration,
+                    iteration=iteration,
                     action=chosen_action,
                     result=success,
                     reasoning=reasoning,
@@ -337,10 +336,10 @@ class Agent:
                 self.logger.info(f"Action executed successfully. New state: {self.fsm.current_state}")
 
             except Exception as e:
-                error_msg = f"Error in loop iteration {current_iteration}: {str(e)}"
+                error_msg = f"Error in loop iteration {iteration}: {str(e)}"
                 self.logger.error(error_msg)
                 self.logger.error(traceback.format_exc())
-                self.history.add_error(current_iteration, error_msg, self.fsm.current_state, str(e))
+                self.history.add_error(iteration, error_msg, self.fsm.current_state, str(e))
                 if stop_on_error:
                     break
                 else:
