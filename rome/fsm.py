@@ -131,9 +131,9 @@ class FSM:
             return self.states[self.current_state].get_available_actions()
         return list(self.transitions.get(self.current_state, {}).keys())
 
-    def get_action_prompt(self, agent) -> str:
+    def get_action_selection_prompt(self, agent) -> str:
         """
-        Construct a prompt that combines state information and available actions
+        Construct a prompt that combines state information and available actions with their summaries
 
         Raises:
             ValueError: If the current state is not properly initialized
@@ -141,12 +141,25 @@ class FSM:
         if self.current_state not in self.states:
             raise ValueError(f"Current state '{self.current_state}' is not a valid state in the FSM")
 
-        state_prompt = self.states[self.current_state].get_state_prompt(agent)
+        state_summary = self.states[self.current_state].summary(agent)
         available_actions = self.get_available_actions()
 
-        prompt = f"""{state_prompt}
+        # Build action list with summaries
+        action_details = []
+        for action_name in available_actions:
+            if action_name in self.actions:
+                action_summary = self.actions[action_name].summary(agent)
+                action_details.append(f"- {action_name}: {action_summary}")
+            else:
+                action_details.append(f"- {action_name}: No summary available")
 
-Available actions: {', '.join(available_actions)}
+        actions_text = "\n".join(action_details)
+
+        prompt = f"""Current agent state:
+{state_summary}
+
+Available actions:
+{actions_text}
 
 Please select one of the available actions to execute. Respond with a JSON object containing:
 {{

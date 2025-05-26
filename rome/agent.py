@@ -265,7 +265,7 @@ class Agent:
                     self.logger.info(f"Available actions from {self.fsm.get_current_state()}: {available_actions}")
 
                 # Construct prompt combining role, state prompt, and available actions
-                prompt = self.fsm.get_action_prompt(self)
+                prompt = self.fsm.get_action_selection_prompt(self)
 
                 # Get action choice from LLM
                 self.logger.info("Requesting action selection from LLM")

@@ -1,4 +1,4 @@
-# state.py
+# Updated state.py with enhanced summary methods
 from abc import ABC, abstractmethod
 import os
 import sys
@@ -6,6 +6,7 @@ from typing import Dict, List, Optional, Callable
 from .logger import get_logger
 from .config import set_attributes_from_config
 
+SUMMARY_LENGTH=100
 
 class State(ABC):
     """Abstract state"""
@@ -27,8 +28,8 @@ class State(ABC):
         pass
 
     @abstractmethod
-    def get_state_prompt(self, agent) -> str:
-        """Returns prompt for state that is passed into llm when action is taken"""
+    def summary(self, agent) -> str:
+        """A short summary description of the current state"""
         pass
 
     def get_available_actions(self) -> List[str]:
@@ -54,9 +55,9 @@ class IdleState(State):
         agent.context.clear()
         return True
 
-    def get_state_prompt(self, agent) -> str:
-        """Prompt for idle state"""
-        return f"""You are in an idle state, ready to start on a new task."""
+    def summary(self, agent) -> str:
+        """Enhanced summary for idle state"""
+        return f"Agent is idle and ready to start a new task"
 
 
 class CodeLoadedState(State):
@@ -81,9 +82,21 @@ class CodeLoadedState(State):
             f"File path does not exist: {selected_file['path']}"
         return True
 
-    def get_state_prompt(self, agent) -> str:
-        """Prompt for code loaded state"""
-        return f"""You are in code loaded state, having selected a code file to edit."""
+    def summary(self, agent) -> str:
+        """Enhanced summary for code loaded state"""
+        selected_file = agent.context['selected_file']
+        file_path = selected_file['path']
+        filename = os.path.basename(file_path)
+        reason = selected_file['reason']
+
+        # Get file size info
+        try:
+            size_kb = os.path.getsize(file_path) / 1024
+            size_info = f" ({size_kb:.1f}KB)"
+        except:
+            size_info = ""
+
+        return f"Selected file {filename}{size_info} for editing. Selection reason: {reason}"
 
 
 class CodeEditedState(State):
@@ -100,7 +113,7 @@ class CodeEditedState(State):
         selected_file = agent.context['selected_file']
 
         # Check required keys in selected_file with a more compact assertion
-        required_keys = ['path', 'content', 'changes']
+        required_keys = ['path', 'content', 'change_record']
         for key in required_keys:
             assert key in selected_file, f"Missing {key} in selected file"
 
@@ -108,9 +121,19 @@ class CodeEditedState(State):
             f"File path does not exist: {selected_file['path']}"
         return True
 
-    def get_state_prompt(self, agent) -> str:
-        """Prompt for code loaded state"""
-        return f"""You are in code edited state, having successfully edited and updated a code file."""
+    def summary(self, agent) -> str:
+        """Enhanced summary for code edited state"""
+        selected_file = agent.context['selected_file']
+        file_path = selected_file['path']
+        filename = os.path.basename(file_path)
+
+        # Get changes info
+        change_record = selected_file['change_record']
+        num_changes = len(change_record.get('changes', []))
+        explanation = change_record['explanation']
+
+        # Get last change explanation if available
+        return f"Modified {filename} with {num_changes} change(s) with explanation: {last_explanation[:SUMMARY_LENGTH]}{'...' if len(last_explanation) > SUMMARY_LENGTH else ''}"
 
 
 class TestEditedState(State):
@@ -135,9 +158,22 @@ class TestEditedState(State):
             assert os.path.exists(path), f"File path does not exist: {path}"
         return True
 
-    def get_state_prompt(self, agent) -> str:
-        """Prompt for code loaded state"""
-        return f"""You are in test edited state, having successfully created and updated tests for a code file."""
+    def summary(self, agent) -> str:
+        """Enhanced summary for test edited state"""
+        selected_file = agent.context['selected_file']
+        file_path = selected_file['path']
+        test_path = selected_file['test_path']
+        filename = os.path.basename(file_path)
+        test_filename = os.path.basename(test_path)
+
+        # Get test changes info
+        test_changes = selected_file['test_changes']
+        num_test_changes = len(test_changes)
+
+        # Check if test file was created or updated
+        action_type = "Created" if not os.path.exists(test_path) else "Updated"
+
+        return f"{action_type} tests in {test_filename} for {filename} with {num_test_changes} change(s)."
 
 
 class CodeExecutedState(State):
@@ -154,7 +190,7 @@ class CodeExecutedState(State):
         selected_file = agent.context['selected_file']
 
         # Check required keys in selected_file with a more compact assertion
-        required_keys = ['path', 'content', 'output', 'exit_code']
+        required_keys = ['path', 'content', 'exec_output', 'exec_exit_code']
         if 'test_path' in selected_file:
             required_keys += ['test_path', 'test_content']
         for key in required_keys:
@@ -167,6 +203,26 @@ class CodeExecutedState(State):
                 f"File path does not exist: {selected_file['test_path']}"
         return True
 
-    def get_state_prompt(self, agent) -> str:
-        """Prompt for code executed state"""
-        return f"""You are in code executed state, having finished running the code or test file."""
+    def summary(self, agent) -> str:
+        """Enhanced summary for code executed state"""
+        selected_file = agent.context['selected_file']
+        test_path = selected_file['test_path']
+        test_filename = os.path.basename(test_path)
+
+        # Get execution results
+        exit_code = selected_file['exec_exit_code']
+        output = selected_file['exec_output']
+
+        # Determine status
+        if exit_code == 0:
+            status = "✓ PASSED"
+        else:
+            status = "✗ FAILED"
+
+        # Get brief output summary
+        output_lines = output.split('\n') if output else []
+        output_summary = output_lines[0] if output_lines else 'No output'
+        if len(output_summary) > SUMMARY_LENGTH:
+            output_summary = output_summary[:SUMMARY_LENGTH] + '...'
+
+        return f"Executed {test_filename}: {status} (exit code: {exit_code}). Output: {output_summary}"

@@ -13,7 +13,12 @@ class EditCodeAction(Action):
         super().__init__(config)
         self.logger = get_logger()
 
-        # custom_prompt will be automatically set from config by set_attributes_from_config in parent class
+    def summary(self, agent) -> str:
+        """Return a short summary of the code editing action"""
+        selected_file = agent.context['selected_file']
+        file_path = selected_file['path']
+        filename = os.path.basename(file_path)
+        return f"Analyze and improve code in {filename} focusing on bugs, performance, and readability"
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute code editing action to improve the current selected file"""
@@ -46,7 +51,7 @@ class EditCodeAction(Action):
             self.logger.error(f"Invalid response format from LLM: {response}")
             return False
 
-        improved_code = result.get('improved_code')
+        improved_code = result['improved_code']
         explanation = result.get('explanation', 'No explanation provided')
         changes = result.get('changes', [])
 
@@ -67,7 +72,7 @@ class EditCodeAction(Action):
             'explanation': explanation,
             'changes': changes
         }
-        selected_file['changes'].append(change_record)
+        selected_file['change_record'] = change_record
 
         # Write the improved code back to the file
         with open(file_path, 'w', encoding='utf-8') as f:

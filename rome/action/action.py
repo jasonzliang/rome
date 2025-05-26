@@ -22,3 +22,8 @@ class Action(ABC):
     def execute(self, agent, **kwargs) -> bool:
         """Execute the action and return True if action succeeded otherwise False"""
         pass
+
+    @abstractmethod
+    def summary(self, agent) --> str:
+        """Return a short summary that describes the current action"""
+        pass

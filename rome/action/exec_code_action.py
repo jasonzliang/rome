@@ -18,6 +18,13 @@ class ExecuteCodeAction(Action):
         # Initialize code executor
         self.executor = CodeExecutor(self.executor_config)
 
+    def summary(self, agent) -> str:
+        """Return a short summary of the code execution action"""
+        selected_file = agent.context['selected_file']
+        test_path = selected_file['test_path']
+        test_filename = os.path.basename(test_path)
+        return f"Execute {test_filename} and analyze results for failures or issues"
+
     def execute(self, agent, **kwargs) -> bool:
         """Execute tests for the current selected file"""
         self.logger.info("Starting ExecuteCodeAction execution")

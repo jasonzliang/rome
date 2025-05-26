@@ -21,6 +21,10 @@ class SearchAction(Action):
         # Check required config parameters are set properly
         check_attrs(self, ['epilson_oldest', 'max_files', 'file_types', 'exclude_dirs', 'exclude_types', 'selection_criteria', 'batch_size'])
 
+    def summary(self, agent) -> str:
+        """Return a short summary of the search action"""
+        return f"Search repository for {', '.join(self.file_types)} files (criteria: {self.selection_criteria}) and select one for editing"
+
     def _create_global_overview(self, agent, files: List[str]) -> List[Dict]:
         """Create a high-level overview of all files in the repository"""
         self.logger.info(f"Creating global overview of {len(files)} files")
