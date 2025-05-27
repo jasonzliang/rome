@@ -110,6 +110,7 @@ DEFAULT_CONFIG = {
 }
 
 
+### Helper methods for setting/loading config parameters ###
 def check_attrs(obj, required_attrs):
     """Helper function to check if required attributes have been set"""
     logger = get_logger()
@@ -202,5 +203,4 @@ def merge_with_default_config(custom_config):
 
 
 if __name__ == "__main__":
-    # Generate default config if script is run directly
-    generate_default_config()
+    pass

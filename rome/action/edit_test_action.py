@@ -23,7 +23,6 @@ class EditTestAction(Action):
         action_type = "update existing tests" if test_exists else "create comprehensive unit tests"
         return f"{action_type} for {filename} covering edge cases and error conditions"
 
-
     def execute(self, agent, **kwargs) -> bool:
         """Execute test editing action to create or improve tests for the current selected file"""
         self.logger.info("Starting EditTestAction execution")
