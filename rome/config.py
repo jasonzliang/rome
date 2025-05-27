@@ -88,6 +88,7 @@ DEFAULT_CONFIG = {
         # 'semantic_clustering': True,
     },
     "ResetAction": {},
+    "AdvancedResetAction": {},
     "EditCodeAction": {
         "custom_prompt": None
     },

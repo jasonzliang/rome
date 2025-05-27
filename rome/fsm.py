@@ -365,7 +365,7 @@ def create_simple_fsm(config):
 
     # Create actions with their respective configurations
     search_action = SearchAction(config.get('SearchAction', {}))
-    reset_action = ResetAction(config.get('ResetAction', {}))
+    reset_action = AdvancedResetAction(config.get('AdvancedResetAction', {}))
     edit_code_action = EditCodeAction(config.get('EditCodeAction', {}))
     edit_test_action = EditTestAction(config.get('EditTestAction', {}))
     execute_code_action = ExecuteCodeAction(config.get('ExecuteCodeAction', {}),
@@ -391,13 +391,10 @@ def create_simple_fsm(config):
         fallback_state=code_executed_fail_state)
 
     # Add transitions from CodeExecutedPass state
-    fsm.add_action(code_executed_pass_state, code_loaded_state, transition_action)
     fsm.add_action(code_executed_pass_state, idle_state, reset_action)
 
     # Add transitions from CodeExecutedFail state
     fsm.add_action(code_executed_fail_state, code_loaded_state, transition_action)
-    fsm.add_action(code_executed_fail_state, code_edited_state, edit_code_action)
-    fsm.add_action(code_executed_fail_state, test_edited_state, edit_test_action)
     fsm.add_action(code_executed_fail_state, idle_state, reset_action)
 
     # Set initial state and validate

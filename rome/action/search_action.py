@@ -18,13 +18,21 @@ class SearchAction(Action):
         self.logger = get_logger()
 
         # Check required config parameters are set properly
-        check_attrs(self, ['max_files', 'file_types', 'exclude_dirs', 'exclude_types', 'selection_criteria', 'batch_size'])
+        check_attrs(self, ['max_files', 'file_types', 'exclude_dirs',
+            'exclude_types', 'selection_criteria', 'batch_size'])
         if LOG_DIR_NAME not in self.exclude_dirs:
             self.exclude_dirs.append(LOG_DIR_NAME)
 
     def summary(self, agent) -> str:
-        """Return a short summary of the search action"""
-        return f"search repository for {', '.join(self.file_types)} files to select and edit (criteria: {self.selection_criteria})"
+        """Return a detailed summary of the search action"""
+        file_types_str = ', '.join(self.file_types)
+        excluded_dirs_str = ', '.join(self.exclude_dirs) if self.exclude_dirs else 'none'
+
+        return (f"search repository for {file_types_str} files using multi-stage LLM selection: "
+                f"(1) scan all files and create overview with size/age/definitions, "
+                f"(2) LLM prioritizes all files 1-5 based on {self.selection_criteria}, "
+                f"(3) process top files in batches of {self.batch_size} with full content for LLM to select best match "
+                f"(max files: {self.max_files}, excluding dirs: {excluded_dirs_str})")
 
     def _create_global_overview(self, agent, files: List[str]) -> List[Dict]:
         """Create a high-level overview of all files in the repository"""

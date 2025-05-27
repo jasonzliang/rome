@@ -178,7 +178,7 @@ class CodeExecutedPassState(State):
 
     def check_context(self, agent, **kwargs) -> bool:
         """Check if we have a selected file in context with successful execution"""
-        required_keys = ['path', 'content', 'test_path', 'test_content', 'exec_output', 'exec_exit_code']
+        required_keys = ['path', 'content', 'test_path', 'test_content', 'exec_output', 'exec_exit_code', 'exec_analysis']
         selected_file = validate_selected_file_context(agent, required_keys)
 
         # Validate file paths exist
@@ -211,7 +211,7 @@ class CodeExecutedFailState(State):
 
     def check_context(self, agent, **kwargs) -> bool:
         """Check if we have a selected file in context with failed execution"""
-        required_keys = ['path', 'content', 'test_path', 'test_content', 'exec_output', 'exec_exit_code']
+        required_keys = ['path', 'content', 'test_path', 'test_content', 'exec_output', 'exec_exit_code', 'exec_analysis']
         selected_file = validate_selected_file_context(agent, required_keys)
 
         # Validate file paths exist
