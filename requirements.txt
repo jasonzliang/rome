@@ -3,6 +3,7 @@ colorama
 graphviz
 numpy
 openai
+portalocker
 psutil
 pytest
 ribs
