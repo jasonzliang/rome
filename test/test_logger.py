@@ -112,37 +112,6 @@ class TestLogger(unittest.TestCase):
             self.assertTrue(os.path.exists(log_dir))
             self.assertEqual(log_dir, os.path.join(temp_dir, 'logs'))
 
-    # @patch('inspect.currentframe')
-    # def test_caller_info(self, mock_currentframe):
-    #     """Test logging with caller information"""
-    #     # Mock the frame data
-    #     mock_frame = MagicMock()
-    #     mock_frame.filename = '/path/to/test_file.py'
-    #     mock_frame.lineno = 42
-    #     mock_frame.function = 'test_function'
-
-    #     # Set up the mock call chain
-    #     mock_currentframe.return_value = MagicMock()
-    #     mock_currentframe.return_value.__enter__.return_value = MagicMock()
-    #     mock_outer_frames = [MagicMock(), MagicMock(), MagicMock(), mock_frame]
-    #     with patch('inspect.getouterframes', return_value=mock_outer_frames):
-    #         logger = Logger()
-    #         config = {
-    #             'level': 'INFO',
-    #             'format': '%(message)s',  # Simplify format to focus on our message
-    #             'console': False,
-    #             'include_caller_info': True
-    #         }
-    #         logger.configure(config)
-
-    #         # Capture log output
-    #         with patch.object(logger._logger, 'info') as mock_info:
-    #             logger.info("Test message")
-    #             mock_info.assert_called_once()
-    #             log_message = mock_info.call_args[0][0]
-    #             self.assertIn("[test_file.py:42 in test_function]", log_message)
-    #             self.assertIn("Test message", log_message)
-
     def test_log_methods(self):
         """Test all logging methods"""
         logger = Logger()

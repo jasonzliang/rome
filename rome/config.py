@@ -60,7 +60,8 @@ DEFAULT_CONFIG = {
         "console": True,
         "include_caller_info": "rome",
         "base_dir": None,  # Directory for log files (Agent sets it if None)
-        "filename": None  # Log file name (Agent sets it if None)
+        "filename": None,  # Log file name (Agent sets it if None)
+        "max_size_kb": 10000,
     },
 
     # FSM configuration

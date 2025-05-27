@@ -29,6 +29,90 @@ def set_attributes_from_config(obj, config=None, required_attrs=None, optional_a
             setattr(obj, key, value)
 
 
+class SizeRotatingFileHandler(logging.FileHandler):
+    """Custom file handler that truncates from the beginning using efficient Unix utilities"""
+
+    def __init__(self, filename, max_size_kb=None, *args, **kwargs):
+        self.max_size_kb = max_size_kb
+        self.max_size_bytes = max_size_kb * 1024 if max_size_kb else None
+        super().__init__(filename, *args, **kwargs)
+
+    def emit(self, record):
+        """Emit a record, checking file size and rotating if necessary"""
+        try:
+            # Check file size before writing if max_size is set
+            if self.max_size_bytes and os.path.exists(self.baseFilename):
+                if os.path.getsize(self.baseFilename) >= self.max_size_bytes:
+                    self._rotate_log()
+
+            # Emit the record normally
+            super().emit(record)
+
+        except Exception:
+            self.handleError(record)
+
+    def _rotate_log(self):
+        """Rotate the log by truncating from the beginning using Unix utilities"""
+        try:
+            import subprocess
+            import tempfile
+
+            # Close the current stream
+            if self.stream:
+                self.stream.close()
+                self.stream = None
+
+            # Calculate target size (keep ~70% of file)
+            target_size = int(self.max_size_bytes * 0.7)
+
+            # Use tail to efficiently keep the last N bytes
+            # First, get total line count to estimate how many lines to keep
+            line_count_result = subprocess.run(['wc', '-l', self.baseFilename],
+                                             capture_output=True, text=True, check=True)
+            total_lines = int(line_count_result.stdout.split()[0])
+
+            # Estimate lines to keep (conservative approach)
+            estimated_lines_to_keep = max(int(total_lines * 0.7), 100)
+
+            # Create temp file with rotation marker + tail content
+            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.log') as tmp:
+                tmp.write(f"[LOG ROTATED - Previous entries truncated due to size limit of {self.max_size_kb}KB]\n")
+
+                # Use tail to get the last N lines efficiently
+                tail_result = subprocess.run(['tail', '-n', str(estimated_lines_to_keep), self.baseFilename], capture_output=True, text=True, check=True)
+                tmp.write(tail_result.stdout)
+                temp_path = tmp.name
+
+            # Atomically replace the original file
+            subprocess.run(['mv', temp_path, self.baseFilename], check=True)
+
+            # Reopen the stream
+            self.stream = self._open()
+
+        except (subprocess.CalledProcessError, ImportError, OSError) as e:
+            # Fallback to Python implementation if Unix utilities fail
+            print(f"Warning: Unix utilities failed ({e}), falling back to Python implementation")
+            self._rotate_log_fallback()
+
+    def _rotate_log_fallback(self):
+        """Fallback Python implementation for non-Unix systems"""
+        try:
+            # Simple fallback: keep last 5000 lines
+            with open(self.baseFilename, 'r', encoding='utf-8') as f:
+                lines = f.readlines()
+
+            lines_to_keep = lines[-5000:] if len(lines) > 5000 else lines
+
+            with open(self.baseFilename, 'w', encoding='utf-8') as f:
+                f.write(f"[LOG ROTATED - Previous entries truncated due to size limit of {self.max_size_kb}KB]\n")
+                f.writelines(lines_to_keep)
+
+            self.stream = self._open()
+
+        except Exception as e:
+            print(f"Warning: Log rotation failed completely: {e}")
+
+
 class ParentPathRichHandler(RichHandler):
     """Custom RichHandler that shows the path of the parent function (1 level above caller)."""
 
@@ -106,7 +190,7 @@ class Logger:
             # Set attributes from config
             set_attributes_from_config(self, log_config)
             check_attrs(self, ['level', 'format', 'console'])
-            check_opt_attrs(self, ['include_caller_info', 'base_dir', 'filename'])
+            check_opt_attrs(self, ['include_caller_info', 'base_dir', 'filename', 'max_size_kb'])
 
             # Set log level
             level = getattr(logging, self.level.upper())
@@ -124,11 +208,21 @@ class Logger:
                     # Construct full log file path
                     log_file_path = os.path.join(self.base_dir, self.filename)
 
-                    file_handler = logging.FileHandler(log_file_path, mode='a')
+                    # Use custom size-rotating handler if max_log_size is specified
+                    if self.max_log_size:
+                        file_handler = SizeRotatingFileHandler(
+                            log_file_path,
+                            max_size_kb=self.max_size_kb,
+                            mode='a'
+                        )
+                        self.info(f"Logging to file: {log_file_path} (max size: {self.max_log_size}KB)")
+                    else:
+                        file_handler = logging.FileHandler(log_file_path, mode='a')
+                        self.info(f"Logging to file: {log_file_path}")
+
                     file_handler.setFormatter(formatter)
                     file_handler.setLevel(level)
                     self._logger.addHandler(file_handler)
-                    self.info(f"Logging to file: {log_file_path}")
 
             # Add Rich console handler if enabled
             if self.console:
@@ -179,6 +273,19 @@ class Logger:
         if not os.path.exists(self.base_dir):
             os.makedirs(self.base_dir)
         return self.base_dir
+
+    def get_log_file_size(self) -> Optional[int]:
+        """Get the current log file size in bytes, returns None if no file logging or file doesn't exist."""
+        if hasattr(self, 'base_dir') and hasattr(self, 'filename') and self.base_dir and self.filename:
+            log_path = os.path.join(self.base_dir, self.filename)
+            if os.path.exists(log_path):
+                return os.path.getsize(log_path)
+        return None
+
+    def get_log_file_size_kb(self) -> Optional[float]:
+        """Get the current log file size in KB, returns None if no file logging or file doesn't exist."""
+        size_bytes = self.get_log_file_size()
+        return round(size_bytes / 1024, 2) if size_bytes is not None else None
 
     def info(self, message: str):
         """Log info message with caller information"""
@@ -263,6 +370,6 @@ def get_logger() -> Logger:
     return _logger_instance
 
 
-# Example usage
+# Example usage and testing
 if __name__ == "__main__":
     pass
