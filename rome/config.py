@@ -19,16 +19,16 @@ DEFAULT_CONFIG = {
     # OpenAIHandler settings - includes all OpenAI API configuration
     "OpenAIHandler": {
         # OpenAI API configuration
-        "base_url": "https://api.openai.com/v1",
-        "key_name": "OPENAI_API_KEY",
-        "timeout": 30,
+        "base_url": "https://api.openai.com/v1", # Url for chat completion API
+        "key_name": "OPENAI_API_KEY", # API key name to find in env
+        "timeout": 60, # Time for allowing responses from API
 
         # General LLM parameters
-        "model": "gpt-4o",
-        "temperature": 0.1,
-        "max_tokens": 8192,
-        "top_p": 1.0,
-        "seed": None,
+        "model": "gpt-4o", # LLM model name
+        "temperature": 0.1, # LLM temperature
+        "max_tokens": 8192, # LLM response max tokens
+        "top_p": 1.0, # LLM top-P
+        "seed": None, # LLM random seed
 
         # Fall back system message for chat completions if none given
         "system_message": "You are a helpful code assistant specializing in code analysis and improvement.",
@@ -45,12 +45,13 @@ DEFAULT_CONFIG = {
         "repository": "./", # Code repository base directory
         "fsm_type": "minimal", # Which FSM to load (see fsm.py)
         "agent_api": True, # Launch an REST API server for agent's internal state
-        "history_context_len": 10, # Length of history to use when selecting action
+        "history_context_len": 20, # Length of history to use when selecting action
+        "patience": 1, # If same state/action chosen repeatedly, prompt to choose different action
     },
 
     "AgentApi": {
-        "host": "localhost",
-        "port": 8000
+        "host": "localhost", # Url to query Agent API
+        "port": 8000 # Port to query agent API
     },
 
     # Logging configuration

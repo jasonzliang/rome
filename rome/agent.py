@@ -44,7 +44,7 @@ class Agent:
         # Set up agent configuration
         agent_config = self.config.get('Agent', {})
         # Automatically set attributes from Agent config
-        set_attributes_from_config(self, agent_config, ['repository', 'fsm_type', 'agent_api', 'history_context_len'])
+        set_attributes_from_config(self, agent_config, ['repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience'])
 
         # Validate repository attribute
         self.logger.assert_attribute(self, 'repository', "repository not provided in Agent config")

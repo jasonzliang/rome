@@ -89,7 +89,6 @@ def main():
             "model": "gpt-4o",
             "temperature": 0.1,
             "max_tokens": 4096,
-            "timeout": 30,
         },
 
         # Agent specific configuration
