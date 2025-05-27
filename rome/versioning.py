@@ -52,8 +52,7 @@ class VersionManager:
     def _get_meta_dir(self, file_path: str) -> str:
         """Get the meta directory path for a test file"""
         meta_dir = f"{file_path}.{META_DIR_EXT}"
-        if not os.path.exists(meta_dir):
-            os.makedirs(meta_dir)
+        os.makedirs(meta_dir, exist_ok=True)
         return meta_dir
 
     def _get_test_meta_dir(self, test_file_path: str, main_file_path: str) -> str:
@@ -61,8 +60,7 @@ class VersionManager:
         main_meta_dir = self._get_meta_dir(main_file_path)
         test_filename = os.path.basename(test_file_path)
         test_meta_dir = os.path.join(main_meta_dir, f"{test_filename}.{META_DIR_EXT}")
-        if not os.path.exists(test_meta_dir):
-            os.makedirs(test_meta_dir)
+        os.makedirs(meta_dir, exist_ok=True)
         return test_meta_dir
 
     def save_original(self, file_path: str, content: str) -> int:
