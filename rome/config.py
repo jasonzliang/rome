@@ -94,16 +94,16 @@ DEFAULT_CONFIG = {
     "EditTestAction": {
         "custom_prompt": None
     },
-    "ExecuteCodeAction": {
-        # Code executor configuration
-        "executor_config": {
-            "timeout": 10,
-            "virtual_env_context": None,
-            "work_dir": "./",
-            "cmd_args": {"pytest": "-vvs"}
-        }
-    },
+    "ExecuteCodeAction": {},
     "TransitionAction": {},
+
+    # Code executor configuration
+    "Executor": {
+        "timeout": 10,
+        "virtual_env_context": None,
+        "work_dir": "./",
+        "cmd_args": {"pytest": "-vvs"}
+    },
 
     # Version manager configuration
     "VersionManager": {},

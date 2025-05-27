@@ -135,7 +135,7 @@ class Agent:
             f"{self.fsm_type} FSM is not defined, cannot be loaded"
         )
 
-        self.fsm = FSM_FACTORY[self.fsm_type](config=self.config)
+        self.fsm = FSM_FACTORY[self.fsm_type](self.config)
         self.logger.info(f"Initialized {self.fsm_type} FSM with state: {self.fsm.get_current_state()}")
 
     def set_fsm(self, fsm: FSM):

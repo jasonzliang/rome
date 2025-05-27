@@ -9,7 +9,6 @@ from typing import Dict, Optional, Any, Union, List
 from .action import Action
 from ..logger import get_logger
 from ..config import LOG_DIR_NAME, check_attrs
-from ..versioning import save_original
 
 class SearchAction(Action):
     """Action to search the repository for code files using OpenAI selection"""
@@ -449,7 +448,8 @@ Respond with a JSON object:
         file_paths = [file_info["file_path"] for file_info in prioritized_files]
         selected_file = self._process_file_batches(agent, file_paths, prioritized_files)
 
-        save_original(selected_file['path'], selected_file['content'])
+        # Save original file to meta directory
+        agent.version_manager.save_original(selected_file['path'], selected_file['content'])
 
         # Add selected file to agent context
         if selected_file:

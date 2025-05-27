@@ -10,10 +10,11 @@ from ..executor import CodeExecutor, CodeBlock
 class ExecuteCodeAction(Action):
     """Action to execute test code for the selected file"""
 
-    def __init__(self, config: Dict = None):
+    def __init__(self, config: Dict = None, executor_config: Dict = None):
         super().__init__(config)
         self.logger = get_logger()
-        check_attrs(self, ['executor_config'])
+        self.executor_config = executor_config
+        # check_attrs(self, ['executor_config'])
 
         # Initialize code executor
         self.executor = CodeExecutor(self.executor_config)
@@ -57,6 +58,7 @@ class ExecuteCodeAction(Action):
 
         # Generate execution analysis using version manager
         analysis = agent.version_manager.create_analysis(
+            agent,
             original_file_content=selected_file['content'],
             test_file_content=selected_file['test_content'],
             output=result.output,

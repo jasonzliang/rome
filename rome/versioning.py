@@ -3,20 +3,20 @@ import json
 import datetime
 import hashlib
 from typing import List, Dict, Any, Optional
-from config import META_DIR_EXT
+from .config import META_DIR_EXT
 from .logger import get_logger
 
 class VersionManager:
     """Manages file versioning and analysis for the agent"""
 
-    def __init__(self, agent=None):
+    def __init__(self, config: Dict = None):
         """
         Initialize the VersionManager
 
         Args:
             agent: Reference to the agent instance
         """
-        self.agent = agent
+        self.config = config or {}
         self.logger = get_logger()
 
     def save_original(self, file_path: str, content: str) -> int:
@@ -36,7 +36,7 @@ class VersionManager:
 
         # If meta dir already exists you can assume original has already been saved
         if os.path.exists(f"{file_path}.{META_DIR_EXT}"):
-            return
+            return 1
 
         return self.save_version(
             file_path=file_path,
@@ -302,8 +302,12 @@ Please take this analysis into account when improving the code and address any i
             return context
         return ""
 
-    def create_analysis(self, original_file_content: str, test_file_content: str,
-                       output: str, exit_code: int) -> str:
+    def create_analysis(self,
+        agent,
+        original_file_content: str,
+        test_file_content: str,
+        output: str,
+        exit_code: int) -> str:
         """
         Generate detailed analysis of test execution results using LLM
 
@@ -347,9 +351,9 @@ Your analysis:
 """
 
         try:
-            response = self.agent.chat_completion(
+            response = agent.chat_completion(
                 prompt=prompt,
-                system_message=self.agent.role
+                system_message=agent.role
             )
             return response
         except Exception as e:
