@@ -13,7 +13,7 @@ from rome.action import Action
 from rome.state import State, IdleState, CodeLoadedState
 from rome.agent import Agent
 from rome.logger import get_logger
-from rome.action import SearchAction, RetryAction
+from rome.action import SearchAction, ResetAction
 from rome.config import DEFAULT_CONFIG
 
 

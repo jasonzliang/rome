@@ -338,7 +338,7 @@ def create_minimal_fsm(config):
                  fallback_state=idle_state)
 
     fsm.add_action(code_loaded_state, idle_state,
-                 RetryAction(config.get('RetryAction', {})))
+                 ResetAction(config.get('ResetAction', {})))
 
     # Set initial state and validate
     fsm.set_initial_state(idle_state)
@@ -360,11 +360,12 @@ def create_simple_fsm(config):
     code_loaded_state = fsm.add_state(CodeLoadedState(config.get('CodeLoadedState', {})))
     code_edited_state = fsm.add_state(CodeEditedState(config.get('CodeEditedState', {})))
     test_edited_state = fsm.add_state(TestEditedState(config.get('TestEditedState', {})))
-    code_executed_state = fsm.add_state(CodeExecutedState(config.get('CodeExecutedState', {})))
+    code_executed_pass_state = fsm.add_state(CodeExecutedPassState(config.get('CodeExecutedPassState', {})))
+    code_executed_fail_state = fsm.add_state(CodeExecutedFailState(config.get('CodeExecutedFailState', {})))
 
     # Create actions with their respective configurations
     search_action = SearchAction(config.get('SearchAction', {}))
-    retry_action = RetryAction(config.get('RetryAction', {}))
+    reset_action = ResetAction(config.get('ResetAction', {}))
     edit_code_action = EditCodeAction(config.get('EditCodeAction', {}))
     edit_test_action = EditTestAction(config.get('EditTestAction', {}))
     execute_code_action = ExecuteCodeAction(config.get('ExecuteCodeAction', {}),
@@ -385,12 +386,19 @@ def create_simple_fsm(config):
     fsm.add_action(code_edited_state, test_edited_state, edit_test_action,
         fallback_state=idle_state)
 
-    # Add transitions from TestEdited state
-    fsm.add_action(test_edited_state, code_executed_state, execute_code_action)
+    # Add transitions from TestEdited state - THIS IS THE KEY CHANGE
+    fsm.add_action(test_edited_state, code_executed_pass_state, execute_code_action,
+        fallback_state=code_executed_fail_state)
 
-    # Add transitions from CodeExecuted state
-    fsm.add_action(code_executed_state, code_loaded_state, transition_action)
-    fsm.add_action(code_executed_state, idle_state, retry_action)
+    # Add transitions from CodeExecutedPass state
+    fsm.add_action(code_executed_pass_state, code_loaded_state, transition_action)
+    fsm.add_action(code_executed_pass_state, idle_state, reset_action)
+
+    # Add transitions from CodeExecutedFail state
+    fsm.add_action(code_executed_fail_state, code_loaded_state, transition_action)
+    fsm.add_action(code_executed_fail_state, code_edited_state, edit_code_action)
+    fsm.add_action(code_executed_fail_state, test_edited_state, edit_test_action)
+    fsm.add_action(code_executed_fail_state, idle_state, reset_action)
 
     # Set initial state and validate
     fsm.set_initial_state(idle_state)

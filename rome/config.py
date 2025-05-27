@@ -87,7 +87,7 @@ DEFAULT_CONFIG = {
         # 'dependency_analysis': True,
         # 'semantic_clustering': True,
     },
-    "RetryAction": {},
+    "ResetAction": {},
     "EditCodeAction": {
         "custom_prompt": None
     },

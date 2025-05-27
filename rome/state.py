@@ -42,7 +42,6 @@ def truncate_text(text: str, max_length: int = SUMMARY_LENGTH) -> str:
     """Truncate text with ellipsis if it exceeds max_length"""
     return text[:max_length] + '...' if len(text) > max_length else text
 
-
 class State(ABC):
     """Abstract state"""
     def __init__(self,
@@ -171,14 +170,14 @@ class TestEditedState(State):
         return f"{self.name}: you {action_type} tests in {test_filename} for {filename} with {num_test_changes} change(s)"
 
 
-class CodeExecutedState(State):
-    """State where code or test file has been executed"""
+class CodeExecutedPassState(State):
+    """State where code or test file has been executed successfully"""
 
     def __init__(self, config: Dict = None):
         super().__init__(actions=[], config=config)
 
     def check_context(self, agent, **kwargs) -> bool:
-        """Check if we have a selected file in context"""
+        """Check if we have a selected file in context with successful execution"""
         required_keys = ['path', 'content', 'test_path', 'test_content', 'exec_output', 'exec_exit_code']
         selected_file = validate_selected_file_context(agent, required_keys)
 
@@ -186,19 +185,53 @@ class CodeExecutedState(State):
         paths_to_check = [selected_file['path'], selected_file['test_path']]
         for path in paths_to_check:
             validate_file_exists(path)
+
+        # Validate that execution was successful
+        exit_code = selected_file['exec_exit_code']
+        assert exit_code == 0, f"Expected successful execution (exit code 0), got {exit_code}"
         return True
 
     def summary(self, agent) -> str:
-        """Enhanced summary for code executed state"""
+        """Enhanced summary for code executed pass state"""
         selected_file = agent.context['selected_file']
         test_filename = os.path.basename(selected_file['test_path'])
-
-        # Get execution results
-        exit_code = selected_file['exec_exit_code']
-        status = "✓ PASSED" if exit_code == 0 else "✗ FAILED"
 
         # Get brief output summary
         output = selected_file['exec_output'] or 'No output'
         output_summary = truncate_text(output.split('\n')[0] if output else 'No output')
 
-        return f"{self.name}: you executed {test_filename}: {status} (exit code: {exit_code}), output: {output_summary}"
+        return f"{self.name}: you executed {test_filename}: ✓ PASSED (exit code: 0), output: {output_summary}"
+
+
+class CodeExecutedFailState(State):
+    """State where code or test file execution failed"""
+
+    def __init__(self, config: Dict = None):
+        super().__init__(actions=[], config=config)
+
+    def check_context(self, agent, **kwargs) -> bool:
+        """Check if we have a selected file in context with failed execution"""
+        required_keys = ['path', 'content', 'test_path', 'test_content', 'exec_output', 'exec_exit_code']
+        selected_file = validate_selected_file_context(agent, required_keys)
+
+        # Validate file paths exist
+        paths_to_check = [selected_file['path'], selected_file['test_path']]
+        for path in paths_to_check:
+            validate_file_exists(path)
+
+        # Validate that execution failed
+        exit_code = selected_file['exec_exit_code']
+        assert exit_code != 0, f"Expected failed execution (exit code != 0), got {exit_code}"
+        return True
+
+    def summary(self, agent) -> str:
+        """Enhanced summary for code executed fail state"""
+        selected_file = agent.context['selected_file']
+        test_filename = os.path.basename(selected_file['test_path'])
+        exit_code = selected_file['exec_exit_code']
+
+        # Get brief output summary focusing on error info
+        output = selected_file['exec_output'] or 'No output'
+        output_summary = truncate_text(output.split('\n')[0] if output else 'No output')
+
+        return f"{self.name}: you executed {test_filename}: ✗ FAILED (exit code: {exit_code}), output: {output_summary}"
