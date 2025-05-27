@@ -3,6 +3,7 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 from .action import Action
+from ..config import check_attrs
 from ..logger import get_logger
 
 class EditTestAction(Action):
@@ -12,7 +13,7 @@ class EditTestAction(Action):
         super().__init__(config)
         self.logger = get_logger()
 
-        # custom_prompt will be automatically set from config by set_attributes_from_config in parent class
+        check_attrs(self, ['custom_prompt'])
 
     def summary(self, agent) -> str:
         """Return a short summary of the test editing action"""

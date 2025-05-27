@@ -81,8 +81,8 @@ class Agent:
         if self.agent_api:
             from .agent_api import AgentApi
             api_config = self.config.get('AgentApi', {})
-            self.api = AgentApi(agent=self, config=api_config)
-            self.api.run()
+            self.agent_api = AgentApi(agent=self, config=api_config)
+            self.agent_api.run()
 
         self.logger.info(f"Agent {self.name} initialized with role:\n{self.role}")
 
@@ -90,8 +90,8 @@ class Agent:
     def shutdown(self):
         """Clean up resources before termination"""
         self.logger.info("Cleaning up agent resources")
-        if self.api:
-            self.api.shutdown()
+        if self.agent_api:
+            self.agent_api.shutdown()
 
 
     def _validate_and_format_role(self, role: str) -> str:

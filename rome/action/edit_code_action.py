@@ -3,6 +3,7 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 from .action import Action
+from ..config import check_attrs
 from ..logger import get_logger
 
 class EditCodeAction(Action):
@@ -11,6 +12,8 @@ class EditCodeAction(Action):
     def __init__(self, config: Dict = None):
         super().__init__(config)
         self.logger = get_logger()
+
+        check_attrs(self, ['custom_prompt'])
 
     def summary(self, agent) -> str:
         """Return a short summary of the code editing action"""

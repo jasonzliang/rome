@@ -351,7 +351,7 @@ class CodeExecutor:
             else:
                 cmd = [program, str(written_file.absolute())]
 
-
+            env = os.environ.copy()
             # Configure virtual environment if available
             if self.virtual_env_context:
                 virtual_env_abs_path = os.path.abspath(str(self.virtual_env_context.bin_path))
@@ -380,7 +380,7 @@ class CodeExecutor:
                     stderr=subprocess.STDOUT,   # Redirect stderr to stdout
                     text=True,
                     timeout=float(self.timeout),
-                    env=os.environ.copy(),
+                    env=env,
                     encoding="utf-8",
                     shell=WIN32,  # Use shell on Windows for better compatibility
                 )
