@@ -32,9 +32,9 @@ def set_attributes_from_config(obj, config=None, required_attrs=None, optional_a
 class SizeRotatingFileHandler(logging.FileHandler):
     """Custom file handler that truncates from the beginning using efficient Unix utilities"""
 
-    def __init__(self, filename, max_size_kb=None, *args, **kwargs):
+    def __init__(self, filename, max_size_kb, *args, **kwargs):
         self.max_size_kb = max_size_kb
-        self.max_size_bytes = max_size_kb * 1024 if max_size_kb else None
+        self.max_size_bytes = max_size_kb * 1024
         super().__init__(filename, *args, **kwargs)
 
     def emit(self, record):
@@ -97,11 +97,12 @@ class SizeRotatingFileHandler(logging.FileHandler):
     def _rotate_log_fallback(self):
         """Fallback Python implementation for non-Unix systems"""
         try:
-            # Simple fallback: keep last 5000 lines
+            # Simple fallback: keep last 1000 lines at least
+            num_lines = self.max_size_kb * 1024 // 80
             with open(self.baseFilename, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
 
-            lines_to_keep = lines[-5000:] if len(lines) > 5000 else lines
+            lines_to_keep = lines[-num_lines:] if len(lines) > num_lines else lines
 
             with open(self.baseFilename, 'w', encoding='utf-8') as f:
                 f.write(f"[LOG ROTATED - Previous entries truncated due to size limit of {self.max_size_kb}KB]\n")
@@ -209,13 +210,13 @@ class Logger:
                     log_file_path = os.path.join(self.base_dir, self.filename)
 
                     # Use custom size-rotating handler if max_log_size is specified
-                    if self.max_log_size:
+                    if self.max_size_kb:
                         file_handler = SizeRotatingFileHandler(
                             log_file_path,
-                            max_size_kb=self.max_size_kb,
+                            max_size_kb=max(self.max_size_kb, 1024),
                             mode='a'
                         )
-                        self.info(f"Logging to file: {log_file_path} (max size: {self.max_log_size}KB)")
+                        self.info(f"Logging to file: {log_file_path} (max size: {self.max_size_kb}KB)")
                     else:
                         file_handler = logging.FileHandler(log_file_path, mode='a')
                         self.info(f"Logging to file: {log_file_path}")
@@ -276,7 +277,7 @@ class Logger:
 
     def get_log_file_size(self) -> Optional[int]:
         """Get the current log file size in bytes, returns None if no file logging or file doesn't exist."""
-        if hasattr(self, 'base_dir') and hasattr(self, 'filename') and self.base_dir and self.filename:
+        if self.base_dir and self.filename:
             log_path = os.path.join(self.base_dir, self.filename)
             if os.path.exists(log_path):
                 return os.path.getsize(log_path)
