@@ -20,7 +20,7 @@ class EditTestAction(Action):
         file_path = selected_file['path']
         filename = os.path.basename(file_path)
         test_exists = 'test_path' in selected_file and os.path.exists(selected_file.get('test_path', ''))
-        action_type = "Update existing tests" if test_exists else "Create comprehensive unit tests"
+        action_type = "update existing tests" if test_exists else "create comprehensive unit tests"
         return f"{action_type} for {filename} covering edge cases and error conditions"
 
 

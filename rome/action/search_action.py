@@ -24,7 +24,7 @@ class SearchAction(Action):
 
     def summary(self, agent) -> str:
         """Return a short summary of the search action"""
-        return f"Search repository for {', '.join(self.file_types)} files to select and edit (criteria: {self.selection_criteria})"
+        return f"search repository for {', '.join(self.file_types)} files to select and edit (criteria: {self.selection_criteria})"
 
     def _create_global_overview(self, agent, files: List[str]) -> List[Dict]:
         """Create a high-level overview of all files in the repository"""

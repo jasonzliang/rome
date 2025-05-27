@@ -24,7 +24,7 @@ class ExecuteCodeAction(Action):
         selected_file = agent.context['selected_file']
         test_path = selected_file['test_path']
         test_filename = os.path.basename(test_path)
-        return f"Execute {test_filename} and analyze results for failures or issues"
+        return f"execute {test_filename} and analyze results for failures or issues"
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute tests for the current selected file"""

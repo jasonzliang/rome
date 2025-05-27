@@ -103,7 +103,7 @@ class CodeLoadedState(State):
         size_info = self._get_file_size_info(selected_file['path'])
         reason = self._truncate_text(selected_file['reason'])
 
-        return f"{self.name}: Agent selected file {filename}{size_info} for editing, selection reason: {reason}"
+        return f"{self.name}: you selected file {filename}{size_info} for editing, selection reason: {reason}"
 
 
 class CodeEditedState(State):
@@ -132,7 +132,7 @@ class CodeEditedState(State):
         num_changes = len(change_record['changes'])
         explanation = self._truncate_text(change_record['explanation'])
 
-        return f"{self.name}: Agent edited {filename} with {num_changes} change(s) with explanation: {explanation}"
+        return f"{self.name}: you edited {filename} with {num_changes} change(s) with explanation: {explanation}"
 
 
 class TestEditedState(State):
@@ -164,7 +164,7 @@ class TestEditedState(State):
         num_test_changes = len(selected_file['test_changes'])
         action_type = "created" if not os.path.exists(selected_file['test_path']) else "updated"
 
-        return f"{self.name}: Agent {action_type} tests in {test_filename} for {filename} with {num_test_changes} change(s)"
+        return f"{self.name}: you {action_type} tests in {test_filename} for {filename} with {num_test_changes} change(s)"
 
 
 class CodeExecutedState(State):
@@ -204,4 +204,4 @@ class CodeExecutedState(State):
         output = selected_file['exec_output'] or 'No output'
         output_summary = self._truncate_text(output.split('\n')[0] if output else 'No output')
 
-        return f"{self.name}: Agent executed {test_filename}: {status} (exit code: {exit_code}), output: {output_summary}"
+        return f"{self.name}: you executed {test_filename}: {status} (exit code: {exit_code}), output: {output_summary}"

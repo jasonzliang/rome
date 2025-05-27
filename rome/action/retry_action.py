@@ -19,7 +19,7 @@ class RetryAction(Action):
 
     def summary(self, agent) -> str:
         """Return a short summary of the retry action"""
-        return "Clear current context and return to idle state to start fresh"
+        return "clear current context and return to idle state to start fresh"
 
     def execute(self, agent, **kwargs) -> bool:
         self.logger.info("Starting RetryAction execution")
