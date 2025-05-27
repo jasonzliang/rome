@@ -543,7 +543,7 @@ Your analysis:
                                 return False
                             else:
                                 # Stale active file, will be overwritten
-                                self.logger.debug(f"Removing stale active file for {file_path}")
+                                self.logger.debug(f"Stale active file for {file_path}")
                     except (json.JSONDecodeError, Exception) as e:
                         # Corrupted active file, will be overwritten
                         self.logger.debug(f"Corrupted active file for {file_path}: {e}")
