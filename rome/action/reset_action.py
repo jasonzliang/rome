@@ -52,11 +52,12 @@ class AdvancedResetAction(ResetAction):
         Returns:
             True if LLM determines work is complete and correct, False otherwise
         """
-        exit_code = selected_file['exec_exit_code']
-        output = selected_file['exec_output']
-        analysis = selected_file['exec_analysis']
+        try:
+            exit_code = selected_file['exec_exit_code']
+            output = selected_file['exec_output']
+            analysis = selected_file['exec_analysis']
 
-        prompt = f"""Examine the test execution results and analysis, use them to determine if the code and tests are now correct and complete.
+            prompt = f"""Examine the test execution results and analysis, use them to determine if the code and tests are now correct and complete.
 
 Test exit code: {exit_code}
 Test execution output:
@@ -65,8 +66,11 @@ Test execution output:
 ```
 Test analysis:
 {analysis}
+"""
+        except:
+            prompt = agent.version_manager.get_analysis_prompt(selected_file['path'])
 
-Based on the execution results and analysis, please determine:
+            prompt += """Based on the execution results and analysis, please determine:
 1. Are all tests passing successfully?
 2. Is the code functioning correctly?
 3. Are there any remaining issues that need to be addressed?
