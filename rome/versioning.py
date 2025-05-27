@@ -201,7 +201,7 @@ class VersionManager:
 
         return analysis_file_path
 
-    def load_analysis(self, file_path: str) -> Optional[Dict[str, Any]]:
+    def _load_analysis(self, file_path: str) -> Optional[Dict[str, Any]]:
         """
         Load the latest analysis results for a given file.
 
@@ -233,7 +233,7 @@ class VersionManager:
             self.logger.error(f"Error loading analysis for {file_path}: {str(e)}")
             raise
 
-    def format_analysis_context(self, analysis_data: Dict[str, Any]) -> str:
+    def _format_analysis_context(self, analysis_data: Dict[str, Any]) -> str:
         """
         Format analysis data into a context string for prompts.
 
@@ -246,6 +246,7 @@ class VersionManager:
         if not analysis_data:
             return ""
 
+# - Execution Date: {analysis_data.get('timestamp', 'Unknown')}
         context = f"""
 PREVIOUS ANALYSIS CONTEXT:
 The following analysis was performed on this code after previous test execution:
@@ -253,7 +254,6 @@ The following analysis was performed on this code after previous test execution:
 Test Execution Results:
 - Exit Code: {analysis_data.get('exit_code', 'Unknown')}
 - Test File: {analysis_data.get('test_path', 'Unknown')}
-- Execution Date: {analysis_data.get('timestamp', 'Unknown')}
 
 Previous Analysis:
 {analysis_data.get('analysis', 'No analysis available')}
@@ -263,12 +263,12 @@ Execution Output:
 {analysis_data.get('output', 'No output available')}
 ```
 
-Please take this analysis into account when improving the code and address any issues identified in the test execution.
+Please take this analysis into account when improving the code or tests.
 
 """
         return context
 
-    def get_analysis_context_for_code_editing(self, file_path: str) -> str:
+    def get_analysis_prompt(self, file_path: str) -> str:
         """
         Get formatted analysis context specifically for code editing prompts.
 
@@ -278,29 +278,10 @@ Please take this analysis into account when improving the code and address any i
         Returns:
             Formatted analysis context string or empty string if no analysis
         """
-        analysis_data = self.load_analysis(file_path)
+        analysis_data = self._load_analysis(file_path)
         if analysis_data:
-            return self.format_analysis_context(analysis_data)
-        return ""
-
-    def get_analysis_context_for_test_editing(self, file_path: str) -> str:
-        """
-        Get formatted analysis context specifically for test editing prompts.
-
-        Args:
-            file_path: Path to the file being tested
-
-        Returns:
-            Formatted analysis context string or empty string if no analysis
-        """
-        analysis_data = self.load_analysis(file_path)
-        if analysis_data:
-            context = self.format_analysis_context(analysis_data)
-            # Add test-specific guidance
-            if context:
-                context += "Please take this analysis into account when creating/improving the tests and address any issues identified in the test execution.\n\n"
-            return context
-        return ""
+            return self._format_analysis(analysis_data)
+        return None
 
     def create_analysis(self,
         agent,

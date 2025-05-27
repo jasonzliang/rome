@@ -150,7 +150,7 @@ Code to test:
 """
 
         # Get analysis context from agent's version manager
-        analysis_context = agent.version_manager.get_analysis_context_for_test_editing(file_path)
+        analysis_context = agent.version_manager.get_analysis_prompt(file_path)
         if analysis_context:
             prompt += analysis_context
 
