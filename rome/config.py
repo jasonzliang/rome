@@ -116,6 +116,7 @@ def check_attrs(obj, required_attrs):
     logger = get_logger()
     for attr in required_attrs:
         logger.assert_attribute(obj, attr)
+        logger.debug(f"'{attr}' provided in {obj.__class__.__name__} config")
 
 
 def check_opt_attrs(obj, optional_attrs):
