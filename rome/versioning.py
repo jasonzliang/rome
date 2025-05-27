@@ -430,17 +430,31 @@ Your analysis:
 
     def _is_process_running(self, pid: int) -> bool:
         """
-        Check if a process with given PID is still running.
+        Check if a process with given PID is still running, is a Python process,
+        and belongs to the same user.
 
         Args:
             pid: Process ID to check
 
         Returns:
-            True if process is running, False otherwise
+            True if process is running, is Python, and owned by current user; False otherwise
         """
         try:
-            return psutil.pid_exists(pid)
-        except Exception:
+            process = psutil.Process(pid)
+
+            # Check user ownership and Python process in one go
+            current_user = os.getlogin() if hasattr(os, 'getlogin') else os.environ.get('USER', os.environ.get('USERNAME'))
+
+            return (
+                process.username() == current_user and
+                ('python' in process.name().lower() or
+                 any('python' in arg.lower() for arg in process.cmdline()[:2]))
+            )
+
+        except (psutil.NoSuchProcess, psutil.AccessDenied, OSError, AttributeError):
+            return False
+        except Exception as e:
+            self.logger.warning(f"Error checking process {pid}: {e}")
             return False
 
     def check_active(self, file_path: str) -> bool:
@@ -590,33 +604,33 @@ Your analysis:
             return True
 
     def check_finished(self, agent, file_path: str) -> bool:
-       """
-       Check if a file has been marked as finished.
+        """
+        Check if a file has been marked as finished.
 
-       Args:
+        Args:
            file_path: Path to the code file to check
            agent_id: Optional specific agent ID to check; if None, checks if any agent finished
 
-       Returns:
+        Returns:
            True if file has been finished (by specified agent or any agent), False otherwise
-       """
-       meta_dir = self._get_meta_dir(file_path)
-       finished_file_path = os.path.join(meta_dir, "finished.json")
+        """
+        meta_dir = self._get_meta_dir(file_path)
+        finished_file_path = os.path.join(meta_dir, "finished.json")
 
-       if not os.path.exists(finished_file_path):
+        if not os.path.exists(finished_file_path):
            return False
 
-       with open(finished_file_path, 'r', encoding='utf-8') as f:
+        with open(finished_file_path, 'r', encoding='utf-8') as f:
            finished_data = json.load(f)
 
-       agents = finished_data.get('agents', [])
-       if not agents:
+        agents = finished_data.get('agents', [])
+        if not agents:
            return False
 
-       for agent_entry in agents:
+        for agent_entry in agents:
            if agent_entry.get('agent_id') == agent.get_id():
                return True
-       return False
+        return False
 
     def flag_finished(self, agent, file_path: str) -> None:
         """
