@@ -67,7 +67,7 @@ Test analysis:
         except:
             prompt = agent.version_manager.get_analysis_prompt(selected_file['path'])
 
-            prompt += """Based on the execution results and analysis, please determine:
+        prompt += """Based on the execution results and analysis, please determine:
 1. Are all tests passing successfully?
 2. Is the code functioning correctly?
 3. Are there any remaining issues that need to be addressed?
