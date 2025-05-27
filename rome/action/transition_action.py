@@ -15,7 +15,7 @@ class TransitionAction(Action):
 
     def __init__(self, config: Dict = None):
         """
-        Initialize the StateTransitionAction
+        Initialize the TransitionAction
 
         Args:
             config: Configuration dictionary
@@ -50,7 +50,7 @@ class TransitionAction(Action):
         Returns:
             bool: Always returns True to indicate successful transition
         """
-        self.logger.info(f"Executing StateTransitionAction: transitioning to {self.target_state_name}")
+        self.logger.info(f"Executing TransitionAction: transitioning to {self.target_state_name}")
         self.logger.debug(f"Agent context preserved: {len(agent.context)} items in context")
 
         # Explicitly preserve context by doing nothing to it

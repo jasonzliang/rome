@@ -107,8 +107,8 @@ class EditTestAction(Action):
         self.logger.info(f"Successfully wrote test code to {test_path}")
 
         # Save version using agent's version manager
-        version_number = agent.version_manager.save_version(
-            file_path=test_path,
+        version_number = agent.version_manager.save_test_version(
+            test_file_path=test_path,
             content=new_test_code,
             changes=test_changes,
             explanation=explanation)

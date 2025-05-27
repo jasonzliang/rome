@@ -209,7 +209,29 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
                 filtered_files.append(file_path)
         return filtered_files
 
+    def _filter_flagged_files(self, agent, files: List[str]) -> List[str]:
+        """Filter out files that are currently active or already finished"""
+        if not files:
+            return files
+
+        filtered_files = []
+        for file_path in files:
+            # Check if file is currently being worked on by another agent
+            is_active = agent.version_manager.check_active(file_path)
+
+            # Check if file has already been marked as finished by this agent
+            is_finished = agent.version_manager.check_finished(agent, file_path)
+
+            if is_active:
+                self.logger.debug(f"Filtering out active file: {file_path}")
+            elif is_finished:
+                self.logger.debug(f"Filtering out finished file: {file_path}")
+            else:
+                filtered_files.append(file_path)
+        return filtered_files
+
     def _filter_max_limit(self, files: List[str]) -> List[str]:
+        """Filter out files if they exceed max file limit"""
         if len(files) > self.max_files:
             random.shuffle(files)
             files = files[:self.max_files]
@@ -421,6 +443,10 @@ Respond with a JSON object:
         filtered_files = self._filter_excluded_types(filtered_files)
         self.logger.info(f"Found {len(filtered_files)} files after type filtering")
 
+        # Filter out files that are currently active or already finished
+        filtered_files = self._filter_flagged_files(agent, filtered_files)
+        self.logger.info(f"Found {len(filtered_files)} files after flagged file filtering")
+
         # Filter out files if they exceed max limit
         filtered_files = self._filter_max_limit(filtered_files)
         self.logger.info(f"Found {len(filtered_files)} files after max-limit filtering")
@@ -454,6 +480,7 @@ Respond with a JSON object:
         # Add selected file to agent context
         if selected_file:
             agent.context['selected_file'] = selected_file
+            agent.version_manager.flag_active(agent, selected_file['path'])
             self.logger.info(f"Search completed. Selected file: {selected_file['path']}")
             return True
         else:
