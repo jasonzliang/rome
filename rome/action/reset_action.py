@@ -14,9 +14,6 @@ class ResetAction(Action):
         super().__init__(config)
         self.logger = get_logger()
 
-        # No specific config requirements for ResetAction, but we should still initialize
-        # with the config dict for consistency
-
     def summary(self, agent) -> str:
         """Return a short summary of the reset action"""
         return "clear current context and return to initial state to start a new task"
@@ -28,7 +25,7 @@ class ResetAction(Action):
         return True
 
 
-class AdvancedResetAction(ResetAction):
+class AdvancedResetAction(Action):
     """Advanced reset action that analyzes execution results and manages file flags appropriately"""
 
     def __init__(self, config: Dict):
