@@ -1,3 +1,4 @@
+# RUN MANUALLY ONLY
 import os
 import sys
 import shutil
