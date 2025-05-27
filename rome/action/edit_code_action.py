@@ -138,6 +138,6 @@ IMPORTANT:
 """
 
         if analysis_context:
-            prompt += "- Pay special attention to addressing any issues identified in the previous analysis"
+            prompt += "- Pay special attention to addressing any issues identified in the code analysis"
 
         return prompt

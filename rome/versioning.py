@@ -177,7 +177,7 @@ class VersionManager:
             self.logger.debug(f"Created metadata directory: {versions_dir}")
 
         # Use a fixed filename for the latest analysis (no timestamp)
-        analysis_filename = "latest_analysis.json"
+        analysis_filename = "code_analysis.json"
         analysis_file_path = os.path.join(versions_dir, analysis_filename)
 
         # Create analysis data structure
@@ -247,24 +247,17 @@ class VersionManager:
             return ""
 
 # - Execution Date: {analysis_data.get('timestamp', 'Unknown')}
-        context = f"""
-PREVIOUS ANALYSIS CONTEXT:
-The following analysis was performed on this code after previous test execution:
-
-Test Execution Results:
-- Exit Code: {analysis_data.get('exit_code', 'Unknown')}
-- Test File: {analysis_data.get('test_path', 'Unknown')}
-
-Previous Analysis:
-{analysis_data.get('analysis', 'No analysis available')}
-
-Execution Output:
+# - Test File: {analysis_data.get('test_path', 'Unknown')}
+# - Exit Code: {analysis_data.get('exit_code', 'Unknown')}
+        context = f"""Code test output:
 ```
 {analysis_data.get('output', 'No output available')}
 ```
 
-Please take this analysis into account when improving the code or tests.
+Code analysis:
+{analysis_data.get('analysis', 'No analysis available')}
 
+IMPORTANT: Please take this analysis into account when improving the code or tests.
 """
         return context
 

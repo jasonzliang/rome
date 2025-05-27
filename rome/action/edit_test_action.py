@@ -141,21 +141,15 @@ class EditTestAction(Action):
         action_type = "improve the existing" if test_exists else "create new"
 
         prompt = f"""{base_prompt}
-I need you to {action_type} unit tests for the following Python file:
-File path: {file_path}
-Code to test:
+I need you to {action_type} unit tests for the following Python code:
+
 ```python
 {file_content}
 ```
 """
-
-        # Get analysis context from agent's version manager
-        analysis_context = agent.version_manager.get_analysis_prompt(file_path)
-        if analysis_context:
-            prompt += analysis_context
-
         if test_exists:
-            prompt += f"""Current test file ({test_path}):
+            prompt += f"""Current code tests:
+
 ```python
 {test_content}
 ```
@@ -164,6 +158,11 @@ Code to test:
             prompt += f"""Create a new test file that will be saved at: {test_path}
 Include proper test setup, all necessary imports, and comprehensive test cases.
 """
+
+        # Get analysis context from agent's version manager
+        analysis_context = agent.version_manager.get_analysis_prompt(file_path)
+        if analysis_context:
+            prompt += analysis_context
 
         prompt += f"""Respond with a JSON object containing:
 {{
@@ -188,6 +187,6 @@ IMPORTANT:
 """
 
         if analysis_context:
-            prompt += "- Pay special attention to addressing any test failures or issues identified in the previous analysis"
+            prompt += "- Pay special attention to addressing any test failures or issues identified in the code analysis"
 
         return prompt
