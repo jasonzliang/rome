@@ -28,3 +28,16 @@ class Action(ABC):
     def summary(self, agent) -> str:
         """Return a short summary that describes the current action"""
         pass
+
+    def set_target_state_info(self, fsm, target_state_name: str):
+        """
+        Optional method to receive target state information when action is added to FSM.
+        Base implementation does nothing - subclasses can override to use this information.
+
+        Args:
+            fsm: The FSM instance containing the target state
+            target_state_name: Name of the target state this action transitions to
+        """
+        # Base implementation is a no-op
+        # Subclasses that need target state info can override this method
+        pass

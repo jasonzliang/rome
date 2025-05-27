@@ -103,6 +103,7 @@ DEFAULT_CONFIG = {
             "cmd_args": {"pytest": "-vvs"}
         }
     },
+    "TransitionAction": {},
 
     # Version manager configuration
     "VersionManager": {},
