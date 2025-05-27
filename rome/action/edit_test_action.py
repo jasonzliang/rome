@@ -141,15 +141,20 @@ class EditTestAction(Action):
         action_type = "improve the existing" if test_exists else "create new"
 
         prompt = f"""{base_prompt}
-I need you to {action_type} unit tests for the following Python code:
+I need you to {action_type} unit tests for the following Python code.
 
+Code file path:
+{file_path}
+Code file content:
 ```python
 {file_content}
 ```
 """
         if test_exists:
-            prompt += f"""Current code tests:
+            prompt += f"""Test file path:
+{test_path}
 
+Test file content:
 ```python
 {test_content}
 ```
