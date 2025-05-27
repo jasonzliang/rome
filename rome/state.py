@@ -77,7 +77,7 @@ class IdleState(State):
 
     def summary(self, agent) -> str:
         """Enhanced summary for idle state"""
-        return f"{self.name}: Agent is idle and ready to start a new task"
+        return f"{self.name}: you are idling in initial state and ready to start a new task"
 
 
 class CodeLoadedState(State):
