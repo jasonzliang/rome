@@ -21,7 +21,13 @@ class FSM:
         self.actions: Dict[str, Action] = {}  # action handlers
         self.current_state = self.default_state = None
         self.current_action = None
+        self.overview = None  # High-level overview of the FSM
         self.logger = get_logger()
+
+    def set_overview(self, overview: str):
+        """Set a high-level overview of what the FSM and agent can do"""
+        self.overview = overview
+        self.logger.info("FSM overview set")
 
     def reset(self, agent):
         """Reset FSM state and clear agent context"""
@@ -181,15 +187,21 @@ class FSM:
         # Get history summary based on config
         history_summary = agent.history.get_history_summary(agent.history_context_len)
 
-        prompt_parts = [
+        prompt_parts = []
+
+        # Add overview if it's set
+        if self.overview:
+            prompt_parts.append(f"## FSM Overview ##\n{self.overview}")
+
+        # Add other sections
+        if history_summary:
+            prompt_parts.append(f"## Recent agent history ##\n{history_summary}")
+
+        prompt_parts.extend([
             f"## Current state ##\n{state_summary}",
             f"## Available actions ##\n{actions_text}",
             f"## Future states ##\n{future_states_text}"
-        ]
-
-        # Add history summary if available
-        if history_summary:
-            prompt_parts.insert(0, f"## Recent agent history ##\n{history_summary}")
+        ])
 
         prompt_parts.append(
 """Please select one of the available actions to execute. Respond with a JSON object containing:
@@ -350,6 +362,14 @@ def create_minimal_fsm(config):
 
     fsm = FSM(config.get("FSM", {}))
 
+    # Set overview for the minimal FSM
+    fsm.set_overview(
+        "This is a minimal code analysis agent with a simple 2-state workflow: "
+        "1) Start in IDLE state → Search and load code files → Move to CODE_LOADED state "
+        "2) From CODE_LOADED state → Reset back to IDLE to start over. "
+        "The agent's purpose is to help users locate, examine, and understand code within a codebase through an iterative search-and-reset cycle."
+    )
+
     # Create and add states
     idle_state = fsm.add_state(IdleState(config.get('IdleState', {})))
     code_loaded_state = fsm.add_state(CodeLoadedState(config.get('CodeLoadedState', {})))
@@ -376,6 +396,18 @@ def create_simple_fsm(config):
     logger.info("Creating FSM with code editing, test writing and execution capabilities")
 
     fsm = FSM(config.get("FSM", {}))
+
+    # Set overview for the simple FSM
+    fsm.set_overview(
+        "This is a comprehensive code development agent with a 6-state workflow: "
+        "1) IDLE → Search/load code → CODE_LOADED "
+        "2) CODE_LOADED → Edit code OR write tests → CODE_EDITED or TEST_EDITED "
+        "3) CODE_EDITED → Write/edit tests → TEST_EDITED "
+        "4) TEST_EDITED → Execute code with tests → CODE_EXECUTED_PASS (success) or CODE_EXECUTED_FAIL (failure) "
+        "5) CODE_EXECUTED_PASS → Reset → IDLE (complete successful cycle) "
+        "6) CODE_EXECUTED_FAIL → Transition back to CODE_LOADED (retry) OR Reset → IDLE (start over). "
+        "The agent follows a complete development lifecycle: discover code → modify code → create tests → validate → iterate or complete."
+    )
 
     # Create and add states
     idle_state = fsm.add_state(IdleState(config.get('IdleState', {})))

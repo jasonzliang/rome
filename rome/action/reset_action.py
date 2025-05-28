@@ -35,8 +35,8 @@ class AdvancedResetAction(Action):
     def summary(self, agent) -> str:
         """Return a short summary of the advanced reset action"""
         return ("analyze test execution results using LLM to determine if code/tests are correct, "
-                "then unflag active file and optionally flag as finished before clearing context "
-                "and returning to initial state")
+                "mark code/tests as finished if they are correct and and returning to initial state"
+                "to start a new coding task")
 
     def _analyze_execution_results(self, agent, selected_file: Dict) -> bool:
         """
