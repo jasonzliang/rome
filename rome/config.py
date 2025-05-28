@@ -105,7 +105,7 @@ DEFAULT_CONFIG = {
         "timeout": 10,
         "virtual_env_context": None,
         "work_dir": "./",
-        "cmd_args": {"pytest": "-vvs --tb=long"}
+        "cmd_args": {"pytest": ["-vvs", "--tb=long"]}
     },
 
     # Version manager configuration

@@ -308,6 +308,7 @@ class Logger:
         """Log critical message with caller information"""
         self._logger.critical(message)
 
+    # IMPORTANT: Do not use logger asserts for code executed from agent.run_loop(...)
     def assert_true(self, condition: bool, message: str,
                     exception_type: Type[Exception] = ValueError,
                     log_only: bool = True) -> None:

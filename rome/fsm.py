@@ -171,13 +171,15 @@ class FSM:
         if history_summary:
             prompt_parts.insert(0, f"## Recent agent history ##\n{history_summary}")
 
-        prompt_parts.append(f"""Please select one of the available actions to execute. Respond with a JSON object containing:
+        prompt_parts.append(
+"""Please select one of the available actions to execute. Respond with a JSON object containing:
 {
     "action": "chosen_action_name",
     "reasoning": "Brief explanation of why you chose this action"
-}
+}"""
+        )
 
-Choose the most appropriate action using your role as a guide. If the action chosen in current state is getting repeated {agent.patience} times or more in recent history, try selecting alternative actions to avoid getting stuck in cycles. Diversity in action selection often leads to better outcomes.""")
+        prompt_parts.append(f"Choose the most appropriate action using your role as a guide. If the action chosen in current state is getting repeated {agent.patience} times or more in recent history, try selecting alternative actions to avoid getting stuck in cycles. Diversity in action selection often leads to better outcomes.")
 
         return "\n\n".join(prompt_parts)
 

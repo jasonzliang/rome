@@ -346,10 +346,14 @@ class CodeExecutor:
                 return CommandLineCodeResult(exit_code=1, output=error_msg)
 
             # Add additional argument if running pytest
+            cmd = [program, str(written_file.absolute())]
             if self.cmd_args and self.cmd_args.get(program):
-                cmd = [program, self.cmd_args.get(program), str(written_file.absolute())]
-            else:
-                cmd = [program, str(written_file.absolute())]
+                cmd_args = self.cmd_args.get(program)
+                assert len(cmd_args) > 0, f"Invalid cmd args: {cmd_args}"
+                if type(cmd_args) is list:
+                    cmd = [cmd[0]] +  cmd_args + [cmd[1]]
+                else:
+                    cmd = [cmd[0], cmd_args, cmd[1]]
 
             env = os.environ.copy()
             # Configure virtual environment if available
