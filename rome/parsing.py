@@ -1,57 +1,248 @@
+import ast
 import json
 import re
-import ast
 from typing import Dict, Optional, Any, Union, List
+import zlib
+
+# Simple global cache - you could also make this a class attribute
+_ast_cache: Dict[int, ast.AST] = {}
 
 
-def parse_python_response(response: str) -> Optional[str]:
+def parse_code_cached(code_content: str) -> ast.AST:
     """
-    Extract the first Python code block from a response.
+    Parse Python code with simple dictionary caching using CRC32.
 
     Args:
-        response (str): The response text containing code blocks
+        code_content: Python source code as string
 
     Returns:
-        Optional[str]: The first Python code block found, or None if no code found
+        Parsed AST tree
     """
-    if not response:
+    # Fast CRC32 hash of the content
+    cache_key = zlib.crc32(code_content.encode('utf-8'))
+
+    # Check cache first
+    if cache_key in _ast_cache:
+        return _ast_cache[cache_key]
+
+    # Parse and cache
+    tree = ast.parse(code_content)
+    _ast_cache[cache_key] = tree
+
+    return tree
+
+
+def clear_ast_cache():
+    """Clear the AST cache if memory usage becomes a concern."""
+    global _ast_cache
+    _ast_cache.clear()
+
+
+def get_cache_stats():
+    """Get simple cache statistics."""
+    return {
+        'cache_size': len(_ast_cache),
+        'num_entries': len(_ast_cache)
+    }
+
+
+def parse_python_response(text: str) -> Optional[str]:
+    """
+    Extracts Python content from markdown code blocks with fallback to inline code.
+
+    Args:
+        text (str): The markdown text containing code blocks
+
+    Returns:
+        Optional[str]: The first Python code block content, or None if not found
+
+    Note:
+        - Preserves internal whitespace
+        - Handles escaped backticks within code
+        - Skips invalid/incomplete code blocks
+        - Falls back to inline code with Python keywords
+    """
+    if not text:
         return None
 
-    # Pattern to match Python code blocks with various formats
-    # Handles ```python, ``` python, and plain ``` code blocks
-    python_patterns = [
-        r'```\s*python\s*\n(.*?)\n```',  # ```python\n...\n```
-        r'```\n(.*?)\n```'               # ```\n...\n```
-    ]
+    # First try to extract from code blocks
+    pattern = r"```[ \t]*(\w+)?[ \t]*\r?\n(.*?)\r?\n[ \t]*```"
+    matches = re.finditer(pattern, text, re.DOTALL)
 
-    for pattern in python_patterns:
-        # Find all matches with the current pattern
-        matches = re.findall(pattern, response, re.DOTALL)
+    for match in matches:
+        try:
+            language = match.group(1)
+            # Remove only the trailing newline if it exists, preserve other whitespace
+            content = match.group(2).rstrip('\r\n')
 
-        # If we found any matches with this pattern
-        if matches:
-            # Clean up the code blocks by stripping leading/trailing whitespace
-            python_blocks = [match.strip() for match in matches]
+            # Skip empty code blocks
+            if not content.strip():
+                continue
+            if language and language.lower() == "python":
+                return content
+            # If no language specified, assume it might be Python if it looks like it
+            elif not language and _looks_like_python(content):
+                return content
 
-            # Return first non-empty block (minimal validation)
-            for block in python_blocks:
-                if block.strip():
-                    return block
+        except (IndexError, AttributeError):
+            # Skip malformed matches
+            continue
 
-    # If no code blocks found, try to find inline code with single backticks
-    # This is a fallback for simple code snippets
+    # Fallback: try to find inline code with Python keywords
     inline_pattern = r'`([^`]+)`'
-    inline_matches = re.findall(inline_pattern, response)
+    inline_matches = re.findall(inline_pattern, text)
 
-    # Only consider inline code with Python keywords
     python_keywords = ['def ', 'import ', 'from ', 'class ', 'if ', 'for ', 'while ', 'return ']
     for match in inline_matches:
-        # Simple validation that this might be Python code
         if any(keyword in match for keyword in python_keywords) or '=' in match or 'print(' in match:
             return match.strip()
 
-    # No valid Python code found
     return None
+
+
+def _looks_like_python(content: str) -> bool:
+    """Helper function to determine if content looks like Python code."""
+    python_indicators = ['def ', 'import ', 'from ', 'class ', 'if ', 'for ', 'while ', 'return ', '=', 'print(']
+    return any(indicator in content for indicator in python_indicators)
+
+
+def extract_function_names(code: str, include_methods: bool = False) -> List[str]:
+    """
+    Extract function names from Python code efficiently.
+
+    Args:
+        code: Python source code
+        include_methods: Include class methods in results
+
+    Returns:
+        List of function names (methods prefixed with 'ClassName.')
+    """
+    if not code or not code.strip():
+        return []
+
+    try:
+        tree = parse_code_cached(code)
+    except SyntaxError:
+        return []
+
+    functions = []
+
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            # Find parent class if this is a method
+            parent_class = None
+            if include_methods:
+                for parent in ast.walk(tree):
+                    if (isinstance(parent, ast.ClassDef) and
+                        any(child is node for child in ast.walk(parent))):
+                        parent_class = parent.name
+                        break
+
+            name = f"{parent_class}.{node.name}" if parent_class else node.name
+            if name not in functions:  # Avoid duplicates
+                functions.append(name)
+
+    return functions
+
+
+def extract_function_from_code(code_string: str, function_name: str,
+                             include_methods: bool = False) -> Optional[str]:
+    """
+    Extract function source code efficiently with robust fallbacks.
+
+    Args:
+        code_string: Source code string
+        function_name: Name of function to extract (or 'Class.method')
+        include_methods: Search in class methods
+
+    Returns:
+        Function source code or None if not found
+    """
+    if not code_string or not function_name:
+        return None
+
+    try:
+        tree = parse_code_cached(code_string)
+    except SyntaxError:
+        return None
+
+    # Handle class.method syntax
+    if '.' in function_name and include_methods:
+        class_name, method_name = function_name.split('.', 1)
+        target_names = {method_name}
+        in_target_class = False
+    else:
+        target_names = {function_name}
+        class_name = method_name = None
+        in_target_class = True
+
+    for node in ast.walk(tree):
+        # Check if we're in the right class context
+        if class_name and isinstance(node, ast.ClassDef):
+            in_target_class = node.name == class_name
+            continue
+
+        # Look for target function
+        if (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and
+            node.name in target_names and (in_target_class or not class_name)):
+
+            # Try precise extraction first
+            try:
+                source = ast.get_source_segment(code_string, node)
+                if source:
+                    return source
+            except (TypeError, AttributeError):
+                pass
+
+            # Fallback to unparsing
+            try:
+                return ast.unparse(node)
+            except AttributeError:
+                return None
+
+    return None
+
+
+def extract_comments_from_code(text: str, include_single_comments: bool = False,
+                              background_only: bool = False, background_index: int = 0) -> str:
+    """
+    Extract comment blocks from Python source code, including docstrings.
+
+    Args:
+        text (str): Input text containing Python code and comments
+        include_single_comments (bool): Whether to include single-line # comments
+
+    Returns:
+        str: A string containing the extracted comment blocks joined by newlines
+    """
+    # Regex pattern to match:
+    # 1. Text inside triple quotes (docstrings)
+    # 2. Single-line comments starting with #, including those after code
+    if include_single_comments:
+        comment_pattern = r'(""".*?"""|\'\'\'.*?\'\'\'|(?:^|\s*)#[^\n]*)'
+    else:
+        comment_pattern = r'(""".*?"""|\'\'\'.*?\'\'\')'
+
+    # Re-use flags for multiline and dot matching
+    flags = re.MULTILINE | re.DOTALL
+
+    # Find all comment blocks
+    comments = re.findall(comment_pattern, text, flags)
+
+    # Clean up the comments
+    processed_comments = []
+    for comment in comments:
+        # Remove triple quotes from docstrings
+        cleaned_comment = re.sub(r'^(\'\'\'|""")|((\'\'\'|""")$)', '', comment).strip()
+
+        # Ensure # comments are preserved
+        if cleaned_comment.startswith('#') or not cleaned_comment:
+            cleaned_comment = comment.strip()
+
+        if cleaned_comment:
+            processed_comments.append(cleaned_comment)
+
+    return "\n".join(processed_comments)
 
 
 def parse_json_response(response: str) -> Union[Dict[str, Any], List[Any]]:
@@ -154,7 +345,7 @@ def extract_all_definitions(content: str) -> List[Dict[str, str]]:
 
     try:
         # Parse the code into an AST
-        tree = ast.parse(content)
+        tree = parse_code_cached(content)
 
         # Walk through all nodes in the AST
         for node in ast.walk(tree):
@@ -196,8 +387,9 @@ def extract_all_definitions(content: str) -> List[Dict[str, str]]:
                 })
 
     except SyntaxError:
-        # If AST parsing fails, fall back to regex-based extraction
-        definitions = _extract_all_definitions_regex(content)
+        # If AST parsing fails due to syntax errors, return empty list
+        # Most malformed code won't benefit from regex extraction anyway
+        return []
 
     # Sort by line number
     definitions.sort(key=lambda x: x['line_number'])
@@ -312,126 +504,3 @@ def _get_class_signature(class_node: ast.ClassDef) -> str:
 
     signature += ":"
     return signature
-
-
-def _extract_classes_regex(content: str) -> List[Dict[str, str]]:
-    """
-    Fallback regex-based class extraction when AST parsing fails.
-
-    Args:
-        content (str): Python source code as a string
-
-    Returns:
-        List[Dict[str, str]]: List of class information dictionaries
-    """
-    classes = []
-    lines = content.split('\n')
-
-    # Pattern to match class definitions
-    class_pattern = r'^\s*class\s+(\w+)(?:\s*\([^)]*\))?\s*:'
-
-    i = 0
-    while i < len(lines):
-        line = lines[i]
-        match = re.match(class_pattern, line)
-
-        if match:
-            class_name = match.group(1)
-            signature = line.strip()
-            line_number = i + 1
-
-            # Look for docstring
-            docstring = ""
-            j = i + 1
-
-            # Skip empty lines and find the first non-empty line
-            while j < len(lines) and not lines[j].strip():
-                j += 1
-
-            # Check if the next non-empty line starts a docstring
-            if j < len(lines):
-                stripped_line = lines[j].strip()
-                if stripped_line.startswith('"""') or stripped_line.startswith("'''"):
-                    quote_type = '"""' if stripped_line.startswith('"""') else "'''"
-
-                    # Single line docstring
-                    if stripped_line.count(quote_type) >= 2:
-                        docstring = stripped_line.replace(quote_type, '').strip()
-                    else:
-                        # Multi-line docstring
-                        docstring_lines = [stripped_line.replace(quote_type, '')]
-                        j += 1
-
-                        while j < len(lines):
-                            if quote_type in lines[j]:
-                                docstring_lines.append(lines[j].split(quote_type)[0])
-                                break
-                            else:
-                                docstring_lines.append(lines[j])
-                            j += 1
-
-                        docstring = '\n'.join(docstring_lines).strip()
-
-            # Extract method names (simplified)
-            methods = []
-            j = i + 1
-            indent_level = len(line) - len(line.lstrip())
-
-            while j < len(lines):
-                method_line = lines[j]
-                if not method_line.strip():
-                    j += 1
-                    continue
-
-                method_indent = len(method_line) - len(method_line.lstrip())
-
-                # If we're back at the same or lower indentation, we've left the class
-                if method_indent <= indent_level and method_line.strip():
-                    break
-
-                # Look for method definitions
-                method_match = re.match(r'^\s*def\s+(\w+)', method_line)
-                if method_match:
-                    methods.append(method_match.group(1))
-
-                j += 1
-
-            classes.append({
-                'name': class_name,
-                'signature': signature,
-                'docstring': docstring,
-                'line_number': line_number,
-                'type': 'class',
-                'methods': methods
-            })
-
-        i += 1
-
-    return classes
-
-
-def _extract_all_definitions_regex(content: str) -> List[Dict[str, str]]:
-    """
-    Fallback regex-based extraction for both functions and classes.
-
-    Args:
-        content (str): Python source code as a string
-
-    Returns:
-        List[Dict[str, str]]: List of definition information dictionaries
-    """
-    definitions = []
-
-    # Extract functions
-    functions = _extract_functions_regex(content)
-    for func in functions:
-        func['type'] = 'function'
-    definitions.extend(functions)
-
-    # Extract classes
-    classes = _extract_classes_regex(content)
-    definitions.extend(classes)
-
-    # Sort by line number
-    definitions.sort(key=lambda x: x['line_number'])
-    return definitions
