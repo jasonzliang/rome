@@ -231,7 +231,7 @@ class Logger:
 
                 # Determine handler type based on include_caller_info setting
                 caller_info = self.include_caller_info
-                self.assert_true(caller_info in ["rome", "rich", "default"],
+                self.assert_true(caller_info in ["rome", "rich", None],
                     f"Invalid value set for caller info: {caller_info}")
 
                 if caller_info == "rome":

@@ -68,7 +68,7 @@ DEFAULT_CONFIG = {
         "level": "ERROR", # Log level in increasing verbosity: INFO -> ERROR -> DEBUG
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s", # Formatting for log messages
         "console": True, # Print to console if true
-        "include_caller_info": "default", # Can be "rome", "rich", or "default"
+        "include_caller_info": None, # Can be "rome", "rich", or None
         "base_dir": None, # Directory for log files (overwrites agent's setting)
         "filename": None, # Log file name (overwrites agent's setting)
         "max_size_kb": 10000, # Max log size in kb, truncates after exceeding
