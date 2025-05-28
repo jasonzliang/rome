@@ -66,20 +66,41 @@ The library includes a Streamlit-based visualization tool (`web_app.py`) that pr
 
 ### Prerequisites
 
-- Python 3.8+
+- Python 3.11+
 - OpenAI API key
 
 ### Installation
 
-1. Clone the repository
-2. Install dependencies:
+#### From Source (Development)
+
+1. Clone the repository:
    ```bash
-   pip install -r requirements.txt
+   git clone https://github.com/yourusername/rome.git
+   cd rome
    ```
-3. Set your OpenAI API key:
+
+2. Install in development mode:
    ```bash
-   export OPENAI_API_KEY=your_api_key_here
+   # Basic installation
+   pip install -e .
+
+   # With development tools
+   pip install -e .[dev]
    ```
+
+#### From PyPI (Coming Soon)
+
+```bash
+# When published to PyPI
+pip install rome
+```
+
+### Environment Setup
+
+Set your OpenAI API key:
+```bash
+export OPENAI_API_KEY=your_api_key_here
+```
 
 ### Configuration
 
@@ -125,7 +146,7 @@ results = agent.run_loop(max_iterations=10)
 Run the Streamlit app to visualize the agent's FSM and current state:
 
 ```bash
-streamlit run web_app.py
+streamlit run web_app/streamlit_app.py
 ```
 
 ## Advanced Features
@@ -166,9 +187,37 @@ The library provides an HTTP API for monitoring and interacting with the agent:
 
 - `GET /agent`: Get current agent state, context, and FSM information
 
+## Development
+
+### Running Tests
+
+```bash
+# Run all tests
+pytest
+
+# Run with coverage
+pytest --cov=rome
+
+# Run specific test file
+pytest test/test_single_agent.py
+```
+
+### Code Formatting
+
+```bash
+# Format code with Black
+black .
+
+# Type checking with MyPy
+mypy rome/
+
+# Linting with flake8
+flake8 rome/
+```
+
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions will be allowed once code is in a stable state.
 
 ## License
 
