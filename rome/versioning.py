@@ -111,9 +111,9 @@ class VersionManager:
         return metadata
 
     def _save_version_internal(self, file_path: str, content: str, versions_dir: str,
-                              changes: Optional[List[Dict[str, str]]] = None,
-                              explanation: Optional[str] = None,
-                              main_file_path: Optional[str] = None) -> int:
+                          changes: Optional[List[Dict[str, str]]] = None,
+                          explanation: Optional[str] = None,
+                          main_file_path: Optional[str] = None) -> int:
         """Internal method to save a versioned snapshot with incremental version numbers."""
         assert os.path.exists(versions_dir), f"File meta dir {versions_dir} does not exist"
 
@@ -137,8 +137,16 @@ class VersionManager:
             # Create new version
             version_number = self._get_next_version_number(index)
 
-            # Save version file
-            file_name = os.path.basename(file_path)
+            # FIX: Ensure we use the original file path for naming, not a meta directory path
+            # Strip any meta directory extension from the file_path to get the original file name
+            original_file_path = file_path
+            meta_ext_suffix = f".{META_DIR_EXT}"
+            if original_file_path.endswith(meta_ext_suffix):
+                original_file_path = original_file_path[:-len(meta_ext_suffix)]
+                self.logger.warning(f"Stripped meta extension from file_path: {file_path} -> {original_file_path}")
+
+            # Save version file using the clean original file name
+            file_name = os.path.basename(original_file_path)
             file_base, file_ext = os.path.splitext(file_name)
             version_file_name = f"{file_base}_v{version_number}{file_ext}"
             version_file_path = os.path.join(versions_dir, version_file_name)
@@ -146,7 +154,7 @@ class VersionManager:
             with open(version_file_path, 'w', encoding='utf-8') as f:
                 f.write(content)
 
-            # Update index
+            # Update index - use the original file_path parameter for metadata consistency
             metadata = self._create_version_metadata(
                 file_path, content_hash, version_number, changes, explanation, main_file_path
             )

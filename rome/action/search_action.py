@@ -1,14 +1,13 @@
 import glob
 import os
-import pprint
-import random  # Added for probability selection
+import random
 import sys
 import time
-import traceback
 from typing import Dict, Optional, Any, Union, List
 from .action import Action
 from ..logger import get_logger
-from ..config import LOG_DIR_NAME, check_attrs
+from ..config import LOG_DIR_NAME, SUMMARY_LENGTH, check_attrs
+from ..parsing import extract_all_definitions
 
 class SearchAction(Action):
     """Action to search the repository for code files using OpenAI selection"""
@@ -17,9 +16,8 @@ class SearchAction(Action):
         super().__init__(config)
         self.logger = get_logger()
 
-        # Check required config parameters are set properly
         check_attrs(self, ['max_files', 'file_types', 'exclude_dirs',
-            'exclude_types', 'selection_criteria', 'batch_size'])
+                          'exclude_types', 'selection_criteria', 'batch_size'])
 
         if LOG_DIR_NAME not in self.exclude_dirs:
             self.exclude_dirs.append(LOG_DIR_NAME)
@@ -30,73 +28,96 @@ class SearchAction(Action):
         excluded_dirs_str = ', '.join(self.exclude_dirs) if self.exclude_dirs else 'none'
 
         return (f"search repository for {file_types_str} files using multi-stage LLM selection: "
-                f"(1) scan all files and create overview with size/age/definitions, "
+                f"(1) scan all files and create overview with size/age/function definitions, "
                 f"(2) LLM prioritizes all files 1-5 based on {self.selection_criteria}, "
                 f"(3) process top files in batches of {self.batch_size} with full content for LLM to select best match "
                 f"(max files: {self.max_files}, excluding dirs: {excluded_dirs_str})")
+
+    def _truncate_text(self, text: str, max_length: int = SUMMARY_LENGTH) -> str:
+        """Truncate text to specified length with ellipsis if needed"""
+        return text[:max_length] + "..." if len(text) > max_length else text
+
+    def _get_file_stats(self, file_path: str) -> Dict[str, Any]:
+        """Get file statistics and content analysis"""
+        try:
+            stats = os.stat(file_path)
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+            all_definitions = extract_all_definitions(content)
+
+            return {
+                "path": file_path,
+                "content": content,
+                "size_kb": round(stats.st_size / 1024, 2),
+                "modified_age": round(time.time() - stats.st_mtime, 1),
+                "all_definitions": all_definitions,
+                "definition_count": len(all_definitions),
+                "function_count": len([d for d in all_definitions if d['type'] == 'function']),
+                "class_count": len([d for d in all_definitions if d['type'] == 'class']),
+            }
+        except Exception as e:
+            self.logger.info(f"Error reading {file_path}: {e}")
+            return None
+
+    def _create_definition_summary(self, definition: Dict) -> str:
+        """Create a concise summary of a function/class definition"""
+        summary = definition['signature']
+
+        if definition['docstring']:
+            first_line = definition['docstring'].split('\n')[0].strip()
+            if first_line:
+                summary += f" # {self._truncate_text(first_line)}"
+
+        if definition['type'] == 'class' and definition.get('methods'):
+            method_count = len(definition['methods'])
+            summary += f" ({method_count} methods)"
+
+        return summary
 
     def _create_global_overview(self, agent, files: List[str]) -> List[Dict]:
         """Create a high-level overview of all files in the repository"""
         self.logger.info(f"Creating global overview of {len(files)} files")
 
-        # Collect file data for overview
         file_overviews = []
-        current_time = time.time()
-
         for file_path in files:
-            try:
-                # Get file stats
-                stats = os.stat(file_path)
-                size_kb = stats.st_size / 1024
-                modified_age = current_time - stats.st_mtime  # Age in seconds
-
-                # Read functions/classes from file
-                definitions = []
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    # Extract function and class definitions
-                    for line in content.split('\n'):
-                        line = line.strip()
-                        if line.startswith('def ') or line.startswith('class '):
-                            definitions.append(line)
+            file_stats = self._get_file_stats(file_path)
+            if file_stats:
+                # Create definition summaries
+                definition_summaries = [
+                    self._create_definition_summary(defn)
+                    for defn in file_stats['all_definitions'][:10]
+                ]
 
                 file_overviews.append({
-                    "path": file_path,
-                    "size_kb": round(size_kb, 2),
-                    "modified_age": round(modified_age, 1),  # Age in seconds
-                    "definitions": definitions[:10]  # Limit to first 10 definitions
+                    **{k: v for k, v in file_stats.items() if k != 'content'},
+                    "definition_summaries": definition_summaries
                 })
 
-            except Exception as e:
-                self.logger.info(f"Error reading {file_path}: {e}")
-
-        # self.logger.info(f"Collected overview data for {len(file_overviews)} files")
         return file_overviews
 
-    def _prioritize_files(self, agent, file_overviews: List[Dict]) -> List[Dict]:
-        """Use LLM to prioritize all files at once based on size, age, and definitions"""
-        self.logger.info(f"Prioritizing all {len(file_overviews)} files at once")
+    def _create_prioritization_prompt(self, file_overviews: List[Dict]) -> str:
+        """Create prompt for file prioritization"""
+        prompt = f"""Return a JSON ARRAY of ALL {len(file_overviews)} files with priority scores.
 
-        # Create a clear and direct prompt
-        prompt = f"""Return a JSON ARRAY of ALL {len(file_overviews)} files with priority scores (1-5).
-
-Assign a priority score (1-5, 5 being highest) to each file based on:
-1. File age (older files are more stable and likely more important)
-2. File size (smaller files are more focused and easier to analyze)
-3. Function/class definitions that match your role and selection criteria
+Assign a priority score (1-5, 5 being highest) using the following criteria in descending importance:
+1. File modification age (older files get higher priority)
+2. File size in KB (smaller files get higher priority)
+3. Function definitions that match your role and selection criteria get higher priority
 
 Files to prioritize:
 """
-        # Add file information to the prompt
+
         for j, file_info in enumerate(file_overviews):
             prompt += f"\n--- File {j+1}: {file_info['path']} ---\n"
             prompt += f"Size: {file_info['size_kb']} KB\n"
             prompt += f"Last modified: {file_info['modified_age']} seconds ago\n"
+            prompt += f"Total definitions: {file_info['definition_count']} ({file_info['function_count']} functions, {file_info['class_count']} classes)\n"
 
-            if file_info['definitions']:
-                prompt += "Definitions:\n"
-                for defn in file_info['definitions']:
-                    prompt += f"  {defn}\n"
+            if file_info['definition_summaries']:
+                prompt += "Code definitions:\n"
+                for def_summary in file_info['definition_summaries']:
+                    prompt += f"  {def_summary}\n"
             else:
                 prompt += "No function/class definitions found\n"
 
@@ -118,52 +139,14 @@ Return a JSON ARRAY with ALL {len(file_overviews)} files like this:
 
 IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending with ], not a single object.
 """
+        return prompt
 
-        # Get priorities from LLM without specifying response_format
-        response = agent.chat_completion(
-            prompt=prompt,
-            system_message=agent.role
-        )
-
-        # Use parse_json_response to extract the result
-        result = agent.parse_json_response(response)
-
-        # Initialize prioritized_files list
-        prioritized_files = []
-
-        # Handle the result based on its type
-        if isinstance(result, list):
-            # Result is a list - use it directly
-            self.logger.info(f"Received array with {len(result)} files")
-            prioritized_files = result
-        elif isinstance(result, dict) and "file_path" in result:
-            # Result is a single object - create array with all files
-            self.logger.info("Received single object instead of array, creating array manually")
-            prioritized_files.append(result)
-
-            # Add all other files with lower priority
-            for file_info in file_overviews:
-                if file_info["path"] != result["file_path"]:
-                    prioritized_files.append({
-                        "file_path": file_info["path"],
-                        "priority": 1,  # Default priority for files not included
-                        "reason": "Added by default (not in LLM response)"
-                    })
-        else:
-            # Invalid response - create default priorities for all files
-            self.logger.error("Invalid response format, using default priorities for all files")
-            for file_info in file_overviews:
-                prioritized_files.append({
-                    "file_path": file_info["path"],
-                    "priority": 1,
-                    "reason": "Default priority (LLM response format error)"
-                })
-
-        # Ensure all files from file_overviews are included
+    def _ensure_all_files_prioritized(self, prioritized_files: List[Dict], file_overviews: List[Dict]) -> List[Dict]:
+        """Ensure all files from overviews are included in prioritized list with fallback priorities"""
         all_paths = {file_info["path"] for file_info in file_overviews}
         prioritized_paths = {file_info.get("file_path") for file_info in prioritized_files}
 
-        # Add any missing files
+        # Add missing files with default priority
         for path in all_paths - prioritized_paths:
             self.logger.info(f"File missing from prioritized list: {path}, adding with default priority")
             prioritized_files.append({
@@ -172,11 +155,55 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
                 "reason": "Added by default (missing from LLM response)"
             })
 
-        # Sort by priority (higher first)
-        prioritized_files.sort(key=lambda x: x.get("priority", 0), reverse=True)
-        self.logger.info(f"Prioritized {len(prioritized_files)} files")
+        return sorted(prioritized_files, key=lambda x: x.get("priority", 0), reverse=True)
 
-        return prioritized_files
+    def _prioritize_files(self, agent, file_overviews: List[Dict]) -> List[Dict]:
+        """Use LLM to prioritize all files at once based on size, age, and function definitions"""
+        self.logger.info(f"Prioritizing all {len(file_overviews)} files at once")
+
+        prompt = self._create_prioritization_prompt(file_overviews)
+        response = agent.chat_completion(prompt=prompt, system_message=agent.role)
+        result = agent.parse_json_response(response)
+
+        # Handle different response formats
+        if isinstance(result, list):
+            prioritized_files = result
+        elif isinstance(result, dict) and "file_path" in result:
+            # Single object response - create list and add remaining files
+            prioritized_files = [result]
+            for file_info in file_overviews:
+                if file_info["path"] != result["file_path"]:
+                    prioritized_files.append({
+                        "file_path": file_info["path"],
+                        "priority": 1,
+                        "reason": "Added by default (not in LLM response)"
+                    })
+        else:
+            # Invalid response - create default priorities
+            self.logger.error("Invalid response format, using default priorities for all files")
+            prioritized_files = [{
+                "file_path": file_info["path"],
+                "priority": 1,
+                "reason": "Default priority (LLM response format error)"
+            } for file_info in file_overviews]
+
+        return self._ensure_all_files_prioritized(prioritized_files, file_overviews)
+
+    def _apply_filters(self, agent, files: List[str]) -> List[str]:
+        """Apply all file filters in sequence"""
+        filters = [
+            ("excluded directories", self._filter_excluded_dirs),
+            ("excluded types", self._filter_excluded_types),
+            ("flagged files", lambda f: self._filter_flagged_files(agent, f)),
+            ("max limit", self._filter_max_limit)
+        ]
+
+        filtered_files = files
+        for filter_name, filter_func in filters:
+            filtered_files = filter_func(filtered_files)
+            self.logger.info(f"Found {len(filtered_files)} files after {filter_name} filtering")
+
+        return filtered_files
 
     def _filter_excluded_dirs(self, files: List[str]) -> List[str]:
         """Filter out files from excluded directories"""
@@ -185,19 +212,15 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
 
         filtered_files = []
         for file_path in files:
-            # Check if file is in an excluded directory
-            exclude = False
-            for excluded_dir in self.exclude_dirs:
-                # Normalize path separators for cross-platform compatibility
-                normalized_path = file_path.replace('\\', '/')
-                normalized_excluded = excluded_dir.replace('\\', '/')
-
-                if f'/{normalized_excluded}/' in normalized_path or \
-                   normalized_path.startswith(f'{normalized_excluded}/'):
-                    exclude = True
-                    break
+            normalized_path = file_path.replace('\\', '/')
+            exclude = any(
+                f'/{excluded_dir.replace("\\", "/")}/' in normalized_path or
+                normalized_path.startswith(f'{excluded_dir.replace("\\", "/")}/')
+                for excluded_dir in self.exclude_dirs
+            )
             if not exclude:
                 filtered_files.append(file_path)
+
         return filtered_files
 
     def _filter_excluded_types(self, files: List[str]) -> List[str]:
@@ -205,18 +228,7 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
         if not self.exclude_types:
             return files
 
-        filtered_files = []
-        for file_path in files:
-            # Get file extension
-            exclude = False
-            for exclude_type in self.exclude_types:
-                if file_path.endswith(exclude_type):
-                    exclude = True; break
-
-            # Check if file type is excluded
-            if not exclude:
-                filtered_files.append(file_path)
-        return filtered_files
+        return [f for f in files if not any(f.endswith(exclude_type) for exclude_type in self.exclude_types)]
 
     def _filter_flagged_files(self, agent, files: List[str]) -> List[str]:
         """Filter out files that are currently active or already finished"""
@@ -225,9 +237,7 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
 
         filtered_files = []
         for file_path in files:
-            # Check if file is currently being worked on by another agent
             is_active = agent.version_manager.check_active(file_path)
-            # Check if file has already been marked as finished by this agent
             is_finished = agent.version_manager.check_finished(agent, file_path)
 
             if is_active:
@@ -236,145 +246,75 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
                 self.logger.debug(f"Filtering out finished file: {file_path}")
             else:
                 filtered_files.append(file_path)
+
         return filtered_files
 
     def _filter_max_limit(self, files: List[str]) -> List[str]:
         """Filter out files if they exceed max file limit"""
         if len(files) > self.max_files:
             random.shuffle(files)
-            files = files[:self.max_files]
+            return files[:self.max_files]
         return files
 
-    def _process_file_batches(self, agent, file_paths: List[str], prioritized_files: List[Dict]) -> Dict:
-        """
-        Process batches of files to find the most relevant match
+    def _create_batch_overview(self, batch_data: List[Dict]) -> str:
+        """Create overview section for batch selection prompt"""
+        overview = "File list:\n"
+        for i, file_info in enumerate(batch_data):
+            filename = os.path.basename(file_info['path'])
+            def_count = len(file_info['all_definitions'])
+            func_count = file_info['function_count']
+            class_count = file_info['class_count']
+            overview += (f"- File {i+1}: {filename} (Priority: {file_info['priority']}/5, "
+                        f"{def_count} total: {func_count} functions, {class_count} classes) "
+                        f"- {file_info['priority_reason']}\n")
+        return overview
 
-        Args:
-            agent: The agent instance
-            file_paths: List of file paths to process
-            prioritized_files: List of prioritized files with metadata
+    def _create_definitions_overview(self, batch_data: List[Dict]) -> str:
+        """Create definitions overview section for batch selection prompt"""
+        overview = "\nCode definitions overview:"
 
-        Returns:
-            Dictionary with selected file or None
-        """
-        self.logger.info("Processing file batches to find relevant match")
-        current_batch = 0
-        selected_file = None
+        for i, file_info in enumerate(batch_data):
+            overview += f"\n\n--- File {i+1}: {file_info['path']} ---"
 
-        while current_batch * self.batch_size < len(file_paths) and selected_file is None:
-            start_idx = current_batch * self.batch_size
-            end_idx = min((current_batch + 1) * self.batch_size, len(file_paths))
-            batch_paths = file_paths[start_idx:end_idx]
-
-            self.logger.info(f"Processing batch {current_batch+1}: files {start_idx+1}-{end_idx}")
-
-            # Load full content for current batch
-            current_batch_data = []
-            for file_path in batch_paths:
-                try:
-                    with open(file_path, 'r', encoding='utf-8') as f:
-                        content = f.read()
-
-                        # Find the priority info for this file
-                        priority_info = next((f for f in prioritized_files if f["file_path"] == file_path), None)
-                        priority = priority_info.get("priority", 1) if priority_info else 1
-                        reason = priority_info.get("reason", "No reason provided") if priority_info else "No reason provided"
-
-                        current_batch_data.append({
-                            'path': file_path,
-                            'content': content,
-                            'priority': priority,
-                            'priority_reason': reason
-                        })
-                except Exception as e:
-                    self.logger.info(f"Error reading {file_path}: {e}")
-
-            if not current_batch_data:
-                self.logger.info(f"No readable files in batch {current_batch+1}")
-                current_batch += 1
+            if not file_info['all_definitions']:
+                overview += "\nNo function or class definitions found"
                 continue
 
-            # Create a more concise selection prompt
-            prompt = self._create_selection_prompt(current_batch_data, current_batch,
-                                                 (len(file_paths) + self.batch_size - 1) // self.batch_size)
+            functions = [d for d in file_info['all_definitions'] if d['type'] == 'function']
+            classes = [d for d in file_info['all_definitions'] if d['type'] == 'class']
 
-            # Request LLM to select a file
-            self.logger.info("Querying OpenAI for file selection")
-            response = agent.chat_completion(
-                prompt=prompt,
-                system_message=agent.role,
-                response_format={"type": "json_object"}
-            )
+            for def_type, definitions in [("Functions", functions), ("Classes", classes)]:
+                if definitions:
+                    overview += f"\n{def_type} ({len(definitions)}):"
+                    for defn in definitions[:3]:  # Limit to first 3
+                        overview += f"\n  {defn['signature']}"
+                        if defn['docstring']:
+                            first_line = defn['docstring'].split('\n')[0].strip()
+                            if first_line:
+                                overview += f" # {self._truncate_text(first_line)}"
 
-            # Parse OpenAI response
-            result = agent.parse_json_response(response)
+                        if defn['type'] == 'class' and defn.get('methods'):
+                            methods = defn['methods'][:5]
+                            overview += f" (methods: {', '.join(methods)}{'...' if len(defn['methods']) > 5 else ''})"
 
-            # Check for parsing errors
-            if not result or "error" in result:
-                self.logger.error(f"Error parsing OpenAI response: {result.get('error', 'Unknown error')}")
-                current_batch += 1
-                continue
+                    if len(definitions) > 3:
+                        overview += f"\n  ... and {len(definitions) - 3} more {def_type.lower()}"
 
-            # Process OpenAI response
-            selected_file_info = result.get('selected_file')
-
-            if selected_file_info:
-                file_number = selected_file_info.get('file_number')
-                if file_number and 1 <= file_number <= len(current_batch_data):
-                    file_data = current_batch_data[file_number - 1]
-                    reason = selected_file_info.get('reason', 'Selected by LLM')
-
-                    selected_file = {
-                        'path': file_data['path'],
-                        'content': file_data['content'],
-                        'reason': reason,
-                        'priority': file_data['priority']
-                    }
-
-                    self.logger.info(f"Selected file: {file_data['path']} - {reason}")
-                else:
-                    self.logger.error(f"Invalid file_number in response: {file_number}")
-
-            # If perfect match found or explicitly directed to stop, break out of loop
-            if selected_file:
-                self.logger.info("Perfect match found, stopping search")
-                break
-
-            # Move to next batch
-            current_batch += 1
-
-        return selected_file
+        return overview
 
     def _create_selection_prompt(self, batch_data: List[Dict], current_batch: int, total_batches: int) -> str:
-        """
-        Create a concise prompt for file selection
-
-        Args:
-            batch_data: List of file data for current batch
-            current_batch: Current batch number (1-indexed)
-            total_batches: Total number of batches
-
-        Returns:
-            Prompt string for LLM
-        """
-        # File list summary at the top
+        """Create a concise prompt for file selection"""
         prompt = f"""Select the most relevant file based on your role and selection criteria: {self.selection_criteria}
 
 Current batch: {current_batch+1}/{total_batches}
-File list:
-"""
-        # Add short file summaries
-        for i, file_info in enumerate(batch_data):
-            filename = os.path.basename(file_info['path'])
-            prompt += f"- File {i+1}: {filename} (Priority: {file_info['priority']}/5) - {file_info['priority_reason']}\n"
+{self._create_batch_overview(batch_data)}
+{self._create_definitions_overview(batch_data)}
 
-        # Add full file contents
-        prompt += "\nDetailed file contents:"
-        for i, file_info in enumerate(batch_data):
-            prompt += f"\n\n--- File {i+1}: {file_info['path']} ---\n"
-            prompt += file_info['content']
+Detailed file contents:"""
 
-        # Add expected response format
+        for i, file_info in enumerate(batch_data):
+            prompt += f"\n\n--- File {i+1}: {file_info['path']} ---\n{file_info['content']}"
+
         prompt += """
 
 Respond with a JSON object:
@@ -390,44 +330,97 @@ Respond with a JSON object:
 """
         return prompt
 
-    # def _find_oldest_file(self, file_overviews: List[Dict]) -> Dict:
-    #     """Find the oldest file based on modification age"""
-    #     if not file_overviews:
-    #         return None
+    def _prepare_batch_data(self, file_paths: List[str], prioritized_files: List[Dict]) -> List[Dict]:
+        """Prepare batch data with file content and metadata"""
+        batch_data = []
 
-    #     oldest_file = max(file_overviews, key=lambda x: x.get("modified_age", 0))
-    #     self.logger.info(f"Oldest file found: {oldest_file['path']} (age: {oldest_file['modified_age']} seconds)")
+        for file_path in file_paths:
+            file_stats = self._get_file_stats(file_path)
+            if not file_stats:
+                continue
 
-    #     # Get file content
-    #     try:
-    #         with open(oldest_file['path'], 'r', encoding='utf-8') as f:
-    #             content = f.read()
+            # Find priority info for this file
+            priority_info = next((f for f in prioritized_files if f["file_path"] == file_path), None)
+            priority = priority_info.get("priority", 1) if priority_info else 1
+            reason = priority_info.get("reason", "No reason provided") if priority_info else "No reason provided"
 
-    #         return {
-    #             'path': oldest_file['path'],
-    #             'content': content,
-    #             'reason': "Selected as oldest file based on epilson_oldest probability",
-    #             'priority': 5  # Give it highest priority since it was selected by age
-    #         }
-    #     except Exception as e:
-    #         self.logger.error(f"Error reading oldest file {oldest_file['path']}: {e}")
-    #         return None
+            batch_data.append({
+                **file_stats,
+                'priority': priority,
+                'priority_reason': reason
+            })
 
-    def execute(self, agent, **kwargs) -> bool:
-        self.logger.info("Starting SearchAction execution")
+        return batch_data
 
-        # Ensure agent has an OpenAI handler (either openai_handler or self.openai_handler)
-        has_openai_handler = hasattr(agent, 'openai_handler') and agent.openai_handler is not None
+    def _process_file_batches(self, agent, file_paths: List[str], prioritized_files: List[Dict]) -> Dict:
+        """Process batches of files to find the most relevant match"""
+        self.logger.info("Processing file batches to find relevant match")
 
-        if not has_openai_handler:
-            error_msg = "Agent must have an openai_handler attribute initialized"
-            self.logger.error(error_msg)
-            raise ValueError(error_msg)
+        current_batch = 0
+        total_batches = (len(file_paths) + self.batch_size - 1) // self.batch_size
 
-        # Get the repo root path from agent
+        while current_batch * self.batch_size < len(file_paths):
+            start_idx = current_batch * self.batch_size
+            end_idx = min((current_batch + 1) * self.batch_size, len(file_paths))
+            batch_paths = file_paths[start_idx:end_idx]
+
+            self.logger.info(f"Processing batch {current_batch+1}: files {start_idx+1}-{end_idx}")
+
+            # Prepare batch data
+            current_batch_data = self._prepare_batch_data(batch_paths, prioritized_files)
+
+            if not current_batch_data:
+                self.logger.info(f"No readable files in batch {current_batch+1}")
+                current_batch += 1
+                continue
+
+            # Create selection prompt and get LLM response
+            prompt = self._create_selection_prompt(current_batch_data, current_batch, total_batches)
+
+            self.logger.info("Querying OpenAI for file selection")
+            response = agent.chat_completion(
+                prompt=prompt,
+                system_message=agent.role,
+                response_format={"type": "json_object"}
+            )
+
+            # Parse and process response
+            result = agent.parse_json_response(response)
+
+            if not result or "error" in result:
+                self.logger.error(f"Error parsing OpenAI response: {result.get('error', 'Unknown error')}")
+                current_batch += 1
+                continue
+
+            selected_file_info = result.get('selected_file')
+
+            if selected_file_info:
+                file_number = selected_file_info.get('file_number')
+                if file_number and 1 <= file_number <= len(current_batch_data):
+                    file_data = current_batch_data[file_number - 1]
+                    reason = selected_file_info.get('reason', 'Selected by LLM')
+
+                    selected_file = {
+                        'path': file_data['path'],
+                        'content': file_data['content'],
+                        'reason': reason,
+                        'priority': file_data['priority'],
+                        'all_definitions': file_data['all_definitions']
+                    }
+
+                    self.logger.info(f"Selected file: {file_data['path']} - {reason}")
+                    return selected_file
+                else:
+                    self.logger.error(f"Invalid file_number in response: {file_number}")
+
+            current_batch += 1
+
+        return None
+
+    def _collect_all_files(self, agent) -> List[str]:
+        """Collect all files matching the specified file types"""
         all_files = []
 
-        # Handle multiple file types
         for file_type in self.file_types:
             # Ensure file_type has a leading dot if needed
             if not file_type.startswith('.'):
@@ -436,61 +429,42 @@ Respond with a JSON object:
             search_path = os.path.join(agent.repository, f'**/*{file_type}')
             self.logger.info(f"Searching for files in: {search_path}")
 
-            # Find all files matching the pattern
             files = glob.glob(search_path, recursive=True)
             self.logger.info(f"Found {len(files)} {file_type} files")
             all_files.extend(files)
 
+        return all_files
+
+    def execute(self, agent, **kwargs) -> bool:
+        """Execute the search action"""
+        self.logger.info("Starting SearchAction execution")
+
+        # Validate OpenAI handler
+        if not (hasattr(agent, 'openai_handler') and agent.openai_handler is not None):
+            error_msg = "Agent must have an openai_handler attribute initialized"
+            self.logger.error(error_msg)
+            raise ValueError(error_msg)
+
+        # Collect and filter files
+        all_files = self._collect_all_files(agent)
         self.logger.info(f"Found {len(all_files)} total files before filtering")
 
-        # Filter out files from excluded directories
-        filtered_files = self._filter_excluded_dirs(all_files)
-        self.logger.info(f"Found {len(filtered_files)} files after directory filtering")
+        filtered_files = self._apply_filters(agent, all_files)
 
-        # Filter out files with excluded types
-        filtered_files = self._filter_excluded_types(filtered_files)
-        self.logger.info(f"Found {len(filtered_files)} files after type filtering")
-
-        # Filter out files that are currently active or already finished
-        filtered_files = self._filter_flagged_files(agent, filtered_files)
-        self.logger.info(f"Found {len(filtered_files)} files after flagged file filtering")
-
-        # Filter out files if they exceed max limit
-        filtered_files = self._filter_max_limit(filtered_files)
-        self.logger.info(f"Found {len(filtered_files)} files after max-limit filtering")
-
-        if len(filtered_files) == 0:
+        if not filtered_files:
             self.logger.error("No files left after filtering")
             return False
 
-        # Step 1: Create global overview of all files
+        # Create overview, prioritize, and process batches
         file_overviews = self._create_global_overview(agent, filtered_files)
-
-        # Check if we should select the oldest file based on probability
-        # if self.epilson_oldest > 0 and random.random() < self.epilson_oldest:
-        #     self.logger.info(f"Using epilson_oldest probability ({self.epilson_oldest}) to select oldest file")
-        #     oldest_file = self._find_oldest_file(file_overviews)
-
-        #     if oldest_file:
-        #         agent.context['selected_file'] = oldest_file
-        #         self.logger.info(f"Selected oldest file: {oldest_file['path']}")
-        #         return True
-        #     else:
-        #         # If oldest file wasn't selected, continue with normal process
-        #         self.logger.error("Failed to read oldest file, continuing with normal selection process")
-
-        # Step 2: Prioritize files based on overview data
         prioritized_files = self._prioritize_files(agent, file_overviews)
 
-        # Step 3: Process batches of files in priority order for detailed review
         file_paths = [file_info["file_path"] for file_info in prioritized_files]
         selected_file = self._process_file_batches(agent, file_paths, prioritized_files)
 
-        # Save original file to meta directory
-        agent.version_manager.save_original(selected_file['path'], selected_file['content'])
-
-        # Add selected file to agent context
         if selected_file:
+            # Save original file and update agent context
+            agent.version_manager.save_original(selected_file['path'], selected_file['content'])
             agent.context['selected_file'] = selected_file
             agent.version_manager.flag_active(agent, selected_file['path'])
             self.logger.info(f"Search completed with selected file: {selected_file['path']}")

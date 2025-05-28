@@ -18,6 +18,8 @@ from .fsm import FSM, FSM_FACTORY
 from .history import AgentHistory
 # Import the VersionManager class
 from .versioning import VersionManager
+# Parsing utility functions
+from .parsing import parse_python_response, parse_json_response
 
 
 class Agent:
@@ -221,14 +223,14 @@ class Agent:
     # Utility methods
     def parse_json_response(self, response: str) -> Dict:
         """Parse JSON response using the handler"""
-        result = self.openai_handler.parse_json_response(response)
+        result = parse_json_response(response)
         if result is None:
             self.logger.error("Failed to parse JSON object from response")
         return result
 
     def parse_python_response(self, response: str) -> str:
         """Parse Python code from response using the handler"""
-        result = self.openai_handler.parse_python_response(response)
+        result = parse_python_response(response)
         if result is None:
             self.logger.error("Failed to parse Python code from response")
         return result
