@@ -21,13 +21,6 @@ class SearchAction(Action):
         check_attrs(self, ['max_files', 'file_types', 'exclude_dirs',
             'exclude_types', 'selection_criteria', 'batch_size'])
 
-        # self.logger.assert_true(len(self.file_types) > 0,
-        #     f"Invalid value for file types: {self.file_types}")
-        # self.logger.assert_true(self.max_files > 0,
-        #     f"Invalid value for max files: {self.max_files}")
-        # self.logger.assert_true(self.batch_size > 0,
-        #     f"Invalid value for batch size: {self.batch_size}")
-
         if LOG_DIR_NAME not in self.exclude_dirs:
             self.exclude_dirs.append(LOG_DIR_NAME)
 
@@ -466,6 +459,10 @@ Respond with a JSON object:
         filtered_files = self._filter_max_limit(filtered_files)
         self.logger.info(f"Found {len(filtered_files)} files after max-limit filtering")
 
+        if len(filtered_files) == 0:
+            self.logger.error("No files left after filtering")
+            return False
+
         # Step 1: Create global overview of all files
         file_overviews = self._create_global_overview(agent, filtered_files)
 
@@ -496,9 +493,8 @@ Respond with a JSON object:
         if selected_file:
             agent.context['selected_file'] = selected_file
             agent.version_manager.flag_active(agent, selected_file['path'])
-            self.logger.info(f"Search completed. Selected file: {selected_file['path']}")
+            self.logger.info(f"Search completed with selected file: {selected_file['path']}")
             return True
         else:
-            agent.context['selected_file'] = None
-            self.logger.info("Search completed. No file was selected.")
+            self.logger.error("Search completed but no file was selected by agent.")
             return False

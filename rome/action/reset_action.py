@@ -152,4 +152,5 @@ Set work_complete to true ONLY if:
             self.logger.info(f"Flagged {file_path} as finished based on LLM analysis")
             return True
         else:
+            self.logger.error(f"Flagged {file_path} as incomplete based on LLM analysis")
             return False

@@ -46,7 +46,7 @@ DEFAULT_CONFIG = {
         "repository": "./", # Code repository base directory
         "fsm_type": "minimal", # Which FSM to load (see fsm.py)
         "agent_api": True, # Launch an REST API server for agent's internal state
-        "history_context_len": 20, # Length of history to use when selecting action
+        "history_context_len": 15, # Length of history to use when selecting action
         "patience": 3, # If same state/action chosen repeatedly, prompt to choose different action
     },
 

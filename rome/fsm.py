@@ -362,8 +362,10 @@ def create_simple_fsm(config):
     code_loaded_state = fsm.add_state(CodeLoadedState(config.get('CodeLoadedState', {})))
     code_edited_state = fsm.add_state(CodeEditedState(config.get('CodeEditedState', {})))
     test_edited_state = fsm.add_state(TestEditedState(config.get('TestEditedState', {})))
-    code_executed_pass_state = fsm.add_state(CodeExecutedPassState(config.get('CodeExecutedPassState', {})))
-    code_executed_fail_state = fsm.add_state(CodeExecutedFailState(config.get('CodeExecutedFailState', {})))
+    code_executed_pass_state = fsm.add_state(
+        CodeExecutedPassState(config.get('CodeExecutedPassState', {})))
+    code_executed_fail_state = fsm.add_state(
+        CodeExecutedFailState(config.get('CodeExecutedFailState', {})))
 
     # Create actions with their respective configurations
     search_action = SearchAction(config.get('SearchAction', {}))

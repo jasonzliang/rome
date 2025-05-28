@@ -42,6 +42,7 @@ def truncate_text(text: str, max_length: int = SUMMARY_LENGTH) -> str:
     """Truncate text with ellipsis if it exceeds max_length"""
     return text[:max_length] + '...' if len(text) > max_length else text
 
+
 class State(ABC):
     """Abstract state"""
     def __init__(self,
