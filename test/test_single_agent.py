@@ -13,7 +13,7 @@ from rome.logger import get_logger
 
 # Sample HumanEval problems to use for testing
 HUMAN_EVAL_SAMPLES = {
-    "HumanEval_0.py": """
+    "HumanEval_0": """
 def has_close_elements(numbers, threshold):
     \"\"\" Check if in given list of numbers, are any two numbers closer to each other than
     given threshold.
@@ -24,7 +24,7 @@ def has_close_elements(numbers, threshold):
     \"\"\"
     pass
 """,
-    "HumanEval_1.py": """
+    "HumanEval_1": """
 def separate_paren_groups(paren_string):
     \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to
     separate those group into separate strings and return the list of those.
@@ -35,7 +35,7 @@ def separate_paren_groups(paren_string):
     \"\"\"
     pass
 """,
-    "HumanEval_2.py": """
+    "HumanEval_2": """
 def truncate_number(number):
     \"\"\" Given a positive floating point number, it can be decomposed into
     and integer part (largest integer smaller than given number) and decimals
@@ -50,7 +50,7 @@ def truncate_number(number):
 }
 
 def setup_test_dir():
-    """Create a test directory and populate it with HumanEval samples"""
+    """Create a test directory and populate it with HumanEval samples in separate directories"""
     # Create results directory if it doesn't exist
     results_dir = Path("result")
     results_dir.mkdir(exist_ok=True)
@@ -61,9 +61,14 @@ def setup_test_dir():
         shutil.rmtree(test_dir)
     test_dir.mkdir()
 
-    # Write the HumanEval sample files
-    for filename, content in HUMAN_EVAL_SAMPLES.items():
-        with open(test_dir / filename, "w") as f:
+    # Create separate directories for each HumanEval problem
+    for problem_name, content in HUMAN_EVAL_SAMPLES.items():
+        # Create directory for this problem (e.g., HumanEval_0, HumanEval_1, etc.)
+        problem_dir = test_dir / problem_name
+        problem_dir.mkdir(exist_ok=True)
+
+        # Write the code to 0.py in that directory
+        with open(problem_dir / f"{problem_name}.py", "w") as f:
             f.write(content)
 
     return test_dir

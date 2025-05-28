@@ -179,7 +179,7 @@ class FSM:
 }"""
         )
 
-        prompt_parts.append(f"Choose the most appropriate action using your role as a guide. If the action chosen in current state is getting repeated {agent.patience} times or more in recent history, try selecting alternative actions to avoid getting stuck in cycles. Diversity in action selection often leads to better outcomes.")
+        prompt_parts.append(f"IMPORTANT:\nChoose the most appropriate action using your role as a guide. If the action chosen in current state is getting repeated {agent.patience} times or more in recent history, try selecting alternative actions to avoid getting stuck in cycles. Diversity in action selection often leads to better outcomes. Please mention in reasoning if avoiding getting stuck in cycles influenced your action selection.")
 
         return "\n\n".join(prompt_parts)
 

@@ -8,6 +8,9 @@ from .logger import get_logger
 
 # How long to display long strings for console output
 SUMMARY_LENGTH = 100
+LONG_SUMMARY_LEN = 200
+LONGER_SUMMARY_LEN = 400
+LONGEST_SUMMARY_LEN = 800
 
 # Meta directory for file specific information
 META_DIR_EXT = 'rome'
