@@ -6,6 +6,7 @@ import yaml
 from typing import Dict, Any
 from .logger import get_logger
 
+######## These constants are not intended to be user modifiable ########
 # Default hash function to use for check file versions and AST cache
 DEFAULT_HASH_FUNC = "xxh128"
 
@@ -20,6 +21,7 @@ META_DIR_EXT = 'rome'
 
 # Default logging base directory name for agents
 LOG_DIR_NAME = "__rome__"
+######## These constants are not intended to be user modifiable ########
 
 # Define the default configuration structure as a dictionary
 DEFAULT_CONFIG = {
