@@ -13,7 +13,7 @@ from .logger import get_logger
 
 
 class VersionManager:
-    """Manages file versioning and analysis for the agent"""
+    """Manages code/test file activity, ownership, and versioning for the agent"""
 
     def __init__(self, config: Dict = None):
         self.config = config or {}
@@ -341,19 +341,6 @@ Your analysis:
 
         return True
 
-    def get_active_files(self) -> Set[str]:
-        """Get all files currently active for this agent"""
-        return self.active_files.copy()
-
-    def cleanup_active_files(self, agent) -> None:
-        """Clear all active files (useful for shutdown)"""
-        for file_path in self.active_files.copy():
-            try:
-                self.unflag_active(agent, file_path)
-            except Exception as e:
-                self.logger.warning(f"Failed to cleanup active file {file_path}: {e}")
-        self.active_files.clear()
-
     def _add_active_file(self, file_path: str) -> None:
         """Add a file to the active files set"""
         self.active_files.add(os.path.abspath(file_path))
@@ -370,18 +357,9 @@ Your analysis:
         """Check if agent has any active files"""
         return len(self.active_files) > 0
 
-    def get_active_files(self) -> Set[str]:
+    def _get_active_files(self) -> Set[str]:
         """Get all files currently active for this agent"""
         return self.active_files.copy()
-
-    def cleanup_active_files(self, agent) -> None:
-        """Clear all active files (useful for shutdown)"""
-        for file_path in self.active_files.copy():
-            try:
-                self.unflag_active(agent, file_path)
-            except Exception as e:
-                self.logger.debug(f"Failed to cleanup active file {file_path}: {e}")
-        self.active_files.clear()
 
     def check_active(self, file_path: str, ignore_self: bool = True) -> bool:
         """Check if there is an active agent working on the given file."""
@@ -417,12 +395,12 @@ Your analysis:
 
             return True
 
-    def flag_active(self, agent, file_path: str, allow_multiple: bool = False) -> bool:
+    def flag_active(self, agent, file_path: str) -> bool:
         """Flag a file as being actively worked on by the given agent."""
 
         # Check if agent already has active files (unless multiple allowed)
-        if not allow_multiple and self._has_active_files():
-            existing_files = list(self.get_active_files())
+        if self._has_active_files():
+            existing_files = list(self._get_active_files())
             raise RuntimeError(
                 f"Agent {agent.get_id()} already has active file(s): {existing_files}. "
                 f"Only one file can be active per agent."
@@ -537,10 +515,346 @@ Your analysis:
             self._save_json(finished_file_path, finished_data)
             self.logger.debug(f"Flagged {file_path} as finished by agent {agent.get_id()}")
 
-    def shutdown(self):
-        """Clean up resources before termination"""
-        self.logger.info("Cleaning up agent resources")
-        self.version_manager.cleanup_active_files(self)  # Clean up active files
-        if self.agent_api:
-            self.agent_api.shutdown()
+    def _validate_index_json(self, index_path: str, main_file_path: str) -> None:
+        """Validate the structure and content of index.json file."""
+        index_data = self._load_json_safely(index_path)
+        if not index_data:
+            raise ValueError(f"Index JSON file is empty or corrupted: {index_path}")
 
+        # Check required structure
+        if 'versions' not in index_data:
+            raise ValueError(f"Index JSON missing 'versions' field: {index_path}")
+
+        if not isinstance(index_data['versions'], list):
+            raise ValueError(f"Index JSON 'versions' field must be a list: {index_path}")
+
+        # Validate each version entry
+        for i, version in enumerate(index_data['versions']):
+            if not isinstance(version, dict):
+                raise ValueError(f"Index JSON version {i} must be a dict: {index_path}")
+
+            required_version_fields = ['version', 'file_path', 'timestamp', 'hash', 'changes', 'explanation']
+            for field in required_version_fields:
+                if field not in version:
+                    raise ValueError(f"Index JSON version {i} missing field '{field}': {index_path}")
+
+            # Validate version number
+            if not isinstance(version['version'], int) or version['version'] <= 0:
+                raise ValueError(f"Index JSON version {i} has invalid version number: {version['version']}")
+
+            # Validate file path
+            if os.path.abspath(version['file_path']) != os.path.abspath(main_file_path):
+                raise ValueError(
+                    f"Index JSON version {i} file_path mismatch. Expected: {main_file_path}, Found: {version['file_path']}"
+                )
+
+            # Validate timestamp
+            try:
+                datetime.datetime.fromisoformat(version['timestamp'])
+            except ValueError as e:
+                raise ValueError(f"Index JSON version {i} invalid timestamp: {version['timestamp']} - {e}")
+
+            # Validate hash format (should be SHA256)
+            if not isinstance(version['hash'], str) or len(version['hash']) != 64:
+                raise ValueError(f"Index JSON version {i} invalid hash format: {version['hash']}")
+
+            # Validate changes is a list
+            if not isinstance(version['changes'], list):
+                raise ValueError(f"Index JSON version {i} 'changes' must be a list: {index_path}")
+
+            # Validate explanation is a string
+            if not isinstance(version['explanation'], str):
+                raise ValueError(f"Index JSON version {i} 'explanation' must be a string: {index_path}")
+
+    def _validate_analysis_json(self, analysis_path: str, main_file_path: str) -> None:
+        """Validate the structure and content of code_analysis.json file."""
+        analysis_data = self._load_json_safely(analysis_path)
+        if not analysis_data:
+            raise ValueError(f"Analysis JSON file is empty or corrupted: {analysis_path}")
+
+        required_analysis_fields = ['timestamp', 'file_path', 'analysis']
+        for field in required_analysis_fields:
+            if field not in analysis_data:
+                raise ValueError(f"Analysis JSON missing required field '{field}': {analysis_path}")
+
+        # Validate timestamp
+        try:
+            datetime.datetime.fromisoformat(analysis_data['timestamp'])
+        except ValueError as e:
+            raise ValueError(f"Analysis JSON invalid timestamp: {analysis_data['timestamp']} - {e}")
+
+        # Validate file path
+        if os.path.abspath(analysis_data['file_path']) != os.path.abspath(main_file_path):
+            raise ValueError(
+                f"Analysis JSON file_path mismatch. Expected: {main_file_path}, Found: {analysis_data['file_path']}"
+            )
+
+        # Validate optional fields if present
+        if 'exit_code' in analysis_data and analysis_data['exit_code'] is not None:
+            if not isinstance(analysis_data['exit_code'], int):
+                raise ValueError(f"Analysis JSON 'exit_code' must be an integer: {analysis_data['exit_code']}")
+
+        if 'output' in analysis_data and analysis_data['output'] is not None:
+            if not isinstance(analysis_data['output'], str):
+                raise ValueError(f"Analysis JSON 'output' must be a string")
+
+        if 'test_path' in analysis_data and analysis_data['test_path'] is not None:
+            if not isinstance(analysis_data['test_path'], str):
+                raise ValueError(f"Analysis JSON 'test_path' must be a string")
+
+    def _validate_finished_json(self, finished_path: str) -> None:
+        """Validate the structure and content of finished.json file."""
+        finished_data = self._load_json_safely(finished_path)
+        if not finished_data:
+            raise ValueError(f"Finished JSON file is empty or corrupted: {finished_path}")
+
+        if 'agents' not in finished_data:
+            raise ValueError(f"Finished JSON missing 'agents' field: {finished_path}")
+
+        if not isinstance(finished_data['agents'], list):
+            raise ValueError(f"Finished JSON 'agents' field must be a list: {finished_path}")
+
+        # Validate each agent entry
+        for i, agent_entry in enumerate(finished_data['agents']):
+            if not isinstance(agent_entry, dict):
+                raise ValueError(f"Finished JSON agent {i} must be a dict: {finished_path}")
+
+            required_agent_fields = ['agent_id', 'timestamp', 'file_path']
+            for field in required_agent_fields:
+                if field not in agent_entry:
+                    raise ValueError(f"Finished JSON agent {i} missing field '{field}': {finished_path}")
+
+            # Validate timestamp
+            try:
+                datetime.datetime.fromisoformat(agent_entry['timestamp'])
+            except ValueError as e:
+                raise ValueError(f"Finished JSON agent {i} invalid timestamp: {agent_entry['timestamp']} - {e}")
+
+    def _validate_version_files(self, meta_dir: str, index_path: str) -> None:
+        """Validate that all version files referenced in index.json actually exist and have correct content."""
+        index_data = self._load_json_safely(index_path)
+        if not index_data or 'versions' not in index_data:
+            return
+
+        for version in index_data['versions']:
+            version_num = version['version']
+            file_path = version['file_path']
+            expected_hash = version['hash']
+
+            # Construct expected version file name
+            file_name = os.path.basename(file_path)
+            file_base, file_ext = os.path.splitext(file_name)
+            version_file_name = f"{file_base}_v{version_num}{file_ext}"
+            version_file_path = os.path.join(meta_dir, version_file_name)
+
+            # Check file exists
+            if not os.path.exists(version_file_path):
+                raise FileNotFoundError(f"Version file referenced in index does not exist: {version_file_path}")
+
+            # Validate content hash
+            try:
+                with open(version_file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                actual_hash = self._get_content_hash(content)
+
+                if actual_hash != expected_hash:
+                    raise ValueError(
+                        f"Version file {version_file_path} content hash mismatch. "
+                        f"Expected: {expected_hash}, Actual: {actual_hash}"
+                    )
+            except Exception as e:
+                raise ValueError(f"Failed to validate version file {version_file_path}: {e}")
+
+    def _validate_test_meta_dirs(self, main_meta_dir: str, main_file_path: str) -> None:
+        """Validate test meta directories within the main file's meta directory."""
+        if not os.path.exists(main_meta_dir):
+            return
+
+        # Look for test meta directories (directories ending with .meta_ext)
+        for item in os.listdir(main_meta_dir):
+            item_path = os.path.join(main_meta_dir, item)
+            if os.path.isdir(item_path) and item.endswith(f".{META_DIR_EXT}"):
+                # This is a test meta directory
+                test_index_path = os.path.join(item_path, "index.json")
+                if os.path.exists(test_index_path):
+                    # Extract test file name from directory name
+                    test_file_name = item[:-len(f".{META_DIR_EXT}")]
+                    test_file_dir = os.path.dirname(main_file_path)
+                    test_file_path = os.path.join(test_file_dir, test_file_name)
+
+                    # Validate test index
+                    self._validate_test_index_json(test_index_path, test_file_path, main_file_path)
+
+                    # Validate test version files
+                    self._validate_version_files(item_path, test_index_path)
+
+    def _validate_test_index_json(self, test_index_path: str, test_file_path: str, main_file_path: str) -> None:
+        """Validate the structure and content of a test file's index.json."""
+        index_data = self._load_json_safely(test_index_path)
+        if not index_data:
+            raise ValueError(f"Test index JSON file is empty or corrupted: {test_index_path}")
+
+        # Check that main_file_path is recorded
+        if 'main_file_path' not in index_data:
+            raise ValueError(f"Test index JSON missing 'main_file_path' field: {test_index_path}")
+
+        if os.path.abspath(index_data['main_file_path']) != os.path.abspath(main_file_path):
+            raise ValueError(
+                f"Test index JSON main_file_path mismatch. Expected: {main_file_path}, "
+                f"Found: {index_data['main_file_path']}"
+            )
+
+        # Validate versions structure (same as main index validation)
+        if 'versions' not in index_data:
+            raise ValueError(f"Test index JSON missing 'versions' field: {test_index_path}")
+
+        if not isinstance(index_data['versions'], list):
+            raise ValueError(f"Test index JSON 'versions' field must be a list: {test_index_path}")
+
+        # Validate each version entry
+        for i, version in enumerate(index_data['versions']):
+            if not isinstance(version, dict):
+                raise ValueError(f"Test index JSON version {i} must be a dict: {test_index_path}")
+
+            required_fields = ['version', 'file_path', 'timestamp', 'hash', 'changes', 'explanation', 'main_file_path']
+            for field in required_fields:
+                if field not in version:
+                    raise ValueError(f"Test index JSON version {i} missing field '{field}': {test_index_path}")
+
+            # Validate file path matches expected test file
+            if os.path.abspath(version['file_path']) != os.path.abspath(test_file_path):
+                raise ValueError(
+                    f"Test index JSON version {i} file_path mismatch. Expected: {test_file_path}, "
+                    f"Found: {version['file_path']}"
+                )
+
+            # Validate main file path
+            if os.path.abspath(version['main_file_path']) != os.path.abspath(main_file_path):
+                raise ValueError(
+                    f"Test index JSON version {i} main_file_path mismatch. Expected: {main_file_path}, "
+                    f"Found: {version['main_file_path']}"
+                )
+
+            # Validate other fields (same as main validation)
+            if not isinstance(version['version'], int) or version['version'] <= 0:
+                raise ValueError(f"Test index JSON version {i} has invalid version number: {version['version']}")
+
+            try:
+                datetime.datetime.fromisoformat(version['timestamp'])
+            except ValueError as e:
+                raise ValueError(f"Test index JSON version {i} invalid timestamp: {version['timestamp']} - {e}")
+
+            if not isinstance(version['hash'], str) or len(version['hash']) != 64:
+                raise ValueError(f"Test index JSON version {i} invalid hash format: {version['hash']}")
+
+            if not isinstance(version['changes'], list):
+                raise ValueError(f"Test index JSON version {i} 'changes' must be a list: {test_index_path}")
+
+            if not isinstance(version['explanation'], str):
+                raise ValueError(f"Test index JSON version {i} 'explanation' must be a string: {test_index_path}")
+
+    def validate_active_files(self, agent) -> None:
+        """
+        Validate that there is at most one active file for the agent and that
+        the meta directory structure and files are properly formatted.
+
+        Args:
+            agent: The agent instance to validate
+
+        Raises:
+            RuntimeError: If validation fails
+            ValueError: If file formats are invalid
+            FileNotFoundError: If expected files are missing
+        """
+        agent_id = agent.get_id()
+
+        # Check that agent has at most 1 active file
+        active_files = self._get_active_files()
+        if len(active_files) > 1:
+            raise RuntimeError(
+                f"Agent {agent_id} has {len(active_files)} active files, but only 1 is allowed: {list(active_files)}"
+            )
+
+        # If no active files, validation passes
+        if len(active_files) == 0:
+            self.logger.debug(f"Agent {agent_id} has no active files - validation passed")
+            return
+
+        # Validate the single active file
+        active_file_path = list(active_files)[0]
+        self.logger.debug(f"Validating active file: {active_file_path}")
+
+        # Validate file exists
+        if not os.path.exists(active_file_path):
+            raise FileNotFoundError(f"Active file does not exist: {active_file_path}")
+
+        # Validate meta directory structure
+        meta_dir = self._get_meta_dir(active_file_path)
+        if not os.path.exists(meta_dir):
+            raise FileNotFoundError(f"Meta directory does not exist for active file: {meta_dir}")
+
+        # Validate active.json file
+        active_json_path = os.path.join(meta_dir, "active.json")
+        if not os.path.exists(active_json_path):
+            raise FileNotFoundError(f"Active JSON file missing: {active_json_path}")
+
+        # Validate active.json format and content
+        active_data = self._load_json_safely(active_json_path)
+        if not active_data:
+            raise ValueError(f"Active JSON file is empty or corrupted: {active_json_path}")
+
+        required_active_fields = ['agent_id', 'timestamp', 'file_path']
+        for field in required_active_fields:
+            if field not in active_data:
+                raise ValueError(f"Active JSON missing required field '{field}': {active_json_path}")
+
+        # Validate that the agent_id matches
+        if active_data['agent_id'] != agent_id:
+            raise ValueError(
+                f"Active file agent_id mismatch. Expected: {agent_id}, Found: {active_data['agent_id']}"
+            )
+
+        # Validate that the file_path matches
+        if os.path.abspath(active_data['file_path']) != os.path.abspath(active_file_path):
+            raise ValueError(
+                f"Active file path mismatch. Expected: {active_file_path}, Found: {active_data['file_path']}"
+            )
+
+        # Validate timestamp format
+        try:
+            datetime.datetime.fromisoformat(active_data['timestamp'])
+        except ValueError as e:
+            raise ValueError(f"Invalid timestamp format in active.json: {active_data['timestamp']} - {e}")
+
+        # Validate index.json if it exists
+        index_json_path = os.path.join(meta_dir, "index.json")
+        if os.path.exists(index_json_path):
+            self._validate_index_json(index_json_path, active_file_path)
+
+        # Validate code_analysis.json if it exists
+        analysis_json_path = os.path.join(meta_dir, "code_analysis.json")
+        if os.path.exists(analysis_json_path):
+            self._validate_analysis_json(analysis_json_path, active_file_path)
+
+        # Validate finished.json if it exists
+        finished_json_path = os.path.join(meta_dir, "finished.json")
+        if os.path.exists(finished_json_path):
+            self._validate_finished_json(finished_json_path)
+
+        # Validate version files referenced in index
+        if os.path.exists(index_json_path):
+            self._validate_version_files(meta_dir, index_json_path)
+
+        # Validate test meta directories if they exist
+        self._validate_test_meta_dirs(meta_dir, active_file_path)
+
+        self.logger.debug(f"Validation passed for active file: {active_file_path}")
+
+    def shutdown(self, agent):
+        """Clear all active files (useful for shutdown)"""
+        for file_path in self.active_files.copy():
+            try:
+                self.unflag_active(agent, file_path)
+            except Exception as e:
+                self.logger.debug(f"Failed to cleanup active file {file_path}: {e}")
+        self.active_files.clear()

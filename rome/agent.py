@@ -154,14 +154,12 @@ class Agent:
 
     def shutdown(self):
         """Clean up resources before termination"""
-        if self.shutdown_called:
-            return
-
+        if self.shutdown_called: return
         self.shutdown_called = True
         try:
             if self.agent_api:
                 self.agent_api.shutdown()
-            self.version_manager.cleanup_active_files(self)
+            self.version_manager.shutdown(self)
             self.logger.info("Agent shutdown completed successfully")
 
         except Exception as e:
@@ -279,11 +277,13 @@ class Agent:
         for iteration in range(1, max_iterations+1):
             try:
                 # Check agent context on first iteration to make sure state is valid
-                if iteration == 1:
-                    self.fsm.check_context(self)
+                if iteration == 1: self.fsm.check_context(self)
 
                 # Increment iteration counter in history
                 self.history.set_iteration(iteration)
+
+                # Validate active file state for consistency
+                self.version_manager.validate_active_files(self)
 
                 self.logger.info(f"Loop iteration {iteration}/{max_iterations}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
