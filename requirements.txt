@@ -7,6 +7,7 @@ portalocker
 psutil
 pytest
 ribs
+xxhash
 
 # For web app
 fastapi

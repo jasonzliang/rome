@@ -2,15 +2,20 @@ import ast
 import json
 import re
 from typing import Dict, Optional, Any, Union, List
-import zlib
+import xxhash
 
 # Simple global cache - you could also make this a class attribute
 _ast_cache: Dict[int, ast.AST] = {}
 
 
+def _hash_content(content: str) -> int:
+    """Fast hash function with xxhash fallback to zlib.crc32."""
+        return xxhash.xxh64(content.encode('utf-8')).intdigest()
+
+
 def parse_code_cached(code_content: str) -> ast.AST:
     """
-    Parse Python code with simple dictionary caching using CRC32.
+    Parse Python code with simple dictionary caching using xxhash.
 
     Args:
         code_content: Python source code as string
@@ -18,8 +23,8 @@ def parse_code_cached(code_content: str) -> ast.AST:
     Returns:
         Parsed AST tree
     """
-    # Fast CRC32 hash of the content
-    cache_key = zlib.crc32(code_content.encode('utf-8'))
+    # Fast xxhash (64-bit)
+    cache_key = _hash_content(code_content)
 
     # Check cache first
     if cache_key in _ast_cache:
