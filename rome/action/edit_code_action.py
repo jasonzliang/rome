@@ -116,7 +116,7 @@ class EditCodeAction(Action):
 
         # Add file info and original code
         prompt += f"""Code file path: {file_path}
-Code file contents:
+Code file content:
 ```python
 {content}
 ```

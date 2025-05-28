@@ -2,7 +2,7 @@ import datetime
 import hashlib
 import json
 import os
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional, Tuple, Set
 from contextlib import contextmanager
 
 import psutil
@@ -18,6 +18,7 @@ class VersionManager:
     def __init__(self, config: Dict = None):
         self.config = config or {}
         self.logger = get_logger()
+        self.active_files: Set[str] = set()  # Track active files for this manager's agent
 
     def _infer_main_file_from_test(self, test_file_path: str) -> Optional[str]:
         """Infer the main file path from a test file path using _test.py naming convention."""
@@ -267,22 +268,22 @@ IMPORTANT: Please take this analysis into account when improving the code or tes
         """Generate detailed analysis of test execution results using LLM."""
         prompt = f"""Analyze the following test execution results and provide comprehensive feedback:
 
-ORIGINAL CODE FILE:
+Code file content:
 ```python
 {original_file_content}
 ```
 
-TEST FILE:
+Test file content:
 ```python
 {test_file_content}
 ```
 
-EXECUTION OUTPUT:
+Execution output:
 ```
 {output}
 ```
 
-EXIT CODE: {exit_code}
+Exit code: {exit_code}
 
 Please provide a detailed analysis covering:
 1. Overall test execution status (passed/failed)
@@ -340,7 +341,49 @@ Your analysis:
 
         return True
 
-    def check_active(self, file_path: str) -> bool:
+    def get_active_files(self) -> Set[str]:
+        """Get all files currently active for this agent"""
+        return self.active_files.copy()
+
+    def cleanup_active_files(self, agent) -> None:
+        """Clear all active files (useful for shutdown)"""
+        for file_path in self.active_files.copy():
+            try:
+                self.unflag_active(agent, file_path)
+            except Exception as e:
+                self.logger.warning(f"Failed to cleanup active file {file_path}: {e}")
+        self.active_files.clear()
+
+    def _add_active_file(self, file_path: str) -> None:
+        """Add a file to the active files set"""
+        self.active_files.add(os.path.abspath(file_path))
+
+    def _remove_active_file(self, file_path: str) -> bool:
+        """Remove a file from the active files set"""
+        abs_path = os.path.abspath(file_path)
+        if abs_path in self.active_files:
+            self.active_files.discard(abs_path)
+            return True
+        return False
+
+    def _has_active_files(self) -> bool:
+        """Check if agent has any active files"""
+        return len(self.active_files) > 0
+
+    def get_active_files(self) -> Set[str]:
+        """Get all files currently active for this agent"""
+        return self.active_files.copy()
+
+    def cleanup_active_files(self, agent) -> None:
+        """Clear all active files (useful for shutdown)"""
+        for file_path in self.active_files.copy():
+            try:
+                self.unflag_active(agent, file_path)
+            except Exception as e:
+                self.logger.debug(f"Failed to cleanup active file {file_path}: {e}")
+        self.active_files.clear()
+
+    def check_active(self, file_path: str, ignore_self: bool = True) -> bool:
         """Check if there is an active agent working on the given file."""
         meta_dir = self._get_meta_dir(file_path)
         active_file_path = os.path.join(meta_dir, "active.json")
@@ -358,34 +401,73 @@ Your analysis:
                 os.remove(active_file_path)
                 return False
 
-            return self._handle_stale_file(active_file_path, active_data.get('agent_id'))
+            agent_id = active_data.get('agent_id')
 
-    def flag_active(self, agent, file_path: str) -> bool:
+            # Check if process is still alive
+            if not self._handle_stale_file(active_file_path, agent_id):
+                # Process is dead, file was cleaned up
+                return False
+
+            # If ignore_self is True and this is our own process, return False
+            if ignore_self:
+                pid = self._get_pid_from_agent_id(agent_id)
+                current_pid = os.getpid()
+                if pid == current_pid:
+                    return False
+
+            return True
+
+    def flag_active(self, agent, file_path: str, allow_multiple: bool = False) -> bool:
         """Flag a file as being actively worked on by the given agent."""
+
+        # Check if agent already has active files (unless multiple allowed)
+        if not allow_multiple and self._has_active_files():
+            existing_files = list(self.get_active_files())
+            raise RuntimeError(
+                f"Agent {agent.get_id()} already has active file(s): {existing_files}. "
+                f"Only one file can be active per agent."
+            )
+
         meta_dir = self._get_meta_dir(file_path)
         active_file_path = os.path.join(meta_dir, "active.json")
         lock_file_path = os.path.join(meta_dir, "active.lock")
 
+        agent_id = agent.get_id()
+
         with self._file_lock(lock_file_path):
             if os.path.exists(active_file_path):
                 active_data = self._load_json_safely(active_file_path)
-                agent_id = active_data.get('agent_id')
+                existing_agent_id = active_data.get('agent_id')
 
-                if agent_id:
-                    pid = self._get_pid_from_agent_id(agent_id)
+                if existing_agent_id:
+                    pid = self._get_pid_from_agent_id(existing_agent_id)
+                    current_pid = os.getpid()
+
                     if pid and self._is_process_running(pid):
-                        self.logger.debug(f"File {file_path} is already being worked on by agent {agent_id}")
-                        return False
+                        if pid != current_pid:
+                            raise RuntimeError(
+                                f"File {file_path} is already being worked on by agent {existing_agent_id} "
+                                f"(PID {pid}). Current process PID is {current_pid}."
+                            )
+                        elif existing_agent_id != agent_id:
+                            raise RuntimeError(
+                                f"File {file_path} is already flagged by a different agent {existing_agent_id} "
+                                f"in the same process. Current agent is {agent_id}."
+                            )
 
-            # File is not actively being worked on, claim it
+            # Create/update the active file
             active_data = {
-                'agent_id': agent.get_id(),
+                'agent_id': agent_id,
                 'timestamp': self._get_timestamp(),
                 'file_path': file_path
             }
 
             self._save_json(active_file_path, active_data)
-            self.logger.debug(f"Flagged {file_path} as active by agent {agent.get_id()}")
+
+            # Add to version manager's active files set
+            self._add_active_file(file_path)
+
+            self.logger.debug(f"Flagged {file_path} as active by agent {agent_id}")
             return True
 
     def unflag_active(self, agent, file_path: str) -> bool:
@@ -394,22 +476,29 @@ Your analysis:
         active_file_path = os.path.join(meta_dir, "active.json")
         lock_file_path = os.path.join(meta_dir, "active.lock")
 
+        agent_id = agent.get_id()
+
         if not os.path.exists(active_file_path):
+            # Clean up version manager tracking just in case
+            self._remove_active_file(file_path)
             self.logger.debug(f"No active file to remove for {file_path}")
             return False
 
         with self._file_lock(lock_file_path):
             if not os.path.exists(active_file_path):
+                self._remove_active_file(file_path)
                 self.logger.debug(f"No active file to remove for {file_path}")
                 return False
 
             active_data = self._load_json_safely(active_file_path)
-            if not active_data or active_data.get('agent_id') != agent.get_id():
-                self.logger.debug(f"Cannot unflag {file_path} - not flagged by agent {agent.get_id()}")
+            if not active_data or active_data.get('agent_id') != agent_id:
+                self.logger.debug(f"Cannot unflag {file_path} - not flagged by agent {agent_id}")
                 return False
 
+            # Remove file and update version manager tracking
             os.remove(active_file_path)
-            self.logger.debug(f"Unflagged {file_path} from agent {agent.get_id()}")
+            self._remove_active_file(file_path)
+            self.logger.debug(f"Unflagged {file_path} from agent {agent_id}")
             return True
 
     def check_finished(self, agent, file_path: str) -> bool:
@@ -447,3 +536,11 @@ Your analysis:
 
             self._save_json(finished_file_path, finished_data)
             self.logger.debug(f"Flagged {file_path} as finished by agent {agent.get_id()}")
+
+    def shutdown(self):
+        """Clean up resources before termination"""
+        self.logger.info("Cleaning up agent resources")
+        self.version_manager.cleanup_active_files(self)  # Clean up active files
+        if self.agent_api:
+            self.agent_api.shutdown()
+

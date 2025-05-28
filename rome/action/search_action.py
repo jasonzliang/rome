@@ -234,7 +234,6 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
         for file_path in files:
             # Check if file is currently being worked on by another agent
             is_active = agent.version_manager.check_active(file_path)
-
             # Check if file has already been marked as finished by this agent
             is_finished = agent.version_manager.check_finished(agent, file_path)
 

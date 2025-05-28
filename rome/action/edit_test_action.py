@@ -153,7 +153,6 @@ Code file content:
         if test_exists:
             prompt += f"""Test file path:
 {test_path}
-
 Test file content:
 ```python
 {test_content}

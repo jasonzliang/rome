@@ -1,5 +1,8 @@
-import os
+import atexit
 import json
+import os
+import signal
+import sys
 import traceback
 from typing import Dict, List
 
@@ -16,139 +19,153 @@ from .history import AgentHistory
 # Import the VersionManager class
 from .versioning import VersionManager
 
+
 class Agent:
     """Agent class using OpenAI API, YAML config, and FSM architecture"""
 
-    def __init__(self,
-        name: str = "CodingExpert",
-        role: str = "You are a Python coding expert",
-        config_dict: Dict = None):
-        """Initialize the Agent with either a config path or a config dictionary"""
+    def __init__(self, name: str = "CodingExpert", role: str = "You are a Python coding expert", config_dict: Dict = None):
+        """Initialize the Agent with configuration and setup all components"""
 
-        # Setup logging first
-        self.logger = get_logger()
-
-        # Store the name for later use with logging
+        # Core initialization
         self.name = name
+        self.logger = get_logger()
+        self.shutdown_called = False
 
-        # Load configuration next
+        # Configuration setup
+        self._setup_config(config_dict)
+        self.role = self._validate_and_format_role(role)
+
+        # Repository validation and logging setup
+        self._setup_repository_and_logging()
+
+        # Initialize core components
+        self._setup_components()
+
+        # Register cleanup handlers
+        self._register_cleanup()
+
+        self.logger.info(f"Agent {self.name} initialized with role:\n{self.role}")
+
+    def _setup_config(self, config_dict: Dict = None) -> None:
+        """Setup and validate configuration"""
         if config_dict:
             self.config = merge_with_default_config(config_dict)
         else:
             self.logger.info("Using DEFAULT_CONFIG, no config dict provided")
             self.config = DEFAULT_CONFIG.copy()
 
-        # Validate and properly format the role string
-        self.role = self._validate_and_format_role(role)
-
-        # Set up agent configuration
+        # Set attributes from Agent config
         agent_config = self.config.get('Agent', {})
-        # Automatically set attributes from Agent config
-        set_attributes_from_config(self, agent_config, ['repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience'])
+        set_attributes_from_config(self, agent_config,
+                                 ['repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience'])
 
-        # Validate some config parameters
-        # self.logger.assert_true(self.history_context_len > 0,
-        #     f"Invalid value for history context length: {self.history_context_len}")
-        # self.logger.assert_true(self.patience > 0, f"Invalid value for patience: {self.patience}")
-
-        # Validate repository attribute
+    def _setup_repository_and_logging(self) -> None:
+        """Validate repository and configure logging"""
+        # Validate repository
         self.logger.assert_attribute(self, 'repository', "repository not provided in Agent config")
         self.logger.assert_true(
             self.repository is not None and os.path.exists(self.repository),
             f"Repository path does not exist: {self.repository}"
         )
 
-        # Configure logging after repository is validated
+        # Setup logging after repository validation
         self._setup_logging()
 
-        # Set up FSM
-        if self.fsm_type:
-            self._setup_fsm()
-        else:
-            self.fsm = None
+    def _setup_components(self) -> None:
+        """Initialize all agent components"""
+        # FSM setup
+        self._setup_fsm()
 
-        # Initialize context and history using the new AgentHistory class
+        # Core components
         self.context = {}
         self.history = AgentHistory()
 
-        # Initialize VersionManager
-        version_config = self.config.get('VersionManager', {})
-        self.version_manager = VersionManager(config=version_config)
-
-        # Add initial state to history if FSM is set up
+        # Add initial FSM state to history
         if self.fsm and self.fsm.current_state:
             self.history.add_initial_state(self.fsm.current_state)
 
-        # Initialize OpenAI handler with OpenAIHandler config
+        # Version manager
+        version_config = self.config.get('VersionManager', {})
+        self.version_manager = VersionManager(config=version_config)
+
+        # OpenAI handler
         openai_config = self.config.get('OpenAIHandler', {})
         self.openai_handler = OpenAIHandler(config=openai_config)
 
-        if self.agent_api:
-            from .agent_api import AgentApi
-            api_config = self.config.get('AgentApi', {})
-            self.agent_api = AgentApi(agent=self, config=api_config)
-            self.agent_api.run()
+        # Optional API setup
+        self._setup_agent_api()
 
-        self.logger.info(f"Agent {self.name} initialized with role:\n{self.role}")
+    def _setup_agent_api(self) -> None:
+        """Setup agent API if enabled"""
+        if not self.agent_api:
+            return
+        from .agent_api import AgentApi
+        api_config = self.config.get('AgentApi', {})
+        self.agent_api = AgentApi(agent=self, config=api_config)
+        self.agent_api.run()
 
+    def _register_cleanup(self) -> None:
+        """Register cleanup handlers for graceful shutdown"""
+        atexit.register(self.shutdown)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        signal.signal(signal.SIGINT, self._signal_handler)
 
-    def shutdown(self):
-        """Clean up resources before termination"""
-        self.logger.info("Cleaning up agent resources")
-        if self.agent_api:
-            self.agent_api.shutdown()
-
+    def _signal_handler(self, signum, frame):
+        """Handle termination signals gracefully"""
+        self.logger.info(f"Received signal {signum}, shutting down agent {self.name}")
+        self.shutdown()
+        sys.exit(0)
 
     def _validate_and_format_role(self, role: str) -> str:
-        """Validates and formats the agent's role string. If not, it formats the role with a proper header."""
-
-        # Check if "your role" exists anywhere in the string (case insensitive)
+        """Validates and formats the agent's role string"""
         if "your role" in role.lower():
             return role
 
-        # If not found, add a properly formatted header
         self.logger.info("Role string does not contain 'your role', reformatting")
-        return f"Your role:\n{role}"
-
-    def get_id(self):
-        """Unique id for identifying agent in file system"""
-        safe_name = ''.join(c if c.isalnum() else '_' for c in self.name).lower()
-        return f'agent_{safe_name}_{os.getpid()}'
+        return f"Your role as an agent:\n{role}"
 
     def _setup_logging(self):
         """Configure logging based on config"""
-        # Get the logging configuration
         log_config = self.config.get('Logger', {}).copy()
 
-        # Set base_dir and filename if not already set
         if not log_config.get('base_dir'):
             log_config['base_dir'] = os.path.join(self.repository, LOG_DIR_NAME)
 
         if not log_config.get('filename'):
-            # Ensure agent name is suitable for a filename
             log_config['filename'] = f"{self.get_id()}.log"
 
-        # Configure the singleton logger with the loaded config
         get_logger().configure(log_config)
-
         self.logger.info(f"Logging configured. Log directory: {log_config['base_dir']}")
 
     def _setup_fsm(self):
         """Initialize the Finite State Machine"""
         self.logger.assert_true(
             self.fsm_type in FSM_FACTORY,
-            f"{self.fsm_type} FSM is not defined, cannot be loaded"
+            f"{self.fsm_type} FSM is not defined in FSM_FACTORY, cannot be loaded"
         )
 
         self.fsm = FSM_FACTORY[self.fsm_type](self.config)
         self.logger.info(f"Initialized {self.fsm_type} FSM with state: {self.fsm.get_current_state()}")
 
-    def set_fsm(self, fsm: FSM):
-        self.fsm = fsm
-        self.logger.info(f"Initialized user FSM with state: {self.fsm.get_current_state()}")
-        # Add initial state to history
-        if self.fsm.current_state:
-            self.history.add_initial_state(self.fsm.current_state)
+    def get_id(self):
+        """Unique id for identifying agent in file system"""
+        safe_name = ''.join(c if c.isalnum() else '_' for c in self.name).lower()
+        return f'agent_{safe_name}_{os.getpid()}'
+
+    def shutdown(self):
+        """Clean up resources before termination"""
+        if self.shutdown_called:
+            return
+
+        self.shutdown_called = True
+        try:
+            if self.agent_api:
+                self.agent_api.shutdown()
+            self.version_manager.cleanup_active_files(self)
+            self.logger.info("Agent shutdown completed successfully")
+
+        except Exception as e:
+            self.logger.error(f"Error during agent shutdown: {e}")
 
     def draw_fsm_graph(self, output_path: str = None) -> str:
         """
