@@ -377,7 +377,7 @@ def extract_all_definitions(content: str) -> List[Dict[str, str]]:
                 # Extract method names
                 methods = []
                 for child in node.body:
-                    if isinstance(child, ast.FunctionDef):
+                    if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                         methods.append(child.name)
 
                 definitions.append({
