@@ -136,15 +136,16 @@ Set work_complete to true ONLY if:
         self.logger.info("Analyzing execution results to determine if work is complete")
         work_complete = self._analyze_execution_results(agent, selected_file)
 
-        # Clear context first (parent class behavior)
-        agent.context.clear()
-        self.logger.info("Agent context has been cleared")
 
         # Handle file flagging if we have a file path
         # Always unflag active since we're resetting
         unflag_result = agent.version_manager.unflag_active(agent, file_path)
         if unflag_result:
             self.logger.info(f"Successfully unflagged active status for {file_path}")
+
+        # Clear context first (parent class behavior)
+        agent.context.clear()
+        self.logger.info("Agent context has been cleared")
 
         # Flag as finished only if LLM determined work is complete
         if work_complete:
