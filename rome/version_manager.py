@@ -559,8 +559,8 @@ Your analysis:
             except ValueError as e:
                 raise ValueError(f"Index JSON version {i} invalid timestamp: {version['timestamp']} - {e}")
 
-            # Validate hash format (should be SHA256)
-            if not isinstance(version['hash'], str) or len(version['hash']) != 64:
+            # Validate hash format (must be str)
+            if not isinstance(version['hash'], str):
                 raise ValueError(f"Index JSON version {i} invalid hash format: {version['hash']}")
 
             # Validate changes is a list

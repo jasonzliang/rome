@@ -3,6 +3,7 @@ import hashlib
 import json
 import re
 from typing import Dict, Optional, Any, Union, List
+import zlib
 
 import xxhash
 

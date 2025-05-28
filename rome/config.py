@@ -9,7 +9,7 @@ from .logger import get_logger
 
 ######## These constants are not intended to be user modifiable ########
 # Default hash function to use for check file versions and AST cache
-DEFAULT_HASH_FUNC = "xxh128"
+DEFAULT_HASH_FUNC = "sha256"
 
 # How long to display long strings for console output
 SUMMARY_LENGTH = 100
