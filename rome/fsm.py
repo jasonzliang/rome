@@ -145,26 +145,46 @@ class FSM:
         if self.current_state not in self.states:
             raise ValueError(f"Current state '{self.current_state}' is not a valid state in the FSM")
 
-        state_summary = self.states[self.current_state].summary(agent)
+        state_summary = f"{self.current_state}: {self.states[self.current_state].summary(agent)}"
         available_actions = self.get_available_actions()
 
-        # Build action list with summaries
+        # Build action list with summaries and transition information
         action_details = []
+        future_states = set()  # Track unique future states for summaries
+
         for action_name in available_actions:
-            if action_name in self.actions:
-                action_summary = self.actions[action_name].summary(agent)
-                action_details.append(f"- {action_name}: {action_summary}")
-            else:
-                action_details.append(f"- {action_name}: No summary available")
+            assert action_name in self.actions
+            action_summary = self.actions[action_name].summary(agent)
+
+            # Get transition information
+            assert self.current_state in self.transitions and action_name in self.transitions[self.current_state]
+            target_state, fallback_state = self.transitions[self.current_state][action_name]
+            transition_info = f"next state: {target_state}"
+            if fallback_state:
+                transition_info += f", fallback: {fallback_state}"
+                future_states.add(fallback_state)
+            future_states.add(target_state)
+
+            action_details.append(f"- {action_name} ({transition_info}): {action_summary}")
 
         actions_text = "\n".join(action_details)
+
+        # Build future states summaries, sort for consistent ordering
+        future_summaries = []
+        for state_name in sorted(future_states):
+            assert state_name in self.states
+            future_summary = self.states[state_name].future_summary(agent)
+            future_summaries.append(f"- {state_name}: {future_summary}")
+
+        future_states_text = "\n".join(future_summaries) if future_summaries else "No future states to display"
 
         # Get history summary based on config
         history_summary = agent.history.get_history_summary(agent.history_context_len)
 
         prompt_parts = [
             f"## Current state ##\n{state_summary}",
-            f"## Available actions ##\n{actions_text}"
+            f"## Available actions ##\n{actions_text}",
+            f"## Future states ##\n{future_states_text}"
         ]
 
         # Add history summary if available
@@ -179,7 +199,7 @@ class FSM:
 }"""
         )
 
-        prompt_parts.append(f"IMPORTANT:\nChoose the most appropriate action using your role as a guide. If the action chosen in current state is getting repeated {agent.patience} times or more in recent history, try selecting alternative actions to avoid getting stuck in cycles. Diversity in action selection often leads to better outcomes. Please mention in reasoning if avoiding getting stuck in cycles influenced your action selection.")
+        prompt_parts.append(f"IMPORTANT:\nChoose the most appropriate action using your role as a guide. If the action chosen in current state is getting repeated {agent.patience} times or more in recent history, try selecting alternative actions to avoid getting stuck in cycles. Diversity in action selection often leads to better outcomes. Please mention in reasoning if avoiding being stuck in cycles influenced your action selection.")
 
         return "\n\n".join(prompt_parts)
 

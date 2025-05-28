@@ -58,6 +58,15 @@ class State(ABC):
         # Set attributes from config if provided
         set_attributes_from_config(self, self.config)
 
+    def get_available_actions(self) -> List[str]:
+        """Get the list of available actions for this state"""
+        return self.actions.copy()
+
+    def add_action(self, action_name: str) -> None:
+        """Add an action to this state if it doesn't already exist"""
+        if action_name not in self.actions:
+            self.actions.append(action_name)
+
     @abstractmethod
     def check_context(self, agent, **kwargs) -> bool:
         """Check if agent context has required values"""
@@ -68,14 +77,10 @@ class State(ABC):
         """A short summary description of the current state"""
         pass
 
-    def get_available_actions(self) -> List[str]:
-        """Get the list of available actions for this state"""
-        return self.actions.copy()
-
-    def add_action(self, action_name: str) -> None:
-        """Add an action to this state if it doesn't already exist"""
-        if action_name not in self.actions:
-            self.actions.append(action_name)
+    @abstractmethod
+    def future_summary(self, agent) -> str:
+        """A short summary description of the state if it is not current state"""
+        pass
 
 
 class IdleState(State):
@@ -91,8 +96,10 @@ class IdleState(State):
 
     def summary(self, agent) -> str:
         """Enhanced summary for idle state"""
-        return f"{self.name}: you are idling in initial state and ready to start a new task"
+        return f"you are idling in initial state and ready to start a new task"
 
+    def future_summary(self, agent) -> str:
+        return "initial state ready to start a new task"
 
 class CodeLoadedState(State):
     """State where code has been loaded and is ready for analysis"""
@@ -113,7 +120,10 @@ class CodeLoadedState(State):
         size_info = get_file_size_info(selected_file['path'])
         reason = truncate_text(selected_file['reason'])
 
-        return f"{self.name}: you selected file {filename}{size_info} for editing, selection reason: {reason}"
+        return f"you selected and loaded code file {filename}{size_info} for editing, selection reason: {reason}"
+
+    def future_summary(self, agent) -> str:
+        return "selected and loaded code file for editing"
 
 
 class CodeEditedState(State):
@@ -140,7 +150,10 @@ class CodeEditedState(State):
         num_changes = len(change_record['changes'])
         explanation = truncate_text(change_record['explanation'])
 
-        return f"{self.name}: you edited {filename} with {num_changes} change(s) with explanation: {explanation}"
+        return f"you edited {filename} with {num_changes} change(s) with explanation: {explanation}"
+
+    def future_summary(self, agent) -> str:
+        return "edited code file with changes and explanation"
 
 
 class TestEditedState(State):
@@ -166,10 +179,10 @@ class TestEditedState(State):
         test_filename = os.path.basename(selected_file['test_path'])
 
         num_test_changes = len(selected_file['test_changes'])
-        action_type = "created" if not os.path.exists(selected_file['test_path']) else "updated"
+        return f"you created/updated tests in {test_filename} for {filename} with {num_test_changes} change(s)"
 
-        return f"{self.name}: you {action_type} tests in {test_filename} for {filename} with {num_test_changes} change(s)"
-
+    def future_summary(self, agent) -> str:
+        return "created or updated test file for code file"
 
 class CodeExecutedPassState(State):
     """State where code or test file has been executed successfully"""
@@ -199,10 +212,14 @@ class CodeExecutedPassState(State):
 
         # Get brief output summary
         output = selected_file['exec_output'] or 'No output'
-        output_summary = truncate_text(output.split('\n')[0] if output else 'No output')
+        analysis = selected_file['exec_analysis'] or 'No analysis'
+        output_summary = truncate_text(output.split('\n')[0])
+        analysis_summary = truncate_text(analysis.split('\n')[0])
 
-        return f"{self.name}: you executed {test_filename}: ✓ PASSED (exit code: 0), output: {output_summary}"
+        return f"you executed {test_filename}: ✓ PASSED (exit code: 0), output: {output_summary}"
 
+    def future_summary(self, agent) -> str:
+        return "executed test file (passed) with execution output"
 
 class CodeExecutedFailState(State):
     """State where code or test file execution failed"""
@@ -233,6 +250,11 @@ class CodeExecutedFailState(State):
 
         # Get brief output summary focusing on error info
         output = selected_file['exec_output'] or 'No output'
-        output_summary = truncate_text(output.split('\n')[0] if output else 'No output')
+        analysis = selected_file['exec_analysis'] or 'No analysis'
+        output_summary = truncate_text(output.split('\n')[0])
+        analysis_summary = truncate_text(analysis.split('\n')[0])
 
-        return f"{self.name}: you executed {test_filename}: ✗ FAILED (exit code: {exit_code}), output: {output_summary}"
+        return f"you executed {test_filename}: ✗ FAILED (exit code: {exit_code}), output: {output_summary}, analysis: {analysis_summary}"
+
+    def future_summary(self, agent) -> str:
+        return "executed test file (failed) with execution output and analysis"

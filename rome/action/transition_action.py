@@ -31,13 +31,14 @@ class TransitionAction(Action):
 
         # Get the target state object and its summary
         if self.target_state_name in self.fsm.states:
-            target_state = self.fsm.states[self.target_state_name]
-            self.target_state_summary = target_state.summary(agent)
+            pass
+            # target_state = self.fsm.states[self.target_state_name]
+            # self.target_state_summary = target_state.summary(agent)
         else:
             self.logger.error(f"Cannot find target state in FSM: {target_state_name}")
             raise
 
-        return f"transition to {self.target_state_name} ({self.target_state_summary})"
+        return f"transition to {self.target_state_name}"
 
     def execute(self, agent, **kwargs) -> bool:
         """
