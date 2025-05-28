@@ -8,11 +8,6 @@ import xxhash
 _ast_cache: Dict[int, ast.AST] = {}
 
 
-def _hash_content(content: str) -> int:
-    """Fast hash function with xxhash fallback to zlib.crc32."""
-        return xxhash.xxh64(content.encode('utf-8')).intdigest()
-
-
 def parse_code_cached(code_content: str) -> ast.AST:
     """
     Parse Python code with simple dictionary caching using xxhash.
@@ -24,7 +19,11 @@ def parse_code_cached(code_content: str) -> ast.AST:
         Parsed AST tree
     """
     # Fast xxhash (64-bit)
-    cache_key = _hash_content(code_content)
+    def _hash(content: str) -> int:
+        """Fast hash function with xxhash fallback to zlib.crc32."""
+        return xxhash.xxh64(content.encode('utf-8')).intdigest()
+
+    cache_key = _hash(code_content)
 
     # Check cache first
     if cache_key in _ast_cache:
@@ -33,7 +32,6 @@ def parse_code_cached(code_content: str) -> ast.AST:
     # Parse and cache
     tree = ast.parse(code_content)
     _ast_cache[cache_key] = tree
-
     return tree
 
 

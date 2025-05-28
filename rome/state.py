@@ -77,10 +77,9 @@ class State(ABC):
         """A short summary description of the current state"""
         pass
 
-    @abstractmethod
     def future_summary(self, agent) -> str:
         """A short summary description of the state if it is not current state"""
-        pass
+        return self.summary(agent)
 
 
 class IdleState(State):
