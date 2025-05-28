@@ -94,7 +94,8 @@ def main():
         # Agent specific configuration
         "Agent": {
             "repository": str(test_dir.absolute()),
-            "fsm_type": "simple"
+            "fsm_type": "simple",
+            "patience": 1,
         },
 
         # Logger specific configuration

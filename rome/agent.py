@@ -30,6 +30,7 @@ class Agent:
         self.name = name
         self.logger = get_logger()
         self.shutdown_called = False
+        self.curr_iteration = 1
 
         # Configuration setup
         self._setup_config(config_dict)
@@ -274,7 +275,7 @@ class Agent:
 
         self.logger.info(f"Starting agent loop for {max_iterations} iterations")
 
-        for iteration in range(1, max_iterations+1):
+        for iteration in range(self.curr_iteration, self.curr_iteration+max_iterations):
             try:
                 # Check agent context on first iteration to make sure state is valid
                 if iteration == 1: self.fsm.check_context(self)
@@ -285,7 +286,7 @@ class Agent:
                 # Validate active file state for consistency
                 self.version_manager.validate_active_files(self)
 
-                self.logger.info(f"Loop iteration {iteration}/{max_iterations}")
+                self.logger.info(f"Loop iteration {iteration}/{self.curr_iteration+max_iterations-1}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
 
                 # Check if there are available actions
@@ -376,6 +377,7 @@ class Agent:
                     continue
 
         # Record final state and context
+        self.curr_iteration = iteration + max_iterations
         self.history.set_final_state(self.fsm.current_state, self.context)
 
         self.logger.info(f"\n\nAgent loop completed after {self.history.get_iteration()} iterations")
