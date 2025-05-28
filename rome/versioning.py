@@ -265,7 +265,7 @@ IMPORTANT: Please take this analysis into account when improving the code or tes
 
     def create_analysis(self, agent, original_file_content: str, test_file_content: str,
                        output: str, exit_code: int) -> str:
-        """Generate detailed analysis of test execution results using LLM."""
+        """Generate an analysis of test execution results using LLM."""
         prompt = f"""Analyze the following test execution results and provide comprehensive feedback:
 
 Code file content:
@@ -285,7 +285,7 @@ Execution output:
 
 Exit code: {exit_code}
 
-Please provide a detailed analysis covering:
+Please provide an analysis covering:
 1. Overall test execution status (passed/failed)
 2. Specific test failures and their root causes
 3. Any errors, exceptions, or warnings found

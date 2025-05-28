@@ -77,7 +77,7 @@ Respond with a JSON object:
 {{
     "work_complete": true/false,
     "confidence": 1-5,
-    "reasoning": "Detailed explanation of your assessment",
+    "reasoning": "Explanation of your assessment",
     "remaining_issues": ["list", "of", "any", "remaining", "issues"]
 }}
 
