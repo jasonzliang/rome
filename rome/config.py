@@ -1,7 +1,8 @@
 # config.py
-import yaml
+import copy
 import os
 import sys
+import yaml
 from typing import Dict, Any
 from .logger import get_logger
 
@@ -119,7 +120,7 @@ def check_attrs(obj, required_attrs):
     logger = get_logger()
     for attr in required_attrs:
         logger.assert_attribute(obj, attr)
-        logger.debug(f"'{attr}' provided in {obj.__class__.__name__} config")
+        # logger.debug(f"'{attr}' provided in {obj.__class__.__name__} config")
 
 
 def check_opt_attrs(obj, optional_attrs):
@@ -128,7 +129,7 @@ def check_opt_attrs(obj, optional_attrs):
     for attr in optional_attrs:
         if not hasattr(obj, attr):
             setattr(obj, attr, None)
-            logger.debug(f"'{attr}' (optional) not provided in {obj.__class__.__name__} config")
+            # logger.debug(f"'{attr}' (optional) not provided in {obj.__class__.__name__} config")
 
 
 def set_attributes_from_config(obj, config=None, required_attrs=None, optional_attrs=None):
@@ -188,16 +189,28 @@ def load_config(config_path="config.yaml", create_if_missing=True):
 
 def merge_with_default_config(custom_config):
     """Merge a custom config with the default config"""
-    import copy
     logger = get_logger()
-
     merged_config = copy.deepcopy(DEFAULT_CONFIG)
+
+    def _validate(key, orig_v, new_v):
+        error_msg = f"Invalid value {new_v} ({type(new_v).__name__}) for config parameter '{key}'"
+        if orig_v is not None:
+            logger.assert_true(type(orig_v) == type(new_v), f"{error_msg} - expected correct type")
+            # If original container was non-empty, expect new one to be non-empty
+            if isinstance(orig_v, (list, tuple, str)) and len(orig_v) > 0:
+                logger.assert_true(len(new_v) > 0, f"{error_msg} — expected non-empty value")
+            # If original numeric was positive, expect new one to be positive
+            if isinstance(orig_v, (int, float)) and orig_v > 0:
+                logger.assert_true(new_v > 0, f"{error_msg} — expected positive value")
+        else:
+            logger.debug(f"Validation skipped for config parameter '{key}' ({orig_v} -> {new_v})")
 
     def update_dict(d, u):
         for k, v in u.items():
             if isinstance(v, dict) and k in d and isinstance(d[k], dict):
                 d[k] = update_dict(d[k], v)
             else:
+                _validate(k, d[k], v)
                 d[k] = v
         return d
 

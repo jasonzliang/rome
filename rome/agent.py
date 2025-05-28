@@ -47,9 +47,9 @@ class Agent:
         set_attributes_from_config(self, agent_config, ['repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience'])
 
         # Validate some config parameters
-        self.logger.assert_true(self.history_context_len > 0,
-            f"Invalid value for history context length: {self.history_context_len}")
-        self.logger.assert_true(self.patience > 0, f"Invalid value for patience: {self.patience}")
+        # self.logger.assert_true(self.history_context_len > 0,
+        #     f"Invalid value for history context length: {self.history_context_len}")
+        # self.logger.assert_true(self.patience > 0, f"Invalid value for patience: {self.patience}")
 
         # Validate repository attribute
         self.logger.assert_attribute(self, 'repository', "repository not provided in Agent config")

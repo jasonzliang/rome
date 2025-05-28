@@ -178,7 +178,7 @@ class CodeExecutor:
         # Ensure work_dir exists
         self.work_dir.mkdir(exist_ok=True, parents=True)
 
-        self.logger.debug(f"Initialized {self.__class__.__name__} with config: {self.config}")
+        # self.logger.debug(f"Initialized {self.__class__.__name__} with config: {self.config}")
 
     @staticmethod
     def sanitize_command(lang: str, code: str) -> None:
@@ -347,13 +347,11 @@ class CodeExecutor:
 
             # Add additional argument if running pytest
             cmd = [program, str(written_file.absolute())]
-            if self.cmd_args and self.cmd_args.get(program):
+            if self.cmd_args and len(self.cmd_args.get(program, [])) > 0:
                 cmd_args = self.cmd_args.get(program)
-                assert len(cmd_args) > 0, f"Invalid cmd args: {cmd_args}"
-                if type(cmd_args) is list:
-                    cmd = [cmd[0]] +  cmd_args + [cmd[1]]
-                else:
-                    cmd = [cmd[0], cmd_args, cmd[1]]
+                if type(cmd_args) is str:
+                    cmd_args = cmd_args.split()
+                cmd = [cmd[0]] + cmd_args + [cmd[1]]
 
             env = os.environ.copy()
             # Configure virtual environment if available

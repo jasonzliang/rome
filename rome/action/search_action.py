@@ -21,12 +21,12 @@ class SearchAction(Action):
         check_attrs(self, ['max_files', 'file_types', 'exclude_dirs',
             'exclude_types', 'selection_criteria', 'batch_size'])
 
-        self.logger.assert_true(len(self.file_types) > 0,
-            f"Invalid value for file types: {self.file_types}")
-        self.logger.assert_true(self.max_files > 0,
-            f"Invalid value for max files: {self.max_files}")
-        self.logger.assert_true(self.batch_size > 0,
-            f"Invalid value for batch size: {self.batch_size}")
+        # self.logger.assert_true(len(self.file_types) > 0,
+        #     f"Invalid value for file types: {self.file_types}")
+        # self.logger.assert_true(self.max_files > 0,
+        #     f"Invalid value for max files: {self.max_files}")
+        # self.logger.assert_true(self.batch_size > 0,
+        #     f"Invalid value for batch size: {self.batch_size}")
 
         if LOG_DIR_NAME not in self.exclude_dirs:
             self.exclude_dirs.append(LOG_DIR_NAME)
