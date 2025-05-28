@@ -8,8 +8,9 @@ from contextlib import contextmanager
 import psutil
 import portalocker
 
-from .config import META_DIR_EXT
+from .config import META_DIR_EXT, set_attributes_from_config
 from .logger import get_logger
+from .parsing import hash_string
 
 
 class VersionManager:
@@ -76,7 +77,7 @@ class VersionManager:
 
     def _get_content_hash(self, content: str) -> str:
         """Generate SHA256 hash of content."""
-        return hashlib.sha256(content.encode()).hexdigest()
+        return hash_string(content)
 
     def _get_timestamp(self) -> str:
         """Get current timestamp in ISO format."""
@@ -171,10 +172,6 @@ class VersionManager:
     def save_original(self, file_path: str, content: str) -> int:
         """Save the original unedited file into the meta directory."""
         self.logger.info(f"Saving original version for file: {file_path}")
-
-        if os.path.exists(self._get_meta_dir(file_path)):
-            return 1
-
         return self.save_version(
             file_path=file_path,
             content=content,

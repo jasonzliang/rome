@@ -231,6 +231,8 @@ class Logger:
 
                 # Determine handler type based on include_caller_info setting
                 caller_info = self.include_caller_info
+                self.assert_true(caller_info in ["rome", "rich", "default"],
+                    f"Invalid value set for caller info: {caller_info}")
 
                 if caller_info == "rome":
                     # Use custom handler that shows parent caller path
@@ -243,7 +245,7 @@ class Logger:
                         markup=True,
                         log_time_format="[%H:%M:%S]"
                     )
-                elif caller_info == "rich" or caller_info == True:
+                elif caller_info == "rich":
                     # Use standard RichHandler with built-in path display
                     rich_handler = RichHandler(
                         console=console,

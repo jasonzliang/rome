@@ -107,7 +107,8 @@ def main():
         "Logger": {
             "level": "DEBUG",
             "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-            "console": True
+            "console": True,
+            "include_caller_info": "rome"
         },
 
         # SearchAction specific configuration

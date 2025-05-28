@@ -1,29 +1,53 @@
 import ast
+import hashlib
 import json
 import re
 from typing import Dict, Optional, Any, Union, List
+
 import xxhash
 
+from .config import DEFAULT_HASH_FUNC
+
 # Simple global cache - you could also make this a class attribute
-_ast_cache: Dict[int, ast.AST] = {}
+_ast_cache: Dict[str, ast.AST] = {}
 
 
-def parse_code_cached(code_content: str) -> ast.AST:
+def hash_string(content: str, hash_name: str = DEFAULT_HASH_FUNC) -> str:
     """
-    Parse Python code with simple dictionary caching using xxhash.
+    Fast hash function with multiple algorithm support.
+
+    Args:
+        content: String content to hash
+        hash_name: Hash algorithm name
+
+    Returns:
+        String hash value (hexadecimal)
+    """
+    if hash_name in ["xxh64", "xxh128"]:
+        hash_func = getattr(xxhash, hash_name)
+        return hash_func(content.encode('utf-8')).hexdigest()
+    elif hash_name == "crc32":
+        return f"{zlib.crc32(content.encode('utf-8')) & 0xffffffff:08x}"
+    elif hash_name in ["md5", "sha1", "sha256", "sha512", "blake2b", "blake2s"]:
+        hash_func = getattr(hashlib, hash_name)
+        return hash_func(content.encode('utf-8')).hexdigest()
+    else:
+        raise ValueError(f"Unsupported hash function: {hash_name}")
+
+
+def parse_code_cached(code_content: str, hash_name: str = DEFAULT_HASH_FUNC) -> ast.AST:
+    """
+    Parse Python code with simple dictionary caching using configurable hash function.
 
     Args:
         code_content: Python source code as string
+        hash_name: Hash algorithm to use for caching
+                  Options: xxhash, crc32, md5, sha1, sha256, sha512, blake2b, blake2s
 
     Returns:
         Parsed AST tree
     """
-    # Fast xxhash (64-bit)
-    def _hash(content: str) -> int:
-        """Fast hash function with xxhash fallback to zlib.crc32."""
-        return xxhash.xxh64(content.encode('utf-8')).intdigest()
-
-    cache_key = _hash(code_content)
+    cache_key = hash_string(code_content, hash_name)
 
     # Check cache first
     if cache_key in _ast_cache:

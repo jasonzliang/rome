@@ -6,6 +6,9 @@ import yaml
 from typing import Dict, Any
 from .logger import get_logger
 
+# Default hash function to use for check file versions and AST cache
+DEFAULT_HASH_FUNC = "xxh128"
+
 # How long to display long strings for console output
 SUMMARY_LENGTH = 100
 LONG_SUMMARY_LEN = 200
@@ -60,13 +63,13 @@ DEFAULT_CONFIG = {
 
     # Logging configuration
     "Logger": {
-        "level": "ERROR",
-        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        "console": True,
-        "include_caller_info": "rome",
-        "base_dir": None,  # Directory for log files (Agent sets it if None)
-        "filename": None,  # Log file name (Agent sets it if None)
-        "max_size_kb": 10000,
+        "level": "ERROR", # Log level in increasing verbosity: INFO -> ERROR -> DEBUG
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s", # Formatting for log messages
+        "console": True, # Print to console if true
+        "include_caller_info": "default", # Can be "rome", "rich", or "default"
+        "base_dir": None, # Directory for log files (overwrites agent's setting)
+        "filename": None, # Log file name (overwrites agent's setting)
+        "max_size_kb": 10000, # Max log size in kb, truncates after exceeding
     },
 
     # FSM configuration
@@ -101,9 +104,9 @@ DEFAULT_CONFIG = {
 
     # Code executor configuration
     "Executor": {
-        "timeout": 10,
-        "virtual_env_context": None,
-        "work_dir": "./",
+        "timeout": 10, # Maximum time for code to run
+        "virtual_env_context": None, # Name of virtual env to run in
+        "work_dir": "./", #
         "cmd_args": {"pytest": ["-vvs", "--tb=long"]}
     },
 
