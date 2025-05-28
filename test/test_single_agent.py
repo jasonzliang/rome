@@ -108,15 +108,15 @@ def main():
         # SearchAction specific configuration
         "SearchAction": {
             "file_types": [".py"],
-            "batch_size": 3,  # Process all 3 files in a single batch
-            "selection_criteria": "Select the most interesting code file to improve and complete",
+            "batch_size": 1,
+            "batch_sampling": True,
         },
     }
 
     # Create and initialize the agent
     agent = Agent(
         name="CodeAnalyzer",
-        role="You are an expert code analyzer that can identify interesting algorithms and functions",
+        role="You are an expert code analyzer that can identify and write interesting algorithms and functions",
         config_dict=config
     )
     agent.draw_fsm_graph()

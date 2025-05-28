@@ -76,7 +76,7 @@ Test analysis:
 Respond with a JSON object:
 {{
     "work_complete": true/false,
-    "confidence": 1-5,
+    "confidence": 1-10,
     "reasoning": "Explanation of your assessment",
     "remaining_issues": ["list", "of", "any", "remaining", "issues"]
 }}
@@ -86,7 +86,7 @@ Set work_complete to true ONLY if:
 - All tests are passing
 - No critical errors or failures
 - Code appears to be functioning correctly
-- You are confident (confidence >= 4) that no further work is needed
+- You are confident (confidence >= 8) that no further work is needed
 """
 
         response = agent.chat_completion(

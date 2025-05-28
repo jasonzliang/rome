@@ -81,14 +81,9 @@ DEFAULT_CONFIG = {
         "file_types": [".py"],
         "exclude_types": ["_test.py"],
         "exclude_dirs": [".git", "venv", "__pycache__"],
-        "selection_criteria": None,
-        "batch_size": 5,
-        # "epsilon_oldest": 0.0, # Prob to choose the oldest file for editing
-        # 'exploration_strategy': 'adaptive',  # or 'breadth_first', 'depth_first', 'novelty_seeking'
-        # 'diversity_weight': 1.5,
-        # 'novelty_bonus': 2.0,
-        # 'dependency_analysis': True,
-        # 'semantic_clustering': True,
+        "selection_criteria": "Select the file you have the most confidence in improving or fixing.",
+        "batch_size": 10,
+        "batch_sampling": False
     },
     "ResetAction": {},
     "AdvancedResetAction": {},
