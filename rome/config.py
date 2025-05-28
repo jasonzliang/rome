@@ -3,6 +3,7 @@ import copy
 import os
 import sys
 import yaml
+from types import NoneType
 from typing import Dict, Any
 from .logger import get_logger
 
@@ -196,17 +197,23 @@ def merge_with_default_config(custom_config):
     merged_config = copy.deepcopy(DEFAULT_CONFIG)
 
     def _validate(key, orig_v, new_v):
-        error_msg = f"Invalid value {new_v} ({type(new_v).__name__}) for config parameter '{key}'"
+        def _error_msg(key, val):
+            return f"Invalid value {val} ({type(val).__name__}) for config parameter '{key}'"
+
         if orig_v is not None:
-            logger.assert_true(type(orig_v) == type(new_v), f"{error_msg} - expected correct type")
-            # If original container was non-empty, expect new one to be non-empty
-            if isinstance(orig_v, (list, tuple, str)) and len(orig_v) > 0:
-                logger.assert_true(len(new_v) > 0, f"{error_msg} — expected non-empty value")
-            # If original numeric was positive, expect new one to be positive
-            if isinstance(orig_v, (int, float)) and orig_v > 0:
-                logger.assert_true(new_v > 0, f"{error_msg} — expected positive value")
+            logger.assert_true(type(orig_v) == type(new_v), f"Type mismatch for old {type(orig_v).__name__} and new value {type(orig_v).__name__} for config parameter '{key}'")
         else:
-            logger.debug(f"Validation skipped for config parameter '{key}' ({orig_v} -> {new_v})")
+            logger.debug(f"Type matching skipped for config parameter '{key}' ({orig_v} -> {new_v})")
+
+        for v in [orig_v, new_v]:
+            if isinstance(v, (list, tuple, str)):
+                if not key.startswith("exclude_"):
+                    logger.assert_true(len(v) > 0, f"{_error_msg(key, v)} — non-empty value")
+            elif isinstance(v, (int, float)):
+                logger.assert_true(v >= 0, f"{_error_msg(key, v)} — non-negative value")
+            else:
+                logger.assert_true(isinstance(v, (bool, NoneType)),
+                    f"{_error_msg(key, v)} - invalid type")
 
     def update_dict(d, u):
         for k, v in u.items():
