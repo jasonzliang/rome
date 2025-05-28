@@ -13,12 +13,14 @@ from .config import DEFAULT_CONFIG, LOG_DIR_NAME
 from .config import set_attributes_from_config, load_config, merge_with_default_config
 # Import singleton logger
 from .logger import get_logger
-from .fsm import FSM, FSM_FACTORY
+# Import FSM and factory
+from .fsm import FSM
+from .fsm_factory import FSM_FACTORY
 # Import the new AgentHistory class
 from .history import AgentHistory
 # Import the VersionManager class
-from .versioning import VersionManager
-# Parsing utility functions
+from .version_manager import VersionManager
+# Import parsing utility functions
 from .parsing import parse_python_response, parse_json_response
 
 

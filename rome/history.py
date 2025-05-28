@@ -105,7 +105,7 @@ class AgentHistory:
             # Format the transition
             history_lines.extend([
                 f"[Iteration {iteration}] - selected action: {action_name}, reason: {reasoning}, result: {result}",
-                f"[Iteration {iteration}] - state transition: {prev_state} --[{action_name}]--> {curr_state}"
+                f"[Iteration {iteration}] - changed state: {prev_state} --[{action_name}]--> {curr_state}"
             ])
 
         return "\n".join(history_lines)

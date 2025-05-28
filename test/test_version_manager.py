@@ -50,7 +50,7 @@ sys.modules['rome.logger'] = MagicMock()
 sys.modules['rome.logger'].get_logger = get_logger
 
 # Now import the actual VersionManager
-from rome.versioning import VersionManager
+from rome.version_manager import VersionManager
 print("✅ Successfully imported VersionManager from rome.versioning")
 
 
