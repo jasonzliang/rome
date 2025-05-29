@@ -135,7 +135,7 @@ class Agent:
         log_config = self.config.get('Logger', {}).copy()
 
         if not log_config.get('base_dir'):
-            log_config['base_dir'] = os.path.join(self.repository, LOG_DIR_NAME)
+            log_config['base_dir'] = self.get_log_dir()
 
         if not log_config.get('filename'):
             log_config['filename'] = f"{self.get_id()}.log"
@@ -157,6 +157,12 @@ class Agent:
         """Unique id for identifying agent in file system"""
         safe_name = ''.join(c if c.isalnum() else '_' for c in self.name).lower()
         return f'agent_{safe_name}_{os.getpid()}'
+
+    def get_log_dir(self):
+        """Get agent log directory and create if it doesn't exist"""
+        log_dir = os.path.join(self.repository, LOG_DIR_NAME)
+        os.makedirs(log_dir, exist_ok=True)
+        return log_dir
 
     def shutdown(self):
         """Clean up resources before termination"""

@@ -1,4 +1,4 @@
-# Core library required pkgs
+# Library required pkgs
 colorama
 numpy
 openai
@@ -7,7 +7,8 @@ psutil
 pytest
 tinydb
 
-# Core library optional pkgs
+# Library optional pkgs
+evalplus
 graphviz
 llmlingua
 ribs
