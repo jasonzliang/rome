@@ -105,7 +105,6 @@ Your analysis:
 
         # Store execution results in TinyDB
         execution_data = {
-            'code_path': file_path,
             'test_path': test_path,
             'output': result.output,
             'analysis': analysis,

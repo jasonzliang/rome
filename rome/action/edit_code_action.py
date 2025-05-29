@@ -20,7 +20,7 @@ def create_analysis_prompt(agent, file_path: str) -> Optional[str]:
         Formatted analysis context string or None if no data available
     """
     # Load the latest execution results
-    execution_data = agent.version_manager.get_latest_data(file_path, 'exec_result')
+    execution_data = agent.version_manager.get_data(file_path, 'exec_result')
     if not execution_data:
         return None
     context_parts = []

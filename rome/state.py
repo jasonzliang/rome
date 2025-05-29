@@ -98,7 +98,7 @@ class IdleState(State):
         return f"you are idling in initial state and ready to start a new task"
 
     def future_summary(self, agent) -> str:
-        return "initial state ready to start a new task"
+        return "you are in default initial state and ready to start a new task"
 
 class CodeLoadedState(State):
     """State where code has been loaded and is ready for analysis"""
@@ -122,7 +122,7 @@ class CodeLoadedState(State):
         return f"you selected and loaded code file {filename}{size_info} for editing, selection reason: {reason}"
 
     def future_summary(self, agent) -> str:
-        return "select and load code file for editing"
+        return "you have loaded a code file for editing and testing"
 
 
 class CodeEditedState(State):
@@ -152,7 +152,7 @@ class CodeEditedState(State):
         return f"you edited {filename} with {num_changes} change(s) with explanation: {explanation}"
 
     def future_summary(self, agent) -> str:
-        return "edit code file with changes and explanation"
+        return "you have edited the code file with changes and explanation"
 
 
 class TestEditedState(State):
@@ -181,7 +181,7 @@ class TestEditedState(State):
         return f"you created/updated tests in {test_filename} for {filename} with {num_test_changes} change(s)"
 
     def future_summary(self, agent) -> str:
-        return "create or update test file for code file"
+        return "you have created or updated tests for the code file"
 
 class CodeExecutedPassState(State):
     """State where code or test file has been executed successfully"""
@@ -218,7 +218,7 @@ class CodeExecutedPassState(State):
         return f"you executed {test_filename}: ✓ PASSED (exit code: 0), output: {output_summary}"
 
     def future_summary(self, agent) -> str:
-        return "execute test file with passing execution output"
+        return "you have executed test file and the output shows the tests have passed"
 
 class CodeExecutedFailState(State):
     """State where code or test file execution failed"""
@@ -256,4 +256,4 @@ class CodeExecutedFailState(State):
         return f"you executed {test_filename}: ✗ FAILED (exit code: {exit_code}), output: {output_summary}, analysis: {analysis_summary}"
 
     def future_summary(self, agent) -> str:
-        return "execute test file with failing execution output and analysis"
+        return "you have executed test file and the output shows the tests have failed"

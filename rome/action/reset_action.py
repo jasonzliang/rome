@@ -51,17 +51,17 @@ class AdvancedResetAction(Action):
         Returns:
             True if LLM determines work is complete and correct, False otherwise
         """
-        try:
-            analysis_prompt = create_analysis_prompt(agent, selected_file['path'])
-            if not analysis_prompt: raise
+        # try:
+        #     analysis_prompt = create_analysis_prompt(agent, selected_file['path'])
+        #     if not analysis_prompt: raise
 
-            prompt = f"Examine the execution results and analysis to determine if the code and tests are now correct and complete.\n\n{analysis_prompt}"
-        except:
-            exit_code = selected_file['exec_exit_code']
-            output = selected_file['exec_output']
-            analysis = selected_file['exec_analysis']
+        #     prompt = f"Examine the execution results and analysis to determine if the code and tests are now correct and complete.\n\n{analysis_prompt}"
+        # except:
+        exit_code = selected_file['exec_exit_code']
+        output = selected_file['exec_output']
+        analysis = selected_file['exec_analysis']
 
-            prompt = f"""Examine the test execution results and analysis, use them to determine if the code and tests are now correct and complete.
+        prompt = f"""Examine the test execution results and analysis, use them to determine if the code and tests are now correct and complete.
 
 Test exit code: {exit_code}
 Test execution output:

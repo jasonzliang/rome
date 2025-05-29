@@ -536,7 +536,7 @@ class VersionManager:
         """Store data in the TinyDB database for a file."""
         return self.db.store_data(file_path, table_name, data)
 
-    def get_latest_data(self, file_path: str, table_name: str,
+    def get_data(self, file_path: str, table_name: str,
                        query_filter: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """Get the most recent record from a table."""
         return self.db.get_latest_data(file_path, table_name, query_filter)
