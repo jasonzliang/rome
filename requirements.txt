@@ -5,6 +5,7 @@ openai
 portalocker
 psutil
 pytest
+tinydb
 
 # Core library optional pkgs
 graphviz

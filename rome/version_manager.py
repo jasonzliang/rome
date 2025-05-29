@@ -22,7 +22,7 @@ class FileType(Enum):
     INDEX = "index.json"
     ACTIVE = "active.json"
     FINISHED = "finished.json"
-    DATABASE = "metadata.json"  # TinyDB database file
+    DATABASE = "tinydb.json"  # TinyDB database file
 
 
 @dataclass
