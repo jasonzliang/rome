@@ -16,9 +16,9 @@ class CostLimitExceededException(Exception):
         self.cost_limit = cost_limit
         self.accumulated_cost = accumulated_cost
         if accumulated_cost is not None:
-            super().__init__(f"Estimated cost ${estimated_cost:.6f} would bring total to ${accumulated_cost + estimated_cost:.6f}, exceeding limit ${cost_limit:.6f}")
+            super().__init__(f"Estimated cost ${estimated_cost:.4f} would bring total to ${accumulated_cost + estimated_cost:.4f}, exceeding limit ${cost_limit:.4f}")
         else:
-            super().__init__(f"Estimated cost ${estimated_cost:.6f} exceeds limit ${cost_limit:.6f}")
+            super().__init__(f"Estimated cost ${estimated_cost:.4f} exceeds limit ${cost_limit:.4f}")
 
 
 class OpenAIHandler:
@@ -116,7 +116,7 @@ class OpenAIHandler:
 
         self.logger.info(f"OpenAI handler initialized with model: {self.model}")
         if self.cost_limit:
-            self.logger.info(f"Cost limit enabled: ${self.cost_limit:.6f}")
+            self.logger.info(f"Cost limit enabled: ${self.cost_limit:.4f}")
 
     def _get_max_input_tokens(self) -> int:
         """Get max input tokens."""
@@ -225,8 +225,7 @@ class OpenAIHandler:
             'total_tokens': input_tokens + output_tokens,
             'accumulated_cost': self.accumulated_cost
         })
-
-        self.logger.debug(f"Added ${actual_cost:.6f} to accumulated cost. Total: ${self.accumulated_cost:.6f}")
+        # self.logger.debug(f"Added ${actual_cost:.4f} to total cost. Total: ${self.accumulated_cost:.4f}")
 
     def _check_and_log_cost(self, messages: List[Dict], max_tokens: int, model: str):
         """Check cost limit including accumulated costs and log estimation."""
@@ -240,8 +239,8 @@ class OpenAIHandler:
         if total_projected_cost > self.cost_limit:
             raise CostLimitExceededException(estimated_cost, self.cost_limit, self.accumulated_cost)
 
-        self.logger.debug(f"Estimated cost: ${estimated_cost:.6f} (input: {input_tokens}, max output: {max_tokens})")
-        self.logger.debug(f"Accumulated cost: ${self.accumulated_cost:.6f}, Projected total: ${total_projected_cost:.6f}")
+        # self.logger.debug(f"Estimated cost: ${estimated_cost:.4f} (input: {input_tokens}, max output: {max_tokens})")
+        # self.logger.debug(f"Total cost: ${self.accumulated_cost:.4f}, Projected total: ${total_projected_cost:.4f}")
 
     def _log_messages_with_multiline_support(self, messages):
         """Log messages with proper multiline string formatting"""
@@ -345,13 +344,12 @@ class OpenAIHandler:
             # Add the actual cost to our tracking
             self._add_cost(actual_cost, usage.prompt_tokens, usage.completion_tokens)
 
-            self.logger.debug(f"Tokens: {usage.prompt_tokens}→{usage.completion_tokens} (total: {usage.total_tokens})")
-            self.logger.debug(f"Call cost: ${actual_cost:.6f}, Accumulated: ${self.accumulated_cost:.6f}")
-
             pricing = self._get_model_pricing(kwargs["model"])
             input_cost = (usage.prompt_tokens * pricing["input"]) / 1_000_000
             output_cost = (usage.completion_tokens * pricing["output"]) / 1_000_000
-            self.logger.debug(f"Cost breakdown - Input: ${input_cost:.6f}, Output: ${output_cost:.6f}")
+
+            self.logger.debug(f"Tokens: {usage.prompt_tokens}→{usage.completion_tokens}, Sum: {usage.total_tokens}")
+            self.logger.debug(f"Cost: ${actual_cost:.4f} ({input_cost:.4f}→{output_cost:.4f}), Total: ${self.accumulated_cost:.2f}/{self.cost_limit:.2f}")
 
         self.logger.debug(f"Response: {content}")
         return content
