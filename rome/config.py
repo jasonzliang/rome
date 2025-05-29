@@ -23,6 +23,10 @@ META_DIR_EXT = 'rome'
 
 # Default logging base directory name for agents
 LOG_DIR_NAME = "__rome__"
+
+# Default extension for test files:
+TEST_FILE_EXT = '_test.py'
+
 ######## These constants are not intended to be user modifiable ########
 
 # Define the default configuration structure as a dictionary
@@ -90,8 +94,8 @@ DEFAULT_CONFIG = {
     "SearchAction": {
         "max_files": sys.maxsize, # Maximum number of candidates to select from after search
         "file_types": [".py"], #  File types to search for
-        "exclude_types": ["_test.py"], # File types to not search for
-        "exclude_dirs": [".git", "venv", "__pycache__"], # Directories to not search in
+        "exclude_types": [], # File types to not search for
+        "exclude_dirs": [".*", "venv", "__*__"], # Directories to not search in
         "selection_criteria": "Select the file that you have the most confidence in improving or fixing.", # Criteria for selecting file from possible candidates
         "batch_size": 10, # Candidate batch size for selection
         "batch_sampling": False # If set to true, randomly sample batches

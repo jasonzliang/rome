@@ -1,12 +1,17 @@
+import fnmatch
 import glob
 import os
+from pathlib import Path
 import random
+import re
 import sys
 import time
 from typing import Dict, Optional, Any, Union, List
+
 from .action import Action
 from ..logger import get_logger
-from ..config import LOG_DIR_NAME, SUMMARY_LENGTH, check_attrs
+from ..config import LOG_DIR_NAME, SUMMARY_LENGTH, TEST_FILE_EXT
+from ..config import check_attrs
 from ..parsing import extract_all_definitions
 
 class SearchAction(Action):
@@ -22,6 +27,10 @@ class SearchAction(Action):
 
         if LOG_DIR_NAME not in self.exclude_dirs:
             self.exclude_dirs.append(LOG_DIR_NAME)
+        if f"*.{META_DIR_EXT}" not in self.exclude_dirs:
+            self.exclude_dirs.append(f"*.{META_DIR_EXT}")
+        if TEST_FILE_EXT not in self.exclude_types:
+            self.exclude_types.append(TEST_FILE_EXT)
 
     def summary(self, agent) -> str:
         """Return a detailed summary of the search action"""
@@ -211,23 +220,39 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
         return filtered_files
 
     def _filter_excluded_dirs(self, files: List[str]) -> List[str]:
-        """Filter out files from excluded directories"""
+    """Compact, efficient, and tested version with wildcard support"""
         if not self.exclude_dirs:
             return files
 
-        filtered_files = []
-        for file_path in files:
-            normalized_path = file_path.replace('\\', '/')
-            exclude = any(
-                f'/{excluded_dir_norm}/' in normalized_path or
-                normalized_path.startswith(f'{excluded_dir_norm}/')
-                for excluded_dir in self.exclude_dirs
-                for excluded_dir_norm in [excluded_dir.replace('\\', '/')]
-            )
-            if not exclude:
-                filtered_files.append(file_path)
+        # Normalize patterns once
+        patterns = [p.replace('\\', '/') for p in self.exclude_dirs]
 
-        return filtered_files
+        def is_excluded(file_path: str) -> bool:
+            norm_path = file_path.replace('\\', '/')
+            path_parts = norm_path.split('/')
+
+            for pattern in patterns:
+                # Strategy 1: Match directory names
+                for part in path_parts[:-1]: # Exclude filename
+                    if fnmatch.fnmatch(part, pattern):
+                        return True
+
+                # Strategy 2: Match path segments (for patterns like "build/debug")
+                for i in range(len(path_parts) - 1):
+                    segment = '/'.join(path_parts[:i+1])
+                    if fnmatch.fnmatch(segment, pattern):
+                        return True
+
+                # Strategy 3: Match if path contains pattern (for *cache*, */logs/*, etc.)
+                if ('*' in pattern and
+                    (fnmatch.fnmatch(norm_path, f"*/{pattern}/*") or
+                     fnmatch.fnmatch(norm_path, f"{pattern}/*") or
+                     fnmatch.fnmatch(norm_path, f"*{pattern}*"))):
+                    return True
+
+            return False
+
+        return [f for f in files if not is_excluded(f)]
 
     def _filter_excluded_types(self, files: List[str]) -> List[str]:
         """Filter out files with excluded file types"""

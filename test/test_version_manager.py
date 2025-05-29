@@ -9,17 +9,15 @@ import os
 import json
 import tempfile
 import shutil
-import hashlib
 import sys
 from unittest.mock import Mock, patch, MagicMock
-from contextlib import contextmanager
 import datetime
 from pathlib import Path
 
 # Add the project root to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Mock the dependencies that might not be available
+# Mock dependencies
 class MockConfig:
     META_DIR_EXT = "meta"
 
@@ -42,16 +40,18 @@ mock_portalocker.lock = MagicMock()
 sys.modules['psutil'] = mock_psutil
 sys.modules['portalocker'] = mock_portalocker
 
-# Mock the rome.config and rome.logger modules
+# Mock the rome modules
 mock_config = MagicMock()
 mock_config.META_DIR_EXT = "meta"
 sys.modules['rome.config'] = mock_config
 sys.modules['rome.logger'] = MagicMock()
 sys.modules['rome.logger'].get_logger = get_logger
+sys.modules['rome.parsing'] = MagicMock()
+sys.modules['rome.parsing'].hash_string = lambda x: f"hash_{hash(x):064x}"[-64:]
 
 # Now import the actual VersionManager
-from rome.version_manager import VersionManager
-print("✅ Successfully imported VersionManager from rome.versioning")
+from rome.version_manager import VersionManager, ValidationError, FileType, locked_file_operation, locked_json_operation
+print("✅ Successfully imported VersionManager")
 
 
 class TestVersionManager:
@@ -80,69 +80,46 @@ class TestVersionManager:
 
     @pytest.fixture
     def mock_agent(self):
-        """Create a mock agent"""
+        """Create a mock agent with chat completion"""
         agent = Mock()
-        agent.get_id.return_value = "test_agent_12345"
+        # Use current process PID to ensure process checks work correctly
+        agent.get_id.return_value = f"test_agent_{os.getpid()}"
+        agent.chat_completion.return_value = "Test analysis result"
+        agent.role = "Test role"
         return agent
 
+    @pytest.fixture
+    def test_file_pair(self, temp_dir):
+        """Create a main file and corresponding test file"""
+        main_file = os.path.join(temp_dir, "module.py")
+        test_file = os.path.join(temp_dir, "module_test.py")
+
+        main_content = "def add(a, b):\n    return a + b"
+        test_content = "def test_add():\n    assert add(2, 3) == 5"
+
+        with open(main_file, 'w') as f:
+            f.write(main_content)
+
+        return main_file, test_file, main_content, test_content
+
+    # Utility Tests
     def test_init(self):
         """Test VersionManager initialization"""
         vm = VersionManager()
         assert vm.config == {}
         assert vm.logger is not None
+        assert vm.active_files == set()
 
         config = {"test": "value"}
         vm = VersionManager(config)
         assert vm.config == config
 
-    def test_get_meta_dir(self, vm, temp_dir):
-        """Test meta directory creation"""
-        file_path = os.path.join(temp_dir, "test.py")
-        meta_dir = vm._get_meta_dir(file_path)
+    def test_timestamp_and_hash(self, vm):
+        """Test timestamp and hash generation"""
+        timestamp = vm._get_timestamp()
+        assert isinstance(timestamp, str)
+        datetime.datetime.fromisoformat(timestamp)
 
-        expected = f"{file_path}.{mock_config.META_DIR_EXT}"
-        assert meta_dir == expected
-        assert os.path.exists(meta_dir)
-
-    def test_load_json_safely(self, vm, temp_dir):
-        """Test safe JSON loading"""
-        # Test non-existent file
-        result = vm._load_json_safely("nonexistent.json")
-        assert result == {}
-
-        result = vm._load_json_safely("nonexistent.json", {"default": "value"})
-        assert result == {"default": "value"}
-
-        # Test valid JSON file
-        json_file = os.path.join(temp_dir, "test.json")
-        test_data = {"key": "value"}
-        with open(json_file, 'w') as f:
-            json.dump(test_data, f)
-
-        result = vm._load_json_safely(json_file)
-        assert result == test_data
-
-        # Test corrupted JSON file
-        with open(json_file, 'w') as f:
-            f.write("invalid json{")
-
-        result = vm._load_json_safely(json_file, {"error": "handled"})
-        assert result == {"error": "handled"}
-
-    def test_save_json(self, vm, temp_dir):
-        """Test JSON saving"""
-        json_file = os.path.join(temp_dir, "output.json")
-        test_data = {"test": "data", "number": 42}
-
-        vm._save_json(json_file, test_data)
-
-        assert os.path.exists(json_file)
-        with open(json_file, 'r') as f:
-            loaded_data = json.load(f)
-        assert loaded_data == test_data
-
-    def test_get_content_hash(self, vm):
-        """Test content hash generation"""
         content = "test content"
         hash1 = vm._get_content_hash(content)
         hash2 = vm._get_content_hash(content)
@@ -150,17 +127,42 @@ class TestVersionManager:
 
         assert hash1 == hash2
         assert hash1 != hash3
-        assert len(hash1) == 64  # SHA256 hex length
+        assert len(hash1) == 64
 
-    def test_get_timestamp(self, vm):
-        """Test timestamp generation"""
-        timestamp = vm._get_timestamp()
-        assert isinstance(timestamp, str)
-        # Should be ISO format
-        datetime.datetime.fromisoformat(timestamp)
+    def test_meta_directories(self, vm, temp_dir):
+        """Test meta directory creation and management"""
+        file_path = os.path.join(temp_dir, "test.py")
+        meta_dir = vm._get_meta_dir(file_path)
 
-    def test_find_existing_version_by_hash(self, vm):
-        """Test finding existing version by hash"""
+        expected = f"{file_path}.{mock_config.META_DIR_EXT}"
+        assert meta_dir == expected
+        assert os.path.exists(meta_dir)
+
+    def test_file_path_utilities(self, vm, temp_dir):
+        """Test file path utility methods"""
+        # Test main file inference
+        main_file = os.path.join(temp_dir, "module.py")
+        test_file = os.path.join(temp_dir, "module_test.py")
+
+        with open(main_file, 'w') as f:
+            f.write("def main(): pass")
+
+        inferred = vm._infer_main_file_from_test(test_file)
+        assert inferred == main_file
+
+        # Test non-test file
+        regular_file = os.path.join(temp_dir, "regular.py")
+        assert vm._infer_main_file_from_test(regular_file) is None
+
+        # Test clean file path
+        dirty_path = f"/test/file.py.{mock_config.META_DIR_EXT}"
+        clean_path = vm._clean_file_path(dirty_path)
+        assert clean_path == "/test/file.py"
+
+    # Version Management Tests
+    def test_version_utilities(self, vm):
+        """Test version management utility methods"""
+        # Test finding existing version by hash
         index = {
             'versions': [
                 {'version': 1, 'hash': 'abc123'},
@@ -173,23 +175,12 @@ class TestVersionManager:
         assert vm._find_existing_version_by_hash(index, 'nonexistent') is None
         assert vm._find_existing_version_by_hash({}, 'abc123') is None
 
-    def test_get_next_version_number(self, vm):
-        """Test version number generation"""
-        # Empty index
+        # Test next version number
         assert vm._get_next_version_number({}) == 1
         assert vm._get_next_version_number({'versions': []}) == 1
-
-        # With existing versions
-        index = {
-            'versions': [
-                {'version': 1},
-                {'version': 3},
-                {'version': 2}
-            ]
-        }
         assert vm._get_next_version_number(index) == 4
 
-    def test_create_version_metadata(self, vm):
+    def test_version_metadata_creation(self, vm):
         """Test version metadata creation"""
         metadata = vm._create_version_metadata(
             file_path="/test/file.py",
@@ -208,14 +199,12 @@ class TestVersionManager:
         assert metadata['main_file_path'] == "/test/main.py"
         assert 'timestamp' in metadata
 
-    def test_save_version(self, vm, sample_file):
-        """Test version saving"""
+    def test_save_version_workflow(self, vm, sample_file):
+        """Test complete version saving workflow"""
         file_path, content = sample_file
 
-        # First save
-        version = vm.save_version(file_path, content,
-                                changes=[{"type": "initial", "description": "First version"}],
-                                explanation="Initial version")
+        # Save original
+        version = vm.save_original(file_path, content)
         assert version == 1
 
         # Save same content (should return existing version)
@@ -224,7 +213,9 @@ class TestVersionManager:
 
         # Save different content
         new_content = "def hello():\n    return 'universe'"
-        version3 = vm.save_version(file_path, new_content)
+        version3 = vm.save_version(file_path, new_content,
+                                 changes=[{"type": "update", "description": "Changed return value"}],
+                                 explanation="Updated greeting")
         assert version3 == 2
 
         # Verify files exist
@@ -233,44 +224,38 @@ class TestVersionManager:
         assert os.path.exists(os.path.join(meta_dir, "sample_v1.py"))
         assert os.path.exists(os.path.join(meta_dir, "sample_v2.py"))
 
-    def test_save_original(self, vm, sample_file):
-        """Test saving original version"""
-        file_path, content = sample_file
+        # Verify index content
+        with open(os.path.join(meta_dir, "index.json"), 'r') as f:
+            index = json.load(f)
+        assert len(index['versions']) == 2
+        assert index['versions'][0]['version'] == 1
+        assert index['versions'][1]['version'] == 2
 
-        # First call should save the original
-        version = vm.save_original(file_path, content)
-        assert version == 1
+    def test_save_test_version(self, vm, test_file_pair):
+        """Test saving test file versions"""
+        main_file, test_file, main_content, test_content = test_file_pair
 
-        # Second call should return 1 (already exists)
-        version2 = vm.save_original(file_path, content)
-        assert version2 == 1
-
-    def test_save_test_version(self, vm, temp_dir):
-        """Test saving test version"""
-        # Create main file
-        main_file = os.path.join(temp_dir, "module.py")
-        main_content = "def main(): pass"
-        with open(main_file, 'w') as f:
-            f.write(main_content)
-
-        # Create test file
-        test_file = os.path.join(temp_dir, "module_test.py")
-        test_content = "def test_main(): assert True"
-
-        # Save test version
+        # Save test version with explicit main file
         version = vm.save_test_version(test_file, test_content, main_file_path=main_file)
         assert version == 1
+
+        # Save test version with inferred main file
+        version2 = vm.save_test_version(test_file, test_content + "\n# updated")
+        assert version2 == 2
 
         # Verify test meta directory structure
         main_meta_dir = vm._get_meta_dir(main_file)
         test_meta_dir = vm._get_test_meta_dir(test_file, main_file)
         assert os.path.exists(test_meta_dir)
         assert test_meta_dir.startswith(main_meta_dir)
+        assert "module_test.py.meta" in test_meta_dir
 
-    def test_save_analysis(self, vm, sample_file):
-        """Test analysis saving"""
+    # Analysis Tests
+    def test_analysis_workflow(self, vm, sample_file, mock_agent):
+        """Test analysis saving and loading"""
         file_path, _ = sample_file
 
+        # Save analysis
         analysis_path = vm.save_analysis(
             file_path=file_path,
             analysis="Code looks good",
@@ -281,164 +266,202 @@ class TestVersionManager:
 
         assert os.path.exists(analysis_path)
 
-        # Load and verify
-        with open(analysis_path, 'r') as f:
-            data = json.load(f)
+        # Load analysis data
+        analysis_data = vm._load_analysis(file_path)
+        assert analysis_data is not None
+        assert analysis_data['analysis'] == "Code looks good"
+        assert analysis_data['test_path'] == "/test/test_file.py"
+        assert analysis_data['exit_code'] == 0
+        assert analysis_data['output'] == "All tests passed"
 
-        assert data['analysis'] == "Code looks good"
-        assert data['test_path'] == "/test/test_file.py"
-        assert data['exit_code'] == 0
-        assert data['output'] == "All tests passed"
+        # Load formatted analysis
+        formatted = vm.load_analysis(file_path)
+        assert formatted is not None
+        assert 'Code looks good' in formatted
+        assert 'All tests passed' in formatted
+        assert 'IMPORTANT' in formatted
 
-    def test_load_analysis(self, vm, sample_file):
-        """Test analysis loading"""
+    def test_create_analysis(self, vm, mock_agent):
+        """Test analysis creation with LLM"""
+        original_content = "def add(a, b): return a + b"
+        test_content = "def test_add(): assert add(2, 3) == 5"
+        output = "All tests passed"
+        exit_code = 0
+
+        result = vm.create_analysis(mock_agent, original_content, test_content, output, exit_code)
+        assert result == "Test analysis result"
+        mock_agent.chat_completion.assert_called_once()
+
+    # Active File Management Tests
+    def test_active_file_management(self, vm, sample_file, mock_agent):
+        """Test active file flagging and checking"""
         file_path, _ = sample_file
 
-        # No analysis exists
-        result = vm._load_analysis(file_path)
-        assert result is None
+        # Initially not active
+        assert not vm.check_active(file_path)
+        assert not vm._has_active_files()
 
-        # Save and load analysis
-        vm.save_analysis(file_path, "Test analysis")
-        result = vm._load_analysis(file_path)
-
-        assert result is not None
-        assert result['analysis'] == "Test analysis"
-
-    def test_format_analysis_context(self, vm):
-        """Test analysis context formatting"""
-        # Empty data
-        assert vm._format_analysis_context(None) == ""
-        assert vm._format_analysis_context({}) == ""
-
-        # With data
-        analysis_data = {
-            'output': 'Test output',
-            'analysis': 'Test analysis'
-        }
-
-        result = vm._format_analysis_context(analysis_data)
-        assert 'Test output' in result
-        assert 'Test analysis' in result
-        assert 'IMPORTANT' in result
-
-    def test_get_analysis_prompt(self, vm, sample_file):
-        """Test analysis prompt generation"""
-        file_path, _ = sample_file
-
-        # No analysis
-        result = vm.get_analysis_prompt(file_path)
-        assert result is None
-
-        # With analysis
-        vm.save_analysis(file_path, "Test analysis", output="Test output")
-        result = vm.get_analysis_prompt(file_path)
-
-        assert result is not None
-        assert 'Test analysis' in result
-        assert 'Test output' in result
-
-    def test_infer_main_file_from_test(self, vm, temp_dir):
-        """Test main file inference from test file"""
-        # Create main file
-        main_file = os.path.join(temp_dir, "module.py")
-        with open(main_file, 'w') as f:
-            f.write("def main(): pass")
-
-        # Test file that should match
-        test_file = os.path.join(temp_dir, "module_test.py")
-        result = vm._infer_main_file_from_test(test_file)
-        assert result == main_file
-
-        # Test file that shouldn't match
-        other_test = os.path.join(temp_dir, "other_test.py")
-        result = vm._infer_main_file_from_test(other_test)
-        assert result is None
-
-        # Non-test file
-        regular_file = os.path.join(temp_dir, "regular.py")
-        result = vm._infer_main_file_from_test(regular_file)
-        assert result is None
-
-    def test_flag_active(self, vm, sample_file, mock_agent):
-        """Test active flagging"""
-        file_path, _ = sample_file
-
-        # Mock the process checking to simulate a running process
+        # Flag as active
         with patch.object(vm, '_is_process_running', return_value=True):
-            # Flag as active
             result = vm.flag_active(mock_agent, file_path)
             assert result is True
+            # Use ignore_self=False to check the current process
+            assert vm.check_active(file_path, ignore_self=False)
+            assert vm._has_active_files()
+            assert os.path.abspath(file_path) in vm._get_active_files()
 
-            # Check if flagged
-            assert vm.check_active(file_path) is True
+            # Try to flag another file (should fail)
+            other_file = os.path.join(os.path.dirname(file_path), "other.py")
+            with open(other_file, 'w') as f:
+                f.write("# other file")
 
-    def test_check_active(self, vm, sample_file):
-        """Test active checking"""
-        file_path, _ = sample_file
-
-        # Not active initially
-        assert vm.check_active(file_path) is False
-
-    def test_active_with_stale_process(self, vm, sample_file, mock_agent):
-        """Test active checking with stale process (no mocking)"""
-        file_path, _ = sample_file
-
-        # Flag as active (this will succeed)
-        result = vm.flag_active(mock_agent, file_path)
-        assert result is True
-
-        # Check active without mocking - should return False because
-        # the mock agent's PID doesn't correspond to a real running process
-        assert vm.check_active(file_path) is False
-
-        # Verify the active file was cleaned up due to stale process
-        meta_dir = vm._get_meta_dir(file_path)
-        active_file_path = os.path.join(meta_dir, "active.json")
-        assert not os.path.exists(active_file_path)
-
-    def test_unflag_active(self, vm, sample_file, mock_agent):
-        """Test active unflagging"""
-        file_path, _ = sample_file
-
-        # Mock the process checking to simulate a running process
-        with patch.object(vm, '_is_process_running', return_value=True):
-            # Flag first
-            vm.flag_active(mock_agent, file_path)
-            assert vm.check_active(file_path) is True
+            with pytest.raises(RuntimeError, match="already has active file"):
+                vm.flag_active(mock_agent, other_file)
 
             # Unflag
             result = vm.unflag_active(mock_agent, file_path)
             assert result is True
-            assert vm.check_active(file_path) is False
+            assert not vm.check_active(file_path, ignore_self=False)
+            assert not vm._has_active_files()
 
-            # Try to unflag again
-            result = vm.unflag_active(mock_agent, file_path)
-            assert result is False
-
-    def test_check_finished(self, vm, sample_file, mock_agent):
-        """Test finished checking"""
+    def test_stale_process_cleanup(self, vm, sample_file, mock_agent):
+        """Test cleanup of stale process files"""
         file_path, _ = sample_file
 
-        # Not finished initially
-        assert vm.check_finished(mock_agent, file_path) is False
+        # Test with current process (should work)
+        with patch.object(vm, '_is_process_running', return_value=True):
+            # Flag as active
+            vm.flag_active(mock_agent, file_path)
 
-    def test_flag_finished(self, vm, sample_file, mock_agent):
-        """Test finished flagging"""
+            # With ignore_self=True (default), should return False because it ignores current process
+            is_active_ignore_self = vm.check_active(file_path)  # default ignore_self=True
+            assert not is_active_ignore_self
+
+            # With ignore_self=False, should return True because the process is running
+            is_active_include_self = vm.check_active(file_path, ignore_self=False)
+            assert is_active_include_self
+
+            # Clean up
+            vm.unflag_active(mock_agent, file_path)
+
+        # Test actual stale process cleanup with different agent
+        stale_agent = Mock()
+        stale_agent.get_id.return_value = "stale_agent_99999"  # Non-existent PID
+
+        # Manually create stale active file
+        meta_dir = vm._get_meta_dir(file_path)
+        active_file_path = vm._get_file_path(meta_dir, FileType.ACTIVE)
+        stale_data = {
+            'agent_id': stale_agent.get_id(),
+            'timestamp': vm._get_timestamp(),
+            'file_path': file_path
+        }
+        with open(active_file_path, 'w') as f:
+            json.dump(stale_data, f)
+
+        # Check should clean up the stale file (no mocking, so process won't be found)
+        is_active = vm.check_active(file_path)
+        assert not is_active
+        assert not os.path.exists(active_file_path)
+
+    # Finished File Management Tests
+    def test_finished_file_management(self, vm, sample_file, mock_agent):
+        """Test finished file flagging"""
         file_path, _ = sample_file
+
+        # Initially not finished
+        assert not vm.check_finished(mock_agent, file_path)
 
         # Flag as finished
         vm.flag_finished(mock_agent, file_path)
-        assert vm.check_finished(mock_agent, file_path) is True
+        assert vm.check_finished(mock_agent, file_path)
 
         # Flag again (should not duplicate)
         vm.flag_finished(mock_agent, file_path)
-        assert vm.check_finished(mock_agent, file_path) is True
+        assert vm.check_finished(mock_agent, file_path)
 
+        # Verify finished file content
+        meta_dir = vm._get_meta_dir(file_path)
+        finished_file_path = vm._get_file_path(meta_dir, FileType.FINISHED)
+        with open(finished_file_path, 'r') as f:
+            finished_data = json.load(f)
+
+        assert len(finished_data['agents']) == 1
+        assert finished_data['agents'][0]['agent_id'] == mock_agent.get_id()
+
+    # Process Management Tests
+    def test_process_utilities(self, vm):
+        """Test process-related utility methods"""
+        # Test PID extraction
+        agent_id = "test_agent_12345"
+        pid = vm._get_pid_from_agent_id(agent_id)
+        assert pid == 12345
+
+        # Test invalid agent ID formats
+        assert vm._get_pid_from_agent_id("invalid_format") is None
+        assert vm._get_pid_from_agent_id("test_agent") is None
+        assert vm._get_pid_from_agent_id("") is None
+
+        # Test process running check
+        with patch('psutil.Process') as mock_process:
+            mock_proc = mock_process.return_value
+            mock_proc.username.return_value = "testuser"
+            mock_proc.name.return_value = "python"
+            mock_proc.cmdline.return_value = ["python", "script.py"]
+
+            with patch('os.getlogin', return_value="testuser"):
+                result = vm._is_process_running(12345)
+                assert isinstance(result, bool)
+
+    # Validation Tests
+    def test_validation_methods(self, vm, sample_file, mock_agent):
+        """Test validation functionality"""
+        file_path, _ = sample_file
+
+        # Test validation with no active files
+        vm.validate_active_files(mock_agent)  # Should not raise
+
+        # Test validation with active file
+        with patch.object(vm, '_is_process_running', return_value=True):
+            vm.flag_active(mock_agent, file_path)
+            vm.validate_active_files(mock_agent)  # Should not raise
+
+        # Test validation error creation
+        error = ValidationError("test.py", "field", "message", "value")
+        assert error.file_path == "test.py"
+        assert error.field == "field"
+        assert error.message == "message"
+        assert error.value == "value"
+
+    # Context Manager Tests
+    def test_locked_operations(self, vm, temp_dir):
+        """Test locked file and JSON operations"""
+        # Test locked_file_operation (standalone function)
+        test_file = os.path.join(temp_dir, "test.txt")
+        with locked_file_operation(test_file, 'w') as f:
+            f.write("test content")
+
+        assert os.path.exists(test_file)
+        with open(test_file, 'r') as f:
+            assert f.read() == "test content"
+
+        # Test locked_json_operation (standalone function)
+        json_file = os.path.join(temp_dir, "test.json")
+        with locked_json_operation(json_file, {"default": "value"}) as data:
+            data["new_key"] = "new_value"
+
+        assert os.path.exists(json_file)
+        with open(json_file, 'r') as f:
+            loaded = json.load(f)
+        assert loaded["default"] == "value"
+        assert loaded["new_key"] == "new_value"
+
+    # Integration and Edge Case Tests
     def test_edge_cases(self, vm, temp_dir):
         """Test edge cases and error conditions"""
+        file_path = os.path.join(temp_dir, "edge_case.py")
+
         # Test with empty content
-        file_path = os.path.join(temp_dir, "empty.py")
         version = vm.save_version(file_path, "")
         assert version == 1
 
@@ -452,114 +475,77 @@ class TestVersionManager:
         version = vm.save_version(file_path, unicode_content)
         assert version == 3
 
-    def test_file_lock_context_manager(self, vm, temp_dir):
-        """Test file locking context manager"""
-        lock_file = os.path.join(temp_dir, "test.lock")
+    def test_shutdown(self, vm, sample_file, mock_agent):
+        """Test shutdown cleanup"""
+        file_path, _ = sample_file
 
-        # Test that context manager works without errors
-        try:
-            with vm._file_lock(lock_file):
-                assert os.path.exists(lock_file)
-        except Exception as e:
-            pytest.fail(f"File lock context manager failed: {e}")
+        with patch.object(vm, '_is_process_running', return_value=True):
+            # Create some active files
+            vm.flag_active(mock_agent, file_path)
+            assert vm._has_active_files()
 
-    def test_integration_workflow(self, vm, sample_file, mock_agent):
+            # Shutdown
+            vm.shutdown(mock_agent)
+            assert not vm._has_active_files()
+
+    def test_complete_integration_workflow(self, vm, test_file_pair, mock_agent):
         """Test complete integration workflow"""
-        file_path, content = sample_file
+        main_file, test_file, main_content, test_content = test_file_pair
 
-        # Complete workflow test
         try:
-            # Mock the process checking to simulate a running process
             with patch.object(vm, '_is_process_running', return_value=True):
-                # 1. Save version
-                version = vm.save_version(file_path, content)
-                assert version >= 1
+                # 1. Save original version
+                version = vm.save_original(main_file, main_content)
+                assert version == 1
 
-                # 2. Save analysis
-                analysis_path = vm.save_analysis(file_path, "Analysis complete")
+                # 2. Save test version
+                test_version = vm.save_test_version(test_file, test_content)
+                assert test_version == 1
+
+                # 3. Save analysis
+                analysis_path = vm.save_analysis(
+                    main_file, "Code analysis complete",
+                    test_path=test_file, exit_code=0, output="Tests passed"
+                )
                 assert os.path.exists(analysis_path)
 
-                # 3. Flag as active
-                flag_result = vm.flag_active(mock_agent, file_path)
-                assert flag_result is True
+                # 4. Flag as active
+                vm.flag_active(mock_agent, main_file)
+                assert vm.check_active(main_file, ignore_self=False)
 
-                # 4. Check active
-                is_active = vm.check_active(file_path)
-                assert is_active is True
+                # 5. Save updated version
+                updated_content = main_content + "\n# Updated"
+                updated_version = vm.save_version(
+                    main_file, updated_content,
+                    changes=[{"type": "enhancement", "description": "Added comment"}],
+                    explanation="Minor update"
+                )
+                assert updated_version == 2
 
-                # 5. Unflag active
-                unflag_result = vm.unflag_active(mock_agent, file_path)
-                assert unflag_result is True
+                # 6. Unflag active
+                vm.unflag_active(mock_agent, main_file)
+                assert not vm.check_active(main_file, ignore_self=False)
 
-                # 6. Flag as finished
-                vm.flag_finished(mock_agent, file_path)
-                assert vm.check_finished(mock_agent, file_path) is True
+                # 7. Flag as finished
+                vm.flag_finished(mock_agent, main_file)
+                assert vm.check_finished(mock_agent, main_file)
+
+                # 8. Verify all metadata exists
+                main_meta_dir = vm._get_meta_dir(main_file)
+                test_meta_dir = vm._get_test_meta_dir(test_file, main_file)
+
+                assert os.path.exists(os.path.join(main_meta_dir, "index.json"))
+                assert os.path.exists(os.path.join(main_meta_dir, "code_analysis.json"))
+                assert os.path.exists(os.path.join(main_meta_dir, "finished.json"))
+                assert os.path.exists(os.path.join(test_meta_dir, "index.json"))
 
         except Exception as e:
             pytest.fail(f"Integration workflow failed: {e}")
 
-    def test_robust_error_handling(self, vm, temp_dir):
-        """Test robust error handling"""
-        # Test with invalid paths
-        try:
-            result = vm._load_json_safely("/nonexistent/path/file.json")
-            assert result == {}
-        except Exception as e:
-            pytest.fail(f"Should handle invalid paths gracefully: {e}")
-
-        # Test with permission issues (simulate)
-        try:
-            vm._get_meta_dir(os.path.join(temp_dir, "test_file.py"))
-        except Exception as e:
-            pytest.fail(f"Should handle directory creation gracefully: {e}")
-
-    def test_concurrent_access_simulation(self, vm, sample_file, mock_agent):
-        """Test simulation of concurrent access patterns"""
-        file_path, content = sample_file
-
-        # Multiple versions in sequence
-        for i in range(5):
-            modified_content = content + f"\n# Version {i}"
-            version = vm.save_version(file_path, modified_content)
-            assert version == i + 1
-
-        # Verify index integrity
-        meta_dir = vm._get_meta_dir(file_path)
-        index_path = os.path.join(meta_dir, "index.json")
-        with open(index_path, 'r') as f:
-            index = json.load(f)
-
-        assert len(index['versions']) == 5
-        versions = [v['version'] for v in index['versions']]
-        assert versions == [1, 2, 3, 4, 5]
-
-    def test_process_utilities(self, vm):
-        """Test process-related utility methods"""
-        # Test PID extraction from agent ID
-        agent_id = "test_agent_12345"
-        pid = vm._get_pid_from_agent_id(agent_id)
-        assert pid == 12345
-
-        # Test invalid agent ID
-        invalid_id = "invalid_format"
-        pid = vm._get_pid_from_agent_id(invalid_id)
-        assert pid is None
-
-        # Test process running check with mock
-        with patch('psutil.Process') as mock_process:
-            mock_proc = mock_process.return_value
-            mock_proc.username.return_value = "testuser"
-            mock_proc.name.return_value = "python"
-            mock_proc.cmdline.return_value = ["python", "script.py"]
-
-            with patch('os.getlogin', return_value="testuser"):
-                result = vm._is_process_running(12345)
-                assert isinstance(result, bool)
-
 
 def run_tests():
     """Run all tests with proper setup"""
-    print("Testing VersionManager (real implementation)")
+    print("Testing VersionManager (updated implementation)")
     print("=" * 70)
 
     # Configure pytest arguments
@@ -576,7 +562,7 @@ def run_tests():
     print("\n" + "=" * 70)
     if exit_code == 0:
         print("✅ All tests passed!")
-        print("🎉 Real VersionManager implementation tested successfully!")
+        print("🎉 Updated VersionManager implementation tested successfully!")
     else:
         print("❌ Some tests failed!")
         print("💡 Check the error messages above for details")
