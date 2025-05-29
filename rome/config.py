@@ -32,6 +32,7 @@ DEFAULT_CONFIG = {
         "base_url": "https://api.openai.com/v1", # Url for chat completion API
         "key_name": "OPENAI_API_KEY", # API key name to find in env
         "timeout": 60, # Time for allowing responses from API
+        "cost_limit": 500, # Max budget ($) for running OpenAI chat completion
 
         # General LLM parameters
         "model": "gpt-4o", # LLM model name

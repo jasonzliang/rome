@@ -203,16 +203,12 @@ class Agent:
         Returns:
             The response content as string
         """
-        # Set up base config
-        config = {}
 
         # Use action-specific system message if not provided
         if system_message is None:
             system_message = self.role
 
-        # Merge with any overrides
-        if override_config:
-            config.update(override_config)
+        config = override_config if override_config else None
 
         return self.openai_handler.chat_completion(
             prompt=prompt,
