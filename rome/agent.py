@@ -138,7 +138,7 @@ class Agent:
             log_config['base_dir'] = self.get_log_dir()
 
         if not log_config.get('filename'):
-            log_config['filename'] = f"{self.get_id()}.log"
+            log_config['filename'] = f"{self.get_id()}.console.log"
 
         get_logger().configure(log_config)
         self.logger.info(f"Logging configured. Log directory: {log_config['base_dir']}")
@@ -183,8 +183,8 @@ class Agent:
         """
         # If no output path specified, use the .rome directory
         if output_path is None:
-            output_path = os.path.join(self.logger.get_log_dir(),
-                f"fsm_graph_{self.get_id()}.png")
+            output_path = os.path.join(self.get_log_dir(),
+                f"{self.get_id()}.fsm.png")
 
         # Draw the graph using the FSM method
         self.logger.info(f"Drawing FSM graph to {output_path}")

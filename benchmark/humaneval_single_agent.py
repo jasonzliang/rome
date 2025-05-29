@@ -117,7 +117,7 @@ class HumanEvalBenchmark:
         try:
             self.agent.draw_fsm_graph()
         except Exception as e:
-            self.logger.warning(f"Could not generate FSM graph: {e}")
+            self.logger.error(f"Could not generate FSM graph: {e}")
 
         # Run agent
         self.logger.info(f"Running agent for {max_iterations} iterations")
@@ -129,7 +129,7 @@ class HumanEvalBenchmark:
 
     def _save_agent_config(self):
         """Save agent configuration to log directory"""
-        config_file = Path(self.agent.get_log_dir()) / f"{self.agent.get_id()}.yaml"
+        config_file = Path(self.agent.get_log_dir()) / f"{self.agent.get_id()}.config.yaml"
         config_file.write_text(yaml.dump(self.config, default_flow_style=False, sort_keys=False))
         self.logger.info(f"Saved agent configuration to: {config_file}")
 
@@ -147,7 +147,7 @@ class HumanEvalBenchmark:
                     "solution": solution_file.read_text(encoding="utf-8")
                 })
             else:
-                self.logger.warning(f"No solution file found for {task_id}")
+                self.logger.error(f"No solution file found for {task_id}")
 
         self.logger.info(f"Extracted {len(solutions)} solutions")
         return solutions
@@ -233,7 +233,7 @@ class HumanEvalBenchmark:
 
             return scores if scores else None
         except Exception as e:
-            self.logger.warning(f"Could not parse evaluation scores: {e}")
+            self.logger.error(f"Could not parse evaluation scores: {e}")
             return None
 
     def save_results(self, agent_results: Dict, evaluation_results: Dict) -> Path:
@@ -332,9 +332,9 @@ def main():
     parser.add_argument("--dataset", choices=["humaneval", "mbpp"], default="humaneval")
     parser.add_argument("--num-samples", type=int, help="Number of samples to include")
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs to include")
-    parser.add_argument("--max-iterations", type=int, default=10)
+    parser.add_argument("--max-iterations", type=int, default=4000)
     parser.add_argument("--stop-on-error", action="store_true")
-    parser.add_argument("--no-evaluation", action="store_true")
+    parser.add_argument("--no-evaluation", action="store_false")
 
     args = parser.parse_args()
 
