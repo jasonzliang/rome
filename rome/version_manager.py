@@ -473,15 +473,22 @@ class VersionManager:
     # ========== DATABASE INTERFACE METHODS ==========
     # Only methods actually used by action classes are exposed
 
-    def store_data(self, file_path: str, table_name: str, data: Dict[str, Any]) -> int:
+    def store_data(self,
+        file_path: str,
+        table_name: str,
+        data: Dict[str, Any],
+        single_entry: bool = True) -> int:
         """Store data in the TinyDB database for a file, clearing existing data first."""
         # Clear the table before storing new data
-        self.db.clear_table(file_path, table_name)
+        if single_entry:
+            self.db.clear_table(file_path, table_name)
         # Store the new data
         return self.db.store_data(file_path, table_name, data)
 
-    def get_data(self, file_path: str, table_name: str,
-                       query_filter: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    def get_data(self,
+        file_path: str,
+        table_name: str,
+        query_filter: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """Get the most recent record from a table."""
         return self.db.get_latest_data(file_path, table_name, query_filter)
 
