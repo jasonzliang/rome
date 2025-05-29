@@ -251,7 +251,7 @@ class FSM:
         try:
             import graphviz
         except ImportError:
-            error_msg = "Unable to draw FSM graph: graphviz package not installed. Please install with 'pip install graphviz'"
+            error_msg = "Unable to draw FSM graph, please install: 'pip install graphviz/brew install graphviz'"
             self.logger.error(error_msg)
             raise ImportError(error_msg)
 

@@ -206,7 +206,7 @@ class OpenAIHandler:
             )
             self.logger.info("LLMLingua-2 compressor initialized")
         except ImportError:
-            self.logger.error("LLMLingua not available, using truncation only")
+            self.logger.error("Text compression unavailable, please install: 'pip install llmlingua'")
             self.compressor = None
 
     def _fit_messages_with_compression(self, messages, max_input, current_tokens):

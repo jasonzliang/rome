@@ -37,7 +37,8 @@ def hash_string(content: str, hash_name: str = DEFAULT_HASH_FUNC) -> str:
     elif hash_name == "crc32":
         return f"{zlib.crc32(content.encode('utf-8')) & 0xffffffff:08x}"
     else:
-        raise ValueError(f"Unsupported hash function: {hash_name}")
+        need_xxhash = f", please install: 'pip install xxhash'" if not has_xxhash else ""
+        raise ValueError(f"Unsupported hash function: {hash_name}" + need_xxhash)
 
 
 def parse_code_cached(code_content: str, hash_name: str = DEFAULT_HASH_FUNC) -> ast.AST:
