@@ -216,38 +216,37 @@ def load_config(config_path="config.yaml", create_if_missing=False):
         raise FileNotFoundError(f"Config file {config_path} not found.")
 
 
-def _validate(key, orig_v, new_v):
+def merge_with_default_config(custom_config):
+    """Merge a custom config with the default config"""
+
     def _error_msg(key, val):
         return f"Invalid value {val} ({type(val).__name__}) for config parameter '{key}'"
 
-    if orig_v is not None:
-        logger.assert_true(type(orig_v) == type(new_v), f"Type mismatch for old {type(orig_v).__name__} and new value {type(orig_v).__name__} for config parameter '{key}'")
-    else:
-        logger.debug(f"Type matching skipped for config parameter '{key}' ({orig_v} -> {new_v})")
-
-    for v in [orig_v, new_v]:
-        if isinstance(v, (list, tuple, str)):
-            if not key.startswith("exclude_"):
-                logger.assert_true(len(v) > 0, f"{_error_msg(key, v)} — non-empty value")
-        elif isinstance(v, (int, float)):
-            logger.assert_true(v >= 0, f"{_error_msg(key, v)} — non-negative value")
+    def _validate(key, orig_v, new_v):
+        if orig_v is not None:
+            logger.assert_true(type(orig_v) == type(new_v), f"Type mismatch for old {type(orig_v).__name__} and new value {type(orig_v).__name__} for config parameter '{key}'")
         else:
-            logger.assert_true(isinstance(v, (bool, NoneType)),
-                f"{_error_msg(key, v)} - invalid type")
+            logger.debug(f"Type matching skipped for config parameter '{key}' ({orig_v} -> {new_v})")
 
+        for v in [orig_v, new_v]:
+            if isinstance(v, (list, tuple, str)):
+                if not key.startswith("exclude_"):
+                    logger.assert_true(len(v) > 0, f"{_error_msg(key, v)} — non-empty value")
+            elif isinstance(v, (int, float)):
+                logger.assert_true(v >= 0, f"{_error_msg(key, v)} — non-negative value")
+            else:
+                logger.assert_true(isinstance(v, (bool, NoneType)),
+                    f"{_error_msg(key, v)} - invalid type")
 
-def _update_dict(d, u):
-    for k, v in u.items():
-        if isinstance(v, dict) and k in d and isinstance(d[k], dict):
-            d[k] = _update_dict(d[k], v)
-        else:
-            _validate(k, d[k], v)
-            d[k] = v
-    return d
+    def _update_dict(d, u):
+        for k, v in u.items():
+            if isinstance(v, dict) and k in d and isinstance(d[k], dict):
+                d[k] = _update_dict(d[k], v)
+            else:
+                _validate(k, d[k], v)
+                d[k] = v
+        return d
 
-
-def merge_with_default_config(custom_config):
-    """Merge a custom config with the default config"""
     logger = get_logger()
     merged_config = copy.deepcopy(DEFAULT_CONFIG)
     result = _update_dict(merged_config, custom_config)
