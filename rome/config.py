@@ -61,8 +61,8 @@ DEFAULT_CONFIG = {
     },
 
     "AgentApi": {
-        "host": "localhost", # Url to query Agent API
-        "port": 8000 # Port to query agent API
+        "host": "localhost", # Url/hostname to query agent API
+        "port": 8000 # Port number to query agent API
     },
 
     # Logging configuration
@@ -87,21 +87,21 @@ DEFAULT_CONFIG = {
 
     # Action configuration
     "SearchAction": {
-        "max_files": sys.maxsize,
-        "file_types": [".py"],
-        "exclude_types": ["_test.py"],
-        "exclude_dirs": [".git", "venv", "__pycache__"],
-        "selection_criteria": "Select the file you have the most confidence in improving or fixing.",
-        "batch_size": 10,
-        "batch_sampling": False
+        "max_files": sys.maxsize, # Maximum number of candidates to select from after search
+        "file_types": [".py"], #  File types to search for
+        "exclude_types": ["_test.py"], # File types to not search for
+        "exclude_dirs": [".git", "venv", "__pycache__"], # Directories to not search in
+        "selection_criteria": "Select the file that you have the most confidence in improving or fixing.", # Criteria for selecting file from possible candidates
+        "batch_size": 10, # Candidate batch size for selection
+        "batch_sampling": False # If set to true, randomly sample batches
     },
     "ResetAction": {},
     "AdvancedResetAction": {},
     "EditCodeAction": {
-        "custom_prompt": None
+        "custom_prompt": None # Override prompt for editing code
     },
     "EditTestAction": {
-        "custom_prompt": None
+        "custom_prompt": None # Override prompt for editing tests
     },
     "ExecuteCodeAction": {},
     "TransitionAction": {},
@@ -110,8 +110,8 @@ DEFAULT_CONFIG = {
     "Executor": {
         "timeout": 10, # Maximum time for code to run
         "virtual_env_context": None, # Name of virtual env to run in
-        "work_dir": "./", #
-        "cmd_args": {"pytest": ["-vvs", "--tb=long"]}
+        "work_dir": "./", # Working directory when running code
+        "cmd_args": {"pytest": ["-vvs", "--tb=long"]} # Additional args for custom commands
     },
 
     # Version manager configuration
