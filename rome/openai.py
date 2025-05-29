@@ -169,7 +169,7 @@ class OpenAIHandler:
         return fast_estimate > threshold
 
     def _prepare_messages(self, messages: List[Dict]) -> List[Dict]:
-        """Prepare messages with smart context management."""
+        """Prepare messages with smart context management and LLMLingua-2 compression."""
         if not self._should_use_precise_counting(messages):
             return messages
 
@@ -177,29 +177,89 @@ class OpenAIHandler:
         if self._count_tokens(messages, precise=True) <= max_input:
             return messages
 
+        self._init_compressor()
+
         system_msg = messages[0] if messages and messages[0].get("role") == "system" else None
         other_msgs = messages[1:] if system_msg else messages
 
         result = [system_msg] if system_msg else []
         current_tokens = self._count_tokens(result, precise=True) if system_msg else 0
 
-        # Build list of messages that fit, then reverse to maintain chronological order
-        temp_msgs = []
-        for msg in reversed(other_msgs):
+        temp_msgs, compressed_count = self._fit_messages_with_compression(
+            reversed(other_msgs), max_input, current_tokens
+        )
+
+        result.extend(reversed(temp_msgs))
+        self._log_context_changes(len(messages) - len(result), compressed_count)
+        return result
+
+    def _init_compressor(self):
+        """Initialize LLMLingua-2 compressor (lazy loading)."""
+        if hasattr(self, 'compressor'):
+            return
+        try:
+            from llmlingua import PromptCompressor
+            self.compressor = PromptCompressor(
+                model_name="microsoft/llmlingua-2-bert-base-multilingual-cased-meetingbank",
+                use_llmlingua2=True,
+                device_map="cpu"
+            )
+            self.logger.info("LLMLingua-2 compressor initialized")
+        except ImportError:
+            self.logger.error("LLMLingua not available, using truncation only")
+            self.compressor = None
+
+    def _fit_messages_with_compression(self, messages, max_input, current_tokens):
+        """Fit messages using compression when needed."""
+        temp_msgs, compressed_count = [], 0
+
+        for msg in messages:
             msg_tokens = self._count_tokens([msg], precise=True)
+
             if current_tokens + msg_tokens <= max_input:
                 temp_msgs.append(msg)
                 current_tokens += msg_tokens
+            elif compressed_msg := self._try_compress_message(msg, max_input - current_tokens, msg_tokens):
+                temp_msgs.append(compressed_msg)
+                current_tokens += self._count_tokens([compressed_msg], precise=True)
+                compressed_count += 1
             else:
                 break
 
-        # Add messages in correct order
-        result.extend(reversed(temp_msgs))
-        truncated = len(messages) - len(result)
-        if truncated > 0:
-            self.logger.info(f"Truncated {truncated} messages to fit context")
+        return temp_msgs, compressed_count
 
-        return result
+    def _try_compress_message(self, msg, remaining_tokens, msg_tokens):
+        """Try to compress a message to fit in remaining token budget."""
+        if not (self.compressor and msg.get('content')):
+            return None
+
+        target_ratio = min(0.9, remaining_tokens / msg_tokens)
+        if target_ratio <= 0.1:
+            return None
+
+        result = self.compressor.compress_prompt(
+            msg['content'],
+            ratio=target_ratio,
+            force_tokens=['\n', '?', '!', '.', ',']
+        )
+        compressed_msg = msg.copy()
+        compressed_msg['content'] = result['compressed_prompt']
+
+        if self._count_tokens([compressed_msg], precise=True) <= remaining_tokens:
+            self.logger.debug(f"Compressed: {msg_tokens}→{self._count_tokens([compressed_msg], precise=True)} ({result.get('ratio', 'N/A')})")
+            return compressed_msg
+
+        return None
+
+    def _log_context_changes(self, truncated, compressed_count):
+        """Log context management changes."""
+        if truncated or compressed_count:
+            parts = []
+            if compressed_count:
+                parts.append(f"compressed {compressed_count}")
+            if truncated:
+                parts.append(f"truncated {truncated}")
+            self.logger.info(f"Context management: {', '.join(parts)} messages")
 
     def _get_model_pricing(self, model: str = None) -> Dict[str, float]:
         """Get pricing for a model (internal method)."""

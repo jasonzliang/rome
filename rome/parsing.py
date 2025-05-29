@@ -5,8 +5,6 @@ import re
 from typing import Dict, Optional, Any, Union, List
 import zlib
 
-import xxhash
-
 from .config import DEFAULT_HASH_FUNC
 
 # Simple global cache - you could also make this a class attribute
@@ -24,14 +22,20 @@ def hash_string(content: str, hash_name: str = DEFAULT_HASH_FUNC) -> str:
     Returns:
         String hash value (hexadecimal)
     """
-    if hash_name in ["xxh64", "xxh128"]:
+    try:
+        import xxhash
+        has_xxhash = True
+    except:
+        has_xxhash = False
+
+    if has_xxhash and hash_name in ["xxh64", "xxh128"]:
         hash_func = getattr(xxhash, hash_name)
         return hash_func(content.encode('utf-8')).hexdigest()
-    elif hash_name == "crc32":
-        return f"{zlib.crc32(content.encode('utf-8')) & 0xffffffff:08x}"
     elif hash_name in ["md5", "sha1", "sha256", "sha512", "blake2b", "blake2s"]:
         hash_func = getattr(hashlib, hash_name)
         return hash_func(content.encode('utf-8')).hexdigest()
+    elif hash_name == "crc32":
+        return f"{zlib.crc32(content.encode('utf-8')) & 0xffffffff:08x}"
     else:
         raise ValueError(f"Unsupported hash function: {hash_name}")
 

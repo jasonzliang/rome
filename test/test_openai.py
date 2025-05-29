@@ -54,10 +54,19 @@ class MockOpenAI:
 class MockAPIError(Exception):
     pass
 
-# Mock the openai module
+# Create a proper mock module with __spec__ attribute
 mock_openai_module = Mock()
 mock_openai_module.OpenAI = MockOpenAI
 mock_openai_module.APIError = MockAPIError
+
+# Create a proper module spec to avoid import issues
+import importlib.util
+mock_spec = importlib.util.spec_from_loader('openai', loader=None)
+mock_openai_module.__spec__ = mock_spec
+mock_openai_module.__name__ = 'openai'
+mock_openai_module.__package__ = 'openai'
+
+# Install the mock before any imports that might use it
 sys.modules['openai'] = mock_openai_module
 
 # Mock tiktoken if not available
@@ -188,8 +197,13 @@ class TestOpenAIHandler:
         assert len(prepared) == len(messages)
         assert prepared[0]["role"] == "system"
 
-    def test_context_management_with_truncation(self, handler):
+    @patch('rome.openai.OpenAIHandler._init_compressor')
+    def test_context_management_with_truncation(self, mock_init_compressor, handler):
         """Test context management with forced truncation"""
+        # Mock the compressor initialization to avoid llmlingua dependency issues
+        mock_init_compressor.return_value = None
+        handler.compressor = None  # Simulate compressor not available
+
         # Force small context to trigger truncation
         handler.max_input_tokens = 50
         handler.manage_context = True

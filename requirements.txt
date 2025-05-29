@@ -1,15 +1,18 @@
-# For Rome library
+# Core library required pkgs
 colorama
-graphviz
 numpy
 openai
 portalocker
 psutil
 pytest
+
+# Core library optional pkgs
+graphviz
+llmlingua
 ribs
 xxhash
 
-# For web app
+# Web app pkgs
 fastapi
 matplotlib
 networkx
