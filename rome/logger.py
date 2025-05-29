@@ -198,7 +198,7 @@ class Logger:
             self._logger.setLevel(level)
 
             # Create formatter
-            formatter = logging.Formatter(self.format)
+            formatter = logging.Formatter(self.format, datefmt="%H:%M:%S")
 
             # Add file handler if base_dir and filename are specified
             if self.base_dir:
