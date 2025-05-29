@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Compact efficient tests for TinyDBManager with maximum code reuse.
-Run with: python test_tinydb_manager.py
+Run with: python test_database.py
 """
 
 import os
@@ -16,7 +16,7 @@ from unittest.mock import Mock, MagicMock, patch
 # Add parent directory to path to import rome.tinydb_manager
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-class TestTinyDBManager:
+class TestDatabaseManager:
     """Test suite for TinyDBManager with maximum code reuse."""
 
     def setup_method(self):
@@ -28,8 +28,8 @@ class TestTinyDBManager:
             return os.path.join(self.temp_dir, f"{os.path.basename(file_path)}.db")
 
         # Mock the logger to avoid import issues
-        from rome.tinydb_manager import TinyDBManager
-        self.manager = TinyDBManager(get_db_path)
+        from rome.database import DatabaseManager
+        self.manager = DatabaseManager(get_db_path)
 
     def teardown_method(self):
         """Cleanup after each test."""
@@ -274,7 +274,7 @@ def run_tests():
         print("Install with: pip install tinydb portalocker")
         return
 
-    test_class = TestTinyDBManager()
+    test_class = TestDatabaseManager()
     test_methods = [method for method in dir(test_class) if method.startswith('test_')]
 
     passed = 0

@@ -23,26 +23,34 @@ def create_analysis_prompt(agent, file_path: str) -> Optional[str]:
     execution_data = agent.version_manager.get_data(file_path, 'exec_result')
     if not execution_data:
         return None
+
     context_parts = []
 
     # Add execution output
     if execution_data.get('output'):
-        context_parts.append(f"Code test output:\n```\n{execution_data['output']}\n```")
+        context_parts.append(f"**Test Execution Output:**\n```\n{execution_data['output']}\n```")
 
     # Add exit code info
     if execution_data.get('exit_code'):
-        context_parts.append(f"Exit code: {execution_data['exit_code']}")
+        context_parts.append(f"**Exit Code:** {execution_data['exit_code']}")
 
     # Add analysis if available
     if execution_data.get('analysis'):
-        context_parts.append(f"Code analysis:\n{execution_data['analysis']}")
+        context_parts.append(f"**Automated Code Analysis:**\n{execution_data['analysis']}")
 
     if not context_parts:
         return None
 
-    context = "\n\n".join(context_parts)
-    context += "\n\nIMPORTANT: Please take this analysis into account when improving the code or tests.\n"
-    return context
+    # Create a clearly separated analysis section
+    analysis_context = "\n" + "="*80 + "\n"
+    analysis_context += "Previous execution results and analysis:\n"
+    analysis_context += "="*80 + "\n\n"
+    analysis_context += "\n\n".join(context_parts)
+    analysis_context += "\n\n" + "="*80 + "\n"
+    analysis_context += "Please address any issues identified above\n"
+    analysis_context += "="*80 + "\n"
+
+    return analysis_context
 
 
 class EditCodeAction(Action):
@@ -157,20 +165,19 @@ class EditCodeAction(Action):
 4. Performance optimizations
 5. Documentation improvements
 """
-
-        # Get analysis context using the static function
-        analysis_prompt = create_analysis_prompt(agent, file_path)
-        if analysis_prompt:
-            prompt += f"\n{analysis_prompt}\n"
-
         # Add file info and original code
         prompt += f"""Code file path: {file_path}
 Code file content:
 ```python
 {content}
 ```
+"""
+        # Get analysis context using the static function
+        analysis_prompt = create_analysis_prompt(agent, file_path)
+        if analysis_prompt:
+            prompt += f"\n{analysis_prompt}\n"
 
-Respond with a JSON object containing:
+        prompt += """Respond with a JSON object containing:
 {{
     "improved_code": "The complete improved code as a string, including all original code with your improvements",
     "explanation": "A clear explanation of the changes you made and why",

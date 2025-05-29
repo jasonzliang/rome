@@ -1,5 +1,6 @@
 """
 Compact, deadlock-safe TinyDB management with maximum code reuse.
+Includes unified locking operations for file and JSON handling.
 """
 import datetime
 import json
@@ -13,7 +14,80 @@ from tinydb.storages import JSONStorage
 from tinydb.middlewares import CachingMiddleware
 import portalocker
 
+from .config import set_attributes_from_config
 from .logger import get_logger
+
+def ensure_dir(file_path: str) -> None:
+    """Thread-safe directory creation."""
+    try:
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+    except FileExistsError:
+        pass
+
+
+@contextmanager
+def locked_file_operation(file_path: str, mode: str = 'r',
+                         lock_type: int = portalocker.LOCK_EX,
+                         timeout: float = 5.0, encoding: str = 'utf-8',
+                         create_dirs: bool = True):
+    """File operation with timeout-based locking."""
+    if create_dirs:
+        ensure_dir(file_path)
+
+    with open(file_path, mode, encoding=encoding) as f:
+        # Reuse the existing timeout logic pattern
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                portalocker.lock(f, lock_type | portalocker.LOCK_NB)
+                break
+            except portalocker.LockException:
+                time.sleep(0.01)
+        else:
+            raise TimeoutError(f"Lock timeout on {file_path}")
+
+        yield f
+
+
+@contextmanager
+def locked_json_operation(file_path: str, default_data: Optional[Dict] = None,
+                         timeout: float = 5.0, create_dirs: bool = True,
+                         logger=None):
+    """JSON operation with timeout-based locking and atomic writes."""
+    if create_dirs:
+        ensure_dir(file_path)
+
+    with open(file_path, 'a+', encoding='utf-8') as f:
+        # Reuse the existing timeout logic pattern
+        start_time = time.time()
+        while time.time() - start_time < timeout:
+            try:
+                portalocker.lock(f, portalocker.LOCK_EX | portalocker.LOCK_NB)
+                break
+            except portalocker.LockException:
+                time.sleep(0.01)
+        else:
+            raise TimeoutError(f"Lock timeout on {file_path}")
+
+        # Read existing content
+        f.seek(0)
+        content = f.read()
+
+        data = default_data or {}
+        if content.strip():
+            try:
+                data = json.loads(content)
+            except json.JSONDecodeError as e:
+                if logger:
+                    logger.error(f"Corrupted JSON file {file_path}: {e}")
+                data = default_data or {}
+
+        yield data
+
+        # Atomic write
+        f.seek(0)
+        f.truncate()
+        json.dump(data, f, indent=4)
 
 
 class TimeoutLockedJSONStorage(JSONStorage):
@@ -52,7 +126,7 @@ class TimeoutLockedJSONStorage(JSONStorage):
             json.dump(data, f, indent=4)
 
 
-class TinyDBManager:
+class DatabaseManager:
     """Compact, deadlock-safe TinyDB manager with maximum code reuse"""
 
     def __init__(self, get_db_path_func, config: Dict = None):
@@ -61,9 +135,7 @@ class TinyDBManager:
         self._get_db_path = get_db_path_func
 
         # Configuration with defaults
-        self.lock_timeout = self.config.get('lock_timeout', 5.0)
-        self.max_retries = self.config.get('max_retries', 3)
-        self.retry_delay = self.config.get('retry_delay', 0.1)
+        set_attributes_from_config(self, ['lock_timeout', 'max_retries', 'retry_delay'])
 
     def _timestamp(self) -> str:
         """Generate ISO timestamp"""
@@ -82,7 +154,7 @@ class TinyDBManager:
             try:
                 db.close()
             except Exception as e:
-                self.logger.warning(f"Error closing database: {e}")
+                self.logger.error(f"Error closing database: {e}")
 
     def _with_retry(self, operation: Callable, *args, **kwargs):
         """Execute operation with retry logic"""
@@ -94,7 +166,7 @@ class TinyDBManager:
             except (TimeoutError, portalocker.LockException) as e:
                 last_exception = e
                 if attempt < self.max_retries - 1:
-                    self.logger.warning(f"Lock timeout on attempt {attempt + 1}, retrying...")
+                    self.logger.error(f"Lock timeout on attempt {attempt + 1}, retrying...")
                     time.sleep(self.retry_delay * (2 ** attempt))
                 continue
             except Exception:
@@ -327,4 +399,4 @@ class TinyDBManager:
 
     def shutdown(self):
         """Shutdown - no cached connections to close"""
-        self.logger.debug("TinyDBManager shutdown complete")
+        self.logger.debug("DatabaseManager shutdown complete")

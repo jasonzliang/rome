@@ -7,22 +7,18 @@ from dataclasses import dataclass
 from enum import Enum
 
 import psutil
-import portalocker
-from tinydb import TinyDB, Query
-from tinydb.storages import JSONStorage
-from tinydb.middlewares import CachingMiddleware
 
 from .config import META_DIR_EXT, TEST_FILE_EXT
 from .logger import get_logger
 from .parsing import hash_string
-from .tinydb_manager import TinyDBManager
+from .database import DatabaseManager, locked_file_operation, locked_json_operation
 
 
 class FileType(Enum):
     INDEX = "index.json"
     ACTIVE = "active.json"
     FINISHED = "finished.json"
-    DATABASE = "tinydb.json"  # TinyDB database file
+    DATABASE = "database.json"  # TinyDB database file
 
 
 @dataclass
@@ -34,61 +30,6 @@ class ValidationError:
     value: Any = None
 
 
-@contextmanager
-def locked_file_operation(file_path: str, mode: str = 'r',
-                         lock_type: int = portalocker.LOCK_EX,
-                         encoding: str = 'utf-8', create_dirs: bool = True):
-    """Context manager for file operations with automatic locking."""
-    if create_dirs:
-        # FIXED: Use try-except to handle race conditions in directory creation
-        try:
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        except FileExistsError:
-            # Another process created the directory
-            pass
-
-    with open(file_path, mode, encoding=encoding) as f:
-        portalocker.lock(f, lock_type)
-        yield f
-
-
-@contextmanager
-def locked_json_operation(file_path: str, default_data: Optional[Dict] = None,
-                         create_dirs: bool = True, logger=None):
-    """Context manager for JSON file operations with proper file locking."""
-    if create_dirs:
-        # FIXED: Use try-except to handle race conditions in directory creation
-        try:
-            os.makedirs(os.path.dirname(file_path), exist_ok=True)
-        except FileExistsError:
-            # Another process created the directory
-            pass
-
-    # FIXED: Use proper file locking instead of separate lock file
-    with open(file_path, 'a+', encoding='utf-8') as f:
-        portalocker.lock(f, portalocker.LOCK_EX)
-
-        # Seek to beginning to read existing content
-        f.seek(0)
-        content = f.read()
-
-        data = default_data or {}
-        if content.strip():
-            try:
-                data = json.loads(content)
-            except json.JSONDecodeError as e:
-                if logger:
-                    logger.warning(f"Corrupted JSON file {file_path}: {e}")
-                data = default_data or {}
-
-        yield data
-
-        # Write updated data back to file
-        f.seek(0)
-        f.truncate()
-        json.dump(data, f, indent=4)
-
-
 class VersionManager:
     """Manages code/test file activity, ownership, and versioning for the agent"""
 
@@ -98,9 +39,9 @@ class VersionManager:
         self.active_files: Set[str] = set()
 
         # Initialize TinyDBManager with database path function
-        self.db = TinyDBManager(
+        self.db = DatabaseManager(
             get_db_path_func=self._get_database_path,
-            config=self.config.get('TinyDBManager', {})
+            config=self.config.get('DatabaseManager', {})
         )
 
     # Core utility methods
@@ -533,7 +474,10 @@ class VersionManager:
     # Only methods actually used by action classes are exposed
 
     def store_data(self, file_path: str, table_name: str, data: Dict[str, Any]) -> int:
-        """Store data in the TinyDB database for a file."""
+        """Store data in the TinyDB database for a file, clearing existing data first."""
+        # Clear the table before storing new data
+        self.db.clear_table(file_path, table_name)
+        # Store the new data
         return self.db.store_data(file_path, table_name, data)
 
     def get_data(self, file_path: str, table_name: str,

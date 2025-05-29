@@ -121,7 +121,11 @@ DEFAULT_CONFIG = {
 
     # Version manager configuration
     "VersionManager": {
-        "TinyDBManager": {}
+        "DatabaseManager": {
+            "lock_timeout": 5.0,
+            "max_retries": 5,
+            "retry_delay": 0.1
+        }
     },
 }
 
