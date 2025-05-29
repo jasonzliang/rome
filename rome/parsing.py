@@ -6,6 +6,7 @@ from typing import Dict, Optional, Any, Union, List
 import zlib
 
 from .config import DEFAULT_HASH_FUNC
+from .logger import get_logger
 
 # Simple global cache - you could also make this a class attribute
 _ast_cache: Dict[str, ast.AST] = {}
@@ -24,11 +25,10 @@ def hash_string(content: str, hash_name: str = DEFAULT_HASH_FUNC) -> str:
     """
     try:
         import xxhash
-        has_xxhash = True
     except:
-        has_xxhash = False
+        hash_name = "md5" # Fallback hash if xxhash not installed
 
-    if has_xxhash and hash_name in ["xxh64", "xxh128"]:
+    if hash_name in ["xxh64", "xxh128"]:
         hash_func = getattr(xxhash, hash_name)
         return hash_func(content.encode('utf-8')).hexdigest()
     elif hash_name in ["md5", "sha1", "sha256", "sha512", "blake2b", "blake2s"]:
@@ -37,8 +37,7 @@ def hash_string(content: str, hash_name: str = DEFAULT_HASH_FUNC) -> str:
     elif hash_name == "crc32":
         return f"{zlib.crc32(content.encode('utf-8')) & 0xffffffff:08x}"
     else:
-        need_xxhash = f", please install: 'pip install xxhash'" if not has_xxhash else ""
-        raise ValueError(f"Unsupported hash function: {hash_name}" + need_xxhash)
+        raise ValueError(f"Unsupported hash function: {hash_name}")
 
 
 def parse_code_cached(code_content: str, hash_name: str = DEFAULT_HASH_FUNC) -> ast.AST:

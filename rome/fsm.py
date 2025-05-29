@@ -253,7 +253,7 @@ class FSM:
         except ImportError:
             error_msg = "Unable to draw FSM graph, please install: 'pip install graphviz/brew install graphviz'"
             self.logger.error(error_msg)
-            raise ImportError(error_msg)
+            return
 
         # Create and configure graph
         dot = graphviz.Digraph('FSM', format='png')
