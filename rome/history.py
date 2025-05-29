@@ -76,7 +76,7 @@ class AgentHistory:
             return []
         return self.actions_executed[-count:]
 
-    def get_history_summary(self, context_length: int = 3) -> str:
+    def get_history_summary(self, context_length: int = 5) -> str:
         """
         Generate a summary of recent state/action transitions
 

@@ -122,7 +122,7 @@ class CodeLoadedState(State):
         return f"you selected and loaded code file {filename}{size_info} for editing, selection reason: {reason}"
 
     def future_summary(self, agent) -> str:
-        return "selected and loaded code file for editing"
+        return "select and load code file for editing"
 
 
 class CodeEditedState(State):
@@ -152,7 +152,7 @@ class CodeEditedState(State):
         return f"you edited {filename} with {num_changes} change(s) with explanation: {explanation}"
 
     def future_summary(self, agent) -> str:
-        return "edited code file with changes and explanation"
+        return "edit code file with changes and explanation"
 
 
 class TestEditedState(State):
@@ -181,7 +181,7 @@ class TestEditedState(State):
         return f"you created/updated tests in {test_filename} for {filename} with {num_test_changes} change(s)"
 
     def future_summary(self, agent) -> str:
-        return "created or updated test file for code file"
+        return "create or update test file for code file"
 
 class CodeExecutedPassState(State):
     """State where code or test file has been executed successfully"""
@@ -218,7 +218,7 @@ class CodeExecutedPassState(State):
         return f"you executed {test_filename}: ✓ PASSED (exit code: 0), output: {output_summary}"
 
     def future_summary(self, agent) -> str:
-        return "executed test file (passed) with execution output"
+        return "execute test file with passing execution output"
 
 class CodeExecutedFailState(State):
     """State where code or test file execution failed"""
@@ -256,4 +256,4 @@ class CodeExecutedFailState(State):
         return f"you executed {test_filename}: ✗ FAILED (exit code: {exit_code}), output: {output_summary}, analysis: {analysis_summary}"
 
     def future_summary(self, agent) -> str:
-        return "executed test file (failed) with execution output and analysis"
+        return "execute test file with failing execution output and analysis"
