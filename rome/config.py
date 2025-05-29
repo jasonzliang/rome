@@ -1,4 +1,5 @@
 # config.py
+import ast
 import copy
 import os
 import sys
@@ -174,21 +175,40 @@ def generate_default_config(output_path="config.yaml"):
     print(f"Default configuration saved to {output_path}")
 
 
-def load_config(config_path="config.yaml", create_if_missing=True):
-    """Load configuration from a YAML file, creating it if it doesn't exist"""
+def load_config(config_path="config.yaml", create_if_missing=False):
+    """Load configuration from a YAML file or Python file, creating it if it doesn't exist"""
     logger = get_logger()
 
     if os.path.exists(config_path):
         logger.info(f"Loading configuration from {config_path}")
-        with open(config_path, 'r') as f:
-            config = yaml.safe_load(f)
-        return config
+        _, ext = os.path.splitext(config_path.lower())
+
+        if ext == '.py':
+            with open(config_path, 'r') as f:
+                tree = ast.parse(f.read())
+
+            for node in tree.body:
+                if (isinstance(node, ast.Assign) and
+                    any(isinstance(target, ast.Name) and target.id.upper() == 'ROME_CONFIG'
+                        for target in node.targets)):
+                    config = ast.literal_eval(node.value)
+                    if not isinstance(config, dict):
+                        raise TypeError(f"ROME_CONFIG must be a dictionary in {config_path}")
+                    return config
+
+            raise ValueError(f"No ROME_CONFIG found in {config_path}")
+
+        elif ext in ['.yaml', '.yml']:
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f)
+        else:
+            raise ValueError(f"Unsupported config file format: {ext}")
+
     elif create_if_missing:
         logger.info(f"Config file {config_path} not found. Creating default config...")
         generate_default_config(config_path)
         return DEFAULT_CONFIG
     else:
-        logger.error(f"Config file {config_path} not found.")
         raise FileNotFoundError(f"Config file {config_path} not found.")
 
 
