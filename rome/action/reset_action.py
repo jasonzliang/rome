@@ -65,7 +65,7 @@ Test analysis:
 {analysis}
 """
         except:
-            prompt = agent.version_manager.get_analysis_prompt(selected_file['path'])
+            prompt = agent.version_manager.load_analysis(selected_file['path'])
 
         prompt += """Based on the execution results and analysis, please determine:
 1. Are all tests passing successfully?
@@ -78,7 +78,7 @@ Respond with a JSON object:
     "work_complete": true/false,
     "confidence": 1-10,
     "reasoning": "Explanation of your assessment",
-    "remaining_issues": ["list", "of", "any", "remaining", "issues"]
+    "remaining_issues": "Short summary of remaining issues",
 }}
 
 Set work_complete to true ONLY if:
@@ -104,7 +104,7 @@ Set work_complete to true ONLY if:
         work_complete = result.get('work_complete', False)
         confidence = result.get('confidence', 1)
         reasoning = result.get('reasoning', 'No reasoning provided')
-        remaining_issues = result.get('remaining_issues', [])
+        remaining_issues = result.get('remaining_issues', "No issues provided")
 
         self.logger.info(f"LLM analysis - Work complete: {work_complete}, "
                        f"Confidence: {confidence}/5, Reasoning: {reasoning}")
@@ -113,7 +113,8 @@ Set work_complete to true ONLY if:
             self.logger.info(f"Remaining issues identified: {remaining_issues}")
 
         # Only consider work complete if LLM is confident
-        return work_complete and confidence >= 4
+        work_complete = work_complete and confidence >= 8
+        return work_complete
 
 
     def execute(self, agent, **kwargs) -> bool:

@@ -204,7 +204,7 @@ class Agent:
             The response content as string
         """
 
-        # Use action-specific system message if not provided
+        # Use role as system message if not provided
         if system_message is None:
             system_message = self.role
 

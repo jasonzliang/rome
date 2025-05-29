@@ -263,7 +263,7 @@ Code analysis:
 IMPORTANT: Please take this analysis into account when improving the code or tests.
 """
 
-    def get_analysis_prompt(self, file_path: str) -> Optional[str]:
+    def load_analysis(self, file_path: str) -> Optional[str]:
         """Get formatted analysis context specifically for code editing prompts."""
         analysis_data = self._load_analysis(file_path)
         return self._format_analysis_context(analysis_data) if analysis_data else None
@@ -300,12 +300,7 @@ Please provide an analysis covering:
 
 Your analysis:
 """
-
-        try:
-            return agent.chat_completion(prompt=prompt, system_message=agent.role)
-        except Exception as e:
-            self.logger.error(f"Failed to generate LLM analysis: {str(e)}")
-            return f"Failed to generate analysis: {str(e)}"
+        return agent.chat_completion(prompt=prompt, system_message=agent.role)
 
     def _get_pid_from_agent_id(self, agent_id: str) -> Optional[int]:
         """Extract PID from agent ID string."""

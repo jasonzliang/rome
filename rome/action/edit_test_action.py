@@ -164,7 +164,7 @@ Include proper test setup, all necessary imports, and comprehensive test cases.
 """
 
         # Get analysis context from agent's version manager
-        analysis_context = agent.version_manager.get_analysis_prompt(file_path)
+        analysis_context = agent.version_manager.load_analysis(file_path)
         if analysis_context:
             prompt += analysis_context
 
