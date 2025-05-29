@@ -14,6 +14,19 @@ Rome is designed around a Finite State Machine architecture that allows AI agent
 - Visualization of agent state
 - Versioning of code changes
 
+### FSM Workflow
+
+Rome’s default FSM supports a comprehensive 6-state development lifecycle:
+
+1. **IDLE → CODE_LOADED**: Load or search for code to work on.
+2. **CODE_LOADED → CODE_EDITED or TEST_EDITED**: Modify code or write tests.
+3. **CODE_EDITED → TEST_EDITED**: After editing code, proceed to write/edit tests.
+4. **TEST_EDITED → CODE_EXECUTED_PASS / CODE_EXECUTED_FAIL**: Execute tests; transition based on pass/fail.
+5. **CODE_EXECUTED_PASS → IDLE**: Successful cycle completed.
+6. **CODE_EXECUTED_FAIL → CODE_LOADED or IDLE**: Retry or restart.
+
+This FSM ensures a structured agent behavior from discovery through validation.
+
 ## How It Works
 
 Rome takes in a Python code file and performs the following:
@@ -66,48 +79,38 @@ The library includes a Streamlit-based visualization tool (`web_app.py`) that pr
 
 ### Prerequisites
 
-- Python 3.11+
-- OpenAI API key
+- Linux or MacOS with Python 3.10+ installed
+- API key compatible with OpenAI's chat completion API
 
 ### Installation
 
 #### From Source (Development)
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/rome.git
-   cd rome
-   ```
-
-2. Install in development mode:
-   ```bash
-   # Basic installation
-   pip install -e .
-
-   # With development tools
-   pip install -e .[dev]
-   ```
+```bash
+git clone https://github.com/yourusername/rome.git
+cd rome
+pip install -e .        # Basic install
+pip install -e .[dev]   # With dev tools
+```
 
 #### From PyPI (Coming Soon)
 
 ```bash
-# When published to PyPI
 pip install rome
 ```
 
 ### Environment Setup
 
-Set your OpenAI API key:
 ```bash
 export OPENAI_API_KEY=your_api_key_here
 ```
 
 ### Configuration
 
-The library uses a YAML-based configuration system. Create a `config.yaml` file or use the default configuration:
+Rome uses a YAML-based configuration system. You can create your own `config.yaml` or generate one:
 
 ```python
-# Generate a default configuration
+# Generate a default configuration file
 python -c "from config import generate_default_config; generate_default_config()"
 ```
 
@@ -115,17 +118,31 @@ Key configuration options:
 
 - OpenAI model and parameters
 - Repository path
-- FSM type (minimal or simple)
+- FSM type (`minimal`, `simple`, or custom)
 - Logging settings
-- Action-specific configurations
+- API server settings (`host`, `port`)
+- Patience setting to avoid stuck loops
+
+Example snippet from a config:
+
+```yaml
+Agent:
+  repository: "./"
+  fsm_type: "simple"
+  agent_api: true
+  history_context_len: 15
+  patience: 3
+
+AgentApi:
+  host: "localhost"
+  port: 8000
+```
 
 ### Basic Usage
 
 ```python
 from agent import Agent
-from fsm import FSM_FACTORY
 
-# Initialize agent with configuration
 agent = Agent(
     name="CodingAgent",
     role="You are an expert Python developer focused on code quality and testing",
@@ -137,13 +154,10 @@ agent = Agent(
     }
 )
 
-# Run the agent
-results = agent.run_loop(max_iterations=10)
+agent.run_loop(max_iterations=10)
 ```
 
 ### Visualizing Agent State
-
-Run the Streamlit app to visualize the agent's FSM and current state:
 
 ```bash
 streamlit run web_app/streamlit_app.py
@@ -153,72 +167,61 @@ streamlit run web_app/streamlit_app.py
 
 ### Code Versioning
 
-The library automatically versions code files as they are modified, maintaining a history of changes in a `.rome` directory next to each file.
+Rome automatically versions code files as they are modified, storing metadata in a `.rome/` directory.
 
-### Custom FSM
+### Custom FSMs
 
-You can create custom FSM configurations by implementing your own creation function and registering it:
+Define your own FSM logic:
 
 ```python
 def create_custom_fsm(config):
-    # Create a custom FSM configuration
-    # ...
+    # Custom FSM logic here...
+    return fsm_instance
 
-# Register your custom FSM
-FSM_FACTORY['custom'] = create_custom_fsm
+FSM_FACTORY["custom"] = create_custom_fsm
 ```
 
 ### Extending with New Actions
 
-1. Create a new action class inheriting from `Action`
-2. Implement the `execute` method
-3. Add the action to your FSM configuration
+Create custom actions by subclassing `Action`:
 
 ```python
 class MyCustomAction(Action):
     def execute(self, agent, **kwargs) -> bool:
-        # Implementation
+        # Custom logic here
         return True
 ```
 
+Add the action to your FSM in the configuration.
+
 ## API Reference
 
-The library provides an HTTP API for monitoring and interacting with the agent:
+Rome includes an HTTP API for agent introspection:
 
-- `GET /agent`: Get current agent state, context, and FSM information
+- `GET /agent`: Returns current state, context, and FSM details.
 
 ## Development
 
-### Running Tests
+### Run Tests
 
 ```bash
-# Run all tests
-pytest
-
-# Run with coverage
-pytest --cov=rome
-
-# Run specific test file
-pytest test/test_single_agent.py
+pytest               # All tests
+pytest --cov=rome    # With coverage report
+pytest test/test_*.py  # Specific test file
 ```
 
-### Code Formatting
+### Format & Lint Code
 
 ```bash
-# Format code with Black
 black .
-
-# Type checking with MyPy
 mypy rome/
-
-# Linting with flake8
 flake8 rome/
 ```
 
 ## Contributing
 
-Contributions will be allowed once code is in a stable state.
+Contributions will be accepted once the project reaches a stable state.
 
 ## License
 
-See LICENSE file
+See LICENSE file.
