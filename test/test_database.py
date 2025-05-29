@@ -36,7 +36,7 @@ class TestDatabaseManager:
             mock_get_logger.return_value = mock_logger
 
             # Setup config mock to set default values
-            def mock_set_attributes(obj, attrs):
+            def mock_set_attributes(obj, config, attrs):
                 # Set default values for required attributes
                 obj.lock_timeout = 5.0
                 obj.max_retries = 3

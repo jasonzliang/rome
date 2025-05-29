@@ -68,7 +68,7 @@ def setup_minimal_mocks():
 mock_psutil, logger = setup_minimal_mocks()
 
 # Mock set_attributes_from_config in the config module
-def mock_set_attributes_from_config(obj, attrs):
+def mock_set_attributes_from_config(obj, config, attrs):
     """Mock implementation that sets default values"""
     defaults = {'lock_timeout': 5.0, 'max_retries': 3, 'retry_delay': 0.1}
     for attr in attrs:
@@ -79,7 +79,7 @@ def mock_set_attributes_from_config(obj, attrs):
 sys.modules['rome.config'].set_attributes_from_config = mock_set_attributes_from_config
 
 # Import after mocking - this will use real DatabaseManager and real file operations
-from rome.version_manager import VersionManager, ValidationError, FileType
+from rome.metadata import VersionManager, ValidationError, FileType
 from rome.database import locked_file_operation, locked_json_operation
 
 class TestVersionManager:

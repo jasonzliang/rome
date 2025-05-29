@@ -119,14 +119,13 @@ DEFAULT_CONFIG = {
         "cmd_args": {"pytest": ["-vvs", "--tb=long"]} # Additional args for custom commands
     },
 
-    # Version manager configuration
-    "VersionManager": {
-        "DatabaseManager": {
-            "lock_timeout": 5.0,
-            "max_retries": 5,
-            "retry_delay": 0.1
-        }
+    # Database and version manager configuration
+    "DatabaseManager": {
+        "lock_timeout": 5.0, # Timeout for read/write lock
+        "max_retries": 5, # Num tries to acquire lock
+        "retry_delay": 0.1 # Delay between tries, exponential increase
     },
+    "VersionManager": {},
 }
 
 

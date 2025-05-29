@@ -19,7 +19,7 @@ from .fsm_factory import FSM_FACTORY
 # Import the new AgentHistory class
 from .history import AgentHistory
 # Import the VersionManager class
-from .version_manager import VersionManager
+from .metadata import VersionManager
 # Import parsing utility functions
 from .parsing import parse_python_response, parse_json_response
 
@@ -91,7 +91,8 @@ class Agent:
 
         # Version manager
         version_config = self.config.get('VersionManager', {})
-        self.version_manager = VersionManager(config=version_config)
+        db_config = self.config.get('DatabaseManager', {})
+        self.version_manager = VersionManager(config=version_config, db_config=db_config)
 
         # OpenAI handler
         openai_config = self.config.get('OpenAIHandler', {})

@@ -33,7 +33,7 @@ class ValidationError:
 class VersionManager:
     """Manages code/test file activity, ownership, and versioning for the agent"""
 
-    def __init__(self, config: Dict = None):
+    def __init__(self, config: Dict = None, db_config: Dict = None):
         self.config = config or {}
         self.logger = get_logger()
         self.active_files: Set[str] = set()
@@ -41,7 +41,7 @@ class VersionManager:
         # Initialize TinyDBManager with database path function
         self.db = DatabaseManager(
             get_db_path_func=self._get_database_path,
-            config=self.config.get('DatabaseManager', {})
+            config=db_config
         )
 
     # Core utility methods
