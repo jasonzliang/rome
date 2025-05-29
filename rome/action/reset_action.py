@@ -111,9 +111,17 @@ Set work_complete to true ONLY if:
         reasoning = result.get('reasoning', 'No reasoning provided')
         remaining_issues = result.get('remaining_issues', "No issues provided")
 
+        progress = {
+            'work_complete': work_complete,
+            'confidence': confidence,
+            'reasoning': reasoning,
+            'remaining_issues': remaining_issues,
+            'agent_id': agent.get_id()
+        }
+        agent.version_manager.store_data(selected_file['path'], 'progress', progress)
+
         self.logger.info(f"LLM analysis - Work complete: {work_complete}, "
                        f"Confidence: {confidence}/5, Reasoning: {reasoning}")
-
         if remaining_issues:
             self.logger.info(f"Remaining issues identified: {remaining_issues}")
 

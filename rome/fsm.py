@@ -207,7 +207,7 @@ class FSM:
 """Please select one of the available actions to execute. Respond with a JSON object containing:
 {
     "action": "chosen_action_name",
-    "reasoning": "Brief explanation of why you chose this action"
+    "reasoning": "Short reason of why you chose this action"
 }"""
         )
 

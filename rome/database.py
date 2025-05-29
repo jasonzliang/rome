@@ -135,7 +135,7 @@ class DatabaseManager:
         self._get_db_path = get_db_path_func
 
         # Configuration with defaults
-        set_attributes_from_config(self, ['lock_timeout', 'max_retries', 'retry_delay'])
+        set_attributes_from_config(self, self.config, ['lock_timeout', 'max_retries', 'retry_delay'])
 
     def _timestamp(self) -> str:
         """Generate ISO timestamp"""
