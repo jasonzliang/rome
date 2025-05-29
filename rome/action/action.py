@@ -19,16 +19,6 @@ class Action(ABC):
         # Automatically set attributes from config
         set_attributes_from_config(self, self.config)
 
-    @abstractmethod
-    def execute(self, agent, **kwargs) -> bool:
-        """Execute the action and return True if action succeeded otherwise False"""
-        pass
-
-    @abstractmethod
-    def summary(self, agent) -> str:
-        """Return a short summary that describes the current action"""
-        pass
-
     def set_target_state_info(self, fsm, target_state_name: str):
         """
         Optional method to receive target state information when action is added to FSM.
@@ -40,4 +30,14 @@ class Action(ABC):
         """
         # Base implementation is a no-op
         # Subclasses that need target state info can override this method
+        pass
+
+    @abstractmethod
+    def execute(self, agent, **kwargs) -> bool:
+        """Execute the action and return True if action succeeded otherwise False"""
+        pass
+
+    @abstractmethod
+    def summary(self, agent) -> str:
+        """Return a short summary that describes the current action"""
         pass

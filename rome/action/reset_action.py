@@ -3,7 +3,9 @@ import os
 import sys
 import traceback
 from typing import Dict, List, Any, Optional
+
 from .action import Action
+from .edit_code_action import create_analysis_prompt
 from ..logger import get_logger
 
 
@@ -50,6 +52,11 @@ class AdvancedResetAction(Action):
             True if LLM determines work is complete and correct, False otherwise
         """
         try:
+            analysis_prompt = create_analysis_prompt(agent, selected_file['path'])
+            if not analysis_prompt: raise
+
+            prompt = f"Examine the execution results and analysis to determine if the code and tests are now correct and complete.\n\n{analysis_prompt}"
+        except:
             exit_code = selected_file['exec_exit_code']
             output = selected_file['exec_output']
             analysis = selected_file['exec_analysis']
@@ -64,8 +71,6 @@ Test execution output:
 Test analysis:
 {analysis}
 """
-        except:
-            prompt = agent.version_manager.load_analysis(selected_file['path'])
 
         prompt += """Based on the execution results and analysis, please determine:
 1. Are all tests passing successfully?
@@ -154,5 +159,5 @@ Set work_complete to true ONLY if:
             self.logger.info(f"Flagged {file_path} as finished based on LLM analysis")
             return True
         else:
-            self.logger.error(f"Flagged {file_path} as incomplete based on LLM analysis")
+            self.logger.error(f"{file_path} is incomplete based on LLM analysis")
             return False

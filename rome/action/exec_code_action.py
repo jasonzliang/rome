@@ -7,6 +7,7 @@ from ..config import SUMMARY_LENGTH, check_attrs
 from ..logger import get_logger
 from ..executor import CodeExecutor, CodeBlock
 
+
 class ExecuteCodeAction(Action):
     """Action to execute test code for the selected file"""
 
@@ -26,6 +27,44 @@ class ExecuteCodeAction(Action):
         test_filename = os.path.basename(test_path)
         return f"execute {test_filename} and analyze results for failures or issues"
 
+    def _analyze_execution_result(self,
+        agent,
+        original_file_content: str,
+        test_file_content: str,
+        output: str,
+        exit_code: int) -> str:
+        """Generate analysis of test execution results using LLM."""
+        prompt = f"""Analyze the following test execution results and provide comprehensive feedback:
+
+Code file content:
+```python
+{original_file_content}
+```
+
+Test file content:
+```python
+{test_file_content}
+```
+
+Execution output:
+```
+{output}
+```
+
+Exit code: {exit_code}
+
+Please provide an analysis covering:
+1. Overall test execution status (passed/failed)
+2. Specific test failures and their root causes
+3. Any errors, exceptions, or warnings found
+4. Code quality issues revealed by the tests
+5. Suggestions for fixing identified problems
+6. Recommendations for improving test coverage
+
+Your analysis:
+    """
+        return agent.chat_completion(prompt=prompt, system_message=agent.role)
+
     def execute(self, agent, **kwargs) -> bool:
         """Execute tests for the current selected file"""
         self.logger.info("Starting ExecuteCodeAction execution")
@@ -39,44 +78,41 @@ class ExecuteCodeAction(Action):
         try:
             # Execute the test file
             result = self.executor.execute_file(test_path)
-
-            # Store execution results in context
-            selected_file['exec_output'] = result.output
-            selected_file['exec_exit_code'] = result.exit_code
-
         except Exception as e:
-            error_msg = f"Error executing test file {test_path}: {str(e)}"
-            self.logger.error(error_msg)
-            self.logger.error(traceback.format_exc())
-
             # Store error information in context
+            error_msg = f"Error executing test file {test_path}: {str(e)}"
             selected_file['exec_output'] = error_msg
             selected_file['exec_exit_code'] = 1
             selected_file['exec_analysis'] = f"Test execution failed due to an error: {str(e)}"
 
+            self.logger.error(error_msg)
+            self.logger.error(traceback.format_exc())
             return False
 
-        # Generate execution analysis using version manager
-        analysis = agent.version_manager.create_analysis(
-            agent,
+        # Generate execution analysis
+        analysis = self._analyze_execution_result(
+            agent=agent,
             original_file_content=selected_file['content'],
             test_file_content=selected_file['test_content'],
             output=result.output,
             exit_code=result.exit_code
         )
 
-        # Store analysis in context
+        # Store execution results in context for immediate access
+        selected_file['exec_output'] = result.output
+        selected_file['exec_exit_code'] = result.exit_code
         selected_file['exec_analysis'] = analysis
 
-        # Save analysis using agent's version manager
-        analysis_file_path = agent.version_manager.save_analysis(
-            file_path=file_path,
-            analysis=analysis,
-            test_path=test_path,
-            exit_code=result.exit_code,
-            output=result.output
-        )
-        self.logger.info(f"Analysis saved to: {analysis_file_path}")
+        # Store execution results in TinyDB
+        execution_data = {
+            'code_path': file_path,
+            'test_path': test_path,
+            'output': result.output,
+            'analysis': analysis,
+            'exit_code': result.exit_code,
+            'agent_id': agent.get_id()
+        }
+        agent.version_manager.store_data(file_path, 'exec_result', execution_data)
 
         self.logger.info(f"Test execution completed with exit code: {result.exit_code}")
         self.logger.info(f"Analysis summary: {analysis[:SUMMARY_LENGTH]}...")

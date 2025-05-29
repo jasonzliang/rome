@@ -3,16 +3,17 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 from .action import Action
+from .edit_code_action import create_analysis_prompt
 from ..config import check_attrs
 from ..logger import get_logger
+from ..parsing import hash_string
 
 class EditTestAction(Action):
-    """Action to create or edit tests for the selected file"""
+    """Action to create or edit tests for the selected file - now inherits from Action"""
 
     def __init__(self, config: Dict = None):
         super().__init__(config)
         self.logger = get_logger()
-
         check_attrs(self, ['custom_prompt'])
 
     def summary(self, agent) -> str:
@@ -101,6 +102,19 @@ class EditTestAction(Action):
         }
         selected_file['test_changes'].append(change_record)
 
+        # Store test editing session in TinyDB
+        # test_edit_data = {
+        #     'test_path': test_path,
+        #     'test_existed': test_exists,
+        #     'original_test_content_hash': hash_string(test_content) if test_content else None,
+        #     'new_test_content_hash': hash_string(new_test_code),
+        #     'changes': test_changes,
+        #     'explanation': explanation,
+        #     'agent_id': agent.get_id(),
+        #     'content_changed': new_test_code != test_content
+        # }
+        # agent.version_manager.store_data(file_path, 'test_edits', test_edit_data)
+
         # Write the test code to disk
         with open(test_path, 'w', encoding='utf-8') as f:
             f.write(new_test_code)
@@ -163,10 +177,10 @@ Test file content:
 Include proper test setup, all necessary imports, and comprehensive test cases.
 """
 
-        # Get analysis context from agent's version manager
-        analysis_context = agent.version_manager.load_analysis(file_path)
-        if analysis_context:
-            prompt += analysis_context
+        # Get analysis context using the static function
+        analysis_prompt = create_analysis_prompt(agent, file_path)
+        if analysis_prompt:
+            prompt += f"\n{analysis_prompt}\n"
 
         prompt += f"""Respond with a JSON object containing:
 {{
@@ -190,7 +204,7 @@ IMPORTANT:
 - Avoid external dependencies that are unnecessary for testing
 """
 
-        if analysis_context:
+        if analysis_prompt:
             prompt += "- Pay special attention to addressing any test failures or issues identified in the code analysis"
 
         return prompt

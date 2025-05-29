@@ -8,17 +8,21 @@ from enum import Enum
 
 import psutil
 import portalocker
+from tinydb import TinyDB, Query
+from tinydb.storages import JSONStorage
+from tinydb.middlewares import CachingMiddleware
 
 from .config import META_DIR_EXT, TEST_FILE_EXT
 from .logger import get_logger
 from .parsing import hash_string
+from .tinydb_manager import TinyDBManager
 
 
 class FileType(Enum):
     INDEX = "index.json"
     ACTIVE = "active.json"
     FINISHED = "finished.json"
-    ANALYSIS = "code_analysis.json"
+    DATABASE = "metadata.json"  # TinyDB database file
 
 
 @dataclass
@@ -36,7 +40,12 @@ def locked_file_operation(file_path: str, mode: str = 'r',
                          encoding: str = 'utf-8', create_dirs: bool = True):
     """Context manager for file operations with automatic locking."""
     if create_dirs:
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        # FIXED: Use try-except to handle race conditions in directory creation
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        except FileExistsError:
+            # Another process created the directory
+            pass
 
     with open(file_path, mode, encoding=encoding) as f:
         portalocker.lock(f, lock_type)
@@ -46,29 +55,38 @@ def locked_file_operation(file_path: str, mode: str = 'r',
 @contextmanager
 def locked_json_operation(file_path: str, default_data: Optional[Dict] = None,
                          create_dirs: bool = True, logger=None):
-    """Context manager for JSON file operations with automatic locking."""
+    """Context manager for JSON file operations with proper file locking."""
     if create_dirs:
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        # FIXED: Use try-except to handle race conditions in directory creation
+        try:
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        except FileExistsError:
+            # Another process created the directory
+            pass
 
-    lock_file_path = f"{file_path}.lock"
+    # FIXED: Use proper file locking instead of separate lock file
+    with open(file_path, 'a+', encoding='utf-8') as f:
+        portalocker.lock(f, portalocker.LOCK_EX)
 
-    with open(lock_file_path, 'w') as lock_file:
-        portalocker.lock(lock_file, portalocker.LOCK_EX)
+        # Seek to beginning to read existing content
+        f.seek(0)
+        content = f.read()
 
         data = default_data or {}
-        if os.path.exists(file_path):
+        if content.strip():
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-            except (json.JSONDecodeError, Exception) as e:
+                data = json.loads(content)
+            except json.JSONDecodeError as e:
                 if logger:
                     logger.warning(f"Corrupted JSON file {file_path}: {e}")
                 data = default_data or {}
 
         yield data
 
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, indent=4)
+        # Write updated data back to file
+        f.seek(0)
+        f.truncate()
+        json.dump(data, f, indent=4)
 
 
 class VersionManager:
@@ -79,27 +97,45 @@ class VersionManager:
         self.logger = get_logger()
         self.active_files: Set[str] = set()
 
+        # Initialize TinyDBManager with database path function
+        self.db = TinyDBManager(
+            get_db_path_func=self._get_database_path,
+            config=self.config.get('TinyDBManager', {})
+        )
+
     # Core utility methods
     def _get_timestamp(self) -> str:
         return datetime.datetime.now().isoformat()
 
-    def _get_content_hash(self, content: str) -> str:
-        return hash_string(content)
-
     def _get_meta_dir(self, file_path: str) -> str:
         meta_dir = f"{file_path}.{META_DIR_EXT}"
-        os.makedirs(meta_dir, exist_ok=True)
+        # FIXED: Use try-except to handle race conditions
+        try:
+            os.makedirs(meta_dir, exist_ok=True)
+        except FileExistsError:
+            # Another process created the directory
+            pass
         return meta_dir
 
     def _get_test_meta_dir(self, test_file_path: str, main_file_path: str) -> str:
         main_meta_dir = self._get_meta_dir(main_file_path)
         test_filename = os.path.basename(test_file_path)
         test_meta_dir = os.path.join(main_meta_dir, f"{test_filename}.{META_DIR_EXT}")
-        os.makedirs(test_meta_dir, exist_ok=True)
+        # FIXED: Use try-except to handle race conditions
+        try:
+            os.makedirs(test_meta_dir, exist_ok=True)
+        except FileExistsError:
+            # Another process created the directory
+            pass
         return test_meta_dir
 
     def _get_file_path(self, meta_dir: str, file_type: FileType) -> str:
         return os.path.join(meta_dir, file_type.value)
+
+    def _get_database_path(self, file_path: str) -> str:
+        """Get the TinyDB database path for a given file."""
+        meta_dir = self._get_meta_dir(file_path)
+        return self._get_file_path(meta_dir, FileType.DATABASE)
 
     def _infer_main_file_from_test(self, test_file_path: str) -> Optional[str]:
         """Infer main file path from test file using TEST_FILE_EXT convention."""
@@ -135,20 +171,29 @@ class VersionManager:
             return (process.username() == current_user and
                    ('python' in process.name().lower() or
                     any('python' in arg.lower() for arg in process.cmdline()[:2])))
-        except (psutil.NoSuchProcess, psutil.AccessDenied, OSError, AttributeError, Exception) as e:
-            if isinstance(e, Exception) and not isinstance(e, (psutil.NoSuchProcess, psutil.AccessDenied, OSError, AttributeError)):
-                self.logger.warning(f"Error checking process {pid}: {e}")
+        # FIXED: Simplified exception handling
+        except (psutil.NoSuchProcess, psutil.AccessDenied, OSError, AttributeError):
+            return False
+        except Exception as e:
+            self.logger.warning(f"Unexpected error checking process {pid}: {e}")
             return False
 
     def _handle_stale_file(self, file_path: str, agent_id: str) -> bool:
         """Check if agent process is running, remove stale file if not."""
         if not agent_id:
-            os.remove(file_path)
+            # FIXED: Use try-except for file removal
+            try:
+                os.remove(file_path)
+            except (FileNotFoundError, PermissionError):
+                pass
             return False
 
         pid = self._get_pid_from_agent_id(agent_id)
         if pid is None or not self._is_process_running(pid):
-            os.remove(file_path)
+            try:
+                os.remove(file_path)
+            except (FileNotFoundError, PermissionError):
+                pass
             return False
         return True
 
@@ -219,7 +264,7 @@ class VersionManager:
         """Internal method to save a versioned snapshot."""
         assert os.path.exists(versions_dir), f"File meta dir {versions_dir} does not exist"
 
-        content_hash = self._get_content_hash(content)
+        content_hash = hash_string(content)
         index_file_path = self._get_file_path(versions_dir, FileType.INDEX)
 
         with locked_json_operation(index_file_path, {'versions': []}, logger=self.logger) as index:
@@ -287,98 +332,6 @@ class VersionManager:
             test_file_path, content, test_meta_dir, changes, explanation, main_file_path
         )
 
-    # Analysis methods
-    def save_analysis(self, file_path: str, analysis: str, test_path: Optional[str] = None,
-                     exit_code: Optional[int] = None, output: Optional[str] = None) -> str:
-        """Save analysis results."""
-        self.logger.info(f"Saving analysis for file: {file_path}")
-
-        versions_dir = self._get_meta_dir(file_path)
-        analysis_file_path = self._get_file_path(versions_dir, FileType.ANALYSIS)
-
-        analysis_data = {
-            'timestamp': self._get_timestamp(),
-            'file_path': file_path,
-            'test_path': test_path,
-            'exit_code': exit_code,
-            'output': output,
-            'analysis': analysis
-        }
-
-        with locked_file_operation(analysis_file_path, 'w') as f:
-            json.dump(analysis_data, f, indent=4)
-
-        self.logger.info(f"Saved analysis to {analysis_file_path}")
-        return analysis_file_path
-
-    def _load_analysis(self, file_path: str) -> Optional[Dict[str, Any]]:
-        """Load analysis results for a file."""
-        versions_dir = self._get_meta_dir(file_path)
-        if not os.path.exists(versions_dir):
-            return None
-
-        analysis_file_path = self._get_file_path(versions_dir, FileType.ANALYSIS)
-        if not os.path.exists(analysis_file_path):
-            return None
-
-        try:
-            with open(analysis_file_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, Exception) as e:
-            self.logger.warning(f"Failed to load analysis from {analysis_file_path}: {e}")
-            return None
-
-    def load_analysis(self, file_path: str) -> Optional[str]:
-        """Get formatted analysis context for code editing prompts."""
-        analysis_data = self._load_analysis(file_path)
-        if not analysis_data:
-            return None
-
-        return f"""Code test output:
-```
-{analysis_data.get('output', 'No output available')}
-```
-
-Code analysis:
-{analysis_data.get('analysis', 'No analysis available')}
-
-IMPORTANT: Please take this analysis into account when improving the code or tests.
-"""
-
-    def create_analysis(self, agent, original_file_content: str, test_file_content: str,
-                       output: str, exit_code: int) -> str:
-        """Generate analysis of test execution results using LLM."""
-        prompt = f"""Analyze the following test execution results and provide comprehensive feedback:
-
-Code file content:
-```python
-{original_file_content}
-```
-
-Test file content:
-```python
-{test_file_content}
-```
-
-Execution output:
-```
-{output}
-```
-
-Exit code: {exit_code}
-
-Please provide an analysis covering:
-1. Overall test execution status (passed/failed)
-2. Specific test failures and their root causes
-3. Any errors, exceptions, or warnings found
-4. Code quality issues revealed by the tests
-5. Suggestions for fixing identified problems
-6. Recommendations for improving test coverage
-
-Your analysis:
-"""
-        return agent.chat_completion(prompt=prompt, system_message=agent.role)
-
     # File status management
     def check_active(self, file_path: str, ignore_self: bool = True) -> bool:
         """Check if there is an active agent working on the file."""
@@ -392,8 +345,11 @@ Your analysis:
             with locked_file_operation(active_file_path, 'r') as f:
                 active_data = json.load(f)
         except (json.JSONDecodeError, FileNotFoundError):
-            if os.path.exists(active_file_path):
+            # FIXED: Use try-except for file removal
+            try:
                 os.remove(active_file_path)
+            except (FileNotFoundError, PermissionError):
+                pass
             return False
 
         agent_id = active_data.get('agent_id')
@@ -459,7 +415,11 @@ Your analysis:
         if not active_data or active_data.get('agent_id') != agent_id:
             return False
 
-        os.remove(active_file_path)
+        # FIXED: Use try-except for file removal
+        try:
+            os.remove(active_file_path)
+        except (FileNotFoundError, PermissionError):
+            pass
         self._remove_active_file(file_path)
         self.logger.debug(f"Unflagged {file_path} from agent {agent_id}")
         return True
@@ -569,11 +529,28 @@ Your analysis:
 
         self.logger.debug(f"Validation passed for active file: {active_file_path}")
 
+    # ========== DATABASE INTERFACE METHODS ==========
+    # Only methods actually used by action classes are exposed
+
+    def store_data(self, file_path: str, table_name: str, data: Dict[str, Any]) -> int:
+        """Store data in the TinyDB database for a file."""
+        return self.db.store_data(file_path, table_name, data)
+
+    def get_latest_data(self, file_path: str, table_name: str,
+                       query_filter: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+        """Get the most recent record from a table."""
+        return self.db.get_latest_data(file_path, table_name, query_filter)
+
+    # ========== END DATABASE INTERFACE METHODS ==========
+
     def shutdown(self, agent):
-        """Clear all active files."""
+        """Enhanced cleanup with database closure."""
+        # Clear active files
         for file_path in self.active_files.copy():
             try:
                 self.unflag_active(agent, file_path)
             except Exception as e:
                 self.logger.debug(f"Failed to cleanup active file {file_path}: {e}")
+
         self.active_files.clear()
+        self.db.shutdown()

@@ -5,14 +5,52 @@ from typing import Dict, List, Any, Optional
 from .action import Action
 from ..config import check_attrs
 from ..logger import get_logger
+from ..parsing import hash_string
+
+
+def create_analysis_prompt(agent, file_path: str) -> Optional[str]:
+    """
+    Create analysis context for code editing prompts by loading execution and analysis data.
+
+    Args:
+        agent: Agent instance with version manager
+        file_path: Path to the main file
+
+    Returns:
+        Formatted analysis context string or None if no data available
+    """
+    # Load the latest execution results
+    execution_data = agent.version_manager.get_latest_data(file_path, 'exec_result')
+    if not execution_data:
+        return None
+    context_parts = []
+
+    # Add execution output
+    if execution_data.get('output'):
+        context_parts.append(f"Code test output:\n```\n{execution_data['output']}\n```")
+
+    # Add exit code info
+    if execution_data.get('exit_code'):
+        context_parts.append(f"Exit code: {execution_data['exit_code']}")
+
+    # Add analysis if available
+    if execution_data.get('analysis'):
+        context_parts.append(f"Code analysis:\n{execution_data['analysis']}")
+
+    if not context_parts:
+        return None
+
+    context = "\n\n".join(context_parts)
+    context += "\n\nIMPORTANT: Please take this analysis into account when improving the code or tests.\n"
+    return context
+
 
 class EditCodeAction(Action):
-    """Action to edit and improve code in the selected file"""
+    """Base action class for editing and improving code files"""
 
     def __init__(self, config: Dict = None):
         super().__init__(config)
         self.logger = get_logger()
-
         check_attrs(self, ['custom_prompt'])
 
     def summary(self, agent) -> str:
@@ -76,6 +114,17 @@ class EditCodeAction(Action):
         }
         selected_file['change_record'] = change_record
 
+        # Store code editing session in TinyDB
+        # edit_data = {
+        #     'original_content_hash': hash_string(original_content),
+        #     'improved_content_hash': hash_string(improved_code),
+        #     'changes': changes,
+        #     'explanation': explanation,
+        #     'agent_id': agent.get_id(),
+        #     'content_changed': improved_code != original_content
+        # }
+        # agent.version_manager.store_data(file_path, 'code_edits', edit_data)
+
         # Write the improved code back to the file
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(improved_code)
@@ -109,10 +158,10 @@ class EditCodeAction(Action):
 5. Documentation improvements
 """
 
-        # Get analysis context from agent's version manager
-        analysis_context = agent.version_manager.load_analysis(file_path)
-        if analysis_context:
-            prompt += analysis_context
+        # Get analysis context using the static function
+        analysis_prompt = create_analysis_prompt(agent, file_path)
+        if analysis_prompt:
+            prompt += f"\n{analysis_prompt}\n"
 
         # Add file info and original code
         prompt += f"""Code file path: {file_path}
@@ -140,7 +189,7 @@ IMPORTANT:
 - Be conservative with changes - prioritize correctness over style
 """
 
-        if analysis_context:
+        if analysis_prompt:
             prompt += "- Pay special attention to addressing any issues identified in the code analysis"
 
         return prompt

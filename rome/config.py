@@ -120,7 +120,9 @@ DEFAULT_CONFIG = {
     },
 
     # Version manager configuration
-    "VersionManager": {},
+    "VersionManager": {
+        "TinyDBManager": {}
+    },
 }
 
 
