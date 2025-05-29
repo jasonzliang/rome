@@ -481,7 +481,10 @@ class CodeExecutor:
         # Default fallback
         return 'python'
 
-    def execute_file(self, file_path: Union[str, Path], language: Optional[str] = None) -> CommandLineCodeResult:
+    def execute_file(self,
+        file_path: Union[str, Path],
+        work_dir: Optional[str] = None,
+        language: Optional[str] = None) -> CommandLineCodeResult:
         """Execute a file and return the result."""
         file_path = Path(file_path) if isinstance(file_path, str) else file_path
 
@@ -490,8 +493,8 @@ class CodeExecutor:
             self.logger.error(f"File not found: {file_path}")
             return CommandLineCodeResult(exit_code=1, output=f"File not found: {file_path}")
 
-        # Use the file's directory as the working directory
-        work_dir = file_path.parent
+        # Use the file's directory as the working directory if not provided
+        if not work_dir: work_dir = file_path.parent
 
         # Detect language if not provided
         if language is None:

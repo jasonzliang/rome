@@ -110,7 +110,7 @@ DEFAULT_CONFIG = {
     "Executor": {
         "timeout": 10, # Maximum time for code to run
         "virtual_env_context": None, # Name of virtual env to run in
-        "work_dir": "./", # Working directory when running code
+        "work_dir": "./", # Working directory when running code directly (not code file)
         "cmd_args": {"pytest": ["-vvs", "--tb=long"]} # Additional args for custom commands
     },
 
