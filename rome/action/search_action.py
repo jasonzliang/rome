@@ -10,7 +10,7 @@ from typing import Dict, Optional, Any, Union, List
 
 from .action import Action
 from ..logger import get_logger
-from ..config import LOG_DIR_NAME, SUMMARY_LENGTH, TEST_FILE_EXT
+from ..config import LOG_DIR_NAME, META_DIR_EXT, SUMMARY_LENGTH, TEST_FILE_EXT
 from ..config import check_attrs
 from ..parsing import extract_all_definitions
 
@@ -220,39 +220,36 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
         return filtered_files
 
     def _filter_excluded_dirs(self, files: List[str]) -> List[str]:
-    """Compact, efficient, and tested version with wildcard support"""
+        """Optimized version balancing performance and simplicity"""
         if not self.exclude_dirs:
             return files
 
-        # Normalize patterns once
+        # Preprocess patterns for faster matching
         patterns = [p.replace('\\', '/') for p in self.exclude_dirs]
 
         def is_excluded(file_path: str) -> bool:
             norm_path = file_path.replace('\\', '/')
             path_parts = norm_path.split('/')
 
-            for pattern in patterns:
-                # Strategy 1: Match directory names
-                for part in path_parts[:-1]: # Exclude filename
+            # Check each directory component once
+            for part in path_parts[:-1]:  # Exclude filename
+                for pattern in patterns:
                     if fnmatch.fnmatch(part, pattern):
                         return True
 
-                # Strategy 2: Match path segments (for patterns like "build/debug")
+            # Only check path patterns if they contain '/'
+            path_patterns = [p for p in patterns if '/' in p]
+            if path_patterns:
                 for i in range(len(path_parts) - 1):
                     segment = '/'.join(path_parts[:i+1])
-                    if fnmatch.fnmatch(segment, pattern):
-                        return True
-
-                # Strategy 3: Match if path contains pattern (for *cache*, */logs/*, etc.)
-                if ('*' in pattern and
-                    (fnmatch.fnmatch(norm_path, f"*/{pattern}/*") or
-                     fnmatch.fnmatch(norm_path, f"{pattern}/*") or
-                     fnmatch.fnmatch(norm_path, f"*{pattern}*"))):
-                    return True
+                    for pattern in path_patterns:
+                        if fnmatch.fnmatch(segment, pattern) or fnmatch.fnmatch(norm_path, f"*{pattern}*"):
+                            return True
 
             return False
 
         return [f for f in files if not is_excluded(f)]
+
 
     def _filter_excluded_types(self, files: List[str]) -> List[str]:
         """Filter out files with excluded file types"""
