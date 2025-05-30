@@ -152,7 +152,7 @@ Files to prioritize:
                 prompt += "No function/class definitions found\n"
 
         prompt += f"""
-Return a JSON OBJECT with {self.batch_size} files like this, make these files are a mixture of both high and medium priority files, with occasionally a few low priority ones.
+Return a JSON OBJECT with {self.batch_size} files like below. Make these files are mostly high and medium priority files, with occasionally a few low priority ones.
 {{
   "path/to/file1.py": 8,
   "path/to/file2.py": 6,
