@@ -281,8 +281,8 @@ class Agent:
         # Try to parse as JSON first
         parsed_json = self.parse_json_response(response)
 
-        if parsed_json and 'action' in parsed_json:
-            action = parsed_json['action']
+        if parsed_json and 'selected_action' in parsed_json:
+            action = parsed_json['selected_action']
             reasoning = parsed_json.get('reasoning', 'No reasoning provided')
             self.logger.info(f"Selected action: {action} - {reasoning}")
             return action, reasoning

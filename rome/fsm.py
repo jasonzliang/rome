@@ -206,12 +206,13 @@ class FSM:
         prompt_parts.append(
 """Please select one of the available actions to execute. Respond with a JSON object containing:
 {
-    "action": "chosen_action_name",
-    "reasoning": "Short reason of why you chose this action"
+    "initial_action": "initial considered action name",
+    "selected_action": "final selected action name",
+    "reasoning": "Short reason of why you choose this final action and why it is different from initial action"
 }"""
         )
 
-        prompt_parts.append(f"IMPORTANT:\nChoose the most appropriate action using your role as a guide. If the action chosen in current state is getting repeated {agent.patience} times or more in recent history, try selecting alternative actions to avoid getting stuck in cycles. Diversity in action selection often leads to better outcomes. Please mention in reasoning if avoiding being stuck in cycles influenced your action selection.")
+        prompt_parts.append(f"IMPORTANT:\nChoose the most appropriate action using your role as a guide. First consider an initial action and if that action (and associated state) is getting repeated {agent.patience} times or more in recent history, try selecting an alternative action to avoid getting stuck. Diversity in action selection often leads to better outcomes. Please mention in reasoning if avoiding being stuck influenced the final action that was selected.")
 
         return "\n\n".join(prompt_parts)
 
