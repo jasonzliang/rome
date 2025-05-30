@@ -2,6 +2,8 @@ import logging
 import threading
 import os
 import inspect
+import subprocess
+import tempfile
 import traceback
 from typing import Optional, Dict, Any, Type, Callable
 from rich.console import Console
@@ -30,88 +32,75 @@ def set_attributes_from_config(obj, config=None, required_attrs=None, optional_a
 
 
 class SizeRotatingFileHandler(logging.FileHandler):
-    """Custom file handler that truncates from the beginning using efficient Unix utilities"""
+    """Compact, efficient size-rotating file handler with cross-platform support"""
 
-    def __init__(self, filename, max_size_kb, *args, **kwargs):
-        self.max_size_kb = max_size_kb
+    def __init__(self, filename, max_size_kb, keep_ratio=0.7, *args, **kwargs):
         self.max_size_bytes = max_size_kb * 1024
+        self.keep_ratio = max(0.1, min(0.9, keep_ratio))
+        self._lock = threading.Lock()
         super().__init__(filename, *args, **kwargs)
 
     def emit(self, record):
-        """Emit a record, checking file size and rotating if necessary"""
+        """Emit record with size-based rotation"""
+        with self._lock:
+            try:
+                if (self.max_size_bytes and os.path.exists(self.baseFilename) and
+                    os.path.getsize(self.baseFilename) >= self.max_size_bytes):
+                    self._rotate()
+                super().emit(record)
+            except Exception:
+                self.handleError(record)
+
+    def _rotate(self):
+        """Rotate log efficiently with Unix tools fallback to Python"""
         try:
-            # Check file size before writing if max_size is set
-            if self.max_size_bytes and os.path.exists(self.baseFilename):
-                if os.path.getsize(self.baseFilename) >= self.max_size_bytes:
-                    self._rotate_log()
+            self.stream and self.stream.close()
+            self.stream = None
 
-            # Emit the record normally
-            super().emit(record)
-
-        except Exception:
-            self.handleError(record)
-
-    def _rotate_log(self):
-        """Rotate the log by truncating from the beginning using Unix utilities"""
-        try:
-            import subprocess
-            import tempfile
-
-            # Close the current stream
-            if self.stream:
-                self.stream.close()
-                self.stream = None
-
-            # Calculate target size (keep ~70% of file)
-            target_size = int(self.max_size_bytes * 0.7)
-
-            # Use tail to efficiently keep the last N bytes
-            # First, get total line count to estimate how many lines to keep
-            line_count_result = subprocess.run(['wc', '-l', self.baseFilename],
-                                             capture_output=True, text=True, check=True)
-            total_lines = int(line_count_result.stdout.split()[0])
-
-            # Estimate lines to keep (conservative approach)
-            estimated_lines_to_keep = max(int(total_lines * 0.7), 100)
-
-            # Create temp file with rotation marker + tail content
-            with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.log') as tmp:
-                tmp.write(f"[LOG ROTATED - Previous entries truncated due to size limit of {self.max_size_kb}KB]\n")
-
-                # Use tail to get the last N lines efficiently
-                tail_result = subprocess.run(['tail', '-n', str(estimated_lines_to_keep), self.baseFilename], capture_output=True, text=True, check=True)
-                tmp.write(tail_result.stdout)
-                temp_path = tmp.name
-
-            # Atomically replace the original file
-            subprocess.run(['mv', temp_path, self.baseFilename], check=True)
-
-            # Reopen the stream
-            self.stream = self._open()
-
-        except (subprocess.CalledProcessError, ImportError, OSError) as e:
-            # Fallback to Python implementation if Unix utilities fail
-            print(f"Warning: Unix utilities failed ({e}), falling back to Python implementation")
-            self._rotate_log_fallback()
-
-    def _rotate_log_fallback(self):
-        """Fallback Python implementation for non-Unix systems"""
-        try:
-            # Simple fallback: keep last 1000 lines at least
-            num_lines = self.max_size_kb * 1024 // 80
-            with open(self.baseFilename, 'r', encoding='utf-8') as f:
-                lines = f.readlines()
-
-            lines_to_keep = lines[-num_lines:] if len(lines) > num_lines else lines
-
-            with open(self.baseFilename, 'w', encoding='utf-8') as f:
-                f.write(f"[LOG ROTATED - Previous entries truncated due to size limit of {self.max_size_kb}KB]\n")
-                f.writelines(lines_to_keep)
+            if not self._unix_rotate():
+                self._python_rotate()
 
             self.stream = self._open()
-
         except Exception as e:
-            print(f"Warning: Log rotation failed completely: {e}")
+            print(f"Log rotation failed: {e}")
+            self.stream = self.stream or self._open()
+
+    def _unix_rotate(self) -> bool:
+        """Fast Unix-based rotation"""
+        if os.name != 'posix':
+            return False
+        try:
+            lines = max(int(self.max_size_bytes * self.keep_ratio) // 80, 50)
+            fd, tmp = tempfile.mkstemp(suffix='.log')
+            with os.fdopen(fd, 'w') as f:
+                f.write(f"[ROTATED - {self.max_size_bytes//1024}KB limit]\n")
+                f.write(subprocess.run(['tail', '-n', str(lines), self.baseFilename],
+                                     capture_output=True, text=True, check=True, timeout=10).stdout)
+            subprocess.run(['mv', tmp, self.baseFilename], check=True, timeout=5)
+            return True
+        except:
+            try: os.unlink(tmp)
+            except: pass
+            return False
+
+    def _python_rotate(self):
+        """Cross-platform Python rotation"""
+        try:
+            size = os.path.getsize(self.baseFilename)
+            keep_size = int(size * self.keep_ratio)
+
+            with open(self.baseFilename, 'rb') as f:
+                f.seek(max(0, size - keep_size))
+                size > keep_size and f.readline()  # Skip partial line
+                data = f.read()
+
+            with open(self.baseFilename, 'wb') as f:
+                f.write(f"[ROTATED - {self.max_size_bytes//1024}KB limit]\n".encode())
+                f.write(data)
+        except Exception:
+            # Emergency truncation
+            with open(self.baseFilename, 'w') as f:
+                f.write(f"[TRUNCATED - {self.max_size_bytes//1024}KB limit]\n")
 
 
 class ParentPathRichHandler(RichHandler):
