@@ -86,7 +86,7 @@ WILDCARD EXAMPLES:
   ./download.py '*2024*'             # All dirs containing '2024'
   ./download.py 'exp_[0-9]*'         # Dirs like exp_0*, exp_1*, etc.
 
-⚠ Always quote wildcards to prevent local shell expansion!
+Always quote wildcards to prevent local shell expansion!
         """,
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
