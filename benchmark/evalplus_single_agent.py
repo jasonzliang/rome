@@ -165,7 +165,12 @@ class EvalPlusBenchmark:
         # Save solutions
         solutions_file = (eval_dir / "solutions.jsonl").resolve()
         write_jsonl(str(solutions_file), solutions)
-        self.logger.info(f"Written evalplus solutions to {solutions_file}")
+        self.logger.info(f"Written EvalPlus solutions to {solutions_file}")
+
+        # Remove any existing eval results files
+        for eval_results_file in eval_dir.glob("*.eval_results.json"):
+            eval_results_file.unlink()
+            self.logger.info(f"Removed existing EvalPlus cache file: {eval_results_file}")
 
         # Try sanitization, use sanitized file if available
         try:
@@ -180,6 +185,7 @@ class EvalPlusBenchmark:
         except Exception as e:
             self.logger.error(f"Sanitization failed: {e}, using original file")
 
+        solutions_file
         # Run evaluation
         eval_result = self._run_evalplus_command(
             ["evalplus.evaluate", "--dataset", self.dataset, "--samples", str(solutions_file)],
@@ -370,7 +376,7 @@ def main():
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs to include")
     parser.add_argument("--max-iterations", type=int, default=0, help="Iterations for agent to run")
     parser.add_argument("--stop-on-error", action="store_true", help="Stop agent if exception thrown")
-    parser.add_argument("--no-evaluation", action="store_true", help="Run evalplus after agent finishes")
+    parser.add_argument("--no-evaluation", action="store_true", help="Run EvalPlus after agent finishes")
 
     args = parser.parse_args()
 
