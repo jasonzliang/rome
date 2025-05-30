@@ -96,13 +96,6 @@ class VersionManager:
         self.logger.warning(f"Could not infer main file from test file: {test_file_path}")
         return None
 
-    def _get_pid_from_agent_id(self, agent_id: str) -> Optional[int]:
-        """Extract PID from agent ID string."""
-        try:
-            return int(agent_id.split('_')[-1]) if len(agent_id.split('_')) >= 3 else None
-        except (ValueError, IndexError):
-            return None
-
     def _is_process_running(self, pid: int) -> bool:
         """Check if a process with given PID is still running and is a Python process."""
         try:
@@ -119,25 +112,6 @@ class VersionManager:
         except Exception as e:
             self.logger.warning(f"Unexpected error checking process {pid}: {e}")
             return False
-
-    def _handle_stale_file(self, file_path: str, agent_id: str) -> bool:
-        """Check if agent process is running, remove stale file if not."""
-        if not agent_id:
-            # FIXED: Use try-except for file removal
-            try:
-                os.remove(file_path)
-            except (FileNotFoundError, PermissionError):
-                pass
-            return False
-
-        pid = self._get_pid_from_agent_id(agent_id)
-        if pid is None or not self._is_process_running(pid):
-            try:
-                os.remove(file_path)
-            except (FileNotFoundError, PermissionError):
-                pass
-            return False
-        return True
 
     # Active file management
     def _add_active_file(self, file_path: str) -> None:
@@ -294,14 +268,18 @@ class VersionManager:
                 pass
             return False
 
-        agent_id = active_data.get('agent_id')
-        if not agent_id or not self._handle_stale_file(active_file_path, agent_id):
+        # Use stored PID instead of extracting from agent_id
+        stored_pid = active_data.get('pid')
+        if not stored_pid or not self._is_process_running(stored_pid):
+            # Stale process - remove the active file
+            try:
+                os.remove(active_file_path)
+            except (FileNotFoundError, PermissionError):
+                pass
             return False
 
-        if ignore_self:
-            pid = self._get_pid_from_agent_id(agent_id)
-            if pid == os.getpid():
-                return False
+        if ignore_self and stored_pid == os.getpid():
+            return False
 
         return True
 
@@ -311,37 +289,36 @@ class VersionManager:
             raise RuntimeError(f"Agent {agent.get_id()} already has active file(s): {list(self._get_active_files())}")
 
         meta_dir = self._get_meta_dir(file_path)
-        agent_id = agent.get_id()
+        current_pid = os.getpid()
 
         with locked_json_operation(self._get_file_path(meta_dir, FileType.ACTIVE), {}, logger=self.logger) as active_data:
-            existing_agent_id = active_data.get('agent_id')
+            existing_pid = active_data.get('pid')
 
-            if existing_agent_id:
-                pid = self._get_pid_from_agent_id(existing_agent_id)
-                current_pid = os.getpid()
-
-                if pid and self._is_process_running(pid):
-                    if pid != current_pid:
-                        raise RuntimeError(f"File {file_path} is already being worked on by agent {existing_agent_id} (PID {pid})")
-                    elif existing_agent_id != agent_id:
-                        raise RuntimeError(f"File {file_path} is already flagged by different agent {existing_agent_id}")
+            if existing_pid:
+                if self._is_process_running(existing_pid):
+                    if existing_pid != current_pid:
+                        raise RuntimeError(f"File {file_path} is already being worked on by PID {existing_pid}")
+                    # Same PID - check if it's the same agent
+                    elif active_data.get('agent_id') != agent.get_id():
+                        raise RuntimeError(f"File {file_path} is already flagged by different agent {active_data.get('agent_id')}")
 
             active_data.clear()
             active_data.update({
-                'agent_id': agent_id,
+                'agent_id': agent.get_id(),
+                'pid': current_pid,
                 'timestamp': self._get_timestamp(),
                 'file_path': file_path
             })
             self._add_active_file(file_path)
 
-        self.logger.debug(f"Flagged {file_path} as active by agent {agent_id}")
+        self.logger.debug(f"Flagged {file_path} as active by agent {agent.get_id()} (PID {current_pid})")
         return True
 
     def unflag_active(self, agent, file_path: str) -> bool:
         """Remove the active flag for a file."""
         meta_dir = self._get_meta_dir(file_path)
         active_file_path = self._get_file_path(meta_dir, FileType.ACTIVE)
-        agent_id = agent.get_id()
+        current_pid = os.getpid()
 
         if not os.path.exists(active_file_path):
             self._remove_active_file(file_path)
@@ -354,7 +331,10 @@ class VersionManager:
             self._remove_active_file(file_path)
             return False
 
-        if not active_data or active_data.get('agent_id') != agent_id:
+        # Check PID for ownership - this is sufficient since PID uniquely identifies the process
+        stored_pid = active_data.get('pid')
+
+        if stored_pid != current_pid:
             return False
 
         # FIXED: Use try-except for file removal
@@ -363,22 +343,11 @@ class VersionManager:
         except (FileNotFoundError, PermissionError):
             pass
         self._remove_active_file(file_path)
-        self.logger.debug(f"Unflagged {file_path} from agent {agent_id}")
+        self.logger.debug(f"Unflagged {file_path} from agent {agent.get_id()} (PID {current_pid})")
         return True
 
-    def _get_agent_name_without_pid(self, agent_id: str) -> str:
-        """Extract agent name without PID from agent_id (e.g., 'agent_myname_12345' -> 'agent_myname')."""
-        if not agent_id:
-            return ""
-
-        # Split by underscore and remove the last part (PID)
-        parts = agent_id.split('_')
-        if len(parts) >= 3:  # Should be ['agent', 'name', 'pid']
-            return '_'.join(parts[:-1])  # Join all but last part
-        return agent_id  # Return as-is if format is unexpected
-
     def check_finished(self, agent, file_path: str) -> bool:
-        """Check if a file has been marked as finished, ignoring PID in agent ID comparison."""
+        """Check if a file has been marked as finished by this agent (by name)."""
         meta_dir = self._get_meta_dir(file_path)
         finished_file_path = self._get_file_path(meta_dir, FileType.FINISHED)
 
@@ -388,31 +357,33 @@ class VersionManager:
         except (FileNotFoundError, json.JSONDecodeError):
             return False
 
-        # Get agent name without PID for comparison
-        current_agent_name = self._get_agent_name_without_pid(agent.get_id())
+        # Use agent name for comparison instead of full agent_id
+        current_agent_name = agent.name
 
         agents = finished_data.get('agents', [])
         return any(
-            self._get_agent_name_without_pid(agent_entry.get('agent_id', '')) == current_agent_name
+            agent_entry.get('agent_name') == current_agent_name
             for agent_entry in agents
         )
 
     def flag_finished(self, agent, file_path: str) -> None:
-        """Flag a file as finished."""
+        """Flag a file as finished, storing agent name for cross-session recognition."""
         meta_dir = self._get_meta_dir(file_path)
 
         with locked_json_operation(self._get_file_path(meta_dir, FileType.FINISHED), {'agents': []}, logger=self.logger) as finished_data:
-            # Check for duplicates
-            if any(agent_entry.get('agent_id') == agent.get_id() for agent_entry in finished_data['agents']):
+            # Check for duplicates by agent name
+            current_agent_name = agent.name
+            if any(agent_entry.get('agent_name') == current_agent_name for agent_entry in finished_data['agents']):
                 return
 
             finished_data['agents'].append({
-                'agent_id': agent.get_id(),
+                'agent_id': agent.get_id(),        # Keep full ID for debugging/history
+                'agent_name': agent.name,          # Store name for comparison
                 'timestamp': self._get_timestamp(),
                 'file_path': file_path
             })
 
-        self.logger.debug(f"Flagged {file_path} as finished by agent {agent.get_id()}")
+        self.logger.debug(f"Flagged {file_path} as finished by agent {agent.name} (ID: {agent.get_id()})")
 
     def check_overall_completion(self, agent) -> Dict[str, int]:
         """Check overall completion status across all Python files in the agent's repository."""

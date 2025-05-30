@@ -32,7 +32,7 @@ Agent:
   repository: null  # Will be overridden by benchmark script
   fsm_type: "simple"
   agent_api: true
-  history_context_len: 12
+  history_context_len: 15
   patience: 3
 
 # Agent API (disabled for benchmarking)
