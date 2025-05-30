@@ -132,7 +132,7 @@ def setup_fsm():
     agent = Agent(
         name="TestAgent",
         role="You are a test agent for FSM testing",
-        config_dict=config
+        config=config
     )
 
     # Create a basic FSM for testing

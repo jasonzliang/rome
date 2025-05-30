@@ -41,6 +41,7 @@ class EvalPlusBenchmark:
 
         config = load_config(config_path)
         config = merge_with_default_config(config)
+        # Overwrite whatever repository with benchmark_dir
         config.setdefault('Agent', {})['repository'] = str(self.benchmark_dir.absolute())
         return config
 
@@ -103,13 +104,7 @@ class EvalPlusBenchmark:
 
     def run_agent(self, max_iterations: int = 10, stop_on_error: bool = False) -> Dict:
         """Run agent on benchmark problems"""
-        agent_config = self.config.get('Agent', {})
-
-        self.agent = Agent(
-            name=agent_config.get('name', 'EvalPlusBenchmark'),
-            role=agent_config.get('role', 'You are an expert Python developer tasked with implementing functions to pass all given test cases.'),
-            config=self.config
-        )
+        self.agent = Agent(repository=self.benchmark_dir, config=self.config)
 
         # Export config using the agent's method instead of manual YAML saving
         try:
@@ -146,6 +141,7 @@ class EvalPlusBenchmark:
                     "solution": solution_file.read_text(encoding="utf-8")
                 })
             else:
+                solutions.append({"task_id": task_id, "solution": ""})
                 self.logger.error(f"No solution file found for {task_id}")
 
         self.logger.info(f"Extracted {len(solutions)} solutions")
@@ -163,14 +159,14 @@ class EvalPlusBenchmark:
         solutions_file = eval_dir / "solutions.jsonl"
         write_jsonl(str(solutions_file), solutions)
 
-        sanitized_result = self._run_evalplus_command(
-            ["python", "-m", "evalplus.sanitize", "--samples", str(solutions_file)],
-            eval_dir, "sanitization"
-        )
-
-        # Check if sanitization failed
-        if isinstance(sanitized_result, dict) and "error" in sanitized_result:
-            return sanitized_result
+        try:
+            sanitized_result = self._run_evalplus_command(
+                ["python", "-m", "evalplus.sanitize", "--samples", str(solutions_file)],
+                eval_dir, "sanitization"
+            )
+        except:
+            self.logger.error(f"Failed to sanitize {solutions_file}, using it as is")
+            sanitized_result = None
 
         # Get the sanitized file path
         sanitized_file = sanitized_result if isinstance(sanitized_result, Path) else None
@@ -353,9 +349,9 @@ def main():
     parser.add_argument("--dataset", choices=["humaneval", "mbpp"], default="humaneval")
     parser.add_argument("--num-samples", type=int, help="Number of samples to include")
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs to include")
-    parser.add_argument("--max-iterations", type=int, default=4000)
-    parser.add_argument("--stop-on-error", action="store_true")
-    parser.add_argument("--no-evaluation", action="store_false", dest="run_evaluation")
+    parser.add_argument("--max-iterations", type=int, default=0, help="Iterations for agent to run")
+    parser.add_argument("--stop-on-error", action="store_true", help="Stop agent if exception thrown")
+    parser.add_argument("--evaluation", action="store_true", help="Run evalplus after agent finishes")
 
     args = parser.parse_args()
 
@@ -375,7 +371,7 @@ def main():
             stop_on_error=args.stop_on_error,
             num_samples=args.num_samples,
             task_ids=args.task_ids,
-            run_evaluation=args.run_evaluation
+            run_evaluation=args.evaluation
         )
 
         benchmark.print_summary(results)

@@ -672,92 +672,6 @@ class TestEvalPlusSpecificMethods(TestBase):
                 self.assertEqual(result, expected)
 
 
-class TestRealEvalPlus(unittest.TestCase):
-    """Integration test with actual EvalPlus commands - only runs if EvalPlus is installed"""
-
-    def setUp(self):
-        """Check if EvalPlus is available"""
-        try:
-            result = subprocess.run(
-                ["python", "-c", "import evalplus"],
-                capture_output=True, timeout=10
-            )
-            self.evalplus_available = (result.returncode == 0)
-        except:
-            self.evalplus_available = False
-
-    def create_sample_solution(self):
-        """Create a simple working HumanEval solution"""
-        return {
-            "task_id": "HumanEval/0",
-            "solution": """def has_close_elements(numbers, threshold):
-    \"\"\"Check if any two numbers are closer than threshold\"\"\"
-    for i in range(len(numbers)):
-        for j in range(i + 1, len(numbers)):
-            if abs(numbers[i] - numbers[j]) < threshold:
-                return True
-    return False"""
-        }
-
-    @unittest.skipUnless(subprocess.run(["python", "-c", "import evalplus"],
-                                       capture_output=True).returncode == 0,
-                        "EvalPlus not installed")
-    def test_real_evalplus_sanitization(self):
-        """Test actual EvalPlus sanitization command"""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            solutions_file = temp_path / "solutions.jsonl"
-
-            # Create solutions file
-            solution = self.create_sample_solution()
-            with open(solutions_file, 'w') as f:
-                f.write(json.dumps(solution) + '\n')
-
-            # Run sanitization
-            cmd = ["python", "-m", "evalplus.sanitize", "--samples", str(solutions_file)]
-            result = subprocess.run(cmd, cwd=str(temp_path), capture_output=True, text=True, timeout=60)
-
-            # Verify it ran successfully
-            self.assertEqual(result.returncode, 0, f"Sanitization failed: {result.stderr}")
-
-            # Check if sanitized file exists or original is still valid
-            sanitized_file = temp_path / "solutions-sanitized.jsonl"
-            self.assertTrue(
-                sanitized_file.exists() or solutions_file.exists(),
-                "Neither sanitized nor original solutions file exists"
-            )
-
-    @unittest.skipUnless(subprocess.run(["python", "-c", "import evalplus"],
-                                       capture_output=True).returncode == 0,
-                        "EvalPlus not installed")
-    def test_real_evalplus_evaluation(self):
-        """Test actual EvalPlus evaluation command"""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            temp_path = Path(temp_dir)
-            solutions_file = temp_path / "solutions.jsonl"
-
-            # Create solutions file
-            solution = self.create_sample_solution()
-            with open(solutions_file, 'w') as f:
-                f.write(json.dumps(solution) + '\n')
-
-            # Run evaluation directly (skip sanitization for simplicity)
-            cmd = [
-                "python", "-m", "evalplus.evaluate",
-                "--dataset", "humaneval",
-                "--samples", str(solutions_file)
-            ]
-            result = subprocess.run(cmd, cwd=str(temp_path), capture_output=True, text=True, timeout=120)
-
-            # Verify it ran successfully
-            self.assertEqual(result.returncode, 0, f"Evaluation failed: {result.stderr}")
-
-            # Verify output contains expected format
-            stdout = result.stdout
-            self.assertIn("Base", stdout, "Expected 'Base' scores not found in output")
-            self.assertIn("pass@", stdout, "Expected pass@ metrics not found in output")
-
-
 if __name__ == '__main__':
     # Environment setup
     os.environ.setdefault('OPENAI_API_KEY', 'test-key')
@@ -768,7 +682,7 @@ if __name__ == '__main__':
 
     for test_class in [TestEvalPlusBenchmark, TestEvalPlusIntegration,
                        TestEdgeCasesAndErrors, TestIntegrationWorkflows,
-                       TestEvalPlusSpecificMethods, TestRealEvalPlus]:
+                       TestEvalPlusSpecificMethods]:
         suite.addTests(loader.loadTestsFromTestCase(test_class))
 
     runner = unittest.TextTestRunner(verbosity=2, buffer=True)

@@ -98,7 +98,6 @@ def main():
 
         # Agent specific configuration
         "Agent": {
-            "repository": str(test_dir.absolute()),
             "fsm_type": "simple",
             "patience": 1,
         },
@@ -123,7 +122,8 @@ def main():
     agent = Agent(
         name="CodeAnalyzer",
         role="You are an expert code analyzer that can identify and write interesting algorithms and functions",
-        config_dict=config
+        repository=str(test_dir.absolute()),
+        config=config
     )
     agent.draw_fsm_graph()
 

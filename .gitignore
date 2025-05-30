@@ -173,6 +173,9 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
+####################
+
+# Rome library files
 benchmark/result
 test/result
 .DS_Store

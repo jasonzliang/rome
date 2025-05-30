@@ -10,7 +10,7 @@ from .logger import get_logger
 
 ######## These constants are not intended to be user modifiable ########
 # Min and max allowed lengths for agent names
-AGENT_NAME_LENGTH = [8, 24]
+AGENT_NAME_LENGTH = (8, 24)
 
 # Default hash function to use for check file versions and AST cache
 DEFAULT_HASH_FUNC = "sha256"
@@ -61,10 +61,10 @@ DEFAULT_CONFIG = {
 
     # Agent configuration
     "Agent": {
-        "name": None, # Overwritten by agent's constructor
-        "role": None, # Overwritten by agent's constructor
-        "repository": "./", # Code repository base directory
-        "fsm_type": "minimal", # Which FSM to load (see fsm.py)
+        "name": None, # Agent name, can be overwritten by constructor
+        "role": None, # Agent description, can be overwritten by constructor
+        "repository": None, #  Repository base directory, can be overwritten by constructor
+        "fsm_type": "simple", # Which FSM to load (see fsm_factory.py)
         "agent_api": True, # Launch an REST API server for agent's internal state
         "history_context_len": 15, # Length of history to use when selecting action
         "patience": 3, # If same state/action chosen repeatedly, prompt to choose different action
@@ -81,8 +81,8 @@ DEFAULT_CONFIG = {
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s", # Formatting for log messages
         "console": True, # Print to console if true
         "include_caller_info": None, # Can be "rome", "rich", or None
-        "base_dir": None, # Directory for log files (overwrites agent's setting)
-        "filename": None, # Log file name (overwrites agent's setting)
+        "base_dir": None, # Directory for log files, overwrites agent's auto-generated values
+        "filename": None, # Log file name, overwrites agent's auto-generated values
         "max_size_kb": 10000, # Max log size in kb, truncates after exceeding
     },
 

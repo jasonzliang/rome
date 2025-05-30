@@ -1,6 +1,7 @@
 import atexit
 import json
 import os
+import pprint
 import re
 import signal
 import sys
@@ -32,6 +33,7 @@ class Agent:
     def __init__(self,
         name: str = None,
         role: str = None,
+        repository: str = None,
         config: Dict = None):
         """Initialize the Agent with configuration and setup all components"""
 
@@ -45,7 +47,7 @@ class Agent:
         self._validate_name_role(name, role)
 
         # Repository validation and logging setup
-        self._setup_repository_and_logging()
+        self._setup_repository_and_logging(repository)
 
         # Initialize core components
         self._setup_components()
@@ -62,19 +64,42 @@ class Agent:
         else:
             self.logger.info("Using DEFAULT_CONFIG, no config dict provided")
             self.config = DEFAULT_CONFIG.copy()
+        self.logger.info(f"Agent full config:\n{pprint.pformat(self.config)}")
 
         # Set attributes from Agent config
         agent_config = self.config.get('Agent', {})
         set_attributes_from_config(self, agent_config,
-            ['repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience'],
-            ['name', 'role'])
+            ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience'])
 
-    def _setup_repository_and_logging(self) -> None:
+    def _validate_name_role(self, name: str, role: str) -> None:
+        """Validates and formats the agent's role string"""
+        if role:
+            self.role = role
+        if name:
+            self.name = name
+        self.logger.assert_true(self.role and self.name,
+            f"Invalid name or role: {name}, {role}")
+
+        # Make make role description clear what it is
+        if "your role" not in self.role.lower():
+            self.logger.info("Role string does not contain 'your role', reformatting")
+            self.role = f"Your role as an agent:\n{self.role}"
+
+        # Name must be between 8 and 24 char long and alphanum only
+        a, b = AGENT_NAME_LENGTH
+        # FIXED: Handle name validation properly
+        clean_name = ''.join(re.findall(r'[a-zA-Z0-9]+', self.name))
+        self.logger.assert_true(clean_name and a <= len(clean_name) <= b,
+            f"Agent name must be {a}-{b} alphanumeric characters, got: '{self.name}' -> '{clean_name}'")
+        self.name = clean_name
+
+    def _setup_repository_and_logging(self, repository: str = None) -> None:
         """Validate repository and configure logging"""
         # Validate repository
-        self.logger.assert_attribute(self, 'repository', "repository not provided in Agent config")
+        if repository:
+            self.repository = repository
         self.logger.assert_true(
-            self.repository is not None and os.path.exists(self.repository),
+            self.repository and os.path.exists(self.repository),
             f"Repository path does not exist: {self.repository}"
         )
 
@@ -135,28 +160,6 @@ class Agent:
         self.logger.info(f"Received signal {signum}, shutting down agent {self.name}")
         self.shutdown()
         sys.exit(0)
-
-    def _validate_name_role(self, name: str, role: str) -> None:
-        """Validates and formats the agent's role string"""
-        if role:
-            self.role = role
-        if name:
-            self.name = name
-        self.logger.assert_true(self.role and self.name,
-            f"Invalid name or role: {name}, {role}")
-
-        # Make make role description clear what it is
-        if "your role" not in self.role.lower():
-            self.logger.info("Role string does not contain 'your role', reformatting")
-            self.role = f"Your role as an agent:\n{self.role}"
-
-        # Name must be between 8 and 24 char long and alphanum only
-        a, b = AGENT_NAME_LENGTH
-        # FIXED: Handle name validation properly
-        clean_name = ''.join(re.findall(r'[a-zA-Z0-9]+', self.name))
-        self.logger.assert_true(clean_name and a <= len(clean_name) <= b,
-            f"Agent name must be {a}-{b} alphanumeric characters, got: '{self.name}' -> '{clean_name}'")
-        self.name = clean_name
 
     def _setup_fsm(self):
         """Initialize the Finite State Machine"""
