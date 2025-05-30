@@ -125,7 +125,7 @@ DEFAULT_CONFIG = {
         "virtual_env_context": None, # Name of virtual env to run in
         "work_dir": "./", # Working directory when running code directly (not code file)
         "cmd_args": { # Additional useful flags when executing code
-            "pytest": ["-vs", "--tb=long", "--no-header"],
+            "pytest": ["-vs", "--tb=short", "--no-header"],
             "python": ["-u"],
         }
     },

@@ -85,8 +85,8 @@ TransitionAction: {}
 # Code Execution Configuration
 Executor:
   timeout: 30  # Longer timeout for complex algorithms
-  virtual_env_context: null
-  work_dir: "./"
+  virtual_env_context: "default"
+  work_dir: "default"
   cmd_args:
     pytest: "default"
     python: "default"
