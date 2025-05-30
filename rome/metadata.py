@@ -1,4 +1,5 @@
 import datetime
+import fnmatch
 import json
 import os
 from typing import List, Dict, Any, Optional, Set
@@ -8,7 +9,7 @@ from enum import Enum
 
 import psutil
 
-from .config import META_DIR_EXT, TEST_FILE_EXT
+from .config import LOG_DIR_NAME, META_DIR_EXT, TEST_FILE_EXT
 from .logger import get_logger
 from .parsing import hash_string
 from .database import DatabaseManager, locked_file_operation, locked_json_operation
@@ -396,36 +397,17 @@ class VersionManager:
 
         self.logger.debug(f"Flagged {file_path} as finished by agent {agent.get_id()}")
 
-    def _is_file_finished(self, file_path: str) -> bool:
-        """Check if a file has valid finished.json. Reuses existing path logic."""
-        finished_file_path = self._get_file_path(self._get_meta_dir(file_path), FileType.FINISHED)
-
-        try:
-            with open(finished_file_path, 'r', encoding='utf-8') as f:
-                finished_data = json.load(f)
-            return bool(finished_data.get('agents'))
-        except (FileNotFoundError, json.JSONDecodeError):
-            return False
-
     def check_overall_completion(self, agent) -> Dict[str, int]:
-        """
-        Check overall completion status across all Python files in the agent's repository.
-
-        Args:
-            agent: Agent instance to get repository path from
-
-        Returns:
-            Dict with finished_files, unfinished_files, total_files, completion_percentage
-        """
+        """Check overall completion status across all Python files in the agent's repository."""
         repository_path = agent.repository
         finished_count = 0
         total_count = 0
 
-        self.logger.info(f"Checking completion status in: {repository_path}")
+        self.logger.info(f"Checking agent {agent.get_id()} completion status in: {repository_path}")
 
-        # Walk through all Python files, reusing existing directory skip logic
+        # Walk through all Python files with enhanced directory filtering
         for root, dirs, files in os.walk(repository_path):
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in ['__pycache__', 'node_modules', 'venv', 'env']]
+            dirs[:] = [d for d in dirs if not self._should_exclude_dir(d)]
 
             for file in files:
                 if file.endswith('.py') and not file.startswith('.'):
@@ -433,7 +415,7 @@ class VersionManager:
                     total_count += 1
 
                     # Reuse existing finished check logic
-                    if self._is_file_finished(file_path):
+                    if self.check_finished(agent, file_path):
                         finished_count += 1
 
         unfinished_count = total_count - finished_count
@@ -448,6 +430,20 @@ class VersionManager:
 
         self.logger.info(f"Completion: {finished_count}/{total_count} files ({completion_percentage:.2f}%)")
         return result
+
+    def _should_exclude_dir(self, dirname: str) -> bool:
+        """Check if directory should be excluded using wildcard patterns."""
+        exclude_patterns = [
+            ".*",                    # Hidden directories (starts with .)
+            "venv",                  # Virtual environment
+            "__*__",                 # __pycache__, __init__, etc.
+            "node_modules",          # Node.js modules
+            "env",                   # Environment directories
+            LOG_DIR_NAME,            # Agent log directory
+            f"*.{META_DIR_EXT}"      # Meta directories (e.g., *.rome)
+        ]
+
+        return any(fnmatch.fnmatch(dirname, pattern) for pattern in exclude_patterns)
 
     # Validation methods (simplified)
     def _validate_required_fields(self, data: Dict, required_fields: List[str], context: str) -> List[ValidationError]:
