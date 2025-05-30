@@ -203,7 +203,7 @@ class Logger:
             # Add file handler if base_dir and filename are specified
             if self.base_dir:
                 # Create log directory if it doesn't exist
-                os.makedirs(self.base_dir, exist_ok=True)
+                os.makedirs(self.base_dir, exist_ok=True, parents=True)
 
                 if self.filename:
                     # Construct full log file path
@@ -274,7 +274,7 @@ class Logger:
     def get_log_dir(self) -> Optional[str]:
         """Get the current log directory, creating it if needed."""
         if not os.path.exists(self.base_dir):
-            os.makedirs(self.base_dir)
+            os.makedirs(self.base_dir, exist_ok=True, parents=True)
         return self.base_dir
 
     def get_log_file_size(self) -> Optional[int]:

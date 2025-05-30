@@ -63,8 +63,8 @@ TestEditedState: {}
 SearchAction:
   max_files: "default"
   file_types: [".py"]
-  exclude_types: []
-  exclude_dirs: [".*", "venv", "__*__"]
+  exclude_types: "default"
+  exclude_dirs: "default"
   selection_criteria: "default"
   batch_size: 10
   batch_sampling: true

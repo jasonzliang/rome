@@ -52,7 +52,7 @@ class VersionManager:
         meta_dir = f"{file_path}.{META_DIR_EXT}"
         # FIXED: Use try-except to handle race conditions
         try:
-            os.makedirs(meta_dir, exist_ok=True)
+            os.makedirs(meta_dir, exist_ok=True, parents=True)
         except FileExistsError:
             # Another process created the directory
             pass
@@ -64,7 +64,7 @@ class VersionManager:
         test_meta_dir = os.path.join(main_meta_dir, f"{test_filename}.{META_DIR_EXT}")
         # FIXED: Use try-except to handle race conditions
         try:
-            os.makedirs(test_meta_dir, exist_ok=True)
+            os.makedirs(test_meta_dir, exist_ok=True, parents=True)
         except FileExistsError:
             # Another process created the directory
             pass

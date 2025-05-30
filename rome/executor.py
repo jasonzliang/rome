@@ -174,8 +174,10 @@ class CodeExecutor:
         # Ensure work_dir is a Path object
         try:
             self.work_dir = Path(self.work_dir)
+            self.logger.info(f"Executor work dir: {self.work_dir}")
         except:
             self.work_dir = Path(os.getcwd())
+            self.logger.error(f"Invalid executor work dir, using fallback: {os.getcwd()}")
 
         # Ensure work_dir exists
         self.work_dir.mkdir(exist_ok=True, parents=True)
