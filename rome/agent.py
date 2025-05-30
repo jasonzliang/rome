@@ -337,18 +337,17 @@ class Agent:
 
         for iteration in range(self.curr_iteration, end_iteration):
             try:
-                # Check agent context on first iteration to make sure state is valid
-                if iteration == 1: self.fsm.check_context(self)
-
-                # Increment iteration counter in history
+                # Increment iteration counter in history, show iteration
                 self.history.set_iteration(iteration)
-
-                # Validate active file state for consistency
-                self.version_manager.validate_active_files(self)
-
                 self.logger.info(f"Loop iteration {iteration}/{end_iteration-1}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
 
+                # Validate active file state for consistency and check completion
+                self.version_manager.validate_active_files(self)
+                self.version_manager.check_overall_completion(self)
+
+                # Check agent context on first iteration to make sure state is valid
+                if iteration == 1: self.fsm.check_context(self)
                 # Check if there are available actions
                 available_actions = self.fsm.get_available_actions()
                 if not available_actions:

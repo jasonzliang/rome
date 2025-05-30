@@ -110,21 +110,21 @@ class SearchAction(Action):
 
         return file_overviews
 
-    def _ensure_all_files_prioritized(self, prioritized_files: List[Dict], file_overviews: List[Dict]) -> List[Dict]:
-        """Ensure all files from overviews are included in prioritized list with fallback priorities"""
-        all_paths = {file_info["path"] for file_info in file_overviews}
-        prioritized_paths = {file_info.get("file_path") for file_info in prioritized_files}
+    # def _ensure_all_files_prioritized(self, prioritized_files: List[Dict], file_overviews: List[Dict]) -> List[Dict]:
+    #     """Ensure all files from overviews are included in prioritized list with fallback priorities"""
+    #     all_paths = {file_info["path"] for file_info in file_overviews}
+    #     prioritized_paths = {file_info.get("file_path") for file_info in prioritized_files}
 
-        # Add missing files with default priority
-        for path in all_paths - prioritized_paths:
-            self.logger.info(f"File missing from prioritized list: {path}, adding with default priority")
-            prioritized_files.append({
-                "file_path": path,
-                "priority": 1,
-                "reason": "Added by default (missing from LLM response)"
-            })
+    #     # Add missing files with default priority
+    #     for path in all_paths - prioritized_paths:
+    #         self.logger.info(f"File missing from prioritized list: {path}, adding with default priority")
+    #         prioritized_files.append({
+    #             "file_path": path,
+    #             "priority": 1,
+    #             "reason": "Added by default (missing from LLM response)"
+    #         })
 
-        return sorted(prioritized_files, key=lambda x: x.get("priority", 0), reverse=True)
+    #     return sorted(prioritized_files, key=lambda x: x.get("priority", 0), reverse=True)
 
     def _create_prioritization_prompt(self, file_overviews: List[Dict]) -> str:
         """Create prompt for file prioritization"""
@@ -192,7 +192,7 @@ IMPORTANT: Your response MUST be a valid JSON OBJECT where keys are file paths a
                 "priority": 1
             } for file_info in file_overviews]
 
-        return self._ensure_all_files_prioritized(prioritized_files, file_overviews)
+        return sorted(prioritized_files, key=lambda x: x.get("priority", 0), reverse=True)
 
     def _apply_filters(self, agent, files: List[str]) -> List[str]:
         """Apply all file filters in sequence"""
@@ -287,47 +287,46 @@ IMPORTANT: Your response MUST be a valid JSON OBJECT where keys are file paths a
                         f"- {file_info['priority_reason']}\n")
         return overview
 
-    def _create_definitions_overview(self, batch_data: List[Dict]) -> str:
-        """Create definitions overview section for batch selection prompt"""
-        overview = "\nCode definitions overview:"
+    # def _create_definitions_overview(self, batch_data: List[Dict]) -> str:
+    #     """Create definitions overview section for batch selection prompt"""
+    #     overview = "\nCode definitions overview:"
 
-        for i, file_info in enumerate(batch_data):
-            overview += f"\n\n--- File {i+1}: {file_info['path']} ---"
+    #     for i, file_info in enumerate(batch_data):
+    #         overview += f"\n\n--- File {i+1}: {file_info['path']} ---"
 
-            if not file_info['all_definitions']:
-                overview += "\nNo function or class definitions found"
-                continue
+    #         if not file_info['all_definitions']:
+    #             overview += "\nNo function or class definitions found"
+    #             continue
 
-            functions = [d for d in file_info['all_definitions'] if d['type'] == 'function']
-            classes = [d for d in file_info['all_definitions'] if d['type'] == 'class']
+    #         functions = [d for d in file_info['all_definitions'] if d['type'] == 'function']
+    #         classes = [d for d in file_info['all_definitions'] if d['type'] == 'class']
 
-            for def_type, definitions in [("Functions", functions), ("Classes", classes)]:
-                if definitions:
-                    overview += f"\n{def_type} ({len(definitions)}):"
-                    for defn in definitions[:3]:  # Limit to first 3
-                        overview += f"\n  {defn['signature']}"
-                        if defn['docstring']:
-                            # Allow multiple lines but limit total characters to SUMMARY_LENGTH
-                            docstring_lines = [line.strip() for line in defn['docstring'].split('\n') if line.strip()]
-                            if docstring_lines:
-                                docstring_text = ' '.join(docstring_lines)
-                                overview += f" # {self._truncate_text(docstring_text)}"
+    #         for def_type, definitions in [("Functions", functions), ("Classes", classes)]:
+    #             if definitions:
+    #                 overview += f"\n{def_type} ({len(definitions)}):"
+    #                 for defn in definitions[:3]:  # Limit to first 3
+    #                     overview += f"\n  {defn['signature']}"
+    #                     if defn['docstring']:
+    #                         # Allow multiple lines but limit total characters to SUMMARY_LENGTH
+    #                         docstring_lines = [line.strip() for line in defn['docstring'].split('\n') if line.strip()]
+    #                         if docstring_lines:
+    #                             docstring_text = ' '.join(docstring_lines)
+    #                             overview += f" # {self._truncate_text(docstring_text)}"
 
-                        if defn['type'] == 'class' and defn.get('methods'):
-                            methods = defn['methods'][:5]
-                            overview += f" (methods: {', '.join(methods)}{'...' if len(defn['methods']) > 5 else ''})"
+    #                     if defn['type'] == 'class' and defn.get('methods'):
+    #                         methods = defn['methods'][:5]
+    #                         overview += f" (methods: {', '.join(methods)}{'...' if len(defn['methods']) > 5 else ''})"
 
-                    if len(definitions) > 3:
-                        overview += f"\n  ... and {len(definitions) - 3} more {def_type.lower()}"
+    #                 if len(definitions) > 3:
+    #                     overview += f"\n  ... and {len(definitions) - 3} more {def_type.lower()}"
 
-        return overview
+    #     return overview
 
     def _create_selection_prompt(self, batch_data: List[Dict]) -> str:
         """Create a concise prompt for file selection"""
         prompt = f"""Select the most relevant file based on your role and selection criteria: {self.selection_criteria}
 
 {self._create_batch_overview(batch_data)}
-{self._create_definitions_overview(batch_data)}
 
 Detailed file contents:"""
 
@@ -362,7 +361,7 @@ Respond with a JSON object:
             batch_data.append({
                 **file_stats,
                 'priority': file_info.get("priority", 1),
-                'priority_reason': file_info.get("reason", "No reason provided")
+                'priority_reason': file_info.get("reason", "")
             })
 
         return batch_data
