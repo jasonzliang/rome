@@ -159,9 +159,39 @@ class Agent:
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
 
+    # def _signal_handler(self, signum, frame):
+    #     """Handle termination signals gracefully with concise location info"""
+    #     self.logger.info(f"Received signal {signum}, shutting down agent {self.name}")
+
+    #     # Show just the current location
+    #     if frame:
+    #         filename = frame.f_code.co_filename
+    #         line_number = frame.f_lineno
+    #         function_name = frame.f_code.co_name
+    #         self.logger.info(f"Interrupted at: {filename}:{line_number} in {function_name}()")
+
+    #     # Show full stack trace
+    #     self.logger.info("Call stack:")
+    #     for line in traceback.format_stack(frame):
+    #         self.logger.info(line.rstrip())
+
+    #     self.shutdown()
+    #     sys.exit(0)
+
     def _signal_handler(self, signum, frame):
-        """Handle termination signals gracefully"""
+        """Handle termination signals gracefully with clean stacktrace"""
         self.logger.info(f"Received signal {signum}, shutting down agent {self.name}")
+
+        # Capture traceback to string
+        import io
+        string_buffer = io.StringIO()
+        traceback.print_stack(frame, file=string_buffer)
+        stacktrace = string_buffer.getvalue()
+        string_buffer.close()
+
+        self.logger.info("Execution stack when interrupted:")
+        self.logger.info(stacktrace)
+
         self.shutdown()
         sys.exit(0)
 

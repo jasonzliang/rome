@@ -110,9 +110,25 @@ class SearchAction(Action):
 
         return file_overviews
 
+    def _ensure_all_files_prioritized(self, prioritized_files: List[Dict], file_overviews: List[Dict]) -> List[Dict]:
+        """Ensure all files from overviews are included in prioritized list with fallback priorities"""
+        all_paths = {file_info["path"] for file_info in file_overviews}
+        prioritized_paths = {file_info.get("file_path") for file_info in prioritized_files}
+
+        # Add missing files with default priority
+        for path in all_paths - prioritized_paths:
+            self.logger.info(f"File missing from prioritized list: {path}, adding with default priority")
+            prioritized_files.append({
+                "file_path": path,
+                "priority": 1,
+                "reason": "Added by default (missing from LLM response)"
+            })
+
+        return sorted(prioritized_files, key=lambda x: x.get("priority", 0), reverse=True)
+
     def _create_prioritization_prompt(self, file_overviews: List[Dict]) -> str:
         """Create prompt for file prioritization"""
-        prompt = f"""Return a JSON ARRAY of ALL {len(file_overviews)} files with priority scores.
+        prompt = f"""Return a JSON OBJECT with ALL {len(file_overviews)} files with priority scores.
 
 Assign a priority score (1-10, 10 being highest) using the following criteria in descending importance:
 1. File modification age (older files get higher priority)
@@ -136,40 +152,16 @@ Files to prioritize:
                 prompt += "No function/class definitions found\n"
 
         prompt += f"""
-Return a JSON ARRAY with ALL {len(file_overviews)} files like this:
-[
-  {{
-    "file_path": "path/to/file1.py",
-    "priority": 1-10,
-    "reason": "Brief reason"
-  }},
-  {{
-    "file_path": "path/to/file2.py",
-    "priority": 1-10,
-    "reason": "Brief reason"
-  }}
-  {', ...' if len(file_overviews) > 2 else ''}
-]
+Return a JSON OBJECT with {self.batch_size} highest priority files like this:
+{{
+  "path/to/file1.py": 8,
+  "path/to/file2.py": 6,
+  "path/to/file3.py": 3
+}}
 
-IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending with ], not a single object.
+IMPORTANT: Your response MUST be a valid JSON OBJECT where keys are file paths and values are priority scores (1-10).
 """
         return prompt
-
-    def _ensure_all_files_prioritized(self, prioritized_files: List[Dict], file_overviews: List[Dict]) -> List[Dict]:
-        """Ensure all files from overviews are included in prioritized list with fallback priorities"""
-        all_paths = {file_info["path"] for file_info in file_overviews}
-        prioritized_paths = {file_info.get("file_path") for file_info in prioritized_files}
-
-        # Add missing files with default priority
-        for path in all_paths - prioritized_paths:
-            self.logger.info(f"File missing from prioritized list: {path}, adding with default priority")
-            prioritized_files.append({
-                "file_path": path,
-                "priority": 1,
-                "reason": "Added by default (missing from LLM response)"
-            })
-
-        return sorted(prioritized_files, key=lambda x: x.get("priority", 0), reverse=True)
 
     def _prioritize_files(self, agent, file_overviews: List[Dict]) -> List[Dict]:
         """Use LLM to prioritize all files at once based on size, age, and function definitions"""
@@ -181,26 +173,23 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
             response_format={"type": "json_object"})
         result = agent.parse_json_response(response)
 
-        # Handle different response formats
-        if isinstance(result, list):
-            prioritized_files = result
-        elif isinstance(result, dict) and "file_path" in result:
-            # Single object response - create list and add remaining files
-            prioritized_files = [result]
-            for file_info in file_overviews:
-                if file_info["path"] != result["file_path"]:
+        # Handle simplified JSON object response format {file_path: priority}
+        prioritized_files = []
+
+        if isinstance(result, dict):
+            # Convert simplified format to expected list format
+            for file_path, priority in result.items():
+                if isinstance(priority, (int, float)):
                     prioritized_files.append({
-                        "file_path": file_info["path"],
-                        "priority": 1,
-                        "reason": "Added by default (not in LLM response)"
+                        "file_path": file_path,
+                        "priority": int(priority)
                     })
         else:
             # Invalid response - create default priorities
             self.logger.error("Invalid response format, using default priorities for all files")
             prioritized_files = [{
                 "file_path": file_info["path"],
-                "priority": 1,
-                "reason": "Default priority (LLM response format error)"
+                "priority": 1
             } for file_info in file_overviews]
 
         return self._ensure_all_files_prioritized(prioritized_files, file_overviews)
@@ -352,7 +341,7 @@ Respond with a JSON object:
     "selected_file": {
         "file_number": <int>,
         "path": "<file_path>",
-        "reason": "<rationale>"
+        "reason": "<brief reason>"
     }
 }
 
