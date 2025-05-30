@@ -430,7 +430,7 @@ class VersionManager:
             'completion_percentage': round(completion_percentage, 2)
         }
 
-        self.logger.info(f"Completion: {finished_count}/{total_count} files ({completion_percentage:.2f}%)")
+        self.logger.info(f"Overall repository progress: {finished_count}/{total_count} files ({completion_percentage:.2f}%)")
         return result
 
     # Validation methods (simplified)
