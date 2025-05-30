@@ -176,7 +176,9 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
         self.logger.info(f"Prioritizing all {len(file_overviews)} files at once")
 
         prompt = self._create_prioritization_prompt(file_overviews)
-        response = agent.chat_completion(prompt=prompt, system_message=agent.role)
+        response = agent.chat_completion(prompt=prompt,
+            system_message=agent.role,
+            response_format={"type": "json_object"})
         result = agent.parse_json_response(response)
 
         # Handle different response formats
@@ -249,7 +251,6 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
             return False
 
         return [f for f in files if not is_excluded(f)]
-
 
     def _filter_excluded_types(self, files: List[str]) -> List[str]:
         """Filter out files with excluded file types"""
@@ -332,11 +333,10 @@ IMPORTANT: Your response MUST be a valid JSON ARRAY starting with [ and ending w
 
         return overview
 
-    def _create_selection_prompt(self, batch_data: List[Dict], current_batch: int, total_batches: int) -> str:
+    def _create_selection_prompt(self, batch_data: List[Dict]) -> str:
         """Create a concise prompt for file selection"""
         prompt = f"""Select the most relevant file based on your role and selection criteria: {self.selection_criteria}
 
-Current batch: {current_batch+1}/{total_batches}
 {self._create_batch_overview(batch_data)}
 {self._create_definitions_overview(batch_data)}
 
@@ -360,40 +360,34 @@ Respond with a JSON object:
 """
         return prompt
 
-    def _prepare_batch_data(self, file_paths: List[str], prioritized_files: List[Dict]) -> List[Dict]:
+    def _prepare_batch_data(self, batch_file_info: List[Dict]) -> List[Dict]:
         """Prepare batch data with file content and metadata"""
         batch_data = []
 
-        for file_path in file_paths:
+        for file_info in batch_file_info:
+            file_path = file_info["file_path"]
             file_stats = self._get_file_stats(file_path)
             if not file_stats:
                 continue
 
-            # Find priority info for this file
-            priority_info = next((f for f in prioritized_files if f["file_path"] == file_path), None)
-            priority = priority_info.get("priority", 1) if priority_info else 1
-            reason = priority_info.get("reason", "No reason provided") if priority_info else "No reason provided"
-
             batch_data.append({
                 **file_stats,
-                'priority': priority,
-                'priority_reason': reason
+                'priority': file_info.get("priority", 1),
+                'priority_reason': file_info.get("reason", "No reason provided")
             })
 
         return batch_data
 
-    def _weighted_random_sample(self, file_paths: List[str], prioritized_files: List[Dict], batch_size: int) -> List[str]:
-        """Sample files using weighted random sampling based on priorities"""
-        priority_map = {f["file_path"]: f.get("priority", 1) for f in prioritized_files}
-        weights = [priority_map.get(path, 1) for path in file_paths]
-        sample_size = min(batch_size, len(file_paths))
+    def _weighted_random_sample(self, prioritized_files: List[Dict], batch_size: int) -> List[Dict]:
+        """Sample complete file objects using weighted random sampling"""
+        weights = [file_info.get("priority", 1) for file_info in prioritized_files]
+        sample_size = min(batch_size, len(prioritized_files))
 
-        # Use random.choices for sampling without replacement
         sampled_indices = set()
-        sampled_paths = []
+        sampled_files = []
 
         for _ in range(sample_size):
-            available_indices = [i for i in range(len(file_paths)) if i not in sampled_indices]
+            available_indices = [i for i in range(len(prioritized_files)) if i not in sampled_indices]
             if not available_indices:
                 break
 
@@ -409,24 +403,24 @@ Respond with a JSON object:
                 chosen_idx = available_indices[chosen_relative_idx]
 
             sampled_indices.add(chosen_idx)
-            sampled_paths.append(file_paths[chosen_idx])
+            sampled_files.append(prioritized_files[chosen_idx])
 
-        return sampled_paths
+        return sampled_files
 
-    def _process_single_batch(self, agent, batch_paths: List[str], prioritized_files: List[Dict],
-                             batch_info: str) -> Optional[Dict]:
+    def _process_single_batch(self, agent, batch_file_info: List[Dict], batch_info: str) -> Optional[Dict]:
         """Process a single batch of files and return selected file if found"""
-        self.logger.info(f"Processing {batch_info}: {len(batch_paths)} files")
+        self.logger.info(f"Processing {batch_info}: {len(batch_file_info)} files")
 
-        current_batch_data = self._prepare_batch_data(batch_paths, prioritized_files)
+        current_batch_data = self._prepare_batch_data(batch_file_info)
         if not current_batch_data:
             self.logger.info(f"No readable files in {batch_info}")
             return None
 
         # Get LLM selection
-        prompt = self._create_selection_prompt(current_batch_data, 0, 1)  # Simplified for batch info
-        response = agent.chat_completion(prompt=prompt, system_message=agent.role,
-                                       response_format={"type": "json_object"})
+        prompt = self._create_selection_prompt(current_batch_data)
+        response = agent.chat_completion(prompt=prompt,
+            system_message=agent.role,
+            response_format={"type": "json_object"})
         result = agent.parse_json_response(response)
 
         if not result or "error" in result:
@@ -454,35 +448,35 @@ Respond with a JSON object:
         self.logger.info(f"Selected: {file_data['path']} - {selected_file['reason']}")
         return selected_file
 
-    def _process_file_batches(self, agent, file_paths: List[str], prioritized_files: List[Dict]) -> Optional[Dict]:
+    def _process_file_batches(self, agent, prioritized_files: List[Dict]) -> Optional[Dict]:
         """Process batches of files to find the most relevant match"""
         self.logger.info(f"Processing batches using {'weighted sampling' if self.batch_sampling else 'sequential'} mode")
 
         if self.batch_sampling:
-            remaining_files = file_paths.copy()
+            remaining_files = prioritized_files.copy()
             batch_count = 0
 
             while remaining_files:
                 batch_count += 1
-                batch_paths = self._weighted_random_sample(remaining_files, prioritized_files, self.batch_size)
+                batch_file_info = self._weighted_random_sample(remaining_files, self.batch_size)
 
                 # Remove sampled files
-                for path in batch_paths:
-                    remaining_files.remove(path)
+                for file_info in batch_file_info:
+                    remaining_files.remove(file_info)
 
-                selected_file = self._process_single_batch(agent, batch_paths, prioritized_files, f"sampled batch {batch_count}")
+                selected_file = self._process_single_batch(agent, batch_file_info, f"sampled batch {batch_count}")
                 if selected_file:
                     return selected_file
         else:
-            total_batches = (len(file_paths) + self.batch_size - 1) // self.batch_size
+            total_batches = (len(prioritized_files) + self.batch_size - 1) // self.batch_size
 
             for batch_idx in range(total_batches):
                 start_idx = batch_idx * self.batch_size
-                end_idx = min((batch_idx + 1) * self.batch_size, len(file_paths))
-                batch_paths = file_paths[start_idx:end_idx]
+                end_idx = min((batch_idx + 1) * self.batch_size, len(prioritized_files))
+                batch_file_info = prioritized_files[start_idx:end_idx]
 
                 batch_info = f"batch {batch_idx + 1}/{total_batches}"
-                selected_file = self._process_single_batch(agent, batch_paths, prioritized_files, batch_info)
+                selected_file = self._process_single_batch(agent, batch_file_info, batch_info)
                 if selected_file:
                     return selected_file
 
@@ -530,8 +524,7 @@ Respond with a JSON object:
         file_overviews = self._create_global_overview(agent, filtered_files)
         prioritized_files = self._prioritize_files(agent, file_overviews)
 
-        file_paths = [file_info["file_path"] for file_info in prioritized_files]
-        selected_file = self._process_file_batches(agent, file_paths, prioritized_files)
+        selected_file = self._process_file_batches(agent, prioritized_files)
 
         if selected_file:
             # Save original file and update agent context
