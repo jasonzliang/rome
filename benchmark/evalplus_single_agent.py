@@ -68,10 +68,8 @@ class EvalPlusBenchmark:
     def setup_problems(self, num_samples: Optional[int] = None,
                       task_ids: Optional[List[str]] = None) -> Dict:
         """Setup benchmark directory with problems"""
-        # Clear and create benchmark directory
-        if self.benchmark_dir.exists():
-            shutil.rmtree(self.benchmark_dir)
-        self.benchmark_dir.mkdir(parents=True)
+        # Create benchmark directory if needed
+        self.benchmark_dir.mkdir(parents=True, exist_ok=True)
 
         # Get and filter problems
         problems = self._get_dataset()
@@ -80,29 +78,33 @@ class EvalPlusBenchmark:
         if num_samples and num_samples < len(problems):
             problems = dict(list(problems.items())[:num_samples])
 
-        # Create problem directories
+        # Create problem directories and files
         self.problems = {}
         for task_id, problem in problems.items():
             safe_id = self._make_safe_task_id(task_id)
             problem_dir = self.benchmark_dir / safe_id
             problem_dir.mkdir(exist_ok=True)
 
-            # Write problem file and metadata
-            (problem_dir / f"{safe_id}.py").write_text(problem["prompt"], encoding="utf-8")
-            (problem_dir / "metadata.json").write_text(
-                json.dumps({
-                    "task_id": task_id,
-                    "entry_point": problem["entry_point"],
-                    "canonical_solution": problem.get("canonical_solution", ""),
-                    "base_input": problem.get("base_input", []),
-                    "plus_input": problem.get("plus_input", [])
-                }, indent=4), encoding="utf-8"
-            )
+            # Write files only if they don't exist
+            problem_file = problem_dir / f"{safe_id}.py"
+            # metadata_file = problem_dir / "metadata.json"
 
-            self.problems[task_id] = {
-                "problem_dir": problem_dir,
-                "safe_id": safe_id
-            }
+            if not problem_file.exists():
+                problem_file.write_text(problem["prompt"], encoding="utf-8")
+                self.logger.debug(f"Problem {task_id} written to file {problem_file}")
+            else:
+                self.logger.debug(f"Problem {task_id} ({problem_file}) already exists, skipping")
+
+            # if not metadata_file.exists():
+            #     metadata_file.write_text(json.dumps({
+            #         "task_id": task_id,
+            #         "entry_point": problem["entry_point"],
+            #         "canonical_solution": problem.get("canonical_solution", ""),
+            #         "base_input": problem.get("base_input", []),
+            #         "plus_input": problem.get("plus_input", [])
+            #     }, indent=4), encoding="utf-8")
+
+            self.problems[task_id] = {"problem_dir": problem_dir, "safe_id": safe_id}
 
         self.logger.info(f"Setup {len(self.problems)} problems in {self.benchmark_dir}")
         return self.problems

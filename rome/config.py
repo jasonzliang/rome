@@ -127,7 +127,7 @@ DEFAULT_CONFIG = {
         "cmd_args": { # Additional useful flags when executing code
             "pytest": ["-vvs", "--tb=long", "--no-header"],
             "python": ["-u"],
-            }
+        }
     },
 
     # Database and version manager configuration

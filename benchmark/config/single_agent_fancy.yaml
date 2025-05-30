@@ -1,0 +1,100 @@
+# HumanEval Benchmark Configuration
+# This configuration is optimized for code generation and evaluation tasks
+
+# OpenAI API Configuration
+OpenAIHandler:
+  # API settings
+  base_url: "default"
+  key_name: "default"
+  timeout: "default"
+  cost_limit: 500
+
+  # Model parameters optimized for code generation
+  model: "gpt-4o"
+  temperature: 0.1
+  max_tokens: "default"
+  top_p: 1.0
+  seed: "default"
+
+  # Context management
+  manage_context: true
+  max_input_tokens: "default"
+  token_count_thres: "default"
+  chars_per_token: "default"
+
+  # System message for code tasks
+  system_message: "default"
+
+# Agent Configuration
+Agent:
+  name: "CodeRefactoringExpert"
+  role: "## Your role\nCodeRefactoringExpert specializes in reviewing and optimizing existing codebases to enhance performance, readability, and maintainability, while ensuring adherence to best coding practices and collaborating with other experts for seamless integration and security compliance.\n\n## Task and skill instructions\n- **Task Description**: As the Code_Refactoring_Expert, you are responsible for reviewing and analyzing existing code to identify opportunities for improvement. Your tasks include refactoring code to optimize performance, improve readability, and simplify complex structures without changing the original functionality. You will also document the changes made and ensure the new code follows best practices and project standards.\n- **Skill Description**: Utilize your in-depth understanding of various programming languages, software design patterns, and best practices in coding standards to refactor code effectively. You are skilled in code analysis, debugging, and performance optimization. Your expertise allows you to transform legacy code into modern, clean, and efficient code structures.\n- **Additional Information**: Work closely with other team members such as Python_Experts, Algorithm_Experts, and Security_Experts to ensure that refactored code is not only efficient but also integrates seamlessly with other systems and meets security standards. Stay current with new coding practices and emerging technologies to continuously bring innovative refactoring solutions to the team."
+  repository: null  # Will be overridden by benchmark script
+  fsm_type: "simple"
+  agent_api: true
+  history_context_len: 12
+  patience: 3
+
+# Agent API (disabled for benchmarking)
+AgentApi:
+  host: "localhost"
+  port: 8000
+
+# Logging Configuration
+Logger:
+  level: "DEBUG"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  console: true
+  include_caller_info: "rome"
+  base_dir: null  # Will use agent's default
+  filename: null  # Will use agent's default
+  max_size_kb: 5000
+
+# Finite State Machine Configuration
+FSM: {}
+
+# State Configurations
+IdleState: {}
+CodeLoadedState: {}
+CodeEditedState: {}
+TestEditedState: {}
+
+# Action Configurations
+SearchAction:
+  max_files: "default"
+  file_types: [".py"]
+  exclude_types: []
+  exclude_dirs: [".*", "venv", "__*__"]
+  selection_criteria: "default"
+  batch_size: 10
+  batch_sampling: true
+
+ResetAction: {}
+
+AdvancedResetAction: {}
+
+EditCodeAction:
+  custom_prompt: null
+
+EditTestAction:
+  custom_prompt: null
+ExecuteCodeAction: {}
+
+TransitionAction: {}
+
+# Code Execution Configuration
+Executor:
+  timeout: 30  # Longer timeout for complex algorithms
+  virtual_env_context: null
+  work_dir: "./"
+  cmd_args:
+    pytest: "default"
+    python: "default"
+
+# Database and Version Management
+DatabaseManager:
+  lock_timeout: 5.0
+  max_retries: 5
+  retry_delay: 0.5
+
+VersionManager: {}
