@@ -326,6 +326,8 @@ class EvalPlusBenchmark:
 
         # Save and return results
         results_file = self.save_results(agent_results, evaluation_results)
+        if self.agent:
+            self.agent.shutdown()
 
         return {
             "agent_results": agent_results,
@@ -337,9 +339,6 @@ class EvalPlusBenchmark:
                 "scores": evaluation_results.get("scores")
             }
         }, results_file
-
-        if self.agent:
-            self.agent.shutdown()
 
     def print_summary(self, results: Dict):
         """Print benchmark summary"""
@@ -383,24 +382,17 @@ def main():
     # Run benchmark
     benchmark = EvalPlusBenchmark(args.benchmark_dir, args.config_file, args.dataset)
 
-    try:
-        results, results_file = benchmark.run_complete_benchmark(
-            max_iterations=args.max_iterations,
-            stop_on_error=args.stop_on_error,
-            num_samples=args.num_samples,
-            task_ids=args.task_ids,
-            run_evaluation=not args.no_evaluation
-        )
+    results, results_file = benchmark.run_complete_benchmark(
+        max_iterations=args.max_iterations,
+        stop_on_error=args.stop_on_error,
+        num_samples=args.num_samples,
+        task_ids=args.task_ids,
+        run_evaluation=not args.no_evaluation
+    )
 
-        benchmark.print_summary(results)
-        if results_file:
-            benchmark.logger.info(f"\nDetailed results: {results_file}")
-
-    except Exception as e:
-        print(f"Benchmark failed: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    benchmark.print_summary(results)
+    if results_file:
+        benchmark.logger.info(f"\nDetailed results: {results_file}")
 
 
 if __name__ == "__main__":
