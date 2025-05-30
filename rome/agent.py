@@ -1,5 +1,6 @@
 import atexit
 import json
+import io
 import os
 import pprint
 import re
@@ -182,8 +183,14 @@ class Agent:
         """Handle termination signals gracefully with clean stacktrace"""
         self.logger.info(f"Received signal {signum}, shutting down agent {self.name}")
 
+        # Immediate location for quick reference
+        if frame:
+            filename = frame.f_code.co_filename
+            line_number = frame.f_lineno
+            function_name = frame.f_code.co_name
+            self.logger.info(f"Interrupted at: {filename}:{line_number} in {function_name}()")
+
         # Capture traceback to string
-        import io
         string_buffer = io.StringIO()
         traceback.print_stack(frame, file=string_buffer)
         stacktrace = string_buffer.getvalue()
