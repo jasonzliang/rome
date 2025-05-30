@@ -61,7 +61,7 @@ DEFAULT_CONFIG = {
 
     # Agent configuration
     "Agent": {
-        "name": None, # Overwritten by agent's constructor (FIXED: added missing comma)
+        "name": None, # Overwritten by agent's constructor
         "role": None, # Overwritten by agent's constructor
         "repository": "./", # Code repository base directory
         "fsm_type": "minimal", # Which FSM to load (see fsm.py)

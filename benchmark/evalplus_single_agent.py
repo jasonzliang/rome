@@ -23,7 +23,7 @@ except ImportError:
     sys.exit(1)
 
 
-class HumanEvalBenchmark:
+class EvalPlusBenchmark:
     """Efficient benchmark runner for HumanEval+ with EvalPlus integration"""
 
     def __init__(self, config_path: str, benchmark_dir: str, dataset: str = "humaneval"):
@@ -106,7 +106,7 @@ class HumanEvalBenchmark:
         agent_config = self.config.get('Agent', {})
 
         self.agent = Agent(
-            name=agent_config.get('name', 'HumanEvalBenchmark'),
+            name=agent_config.get('name', 'EvalPlusBenchmark'),
             role=agent_config.get('role', 'You are an expert Python developer tasked with implementing functions to pass all given test cases.'),
             config=self.config
         )
@@ -163,17 +163,29 @@ class HumanEvalBenchmark:
         solutions_file = eval_dir / "solutions.jsonl"
         write_jsonl(str(solutions_file), solutions)
 
-        sanitized_file = self._run_evalplus_command(
+        sanitized_result = self._run_evalplus_command(
             ["python", "-m", "evalplus.sanitize", "--samples", str(solutions_file)],
             eval_dir, "sanitization"
         )
 
+        # Check if sanitization failed
+        if isinstance(sanitized_result, dict) and "error" in sanitized_result:
+            return sanitized_result
+
+        # Get the sanitized file path
+        sanitized_file = sanitized_result if isinstance(sanitized_result, Path) else None
+        samples_file = sanitized_file if sanitized_file and sanitized_file.exists() else solutions_file
+
         # Run evaluation
         eval_result = self._run_evalplus_command(
             ["python", "-m", "evalplus.evaluate", "--dataset", self.dataset,
-             "--samples", str(sanitized_file or solutions_file)],
+             "--samples", str(samples_file)],
             eval_dir, "evaluation", timeout=1800
         )
+
+        # Check if evaluation failed
+        if "error" in eval_result:
+            return eval_result
 
         # Parse scores from output
         scores = self._parse_evaluation_scores(eval_result.get("stdout", ""))
@@ -183,7 +195,7 @@ class HumanEvalBenchmark:
         return eval_result
 
     def _run_evalplus_command(self, cmd: List[str], cwd: Path, operation: str,
-                             timeout: int = 300) -> Dict:
+                             timeout: int = 300):
         """Run EvalPlus command with error handling"""
         try:
             result = subprocess.run(
@@ -192,10 +204,20 @@ class HumanEvalBenchmark:
 
             if result.returncode == 0:
                 self.logger.info(f"EvalPlus {operation} completed successfully")
-                # For sanitize, return the expected output file
+                # For sanitize, check if output file exists and return path or success dict
                 if operation == "sanitization":
                     sanitized_file = cwd / "solutions-sanitized.jsonl"
-                    return sanitized_file if sanitized_file.exists() else None
+                    if sanitized_file.exists():
+                        return sanitized_file
+                    else:
+                        # Return success but note no sanitized file was created
+                        return {
+                            "stdout": result.stdout,
+                            "stderr": result.stderr,
+                            "return_code": result.returncode,
+                            "note": "No sanitized file created"
+                        }
+
                 return {
                     "stdout": result.stdout,
                     "stderr": result.stderr,
@@ -345,7 +367,7 @@ def main():
     })
 
     # Run benchmark
-    benchmark = HumanEvalBenchmark(args.config_file, args.benchmark_dir, args.dataset)
+    benchmark = EvalPlusBenchmark(args.config_file, args.benchmark_dir, args.dataset)
 
     try:
         results, results_file = benchmark.run_complete_benchmark(
