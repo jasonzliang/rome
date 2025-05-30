@@ -366,8 +366,19 @@ class VersionManager:
         self.logger.debug(f"Unflagged {file_path} from agent {agent_id}")
         return True
 
+    def _get_agent_name_without_pid(self, agent_id: str) -> str:
+        """Extract agent name without PID from agent_id (e.g., 'agent_myname_12345' -> 'agent_myname')."""
+        if not agent_id:
+            return ""
+
+        # Split by underscore and remove the last part (PID)
+        parts = agent_id.split('_')
+        if len(parts) >= 3:  # Should be ['agent', 'name', 'pid']
+            return '_'.join(parts[:-1])  # Join all but last part
+        return agent_id  # Return as-is if format is unexpected
+
     def check_finished(self, agent, file_path: str) -> bool:
-        """Check if a file has been marked as finished."""
+        """Check if a file has been marked as finished, ignoring PID in agent ID comparison."""
         meta_dir = self._get_meta_dir(file_path)
         finished_file_path = self._get_file_path(meta_dir, FileType.FINISHED)
 
@@ -377,8 +388,14 @@ class VersionManager:
         except (FileNotFoundError, json.JSONDecodeError):
             return False
 
+        # Get agent name without PID for comparison
+        current_agent_name = self._get_agent_name_without_pid(agent.get_id())
+
         agents = finished_data.get('agents', [])
-        return any(agent_entry.get('agent_id') == agent.get_id() for agent_entry in agents)
+        return any(
+            self._get_agent_name_without_pid(agent_entry.get('agent_id', '')) == current_agent_name
+            for agent_entry in agents
+        )
 
     def flag_finished(self, agent, file_path: str) -> None:
         """Flag a file as finished."""
@@ -410,7 +427,7 @@ class VersionManager:
             dirs[:] = [d for d in dirs if not self._should_exclude_dir(d)]
 
             for file in files:
-                if file.endswith('.py') and not file.startswith('.'):
+                if file.endswith('.py') and not file.startswith('.') and not file.endswith('_test.py'):
                     file_path = os.path.join(root, file)
                     total_count += 1
 
