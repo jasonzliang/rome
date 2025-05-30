@@ -1,0 +1,100 @@
+# HumanEval Benchmark Configuration
+# This configuration is optimized for code generation and evaluation tasks
+
+# OpenAI API Configuration
+OpenAIHandler:
+  # API settings
+  base_url: "default"
+  key_name: "default"
+  timeout: "default"
+  cost_limit: 500
+
+  # Model parameters optimized for code generation
+  model: "gpt-4o"
+  temperature: 0.1
+  max_tokens: "default"
+  top_p: 1.0
+  seed: "default"
+
+  # Context management
+  manage_context: true
+  max_input_tokens: "default"
+  token_count_thres: "default"
+  chars_per_token: "default"
+
+  # System message for code tasks
+  system_message: "default"
+
+# Agent Configuration
+Agent:
+  name: "HumanevalExpert"
+  role: "You are an expert Python developer tasked with implementing functions to pass all given test cases. Focus on writing clean, efficient, and well-tested code that handles edge cases properly."
+  repository: "./"  # Will be overridden by benchmark script
+  fsm_type: "simple"
+  agent_api: true
+  history_context_len: 12
+  patience: 3
+
+# Agent API (disabled for benchmarking)
+AgentApi:
+  host: "localhost"
+  port: 8000
+
+# Logging Configuration
+Logger:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  console: true
+  include_caller_info: "rome"
+  base_dir: null  # Will use agent's default
+  filename: null  # Will use agent's default
+  max_size_kb: 5000
+
+# Finite State Machine Configuration
+FSM: {}
+
+# State Configurations
+IdleState: {}
+CodeLoadedState: {}
+CodeEditedState: {}
+TestEditedState: {}
+
+# Action Configurations
+SearchAction:
+  max_files: "default"
+  file_types: [".py"]
+  exclude_types: []
+  exclude_dirs: [".*", "venv", "__*__"]
+  selection_criteria: "default"
+  batch_size: 10
+  batch_sampling: true
+
+ResetAction: {}
+
+AdvancedResetAction: {}
+
+EditCodeAction:
+  custom_prompt: null
+
+EditTestAction:
+  custom_prompt: null
+ExecuteCodeAction: {}
+
+TransitionAction: {}
+
+# Code Execution Configuration
+Executor:
+  timeout: 30  # Longer timeout for complex algorithms
+  virtual_env_context: null
+  work_dir: "./"
+  cmd_args:
+    pytest: "default"
+    python: ["-u"]  # Unbuffered output
+
+# Database and Version Management
+DatabaseManager:
+  lock_timeout: 5.0
+  max_retries: 5
+  retry_delay: 0.5
+
+VersionManager: {}

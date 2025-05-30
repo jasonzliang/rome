@@ -9,6 +9,9 @@ from typing import Dict, Any
 from .logger import get_logger
 
 ######## These constants are not intended to be user modifiable ########
+# Min and max allowed lengths for agent names
+AGENT_NAME_LENGTH = [8, 24]
+
 # Default hash function to use for check file versions and AST cache
 DEFAULT_HASH_FUNC = "sha256"
 
@@ -47,7 +50,7 @@ DEFAULT_CONFIG = {
         "seed": None, # LLM random seed
 
         # Fall back system message for chat completions if none given
-        "system_message": "You are a helpful code assistant specializing in code analysis and improvement.",
+        "system_message": "You are a helpful assistant.",
 
         # Context management parameters
         "manage_context": True, # Prevent messages from overfilling context window
@@ -58,6 +61,8 @@ DEFAULT_CONFIG = {
 
     # Agent configuration
     "Agent": {
+        "name": None # Overwritten by agent's constructor
+        "role": None, # Overwritten by agent's constructor
         "repository": "./", # Code repository base directory
         "fsm_type": "minimal", # Which FSM to load (see fsm.py)
         "agent_api": True, # Launch an REST API server for agent's internal state
@@ -116,7 +121,7 @@ DEFAULT_CONFIG = {
         "timeout": 10, # Maximum time for code to run
         "virtual_env_context": None, # Name of virtual env to run in
         "work_dir": "./", # Working directory when running code directly (not code file)
-        "cmd_args": {"pytest": ["-vvs", "--tb=long"]} # Additional args for custom commands
+        "cmd_args": {"pytest": ["-vvs", "--tb=long" "--no-header"]} # Additional args for custom commands
     },
 
     # Database and version manager configuration
@@ -222,18 +227,24 @@ def load_config(config_path="config.yaml", create_if_missing=False):
 
 
 def merge_with_default_config(custom_config):
-    """Merge a custom config with the default config"""
+    """Merge a custom config with the default config and do some basic validation"""
 
     def _error_msg(key, val):
         return f"Invalid value {val} ({type(val).__name__}) for config parameter '{key}'"
 
-    def _validate(key, orig_v, new_v):
-        if orig_v is not None:
-            logger.assert_true(type(orig_v) == type(new_v), f"Type mismatch for old {type(orig_v).__name__} and new value {type(orig_v).__name__} for config parameter '{key}'")
-        else:
-            logger.debug(f"Type matching skipped for config parameter '{key}' ({orig_v} -> {new_v})")
+    def _validate(key, old_v, new_v):
+        # Easy to way in include key but still use default
+        if new_v == "default":
+            new_v = old_v
 
-        for v in [orig_v, new_v]:
+        # Check old and new value type matches
+        if old_v is not None:
+            logger.assert_true(type(old_v) == type(new_v), f"Type mismatch for old {type(old_v).__name__} and new value {type(old_v).__name__} for config parameter '{key}'")
+        else:
+            logger.debug(f"Type matching skipped for config parameter '{key}' ({old_v} -> {new_v})")
+
+        # Key value must be >= 0 or length >= 0 (exception for 'exclude_' keys)
+        for v in [old_v, new_v]:
             if isinstance(v, (list, tuple, str)):
                 if not key.startswith("exclude_"):
                     logger.assert_true(len(v) > 0, f"{_error_msg(key, v)} — non-empty value")
@@ -242,14 +253,14 @@ def merge_with_default_config(custom_config):
             else:
                 logger.assert_true(isinstance(v, (bool, NoneType)),
                     f"{_error_msg(key, v)} - invalid type")
+        return new_v
 
     def _update_dict(d, u):
         for k, v in u.items():
             if isinstance(v, dict) and k in d and isinstance(d[k], dict):
                 d[k] = _update_dict(d[k], v)
             else:
-                _validate(k, d[k], v)
-                d[k] = v
+                d[k] = _validate(k, d[k], v)
         return d
 
     logger = get_logger()

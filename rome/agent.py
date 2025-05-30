@@ -1,6 +1,7 @@
 import atexit
 import json
 import os
+import re
 import signal
 import sys
 import traceback
@@ -9,7 +10,7 @@ from typing import Dict, List
 # Import the OpenAIHandler we created
 from .openai import OpenAIHandler
 # Import default config utilities
-from .config import DEFAULT_CONFIG, LOG_DIR_NAME, SUMMARY_LENGTH
+from .config import DEFAULT_CONFIG, LOG_DIR_NAME, SUMMARY_LENGTH, AGENT_NAME_LENGTH
 from .config import set_attributes_from_config, load_config, merge_with_default_config
 # Import singleton logger
 from .logger import get_logger
@@ -27,18 +28,20 @@ from .parsing import parse_python_response, parse_json_response
 class Agent:
     """Agent class using OpenAI API, YAML config, and FSM architecture"""
 
-    def __init__(self, name: str = "CodingExpert", role: str = "You are a Python coding expert", config_dict: Dict = None):
+    def __init__(self,
+        name: str = None,
+        role: str = None,
+        config: Dict = None):
         """Initialize the Agent with configuration and setup all components"""
 
         # Core initialization
-        self.name = name
         self.logger = get_logger()
         self.shutdown_called = False
         self.curr_iteration = 1
 
         # Configuration setup
-        self._setup_config(config_dict)
-        self.role = self._validate_and_format_role(role)
+        self._setup_config(config)
+        self._validate_name_role(name, role)
 
         # Repository validation and logging setup
         self._setup_repository_and_logging()
@@ -51,7 +54,7 @@ class Agent:
 
         self.logger.info(f"Agent {self.name} initialized with role:\n{self.role}")
 
-    def _setup_config(self, config_dict: Dict = None) -> None:
+    def _setup_config(self, config_dict: Dict = None) -> dict:
         """Setup and validate configuration"""
         if config_dict:
             self.config = merge_with_default_config(config_dict)
@@ -62,7 +65,8 @@ class Agent:
         # Set attributes from Agent config
         agent_config = self.config.get('Agent', {})
         set_attributes_from_config(self, agent_config,
-                                 ['repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience'])
+            ['repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience'],
+            ['name', 'role'])
 
     def _setup_repository_and_logging(self) -> None:
         """Validate repository and configure logging"""
@@ -74,7 +78,16 @@ class Agent:
         )
 
         # Setup logging after repository validation
-        self._setup_logging()
+        log_config = self.config.get('Logger', {}).copy()
+
+        if not log_config.get('base_dir'):
+            log_config['base_dir'] = self.get_log_dir()
+
+        if not log_config.get('filename'):
+            log_config['filename'] = f"{self.get_id()}.console.log"
+
+        get_logger().configure(log_config)
+        self.logger.info(f"Logging configured. Log directory: {log_config['base_dir']}")
 
     def _setup_components(self) -> None:
         """Initialize all agent components"""
@@ -122,26 +135,24 @@ class Agent:
         self.shutdown()
         sys.exit(0)
 
-    def _validate_and_format_role(self, role: str) -> str:
+    def _validate_name_role(self, name: str, role: str) -> str:
         """Validates and formats the agent's role string"""
-        if "your role" in role.lower():
-            return role
+        if role:
+            self.role = role
+        if name:
+            self.name = name
+        self.logger.assert_true(self.role and self.name,
+            f"Invalid name or role: {name}, {role}")
 
-        self.logger.info("Role string does not contain 'your role', reformatting")
-        return f"Your role as an agent:\n{role}"
+        # Make make role description clear what it is
+        if "your role" not in self.role.lower():
+            self.logger.info("Role string does not contain 'your role', reformatting")
+            self.role = f"Your role as an agent:\n{self.role}"
 
-    def _setup_logging(self):
-        """Configure logging based on config"""
-        log_config = self.config.get('Logger', {}).copy()
-
-        if not log_config.get('base_dir'):
-            log_config['base_dir'] = self.get_log_dir()
-
-        if not log_config.get('filename'):
-            log_config['filename'] = f"{self.get_id()}.console.log"
-
-        get_logger().configure(log_config)
-        self.logger.info(f"Logging configured. Log directory: {log_config['base_dir']}")
+        # Name must be between 8 and 24 char long and alphanum only
+        a, b = AGENT_NAME_LENGTH
+        self.name = re.findall(r'[a-zA-Z0-9]+', self.name)
+        self.logger.assert_true(self.name and a <= len(self.name) <= b)
 
     def _setup_fsm(self):
         """Initialize the Finite State Machine"""
@@ -155,14 +166,22 @@ class Agent:
 
     def get_id(self):
         """Unique id for identifying agent in file system"""
-        safe_name = ''.join(c if c.isalnum() else '_' for c in self.name).lower()
-        return f'agent_{safe_name}_{os.getpid()}'
+        # safe_name = ''.join(c if c.isalnum() else '_' for c in self.name).lower()
+        return f'agent_{self.name}_{os.getpid()}'
 
     def get_log_dir(self):
         """Get agent log directory and create if it doesn't exist"""
         log_dir = os.path.join(self.repository, LOG_DIR_NAME)
         os.makedirs(log_dir, exist_ok=True)
         return log_dir
+
+    def export_config(self, filepath: str = None):
+        """Export agent configuration to YAML file"""
+        if not filepath:
+            filepath = os.path.join(self.get_log_dir(), f"{self.get_id()}.yaml")
+        with open(filepath, 'w', encoding='utf-8') as f:
+            yaml.dump(self.config, f, default_flow_style=False, sort_keys=False, indent=4)
+        self.logger.info(f"Agent configuration exported to: {filepath}")
 
     def shutdown(self):
         """Clean up resources before termination"""
@@ -176,6 +195,7 @@ class Agent:
 
         except Exception as e:
             self.logger.error(f"Error during agent shutdown: {e}")
+            raise
 
     def draw_fsm_graph(self, output_path: str = None) -> str:
         """
