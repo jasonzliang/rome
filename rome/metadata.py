@@ -385,6 +385,20 @@ class VersionManager:
 
         self.logger.debug(f"Flagged {file_path} as finished by agent {agent.name} (ID: {agent.get_id()})")
 
+    def _should_exclude_dir(self, dirname: str) -> bool:
+        """Check if directory should be excluded using wildcard patterns."""
+        exclude_patterns = [
+            ".*",                    # Hidden directories (starts with .)
+            "venv",                  # Virtual environment
+            "__*__",                 # __pycache__, __init__, etc.
+            "node_modules",          # Node.js modules
+            "env",                   # Environment directories
+            LOG_DIR_NAME,            # Agent log directory
+            f"*.{META_DIR_EXT}"      # Meta directories (e.g., *.rome)
+        ]
+
+        return any(fnmatch.fnmatch(dirname, pattern) for pattern in exclude_patterns)
+
     def check_overall_completion(self, agent) -> Dict[str, int]:
         """Check overall completion status across all Python files in the agent's repository."""
         repository_path = agent.repository
@@ -418,20 +432,6 @@ class VersionManager:
 
         self.logger.info(f"Completion: {finished_count}/{total_count} files ({completion_percentage:.2f}%)")
         return result
-
-    def _should_exclude_dir(self, dirname: str) -> bool:
-        """Check if directory should be excluded using wildcard patterns."""
-        exclude_patterns = [
-            ".*",                    # Hidden directories (starts with .)
-            "venv",                  # Virtual environment
-            "__*__",                 # __pycache__, __init__, etc.
-            "node_modules",          # Node.js modules
-            "env",                   # Environment directories
-            LOG_DIR_NAME,            # Agent log directory
-            f"*.{META_DIR_EXT}"      # Meta directories (e.g., *.rome)
-        ]
-
-        return any(fnmatch.fnmatch(dirname, pattern) for pattern in exclude_patterns)
 
     # Validation methods (simplified)
     def _validate_required_fields(self, data: Dict, required_fields: List[str], context: str) -> List[ValidationError]:

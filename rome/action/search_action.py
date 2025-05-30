@@ -126,8 +126,10 @@ class SearchAction(Action):
 
     #     return sorted(prioritized_files, key=lambda x: x.get("priority", 0), reverse=True)
 
-    def _create_prioritization_prompt(self, file_overviews: List[Dict]) -> str:
+    def _create_prioritization_prompt(self, file_overviews: List[Dict], shuffle: bool = True) -> str:
         """Create prompt for file prioritization"""
+        if shuffle: random.shuffle(file_overviews)
+
         prompt = f"""Return a JSON OBJECT with ALL {len(file_overviews)} files with priority scores.
 
 Assign a priority score (1-10, 10 being highest) using the following criteria in descending importance:
@@ -152,7 +154,7 @@ Files to prioritize:
                 prompt += "No function/class definitions found\n"
 
         prompt += f"""
-Return a JSON OBJECT with {self.batch_size} files like below. Make these files are mostly high and medium priority files, with occasionally a few low priority ones.
+Return a JSON OBJECT with {self.batch_size} files like below. These files should be chosen semi-randomly and should be mostly high and medium priority files, with occasionally a few low priority ones.
 {{
   "path/to/file1.py": 8,
   "path/to/file2.py": 6,

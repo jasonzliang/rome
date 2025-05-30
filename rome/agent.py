@@ -32,6 +32,7 @@ yaml.add_representer(list, lambda dumper, data: dumper.represent_sequence(
     'tag:yaml.org,2002:seq', data, flow_style=True))
 
 
+# TODO: create a repository manager object that keeps track of global statistics like file completion, eligible files for editing, number of attempts on each file, etc, take off some of the load from version manager
 class Agent:
     """Agent class using OpenAI API, YAML config, and FSM architecture"""
 
