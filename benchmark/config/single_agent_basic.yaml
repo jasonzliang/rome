@@ -37,8 +37,8 @@ Agent:
 
 # Agent API (disabled for benchmarking)
 AgentApi:
-  host: "localhost"
-  port: 8000
+  host: "default"
+  port: "default"
 
 # Logging Configuration
 Logger:

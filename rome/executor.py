@@ -172,8 +172,10 @@ class CodeExecutor:
             raise ValueError("Timeout must be greater than or equal to 1.")
 
         # Ensure work_dir is a Path object
-        if isinstance(self.work_dir, str):
+        try:
             self.work_dir = Path(self.work_dir)
+        except:
+            self.work_dir = Path(os.getcwd())
 
         # Ensure work_dir exists
         self.work_dir.mkdir(exist_ok=True, parents=True)
