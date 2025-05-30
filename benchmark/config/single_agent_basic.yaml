@@ -42,7 +42,7 @@ AgentApi:
 
 # Logging Configuration
 Logger:
-  level: "INFO"
+  level: "DEBUG"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   console: true
   include_caller_info: "rome"

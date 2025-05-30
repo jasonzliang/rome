@@ -33,6 +33,7 @@ TEST_FILE_EXT = '_test.py'
 ######## These constants are not intended to be user modifiable ########
 
 # Define the default configuration structure as a dictionary
+# This should show the complete configuration of every class
 DEFAULT_CONFIG = {
     # OpenAIHandler settings - includes all OpenAI API configuration
     "OpenAIHandler": {
@@ -50,7 +51,7 @@ DEFAULT_CONFIG = {
         "seed": None, # LLM random seed
 
         # Fall back system message for chat completions if none given
-        "system_message": "You are a helpful assistant.",
+        "system_message": "You are a helpful assistant",
 
         # Context management parameters
         "manage_context": True, # Prevent messages from overfilling context window
@@ -94,6 +95,8 @@ DEFAULT_CONFIG = {
     "CodeLoadedState": {},
     "CodeEditedState": {},
     "TestEditedState": {},
+    "CodeExecutedPassState": {},
+    "CodeExecutedFailState": {},
 
     # Action configuration
     "SearchAction": {
@@ -121,7 +124,7 @@ DEFAULT_CONFIG = {
         "timeout": 10, # Maximum time for code to run
         "virtual_env_context": None, # Name of virtual env to run in
         "work_dir": "./", # Working directory when running code directly (not code file)
-        "cmd_args": { # Additional args for executing code files
+        "cmd_args": { # Additional useful flags when executing code
             "pytest": ["-vvs", "--tb=long", "--no-header"],
             "python": ["-u"],
             }
@@ -204,13 +207,14 @@ def load_config(config_path="config.yaml", create_if_missing=False):
             with open(config_path, 'r') as f:
                 tree = ast.parse(f.read())
 
+            # Check for first dictionary that has META_DIR_EXT (rome) in its name
             for node in tree.body:
                 if (isinstance(node, ast.Assign) and
-                    any(isinstance(target, ast.Name) and target.id.upper() == 'ROME_CONFIG'
+                    any(isinstance(target, ast.Name) and META_DIR_EXT.lower() in target.id.lower()
                         for target in node.targets)):
                     config = ast.literal_eval(node.value)
                     if not isinstance(config, dict):
-                        raise TypeError(f"ROME_CONFIG must be a dictionary in {config_path}")
+                        raise TypeError(f"Config must be a dictionary in {config_path}")
                     return config
 
             raise ValueError(f"No ROME_CONFIG found in {config_path}")

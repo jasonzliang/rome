@@ -289,7 +289,7 @@ class OpenAIHandler:
 
     def _check_and_log_cost(self, messages: List[Dict], max_tokens: int, model: str):
         """Check cost limit including accumulated costs and log estimation."""
-        if self.cost_limit is None:
+        if not self.cost_limit:
             return
 
         input_tokens = self._count_tokens(messages, precise=True)

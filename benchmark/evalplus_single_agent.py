@@ -33,6 +33,7 @@ class EvalPlusBenchmark:
             "console": True})
 
         self.benchmark_dir = Path(benchmark_dir)
+        os.makedirs(self.benchmark_dir, exist_ok=True)
         self.config = self._load_config(config_path)
         self.dataset = dataset.lower()
         self.agent = None
@@ -159,45 +160,59 @@ class EvalPlusBenchmark:
         eval_dir = Path(self.agent.get_log_dir()) / "evaluation"
         eval_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save solutions and run sanitization
-        solutions_file = eval_dir / "solutions.jsonl"
+        # Save solutions
+        solutions_file = (eval_dir / "solutions.jsonl").resolve()
         write_jsonl(str(solutions_file), solutions)
+        self.logger.info(f"Written evalplus solutions to {solutions_file}")
 
+        # Try sanitization, use sanitized file if available
         try:
-            sanitized_result = self._run_evalplus_command(
+            self._run_evalplus_command(
                 ["evalplus.sanitize", "--samples", str(solutions_file)],
-                eval_dir, "sanitization")
-        except:
-            self.logger.error(f"Failed to sanitize {solutions_file}, using it as is")
-            sanitized_result = None
+                eval_dir.resolve(), "sanitization")
 
-        # Get the sanitized file path
-        sanitized_file = sanitized_result if isinstance(sanitized_result, Path) else None
-        samples_file = sanitized_file if sanitized_file and sanitized_file.exists() else solutions_file
+            sanitized_file = eval_dir / "solutions-sanitized.jsonl"
+            if sanitized_file.exists():
+                solutions_file = sanitized_file.resolve()
+                self.logger.info(f"Using sanitized file: {solutions_file}")
+        except Exception as e:
+            self.logger.error(f"Sanitization failed: {e}, using original file")
 
         # Run evaluation
         eval_result = self._run_evalplus_command(
-            ["evalplus.evaluate", "--dataset", self.dataset, "--samples", str(samples_file)],
-            eval_dir, "evaluation", timeout=1800)
+            ["evalplus.evaluate", "--dataset", self.dataset, "--samples", str(solutions_file)],
+            eval_dir.resolve(), "evaluation", timeout=1800)
 
-        # Check if evaluation failed
-        if "error" in eval_result:
-            return eval_result
-
-        # Parse scores from output
-        scores = self._parse_evaluation_scores(eval_result.get("stdout", ""))
-        if scores:
-            eval_result["scores"] = scores
+        if "error" not in eval_result:
+            scores = self._parse_evaluation_scores(eval_result.get("stdout", ""))
+            if scores:
+                eval_result["scores"] = scores
 
         return eval_result
 
     def _run_evalplus_command(self, cmd: List[str], cwd: Path, operation: str,
-                             timeout: int = 300):
-        """Run EvalPlus command with error handling"""
+                         timeout: int = 300):
+        """Run EvalPlus command with error handling and console output"""
         try:
+            self.logger.info(f"Running EvalPlus {operation}: {' '.join(cmd)}")
+            self.logger.info(f"Working directory: {cwd}")
+
             result = subprocess.run(
                 cmd, cwd=str(cwd), capture_output=True, text=True, timeout=timeout
             )
+
+            # Print stdout and stderr to console immediately
+            if result.stdout:
+                self.logger.debug(f"EvalPlus {operation} stdout:")
+                for line in result.stdout.strip().split('\n'):
+                    if line.strip():
+                        self.logger.debug(f"  {line}")
+
+            if result.stderr:
+                self.logger.error(f"EvalPlus {operation} stderr:")
+                for line in result.stderr.strip().split('\n'):
+                    if line.strip():
+                        self.logger.error(f"  {line}")
 
             if result.returncode == 0:
                 self.logger.info(f"EvalPlus {operation} completed successfully")
@@ -221,11 +236,11 @@ class EvalPlusBenchmark:
                     "return_code": result.returncode
                 }
             else:
-                self.logger.error(f"EvalPlus {operation} failed: {result.stderr}")
-                return {"error": f"{operation} failed", "stderr": result.stderr}
+                self.logger.error(f"EvalPlus {operation} failed with return code {result.returncode}")
+                return {"error": f"{operation} failed", "stderr": result.stderr, "return_code": result.returncode}
 
         except subprocess.TimeoutExpired:
-            self.logger.error(f"EvalPlus {operation} timed out")
+            self.logger.error(f"EvalPlus {operation} timed out after {timeout} seconds")
             return {"error": f"{operation} timed out", "timeout": timeout}
         except Exception as e:
             self.logger.error(f"EvalPlus {operation} error: {e}")
@@ -237,19 +252,20 @@ class EvalPlusBenchmark:
             lines = stdout.strip().split('\n')
             scores = {}
 
-            for i, line in enumerate(lines):
-                if line.strip() == "Base" and i + 1 < len(lines):
-                    try:
-                        scores["base"] = eval(lines[i + 1])
-                    except:
-                        pass
-                elif line.strip() == "Base + Extra" and i + 1 < len(lines):
-                    try:
-                        scores["base_plus_extra"] = eval(lines[i + 1])
-                    except:
-                        pass
+            for i, line in enumerate(lines[:-1]):  # Skip last line to avoid index error
+                lower_line = line.lower()
+                next_line = lines[i + 1].strip()
 
-            return scores if scores else None
+                if next_line.startswith("pass@") and '\t' in next_line:
+                    key, value = next_line.split('\t', 1)
+                    score = {key.rstrip(':'): float(value)}
+
+                    if "base tests" in lower_line:
+                        scores["base"] = score
+                    elif "base + extra" in lower_line:
+                        scores["base_plus_extra"] = score
+
+            return scores or None
         except Exception as e:
             self.logger.error(f"Could not parse evaluation scores: {e}")
             return None
@@ -345,14 +361,14 @@ class EvalPlusBenchmark:
 def main():
     """Main function"""
     parser = argparse.ArgumentParser(description="Benchmark agent on HumanEval+ dataset")
-    parser.add_argument("config_file", help="Path to agent configuration YAML file")
     parser.add_argument("benchmark_dir", help="Path to benchmark directory (will be created/cleared)")
+    parser.add_argument("config_file", help="Path to agent configuration YAML file")
     parser.add_argument("--dataset", choices=["humaneval", "mbpp"], default="humaneval")
     parser.add_argument("--num-samples", type=int, help="Number of samples to include")
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs to include")
     parser.add_argument("--max-iterations", type=int, default=0, help="Iterations for agent to run")
     parser.add_argument("--stop-on-error", action="store_true", help="Stop agent if exception thrown")
-    parser.add_argument("--evaluation", action="store_true", help="Run evalplus after agent finishes")
+    parser.add_argument("--no-evaluation", action="store_true", help="Run evalplus after agent finishes")
 
     args = parser.parse_args()
 
@@ -365,7 +381,7 @@ def main():
             stop_on_error=args.stop_on_error,
             num_samples=args.num_samples,
             task_ids=args.task_ids,
-            run_evaluation=args.evaluation
+            run_evaluation=not args.no_evaluation
         )
 
         benchmark.print_summary(results)

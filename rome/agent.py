@@ -26,7 +26,7 @@ from .metadata import VersionManager
 # Import parsing utility functions
 from .parsing import parse_python_response, parse_json_response
 
-# Make yaml show compact representation for lists
+# Make yaml use compact representation for lists
 yaml.add_representer(list, lambda dumper, data: dumper.represent_sequence(
     'tag:yaml.org,2002:seq', data, flow_style=True))
 
