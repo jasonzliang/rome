@@ -183,7 +183,7 @@ class Agent:
     def get_log_dir(self):
         """Get agent log directory and create if it doesn't exist"""
         log_dir = os.path.join(self.repository, LOG_DIR_NAME)
-        os.makedirs(log_dir, exist_ok=True, parents=True)
+        os.makedirs(log_dir, exist_ok=True)
         return log_dir
 
     def export_config(self, filepath: str = None):

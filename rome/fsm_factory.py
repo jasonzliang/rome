@@ -277,7 +277,7 @@ class FSM:
         # Ensure directory exists
         output_dir = os.path.dirname(output_path)
         if output_dir and not os.path.exists(output_dir):
-            os.makedirs(output_dir, exist_ok=True, parents=True)
+            os.makedirs(output_dir, exist_ok=True)
 
         # Render the graph
         try:
