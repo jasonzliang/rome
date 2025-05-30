@@ -43,12 +43,12 @@ AgentApi:
 # Logging Configuration
 Logger:
   level: "DEBUG"
-  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  format: "default"
   console: true
   include_caller_info: "rome"
   base_dir: null  # Will use agent's default
   filename: null  # Will use agent's default
-  max_size_kb: 5000
+  max_size_kb: 10000
 
 # Finite State Machine Configuration
 FSM: {}
@@ -63,8 +63,8 @@ TestEditedState: {}
 SearchAction:
   max_files: "default"
   file_types: [".py"]
-  exclude_types: []
-  exclude_dirs: [".*", "venv", "__*__"]
+  exclude_types: "default"
+  exclude_dirs: "default"
   selection_criteria: "default"
   batch_size: 10
   batch_sampling: true
