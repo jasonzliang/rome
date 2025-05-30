@@ -160,7 +160,7 @@ class CodeExecutor:
 
         # Update with provided config if any
         set_attributes_from_config(self, self.config,
-            ['timeout', 'virtual_env_context', 'work_dir', 'cmd_args'])
+            ['timeout', 'virtual_env_context', 'work_dir', 'cmd_args', 'max_output_len'])
 
         # Create a custom execution_policies dict merging defaults with any provided in config
         self.execution_policies = self.DEFAULT_EXEC_POLICIES.copy()
@@ -183,6 +183,21 @@ class CodeExecutor:
         self.work_dir.mkdir(exist_ok=True, parents=True)
 
         # self.logger.debug(f"Initialized {self.__class__.__name__} with config: {self.config}")
+
+    def _truncate_output(self, output: str) -> str:
+        """Truncate output if it exceeds max_output_len."""
+        if not output or len(output) <= self.max_output_len:
+            return output
+
+        truncated = output[:self.max_output_len]
+        truncation_msg = f"\n\n[OUTPUT TRUNCATED - showing first {self.max_output_len} characters of {len(output)} total]"
+
+        # Try to find a good break point (newline) near the end
+        last_newline = truncated.rfind('\n', max(0, self.max_output_len - 200))
+        if last_newline > self.max_output_len * 0.8:  # If newline is in last 20%
+            truncated = truncated[:last_newline]
+
+        return truncated + truncation_msg
 
     @staticmethod
     def sanitize_command(lang: str, code: str) -> None:
@@ -390,7 +405,7 @@ class CodeExecutor:
                     encoding="utf-8",
                     shell=WIN32,  # Use shell on Windows for better compatibility
                 )
-                logs_all += "\n" + result.stdout
+                logs_all += "\n" + self._truncate_output(result.stdout)
                 exitcode = result.returncode
 
                 if exitcode != 0:

@@ -124,6 +124,7 @@ DEFAULT_CONFIG = {
         "timeout": 10, # Maximum time for code to run
         "virtual_env_context": None, # Name of virtual env to run in
         "work_dir": "./", # Working directory when running code directly (not code file)
+        "max_output_len": 40000, # Maximum len of execution output
         "cmd_args": { # Additional useful flags when executing code
             "pytest": ["-vs", "--tb=short", "--no-header"],
             "python": ["-u"],
