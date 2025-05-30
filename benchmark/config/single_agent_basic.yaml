@@ -29,7 +29,7 @@ OpenAIHandler:
 Agent:
   name: "HumanevalExpert"
   role: "You are an expert Python developer tasked with implementing functions to pass all given test cases. Focus on writing clean, efficient, and well-tested code that handles edge cases properly."
-  repository: "./"  # Will be overridden by benchmark script
+  repository: null  # Will be overridden by benchmark script
   fsm_type: "simple"
   agent_api: true
   history_context_len: 12
@@ -89,7 +89,7 @@ Executor:
   work_dir: "./"
   cmd_args:
     pytest: "default"
-    python: ["-u"]  # Unbuffered output
+    python: "default"
 
 # Database and Version Management
 DatabaseManager:

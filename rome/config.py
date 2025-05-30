@@ -121,7 +121,10 @@ DEFAULT_CONFIG = {
         "timeout": 10, # Maximum time for code to run
         "virtual_env_context": None, # Name of virtual env to run in
         "work_dir": "./", # Working directory when running code directly (not code file)
-        "cmd_args": {"pytest": ["-vvs", "--tb=long", "--no-header"]} # Additional args for custom commands (FIXED: missing comma)
+        "cmd_args": { # Additional args for executing code files
+            "pytest": ["-vvs", "--tb=long", "--no-header"],
+            "python": ["-u"],
+            }
     },
 
     # Database and version manager configuration

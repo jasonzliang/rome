@@ -26,11 +26,15 @@ except ImportError:
 class EvalPlusBenchmark:
     """Efficient benchmark runner for HumanEval+ with EvalPlus integration"""
 
-    def __init__(self, config_path: str, benchmark_dir: str, dataset: str = "humaneval"):
+    def __init__(self, benchmark_dir: str, config_path: str, dataset: str = "humaneval"):
         self.logger = get_logger()
+        self.logger.configure({"level": "DEBUG",
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "console": True})
+
         self.benchmark_dir = Path(benchmark_dir)
-        self.dataset = dataset.lower()
         self.config = self._load_config(config_path)
+        self.dataset = dataset.lower()
         self.agent = None
         self.problems = {}
 
@@ -161,9 +165,8 @@ class EvalPlusBenchmark:
 
         try:
             sanitized_result = self._run_evalplus_command(
-                ["python", "-m", "evalplus.sanitize", "--samples", str(solutions_file)],
-                eval_dir, "sanitization"
-            )
+                ["evalplus.sanitize", "--samples", str(solutions_file)],
+                eval_dir, "sanitization")
         except:
             self.logger.error(f"Failed to sanitize {solutions_file}, using it as is")
             sanitized_result = None
@@ -174,10 +177,8 @@ class EvalPlusBenchmark:
 
         # Run evaluation
         eval_result = self._run_evalplus_command(
-            ["python", "-m", "evalplus.evaluate", "--dataset", self.dataset,
-             "--samples", str(samples_file)],
-            eval_dir, "evaluation", timeout=1800
-        )
+            ["evalplus.evaluate", "--dataset", self.dataset, "--samples", str(samples_file)],
+            eval_dir, "evaluation", timeout=1800)
 
         # Check if evaluation failed
         if "error" in eval_result:
@@ -287,58 +288,58 @@ class EvalPlusBenchmark:
                               num_samples: Optional[int] = None, task_ids: Optional[List[str]] = None,
                               run_evaluation: bool = True) -> Tuple[Dict, Path]:
         """Run complete benchmark pipeline"""
-        try:
-            # Setup problems
-            self.setup_problems(num_samples, task_ids)
+        # Setup problems
+        self.setup_problems(num_samples, task_ids)
 
-            # Run agent
-            agent_results = self.run_agent(max_iterations, stop_on_error)
+        # Run agent
+        agent_results = self.run_agent(max_iterations, stop_on_error)
 
-            # Run evaluation
-            evaluation_results = {}
-            if run_evaluation:
-                solutions = self.extract_solutions()
-                evaluation_results = self.run_evaluation(solutions)
+        # Run evaluation
+        evaluation_results = {}
+        if run_evaluation:
+            solutions = self.extract_solutions()
+            evaluation_results = self.run_evaluation(solutions)
 
-            # Save and return results
-            results_file = self.save_results(agent_results, evaluation_results)
+        # Save and return results
+        results_file = self.save_results(agent_results, evaluation_results)
 
-            return {
-                "agent_results": agent_results,
-                "evaluation_results": evaluation_results,
-                "summary": {
-                    "problems": len(self.problems),
-                    "actions": len(agent_results.get('actions_executed', [])),
-                    "final_state": agent_results.get('final_state'),
-                    "scores": evaluation_results.get("scores")
-                }
-            }, results_file
+        return {
+            "agent_results": agent_results,
+            "evaluation_results": evaluation_results,
+            "summary": {
+                "problems": len(self.problems),
+                "actions": len(agent_results.get('actions_executed', [])),
+                "final_state": agent_results.get('final_state'),
+                "scores": evaluation_results.get("scores")
+            }
+        }, results_file
 
-        finally:
-            if self.agent:
-                self.agent.shutdown()
+        if self.agent:
+            self.agent.shutdown()
 
     def print_summary(self, results: Dict):
         """Print benchmark summary"""
         summary = results.get("summary", {})
         scores = summary.get("scores", {})
 
-        print("\n" + "="*60)
-        print("BENCHMARK SUMMARY")
-        print("="*60)
-        print(f"Dataset: {self.dataset}")
-        print(f"Problems: {summary.get('problems', 0)}")
-        print(f"Actions: {summary.get('actions', 0)}")
-        print(f"Final State: {summary.get('final_state', 'unknown')}")
+        self.logger.info("")
+        self.logger.info("="*80)
+        self.logger.info("Evalplus benchmark summary")
+        self.logger.info("="*80)
+        self.logger.info(f"Dataset: {self.dataset}")
+        self.logger.info(f"Problems: {summary.get('problems', 0)}")
+        self.logger.info(f"Actions: {summary.get('actions', 0)}")
+        self.logger.info(f"Final State: {summary.get('final_state', 'unknown')}")
 
         if scores:
-            print("\nEVALUATION RESULTS:")
+            self.logger.info("")
+            self.logger.info("Evalplus evaluation results:")
             for score_type, metrics in scores.items():
                 if isinstance(metrics, dict):
                     for metric, value in metrics.items():
-                        print(f"{score_type.replace('_', ' ').title()} {metric}: {value}")
+                        self.logger.info(f"{score_type.replace('_', ' ').title()} {metric}: {value}")
 
-        print("="*60)
+        self.logger.info("="*80)
 
 
 def main():
@@ -355,15 +356,8 @@ def main():
 
     args = parser.parse_args()
 
-    # Setup logging
-    get_logger().configure({
-        "level": "INFO",
-        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        "console": True
-    })
-
     # Run benchmark
-    benchmark = EvalPlusBenchmark(args.config_file, args.benchmark_dir, args.dataset)
+    benchmark = EvalPlusBenchmark(args.benchmark_dir, args.config_file, args.dataset)
 
     try:
         results, results_file = benchmark.run_complete_benchmark(
@@ -376,7 +370,7 @@ def main():
 
         benchmark.print_summary(results)
         if results_file:
-            print(f"\nDetailed results: {results_file}")
+            benchmark.logger.info(f"\nDetailed results: {results_file}")
 
     except Exception as e:
         print(f"Benchmark failed: {e}")

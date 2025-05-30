@@ -6,8 +6,8 @@ import re
 import signal
 import sys
 import traceback
-import yaml  # FIXED: Added missing yaml import
 from typing import Dict, List
+import yaml
 
 # Import the OpenAIHandler we created
 from .openai import OpenAIHandler
@@ -25,6 +25,10 @@ from .history import AgentHistory
 from .metadata import VersionManager
 # Import parsing utility functions
 from .parsing import parse_python_response, parse_json_response
+
+# Make yaml show compact representation for lists
+yaml.add_representer(list, lambda dumper, data: dumper.represent_sequence(
+    'tag:yaml.org,2002:seq', data, flow_style=True))
 
 
 class Agent:
@@ -185,7 +189,7 @@ class Agent:
     def export_config(self, filepath: str = None):
         """Export agent configuration to YAML file"""
         if not filepath:
-            filepath = os.path.join(self.get_log_dir(), f"{self.get_id()}.yaml")
+            filepath = os.path.join(self.get_log_dir(), f"{self.get_id()}.config.yaml")
         with open(filepath, 'w', encoding='utf-8') as f:
             yaml.dump(self.config, f, default_flow_style=False, sort_keys=False, indent=4)
         self.logger.info(f"Agent configuration exported to: {filepath}")
