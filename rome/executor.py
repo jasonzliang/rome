@@ -160,12 +160,14 @@ class CodeExecutor:
 
         # Update with provided config if any
         set_attributes_from_config(self, self.config,
-            ['timeout', 'virtual_env_context', 'work_dir', 'cmd_args', 'max_output_len'])
+            ['timeout', 'work_dir'],
+            ['cmd_args', 'max_output_len', 'virtual_env_context', 'execution_policies'])
 
         # Create a custom execution_policies dict merging defaults with any provided in config
-        self.execution_policies = self.DEFAULT_EXEC_POLICIES.copy()
-        if 'execution_policies' in self.config:
-            self.execution_policies.update(self.config['execution_policies'])
+        execution_policies = self.DEFAULT_EXEC_POLICIES.copy()
+        if self.execution_policies:
+            execution_policies.update(self.execution_policies)
+        self.execution_policies = execution_policies
 
         # Validate timeout
         if self.timeout < 1:
@@ -186,7 +188,7 @@ class CodeExecutor:
 
     def _truncate_output(self, output: str) -> str:
         """Truncate output if it exceeds max_output_len."""
-        if not output or len(output) <= self.max_output_len:
+        if not output or not self.max_output_len or len(output) <= self.max_output_len:
             return output
 
         truncated = output[:self.max_output_len]

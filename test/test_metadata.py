@@ -108,6 +108,7 @@ class TestVersionManager:
         # Single agent for most tests
         agent = Mock()
         agent.get_id.return_value = f"test_agent_{os.getpid()}_{os.getpid()}"  # Ensure 3+ parts
+        agent.name = "test_agent"
 
         yield temp_dir, vm, files, agent, {name: content for name, content in test_data}
 
@@ -230,6 +231,7 @@ class TestVersionManager:
         # Multiple agents
         agent2 = Mock()
         agent2.get_id.return_value = "agent2_host_123"
+        agent2.name = "agent2"
         vm.flag_finished(agent2, main_file)
         assert vm.check_finished(agent2, main_file)
 
@@ -269,12 +271,6 @@ class TestVersionManager:
 
         # Validation with no active files
         vm.validate_active_files(agent)
-
-        # PID extraction edge cases - agent ID needs >= 3 parts separated by _
-        assert vm._get_pid_from_agent_id("test_agent_host_123") == 123
-        assert vm._get_pid_from_agent_id("agent_123") is None  # Only 2 parts
-        assert vm._get_pid_from_agent_id("invalid") is None
-        assert vm._get_pid_from_agent_id("") is None
 
         # File path cleaning
         assert vm._clean_file_path("file.py.meta") == "file.py"

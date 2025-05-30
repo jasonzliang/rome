@@ -34,6 +34,7 @@ class TestCodeExecutor(unittest.TestCase):
             "virtual_env_context": None,
             "work_dir": self.temp_dir,
             "cmd_args": None,
+            "max_output_len": None,
         }
         self.executor = CodeExecutor(self.executor_config)
 
@@ -100,6 +101,7 @@ class TestCodeExecutor(unittest.TestCase):
             "virtual_env_context": None,
             "work_dir": self.temp_dir,
             "cmd_args": None,
+            "max_output_len": None,
         }
         short_executor = CodeExecutor(short_timeout_config)
 
@@ -189,7 +191,8 @@ class TestCodeExecutor(unittest.TestCase):
             "cmd_args": None,
             "execution_policies": {
                 "python": False  # Set Python execution to False
-            }
+            },
+            "max_output_len": None,
         }
         policy_executor = CodeExecutor(custom_policies_config)
 
