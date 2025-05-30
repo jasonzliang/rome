@@ -6,7 +6,6 @@ import os
 import shutil
 import subprocess
 import sys
-import yaml
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -109,11 +108,17 @@ class HumanEvalBenchmark:
         self.agent = Agent(
             name=agent_config.get('name', 'HumanEvalBenchmark'),
             role=agent_config.get('role', 'You are an expert Python developer tasked with implementing functions to pass all given test cases.'),
-            config_dict=self.config
+            config=self.config
         )
 
-        # Save config and draw FSM
-        self._save_agent_config()
+        # Export config using the agent's method instead of manual YAML saving
+        try:
+            self.agent.export_config()
+            self.logger.info("Agent configuration exported successfully")
+        except Exception as e:
+            self.logger.error(f"Could not export agent configuration: {e}")
+
+        # Draw FSM graph
         try:
             self.agent.draw_fsm_graph()
         except Exception as e:
@@ -126,12 +131,6 @@ class HumanEvalBenchmark:
         self.logger.info(f"Agent completed: {len(results.get('actions_executed', []))} actions, "
                         f"final state: {results.get('final_state')}")
         return results
-
-    def _save_agent_config(self):
-        """Save agent configuration to log directory"""
-        config_file = Path(self.agent.get_log_dir()) / f"{self.agent.get_id()}.config.yaml"
-        config_file.write_text(yaml.dump(self.config, default_flow_style=False, sort_keys=False))
-        self.logger.info(f"Saved agent configuration to: {config_file}")
 
     def extract_solutions(self) -> List[Dict]:
         """Extract solutions from problem directories"""
@@ -334,7 +333,7 @@ def main():
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs to include")
     parser.add_argument("--max-iterations", type=int, default=4000)
     parser.add_argument("--stop-on-error", action="store_true")
-    parser.add_argument("--no-evaluation", action="store_false")
+    parser.add_argument("--no-evaluation", action="store_false", dest="run_evaluation")
 
     args = parser.parse_args()
 
@@ -354,7 +353,7 @@ def main():
             stop_on_error=args.stop_on_error,
             num_samples=args.num_samples,
             task_ids=args.task_ids,
-            run_evaluation=not args.no_evaluation
+            run_evaluation=args.run_evaluation
         )
 
         benchmark.print_summary(results)

@@ -61,7 +61,7 @@ DEFAULT_CONFIG = {
 
     # Agent configuration
     "Agent": {
-        "name": None # Overwritten by agent's constructor
+        "name": None, # Overwritten by agent's constructor (FIXED: added missing comma)
         "role": None, # Overwritten by agent's constructor
         "repository": "./", # Code repository base directory
         "fsm_type": "minimal", # Which FSM to load (see fsm.py)
@@ -121,7 +121,7 @@ DEFAULT_CONFIG = {
         "timeout": 10, # Maximum time for code to run
         "virtual_env_context": None, # Name of virtual env to run in
         "work_dir": "./", # Working directory when running code directly (not code file)
-        "cmd_args": {"pytest": ["-vvs", "--tb=long" "--no-header"]} # Additional args for custom commands
+        "cmd_args": {"pytest": ["-vvs", "--tb=long", "--no-header"]} # Additional args for custom commands (FIXED: missing comma)
     },
 
     # Database and version manager configuration
@@ -239,7 +239,7 @@ def merge_with_default_config(custom_config):
 
         # Check old and new value type matches
         if old_v is not None:
-            logger.assert_true(type(old_v) == type(new_v), f"Type mismatch for old {type(old_v).__name__} and new value {type(old_v).__name__} for config parameter '{key}'")
+            logger.assert_true(type(old_v) == type(new_v), f"Type mismatch for old {type(old_v).__name__} and new value {type(new_v).__name__} for config parameter '{key}'")
         else:
             logger.debug(f"Type matching skipped for config parameter '{key}' ({old_v} -> {new_v})")
 

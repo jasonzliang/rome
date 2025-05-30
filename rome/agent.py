@@ -5,6 +5,7 @@ import re
 import signal
 import sys
 import traceback
+import yaml  # FIXED: Added missing yaml import
 from typing import Dict, List
 
 # Import the OpenAIHandler we created
@@ -135,7 +136,7 @@ class Agent:
         self.shutdown()
         sys.exit(0)
 
-    def _validate_name_role(self, name: str, role: str) -> str:
+    def _validate_name_role(self, name: str, role: str) -> None:
         """Validates and formats the agent's role string"""
         if role:
             self.role = role
@@ -151,8 +152,11 @@ class Agent:
 
         # Name must be between 8 and 24 char long and alphanum only
         a, b = AGENT_NAME_LENGTH
-        self.name = re.findall(r'[a-zA-Z0-9]+', self.name)
-        self.logger.assert_true(self.name and a <= len(self.name) <= b)
+        # FIXED: Handle name validation properly
+        clean_name = ''.join(re.findall(r'[a-zA-Z0-9]+', self.name))
+        self.logger.assert_true(clean_name and a <= len(clean_name) <= b,
+            f"Agent name must be {a}-{b} alphanumeric characters, got: '{self.name}' -> '{clean_name}'")
+        self.name = clean_name
 
     def _setup_fsm(self):
         """Initialize the Finite State Machine"""
@@ -188,9 +192,10 @@ class Agent:
         if self.shutdown_called: return
         self.shutdown_called = True
         try:
-            if self.agent_api:
+            if hasattr(self, 'agent_api') and self.agent_api:
                 self.agent_api.shutdown()
-            self.version_manager.shutdown(self)
+            if hasattr(self, 'version_manager'):
+                self.version_manager.shutdown(self)
             self.logger.info("Agent shutdown completed successfully")
 
         except Exception as e:
@@ -260,10 +265,12 @@ class Agent:
             self.logger.error("Failed to parse Python code from response")
         return result
 
-    def _extract_action_from_response(self, response: str) -> str:
+    def _extract_action_from_response(self, response: str) -> tuple:
         """
         Extract the action name from the LLM response
         """
+        reasoning = "No reasoning provided"
+
         # Try to parse as JSON first
         parsed_json = self.parse_json_response(response)
 
@@ -282,7 +289,7 @@ class Agent:
 
         # If no action found, log the issue and return None
         self.logger.error(f"Could not extract valid action from response: {response}")
-        raise
+        raise ValueError(f"Could not extract valid action from response: {response}")
 
     def run_loop(self, max_iterations: int = 10, stop_on_error: bool = True) -> Dict:
         """
