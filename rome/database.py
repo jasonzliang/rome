@@ -20,7 +20,7 @@ from .logger import get_logger
 def ensure_dir(file_path: str) -> None:
     """Thread-safe directory creation."""
     try:
-        os.makedirs(os.path.dirname(file_path), exist_ok=True, parents=True)
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
     except FileExistsError:
         pass
 
@@ -97,7 +97,7 @@ class TimeoutLockedJSONStorage(JSONStorage):
         self.path = path
         self.lock_timeout = lock_timeout
         if create_dirs:
-            os.makedirs(os.path.dirname(path), exist_ok=True, parents=True)
+            os.makedirs(os.path.dirname(path), exist_ok=True)
         super().__init__(path, **kwargs)
 
     def _lock_with_timeout(self, file_handle, lock_type):
@@ -369,7 +369,7 @@ class DatabaseManager:
                 self.logger.error(f"Database does not exist: {db_path}")
                 return False
 
-            os.makedirs(os.path.dirname(backup_path), exist_ok=True, parents=True)
+            os.makedirs(os.path.dirname(backup_path), exist_ok=True)
 
             import shutil
             shutil.copy2(db_path, backup_path)
@@ -387,7 +387,7 @@ class DatabaseManager:
                 return False
 
             db_path = self._get_db_path(file_path)
-            os.makedirs(os.path.dirname(db_path), exist_ok=True, parents=True)
+            os.makedirs(os.path.dirname(db_path), exist_ok=True)
 
             import shutil
             shutil.copy2(backup_path, db_path)
