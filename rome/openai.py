@@ -233,13 +233,13 @@ class OpenAIHandler:
         if not (self.compressor and msg.get('content')):
             return None
 
-        target_ratio = min(0.9, remaining_tokens / msg_tokens)
-        if target_ratio <= 0.1:
+        compression_rate = min(0.9, remaining_tokens / msg_tokens)
+        if compression_rate <= 0.1:
             return None
 
         result = self.compressor.compress_prompt(
             msg['content'],
-            ratio=target_ratio,
+            rate=compression_rate,
             force_tokens=['\n', '?', '!', '.', ',']
         )
         compressed_msg = msg.copy()

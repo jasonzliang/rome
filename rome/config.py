@@ -56,7 +56,7 @@ DEFAULT_CONFIG = {
         # Context management parameters
         "manage_context": True, # Prevent messages from overfilling context window
         "max_input_tokens": None, # Set to manually override auto-calculated input token limit
-        "token_count_thres": 0.8, # Threshold when to use slow method to count number of tokens
+        "token_count_thres": 0.5, # Threshold when to use slow method to count number of tokens
         "chars_per_token": 4 # Used for fast calculation of number of tokens
     },
 
@@ -124,7 +124,7 @@ DEFAULT_CONFIG = {
         "timeout": 10, # Maximum time for code to run
         "virtual_env_context": None, # Name of virtual env to run in
         "work_dir": "./", # Working directory when running code directly (not code file)
-        "max_output_len": 40000, # Maximum len of execution output
+        "max_output_len": 10000, # Maximum tokens for execution output
         "cmd_args": { # Additional useful flags when executing code
             "pytest": ["-vs", "--tb=short", "--no-header"],
             "python": ["-u"],

@@ -191,7 +191,7 @@ class CodeExecutor:
         if not output or not self.max_output_len or len(output) <= self.max_output_len:
             return output
 
-        truncated = output[:self.max_output_len]
+        truncated = output[:self.max_output_len * 4]
         truncation_msg = f"\n\n[OUTPUT TRUNCATED - showing first {self.max_output_len} characters of {len(output)} total]"
 
         # Try to find a good break point (newline) near the end
