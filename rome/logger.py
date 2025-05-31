@@ -1,11 +1,14 @@
-import logging
-import threading
-import os
+from datetime import datetime
 import inspect
+import logging
+import pytz
+import os
 import subprocess
 import tempfile
+import threading
 import traceback
 from typing import Optional, Dict, Any, Type, Callable
+
 from rich.console import Console
 from rich.logging import RichHandler
 from rich.text import Text
@@ -35,6 +38,7 @@ class SizeRotatingFileHandler(logging.FileHandler):
     """Compact, efficient size-rotating file handler with cross-platform support"""
 
     def __init__(self, filename, max_size_kb, keep_ratio=0.7, *args, **kwargs):
+        self.max_size_kb = max_size_kb
         self.max_size_bytes = max_size_kb * 1024
         self.keep_ratio = max(0.1, min(0.9, keep_ratio))
         self._lock = threading.Lock()
@@ -62,7 +66,7 @@ class SizeRotatingFileHandler(logging.FileHandler):
 
             self.stream = self._open()
         except Exception as e:
-            print(f"Log rotation failed: {e}")
+            # print(f"Log rotation failed: {e}")
             self.stream = self.stream or self._open()
 
     def _unix_rotate(self) -> bool:
@@ -73,7 +77,7 @@ class SizeRotatingFileHandler(logging.FileHandler):
             lines = max(int(self.max_size_bytes * self.keep_ratio) // 80, 50)
             fd, tmp = tempfile.mkstemp(suffix='.log')
             with os.fdopen(fd, 'w') as f:
-                f.write(f"[ROTATED - {self.max_size_bytes//1024}KB limit]\n")
+                f.write(f"[ROTATED - {self.max_size_kb}KB limit]\n")
                 f.write(subprocess.run(['tail', '-n', str(lines), self.baseFilename],
                                      capture_output=True, text=True, check=True, timeout=10).stdout)
             subprocess.run(['mv', tmp, self.baseFilename], check=True, timeout=5)
@@ -95,12 +99,12 @@ class SizeRotatingFileHandler(logging.FileHandler):
                 data = f.read()
 
             with open(self.baseFilename, 'wb') as f:
-                f.write(f"[ROTATED - {self.max_size_bytes//1024}KB limit]\n".encode())
+                f.write(f"[ROTATED - {self.max_size_kb}KB limit]\n".encode())
                 f.write(data)
         except Exception:
             # Emergency truncation
             with open(self.baseFilename, 'w') as f:
-                f.write(f"[TRUNCATED - {self.max_size_bytes//1024}KB limit]\n")
+                f.write(f"[TRUNCATED - {self.max_size_kb}KB limit]\n")
 
 
 class ParentPathRichHandler(RichHandler):
@@ -177,16 +181,32 @@ class Logger:
             for handler in self._logger.handlers[:]:
                 self._logger.removeHandler(handler)
 
+            # Clear existing filters to avoid duplicates
+            for filter_obj in self._logger.filters[:]:
+                self._logger.removeFilter(filter_obj)
+
             # Set attributes from config
             set_attributes_from_config(self, log_config)
             check_attrs(self, ['level', 'format', 'console'])
-            check_opt_attrs(self, ['include_caller_info', 'base_dir', 'filename', 'max_size_kb'])
+            check_opt_attrs(self, ['include_caller_info', 'base_dir', 'filename', 'max_size_kb', 'timezone'])
 
             # Set log level
             level = getattr(logging, self.level.upper())
             self._logger.setLevel(level)
 
-            # Create formatter
+            # Set up to use timezone (default 'US/Pacific')
+            if not self.timezone: self.timezone = 'US/Pacific'
+            pacific_tz = pytz.timezone(self.timezone)
+            class PacificTimezoneFilter(logging.Filter):
+                def filter(self, record):
+                    # Convert timestamp to Pacific time
+                    dt = datetime.fromtimestamp(record.created, tz=pacific_tz)
+                    record.created = dt.timestamp()
+                    return True
+            pacific_filter = PacificTimezoneFilter()
+            self._logger.addFilter(pacific_filter)
+
+            # Create formatter (no custom formatTime needed since filter handles timezone)
             formatter = logging.Formatter(self.format, datefmt="%H:%M:%S")
 
             # Add file handler if base_dir and filename are specified

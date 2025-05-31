@@ -85,6 +85,7 @@ DEFAULT_CONFIG = {
         "base_dir": None, # Directory for log files, overwrites agent's auto-generated values
         "filename": None, # Log file name, overwrites agent's auto-generated values
         "max_size_kb": 20000, # Max log size in kb, truncates after exceeding
+        "timezone": 'US/Pacific', # Default timezone to display
     },
 
     # FSM configuration
