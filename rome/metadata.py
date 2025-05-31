@@ -114,20 +114,23 @@ class VersionManager:
             return False
 
     # Active file management
-    def _add_active_file(self, file_path: str) -> None:
+    def _set_active_file_pointer(self, file_path: str) -> None:
+        """Clears set to make sure only 1 active file is stored"""
+        self.active_files.clear()
         self.active_files.add(os.path.abspath(file_path))
 
-    def _remove_active_file(self, file_path: str) -> bool:
+    def _remove_active_file_pointer(self, file_path: str) -> bool:
+        """Only removes if file path matches stored one"""
         abs_path = os.path.abspath(file_path)
         if abs_path in self.active_files:
             self.active_files.discard(abs_path)
             return True
         return False
 
-    def _has_active_files(self) -> bool:
+    def _has_active_files_pointer(self) -> bool:
         return len(self.active_files) > 0
 
-    def _get_active_files(self) -> Set[str]:
+    def _get_active_files_pointer(self) -> Set[str]:
         return self.active_files.copy()
 
     # Version management utilities
@@ -249,8 +252,16 @@ class VersionManager:
         )
 
     # File status management
+    def _cleanup_stale_active_file(self, active_file_path: str) -> None:
+        """Helper method to clean up stale active files."""
+        try:
+            os.remove(active_file_path)
+        except (FileNotFoundError, PermissionError):
+            pass
+
     def check_active(self, file_path: str, ignore_self: bool = True) -> bool:
-        """Check if there is an active agent working on the file."""
+        """Returns true if file is being worked on by an agent (active.json)
+        If ignore_self is True, will return false if being worked on by self"""
         meta_dir = self._get_meta_dir(file_path)
         active_file_path = self._get_file_path(meta_dir, FileType.ACTIVE)
 
@@ -261,21 +272,12 @@ class VersionManager:
             with locked_file_operation(active_file_path, 'r') as f:
                 active_data = json.load(f)
         except (json.JSONDecodeError, FileNotFoundError):
-            # FIXED: Use try-except for file removal
-            try:
-                os.remove(active_file_path)
-            except (FileNotFoundError, PermissionError):
-                pass
+            self._cleanup_stale_active_file(active_file_path)
             return False
 
-        # Use stored PID instead of extracting from agent_id
         stored_pid = active_data.get('pid')
         if not stored_pid or not self._is_process_running(stored_pid):
-            # Stale process - remove the active file
-            try:
-                os.remove(active_file_path)
-            except (FileNotFoundError, PermissionError):
-                pass
+            self._cleanup_stale_active_file(active_file_path)
             return False
 
         if ignore_self and stored_pid == os.getpid():
@@ -285,23 +287,29 @@ class VersionManager:
 
     def flag_active(self, agent, file_path: str) -> bool:
         """Flag a file as being actively worked on."""
-        if self._has_active_files():
-            raise RuntimeError(f"Agent {agent.get_id()} already has active file(s): {list(self._get_active_files())}")
-
         meta_dir = self._get_meta_dir(file_path)
         current_pid = os.getpid()
 
-        with locked_json_operation(self._get_file_path(meta_dir, FileType.ACTIVE), {}, logger=self.logger) as active_data:
-            existing_pid = active_data.get('pid')
+        # Handle existing active file pointer
+        if self._has_active_files_pointer():
+            old_filepath = self._get_active_files_pointer()[0]
+            self.unflag_active(old_filepath)
+            self._set_active_file_pointer(file_path)
+            self.logger.error(f"Agent {agent.get_id()} already has active file(s): {old_filepath}. Unflagging existing active file.")
 
+        # Use a single locked operation to check and set atomically
+        with locked_json_operation(self._get_file_path(meta_dir, FileType.ACTIVE), {}, logger=self.logger) as active_data:
+            # Check for existing active state
+            existing_pid = active_data.get('pid')
             if existing_pid:
                 if self._is_process_running(existing_pid):
                     if existing_pid != current_pid:
                         raise RuntimeError(f"File {file_path} is already being worked on by PID {existing_pid}")
-                    # Same PID - check if it's the same agent
                     elif active_data.get('agent_id') != agent.get_id():
                         raise RuntimeError(f"File {file_path} is already flagged by different agent {active_data.get('agent_id')}")
+                # If process is not running, we'll overwrite the stale data below
 
+            # Set the active flag
             active_data.clear()
             active_data.update({
                 'agent_id': agent.get_id(),
@@ -309,7 +317,6 @@ class VersionManager:
                 'timestamp': self._get_timestamp(),
                 'file_path': file_path
             })
-            self._add_active_file(file_path)
 
         self.logger.debug(f"Flagged {file_path} as active by agent {agent.get_id()} (PID {current_pid})")
         return True
@@ -321,28 +328,24 @@ class VersionManager:
         current_pid = os.getpid()
 
         if not os.path.exists(active_file_path):
-            self._remove_active_file(file_path)
+            self._remove_active_file_pointer(file_path)
             return False
 
         try:
             with locked_file_operation(active_file_path, 'r') as f:
                 active_data = json.load(f)
         except (json.JSONDecodeError, FileNotFoundError):
-            self._remove_active_file(file_path)
+            self._remove_active_file_pointer(file_path)
             return False
 
         # Check PID for ownership - this is sufficient since PID uniquely identifies the process
         stored_pid = active_data.get('pid')
-
         if stored_pid != current_pid:
             return False
 
-        # FIXED: Use try-except for file removal
-        try:
-            os.remove(active_file_path)
-        except (FileNotFoundError, PermissionError):
-            pass
-        self._remove_active_file(file_path)
+        # Use helper method for consistent file cleanup
+        self._cleanup_stale_active_file(active_file_path)  # <- Pass active_file_path, not file_path
+        self._remove_active_file_pointer(file_path)
         self.logger.debug(f"Unflagged {file_path} from agent {agent.get_id()} (PID {current_pid})")
         return True
 
@@ -370,7 +373,9 @@ class VersionManager:
         """Flag a file as finished, storing agent name for cross-session recognition."""
         meta_dir = self._get_meta_dir(file_path)
 
-        with locked_json_operation(self._get_file_path(meta_dir, FileType.FINISHED), {'agents': []}, logger=self.logger) as finished_data:
+        with locked_json_operation(self._get_file_path(meta_dir, FileType.FINISHED),
+            {'agents': []}, logger=self.logger) as finished_data:
+
             # Check for duplicates by agent name
             current_agent_name = agent.name
             if any(agent_entry.get('agent_name') == current_agent_name for agent_entry in finished_data['agents']):
@@ -459,7 +464,7 @@ class VersionManager:
     def validate_active_files(self, agent) -> None:
         """Validate agent's active files and meta directory structure."""
         agent_id = agent.get_id()
-        active_files = self._get_active_files()
+        active_files = self._get_active_files_pointer()
 
         if len(active_files) > 1:
             raise RuntimeError(f"Agent {agent_id} has {len(active_files)} active files, only 1 allowed: {list(active_files)}")

@@ -204,7 +204,10 @@ def load_config(config_path="config.yaml", create_if_missing=False):
         logger.info(f"Loading configuration from {config_path}")
         _, ext = os.path.splitext(config_path.lower())
 
-        if ext == '.py':
+        if ext in ['.yaml', '.yml']:
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f)
+        elif ext == '.py':
             with open(config_path, 'r') as f:
                 tree = ast.parse(f.read())
 
@@ -219,10 +222,6 @@ def load_config(config_path="config.yaml", create_if_missing=False):
                     return config
 
             raise ValueError(f"No ROME_CONFIG found in {config_path}")
-
-        elif ext in ['.yaml', '.yml']:
-            with open(config_path, 'r') as f:
-                return yaml.safe_load(f)
         else:
             raise ValueError(f"Unsupported config file format: {ext}")
 
