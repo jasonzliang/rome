@@ -1,4 +1,5 @@
 import atexit
+import datetime
 import json
 import io
 import os
@@ -343,9 +344,13 @@ class Agent:
                 self.logger.info(f"Loop iteration {iteration}/{end_iteration-1}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
 
-                # Validate active file state for consistency and check completion
+                # Validate active file state for consistency
                 self.version_manager.validate_active_files(self)
-                self.version_manager.check_overall_completion(self)
+
+                # Print summary and write to file
+                summary = self.get_summary()
+                self.print_summary(summary)
+                self.save_summary(summary)
 
                 # Check agent context on first iteration to make sure state is valid
                 if iteration == 1: self.fsm.check_context(self)
@@ -440,15 +445,63 @@ class Agent:
         self.curr_iteration = end_iteration
         self.history.set_final_state(self.fsm.current_state, self.context)
 
-        print("\n\n")
-        self.logger.info(f"Agent loop completed after {self.history.get_iteration()} iterations")
-        self.logger.info(f"Final state: {self.history.final_state}")
-        self.logger.info(f"Recent history:\n{self.history.get_history_summary(self.history_context_len)}")
-        # action_sequence = [action['action'] for action in self.history.actions_executed][-SUMMARY_LENGTH:]
-        # self.logger.info(f"Last {SUMMARY_LENGTH} actions executed: {action_sequence}")
+        summary = self.get_summary()
+        self.print_summary()
+        self.write_summary()
 
         if self.history.has_errors():
             self.logger.info(f"Loop completed with {len(self.history.errors)} errors")
 
         # Return dictionary format for backward compatibility
         return self.history.to_dict()
+
+    def get_summary(self, recent_history=20) -> str:
+        """Get a comprehensive summary of the agent's current state."""
+        summary_lines = []
+
+        # Basic agent info
+        summary_lines.append(f"Agent: {self.name}")
+        summary_lines.append(f"Current State: {self.fsm.current_state}")
+        summary_lines.append(f"Iteration: {self.curr_iteration}")
+        summary_lines.append(f"Repository: {self.repository}")
+
+        # Context info
+        context_keys = list(self.context.keys())  # First 5 context keys
+        if context_keys:
+            summary_lines.append(f"Context Keys: {', '.join(context_keys)}")
+
+        # History summary
+        actions_count = len(self.history.actions_executed)
+        errors_count = len(self.history.errors)
+        summary_lines.append(f"Actions Executed: {actions_count}")
+        summary_lines.append(f"Errors: {errors_count}")
+
+        # Version manager info
+        completion = self.version_manager.check_overall_completion()
+        summary_lines.append(f"Completed Files: {pprint.pformat(completion)}")
+
+        return '\n'.join(summary_lines)
+
+    def print_summary(self, summary):
+        """Print agent summary to console."""
+        self.logger.info("=" * 80)
+        self.logger.info("AGENT SUMMARY")
+        self.logger.info("=" * 80)
+        for line in summary.split('\n'):
+            self.logger.info(line)
+        self.logger.info("=" * 80)
+
+    def save_summary(self, summary):
+        """Save agent summary to file in log directory."""
+        log_dir = self.get_log_dir()
+        summary_file = os.path.join(log_dir, f"{self.get_id()}.summary")
+
+        # Add timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        summary_with_timestamp = f"[{timestamp}]\n{summary}\n\n"
+
+        # Append to file
+        with open(summary_file, 'a', encoding='utf-8') as f:
+            f.write(summary_with_timestamp)
+
+        self.logger.debug(f"Summary saved to: {summary_file}")
