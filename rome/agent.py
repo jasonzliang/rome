@@ -135,6 +135,13 @@ class Agent:
         if self.fsm and self.fsm.current_state:
             self.history.add_initial_state(self.fsm.current_state)
 
+        # Setup repository manager
+        repository_config = self.config.get('RepositoryManager', {})
+        self.repository_manager = RepositoryManager(
+            repository_path=self.repository,
+            config=repository_config
+        )
+
         # Version manager
         version_config = self.config.get('VersionManager', {})
         db_config = self.config.get('DatabaseManager', {})
@@ -221,6 +228,8 @@ class Agent:
         try:
             if hasattr(self, 'agent_api') and self.agent_api:
                 self.agent_api.shutdown()
+            if hasattr(self, 'repository_manager'):
+                self.logger.info("Repository manager shutdown completed")
             if hasattr(self, 'version_manager'):
                 self.version_manager.shutdown(self)
             self.logger.info("Agent shutdown completed successfully")
@@ -348,9 +357,7 @@ class Agent:
                 self.version_manager.validate_active_files(self)
 
                 # Print summary and write to file
-                summary = self.get_summary()
-                self.print_summary(summary)
-                self.save_summary(summary)
+                summary = self.get_summary(); self.print_summary(); self.write_summary()
 
                 # Check agent context on first iteration to make sure state is valid
                 if iteration == 1: self.fsm.check_context(self)
@@ -445,9 +452,7 @@ class Agent:
         self.curr_iteration = end_iteration
         self.history.set_final_state(self.fsm.current_state, self.context)
 
-        summary = self.get_summary()
-        self.print_summary()
-        self.write_summary()
+        summary = self.get_summary(); self.print_summary(); self.write_summary()
 
         if self.history.has_errors():
             self.logger.info(f"Loop completed with {len(self.history.errors)} errors")
@@ -476,8 +481,8 @@ class Agent:
         summary_lines.append(f"Actions Executed: {actions_count}")
         summary_lines.append(f"Errors: {errors_count}")
 
-        # Version manager info
-        completion = self.version_manager.check_overall_completion()
+        # Repository info
+        completion = self.repository_manager.get_repository_completion_stats()
         summary_lines.append(f"Completed Files: {pprint.pformat(completion)}")
 
         return '\n'.join(summary_lines)

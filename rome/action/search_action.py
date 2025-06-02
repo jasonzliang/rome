@@ -9,6 +9,7 @@ import time
 from typing import Dict, Optional, Any, Union, List
 
 from .action import Action
+from .repository_manager import RepositoryManager  # New import
 from ..logger import get_logger
 from ..config import LOG_DIR_NAME, META_DIR_EXT, SUMMARY_LENGTH, TEST_FILE_EXT
 from ..config import check_attrs
@@ -21,27 +22,21 @@ class SearchAction(Action):
         super().__init__(config)
         self.logger = get_logger()
 
-        check_attrs(self, ['max_files', 'file_types', 'exclude_dirs',
-                          'exclude_types', 'selection_criteria', 'batch_size',
-                          'batch_sampling'])
-
-        if LOG_DIR_NAME not in self.exclude_dirs:
-            self.exclude_dirs.append(LOG_DIR_NAME)
-        if f"*.{META_DIR_EXT}" not in self.exclude_dirs:
-            self.exclude_dirs.append(f"*.{META_DIR_EXT}")
-        if TEST_FILE_EXT not in self.exclude_types:
-            self.exclude_types.append(TEST_FILE_EXT)
+        check_attrs(self, ['selection_criteria', 'batch_size', 'batch_sampling'])
 
     def summary(self, agent) -> str:
         """Return a detailed summary of the search action"""
-        file_types_str = ', '.join(self.file_types)
-        excluded_dirs_str = ', '.join(self.exclude_dirs) if self.exclude_dirs else 'none'
+        repo_config = agent.repository_manager.config
+        file_types_str = ', '.join(repo_config.get('file_types', ['.py']))
+        exclude_dirs = repo_config.get('exclude_dirs', [])
+        max_files = repo_config.get('max_files', sys.maxsize)
+        excluded_dirs_str = ', '.join(exclude_dirs) if exclude_dirs else 'none'
 
         return (f"search repository for {file_types_str} files using multi-stage LLM selection: "
                 f"(1) scan all files and create overview with size/age/function definitions, "
                 f"(2) LLM prioritizes all files 1-5 based on {self.selection_criteria}, "
                 f"(3) process top files in batches of {self.batch_size} with full content for LLM to select best match "
-                f"(max files: {self.max_files}, excluding dirs: {excluded_dirs_str})")
+                f"(max files: {max_files}, excluding dirs: {excluded_dirs_str})")
 
     def _truncate_text(self, text: str, max_length: int = SUMMARY_LENGTH) -> str:
         """Truncate text to specified length with ellipsis if needed"""
@@ -109,22 +104,6 @@ class SearchAction(Action):
                 })
 
         return file_overviews
-
-    # def _ensure_all_files_prioritized(self, prioritized_files: List[Dict], file_overviews: List[Dict]) -> List[Dict]:
-    #     """Ensure all files from overviews are included in prioritized list with fallback priorities"""
-    #     all_paths = {file_info["path"] for file_info in file_overviews}
-    #     prioritized_paths = {file_info.get("file_path") for file_info in prioritized_files}
-
-    #     # Add missing files with default priority
-    #     for path in all_paths - prioritized_paths:
-    #         self.logger.info(f"File missing from prioritized list: {path}, adding with default priority")
-    #         prioritized_files.append({
-    #             "file_path": path,
-    #             "priority": 1,
-    #             "reason": "Added by default (missing from LLM response)"
-    #         })
-
-    #     return sorted(prioritized_files, key=lambda x: x.get("priority", 0), reverse=True)
 
     def _create_prioritization_prompt(self, file_overviews: List[Dict], shuffle: bool = True) -> str:
         """Create prompt for file prioritization"""
@@ -196,86 +175,6 @@ IMPORTANT: Your response MUST be a valid JSON OBJECT where keys are file paths a
 
         return sorted(prioritized_files, key=lambda x: x.get("priority", 0), reverse=True)
 
-    def _apply_filters(self, agent, files: List[str]) -> List[str]:
-        """Apply all file filters in sequence"""
-        filters = [
-            ("excluded directories", self._filter_excluded_dirs),
-            ("excluded types", self._filter_excluded_types),
-            ("flagged files", lambda f: self._filter_flagged_files(agent, f)),
-            ("max limit", self._filter_max_limit)
-        ]
-
-        filtered_files = files
-        for filter_name, filter_func in filters:
-            filtered_files = filter_func(filtered_files)
-            self.logger.info(f"Found {len(filtered_files)} files after {filter_name} filtering")
-
-        return filtered_files
-
-    def _filter_excluded_dirs(self, files: List[str]) -> List[str]:
-        """Optimized version balancing performance and simplicity"""
-        if not self.exclude_dirs:
-            return files
-
-        # Preprocess patterns for faster matching
-        patterns = [p.replace('\\', '/') for p in self.exclude_dirs]
-
-        def is_excluded(file_path: str) -> bool:
-            norm_path = file_path.replace('\\', '/')
-            path_parts = norm_path.split('/')
-
-            # Check each directory component once
-            for part in path_parts[:-1]:  # Exclude filename
-                for pattern in patterns:
-                    if fnmatch.fnmatch(part, pattern):
-                        return True
-
-            # Only check path patterns if they contain '/'
-            path_patterns = [p for p in patterns if '/' in p]
-            if path_patterns:
-                for i in range(len(path_parts) - 1):
-                    segment = '/'.join(path_parts[:i+1])
-                    for pattern in path_patterns:
-                        if fnmatch.fnmatch(segment, pattern) or fnmatch.fnmatch(norm_path, f"*{pattern}*"):
-                            return True
-
-            return False
-
-        return [f for f in files if not is_excluded(f)]
-
-    def _filter_excluded_types(self, files: List[str]) -> List[str]:
-        """Filter out files with excluded file types"""
-        if not self.exclude_types:
-            return files
-
-        return [f for f in files if not any(f.endswith(exclude_type) for exclude_type in self.exclude_types)]
-
-    def _filter_flagged_files(self, agent, files: List[str]) -> List[str]:
-        """Filter out files that are currently active or already finished"""
-        if not files:
-            return files
-
-        filtered_files = []
-        for file_path in files:
-            is_active = agent.version_manager.check_active(file_path)
-            is_finished = agent.version_manager.check_finished(agent, file_path)
-
-            if is_active:
-                self.logger.debug(f"Filtering out active file: {file_path}")
-            elif is_finished:
-                self.logger.debug(f"Filtering out finished file: {file_path}")
-            else:
-                filtered_files.append(file_path)
-
-        return filtered_files
-
-    def _filter_max_limit(self, files: List[str]) -> List[str]:
-        """Filter out files if they exceed max file limit"""
-        if len(files) > self.max_files:
-            random.shuffle(files)
-            return files[:self.max_files]
-        return files
-
     def _create_batch_overview(self, batch_data: List[Dict]) -> str:
         """Create overview section for batch selection prompt"""
         overview = "File list:\n"
@@ -288,41 +187,6 @@ IMPORTANT: Your response MUST be a valid JSON OBJECT where keys are file paths a
                         f"{def_count} total: {func_count} functions, {class_count} classes) "
                         f"- {file_info['priority_reason']}\n")
         return overview
-
-    # def _create_definitions_overview(self, batch_data: List[Dict]) -> str:
-    #     """Create definitions overview section for batch selection prompt"""
-    #     overview = "\nCode definitions overview:"
-
-    #     for i, file_info in enumerate(batch_data):
-    #         overview += f"\n\n--- File {i+1}: {file_info['path']} ---"
-
-    #         if not file_info['all_definitions']:
-    #             overview += "\nNo function or class definitions found"
-    #             continue
-
-    #         functions = [d for d in file_info['all_definitions'] if d['type'] == 'function']
-    #         classes = [d for d in file_info['all_definitions'] if d['type'] == 'class']
-
-    #         for def_type, definitions in [("Functions", functions), ("Classes", classes)]:
-    #             if definitions:
-    #                 overview += f"\n{def_type} ({len(definitions)}):"
-    #                 for defn in definitions[:3]:  # Limit to first 3
-    #                     overview += f"\n  {defn['signature']}"
-    #                     if defn['docstring']:
-    #                         # Allow multiple lines but limit total characters to SUMMARY_LENGTH
-    #                         docstring_lines = [line.strip() for line in defn['docstring'].split('\n') if line.strip()]
-    #                         if docstring_lines:
-    #                             docstring_text = ' '.join(docstring_lines)
-    #                             overview += f" # {self._truncate_text(docstring_text)}"
-
-    #                     if defn['type'] == 'class' and defn.get('methods'):
-    #                         methods = defn['methods'][:5]
-    #                         overview += f" (methods: {', '.join(methods)}{'...' if len(defn['methods']) > 5 else ''})"
-
-    #                 if len(definitions) > 3:
-    #                     overview += f"\n  ... and {len(definitions) - 3} more {def_type.lower()}"
-
-    #     return overview
 
     def _create_selection_prompt(self, batch_data: List[Dict]) -> str:
         """Create a concise prompt for file selection"""
@@ -472,24 +336,6 @@ Respond with a JSON object:
 
         return None
 
-    def _collect_all_files(self, agent) -> List[str]:
-        """Collect all files matching the specified file types"""
-        all_files = []
-
-        for file_type in self.file_types:
-            # Ensure file_type has a leading dot if needed
-            if not file_type.startswith('.'):
-                file_type = '.' + file_type
-
-            search_path = os.path.join(agent.repository, f'**/*{file_type}')
-            self.logger.info(f"Searching for files in: {search_path}")
-
-            files = glob.glob(search_path, recursive=True)
-            self.logger.info(f"Found {len(files)} {file_type} files")
-            all_files.extend(files)
-
-        return all_files
-
     def execute(self, agent, **kwargs) -> bool:
         """Execute the search action"""
         self.logger.info("Starting SearchAction execution")
@@ -500,11 +346,8 @@ Respond with a JSON object:
             self.logger.error(error_msg)
             raise ValueError(error_msg)
 
-        # Collect and filter files
-        all_files = self._collect_all_files(agent)
-        self.logger.info(f"Found {len(all_files)} total files before filtering")
-
-        filtered_files = self._apply_filters(agent, all_files)
+        # Use the agent's repository manager to collect and filter files
+        filtered_files = agent.repository_manager.collect_and_filter_files(agent=agent)
 
         if not filtered_files:
             self.logger.error("No files left after filtering")
@@ -513,7 +356,6 @@ Respond with a JSON object:
         # Create overview, prioritize, and process batches
         file_overviews = self._create_global_overview(agent, filtered_files)
         prioritized_files = self._prioritize_files(agent, file_overviews)
-
         selected_file = self._process_file_batches(agent, prioritized_files)
 
         if selected_file:

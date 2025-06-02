@@ -390,54 +390,6 @@ class VersionManager:
 
         self.logger.debug(f"Flagged {file_path} as finished by agent {agent.name} (ID: {agent.get_id()})")
 
-    def _should_exclude_dir(self, dirname: str) -> bool:
-        """Check if directory should be excluded using wildcard patterns."""
-        exclude_patterns = [
-            ".*",                    # Hidden directories (starts with .)
-            "venv",                  # Virtual environment
-            "__*__",                 # __pycache__, __init__, etc.
-            "node_modules",          # Node.js modules
-            "env",                   # Environment directories
-            LOG_DIR_NAME,            # Agent log directory
-            f"*.{META_DIR_EXT}"      # Meta directories (e.g., *.rome)
-        ]
-
-        return any(fnmatch.fnmatch(dirname, pattern) for pattern in exclude_patterns)
-
-    def check_overall_completion(self, agent) -> Dict[str, int]:
-        """Check overall completion status across all Python files in the agent's repository."""
-        repository_path = agent.repository
-        finished_count = 0
-        total_count = 0
-
-        self.logger.info(f"Checking agent {agent.get_id()} completion status in: {repository_path}")
-
-        # Walk through all Python files with enhanced directory filtering
-        for root, dirs, files in os.walk(repository_path):
-            dirs[:] = [d for d in dirs if not self._should_exclude_dir(d)]
-
-            for file in files:
-                if file.endswith('.py') and not file.startswith('.') and not file.endswith('_test.py'):
-                    file_path = os.path.join(root, file)
-                    total_count += 1
-
-                    # Reuse existing finished check logic
-                    if self.check_finished(agent, file_path):
-                        finished_count += 1
-
-        unfinished_count = total_count - finished_count
-        completion_percentage = (finished_count / total_count * 100) if total_count > 0 else 0
-
-        result = {
-            'finished_files': finished_count,
-            'unfinished_files': unfinished_count,
-            'total_files': total_count,
-            'completion_percentage': round(completion_percentage, 2)
-        }
-
-        self.logger.info(f"Overall repository progress: {finished_count}/{total_count} files ({completion_percentage:.2f}%)")
-        return result
-
     # Validation methods (simplified)
     def _validate_required_fields(self, data: Dict, required_fields: List[str], context: str) -> List[ValidationError]:
         """Generic field validation."""

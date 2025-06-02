@@ -76,6 +76,14 @@ DEFAULT_CONFIG = {
         "port": 8000 # Port number to query agent API
     },
 
+    # Repository manager configuration
+    "RepositoryManager": {
+        "file_types": [".py"], # File types to search for
+        "max_files": sys.maxsize, # Maximum number of candidates to select from after search
+        "exclude_types": [], # File types to not search for
+        "exclude_dirs": [".*", "venv", "__*__"], # Directories to not search in
+    },
+
     # Logging configuration
     "Logger": {
         "level": "ERROR", # Log level in increasing verbosity: INFO -> ERROR -> DEBUG
@@ -101,10 +109,6 @@ DEFAULT_CONFIG = {
 
     # Action configuration
     "SearchAction": {
-        "max_files": sys.maxsize, # Maximum number of candidates to select from after search
-        "file_types": [".py"], #  File types to search for
-        "exclude_types": [], # File types to not search for
-        "exclude_dirs": [".*", "venv", "__*__"], # Directories to not search in
         "selection_criteria": "Select the file that you have the most confidence in improving or fixing.", # Criteria for selecting file from possible candidates
         "batch_size": 10, # Candidate batch size for selection
         "batch_sampling": False # If set to true, randomly sample batches
