@@ -1,6 +1,6 @@
 """
-Compact, deadlock-safe TinyDB management with maximum code reuse.
-Includes unified locking operations for file and JSON handling.
+Unified, deadlock-safe TinyDB management with centralized locking configuration.
+All locking operations now use consistent timeout and retry logic.
 """
 import datetime
 import json
@@ -17,6 +17,51 @@ import portalocker
 from .config import set_attributes_from_config
 from .logger import get_logger
 
+
+class LockingConfig:
+    """Centralized locking configuration that can be shared across components"""
+
+    def __init__(self, config: Dict = None):
+        self.config = config or {}
+
+        # Set defaults and apply config
+        set_attributes_from_config(self, self.config, ['lock_timeout', 'max_retries', 'retry_delay'])
+
+    def with_retry(self, operation: Callable, logger=None, operation_name: str = "operation"):
+        """Execute operation with retry logic using configured values"""
+        last_exception = None
+
+        for attempt in range(self.max_retries):
+            try:
+                return operation()
+            except (TimeoutError, portalocker.LockException) as e:
+                last_exception = e
+                if attempt < self.max_retries - 1:
+                    if logger:
+                        logger.warning(f"{operation_name} lock timeout on attempt {attempt + 1}, retrying...")
+                    time.sleep(self.retry_delay * (2 ** attempt))
+                continue
+            except Exception:
+                raise
+
+        raise last_exception
+
+
+# Global locking config instance - will be initialized by DatabaseManager
+_locking_config = None
+
+def get_locking_config() -> LockingConfig:
+    """Get the global locking configuration"""
+    if _locking_config is None:
+        raise RuntimeError("Locking configuration not initialized. Initialize DatabaseManager first.")
+    return _locking_config
+
+def set_locking_config(config: LockingConfig):
+    """Set the global locking configuration"""
+    global _locking_config
+    _locking_config = config
+
+
 def ensure_dir(file_path: str) -> None:
     """Thread-safe directory creation."""
     try:
@@ -25,49 +70,52 @@ def ensure_dir(file_path: str) -> None:
         pass
 
 
+def _acquire_lock_with_timeout(file_handle, lock_type: int, timeout: float, logger=None, file_path: str = ""):
+    """Unified lock acquisition with timeout"""
+    start_time = time.time()
+    while time.time() - start_time < timeout:
+        try:
+            portalocker.lock(file_handle, lock_type | portalocker.LOCK_NB)
+            return
+        except portalocker.LockException:
+            time.sleep(0.01)
+
+    error_msg = f"Lock timeout ({timeout}s) on {file_path or 'file'}"
+    if logger:
+        logger.error(error_msg)
+    raise TimeoutError(error_msg)
+
+
 @contextmanager
 def locked_file_operation(file_path: str, mode: str = 'r',
                          lock_type: int = portalocker.LOCK_EX,
-                         timeout: float = 5.0, encoding: str = 'utf-8',
-                         create_dirs: bool = True):
-    """File operation with timeout-based locking."""
+                         timeout: float = None, encoding: str = 'utf-8',
+                         create_dirs: bool = True, logger=None):
+    """File operation with unified timeout-based locking."""
+    if timeout is None:
+        timeout = get_locking_config().lock_timeout
+
     if create_dirs:
         ensure_dir(file_path)
 
     with open(file_path, mode, encoding=encoding) as f:
-        # Reuse the existing timeout logic pattern
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            try:
-                portalocker.lock(f, lock_type | portalocker.LOCK_NB)
-                break
-            except portalocker.LockException:
-                time.sleep(0.01)
-        else:
-            raise TimeoutError(f"Lock timeout on {file_path}")
-
+        _acquire_lock_with_timeout(f, lock_type, timeout, logger, file_path)
         yield f
 
 
 @contextmanager
 def locked_json_operation(file_path: str, default_data: Optional[Dict] = None,
-                         timeout: float = 5.0, create_dirs: bool = True,
+                         timeout: float = None, create_dirs: bool = True,
                          logger=None):
-    """JSON operation with timeout-based locking and atomic writes."""
+    """JSON operation with unified timeout-based locking and atomic writes."""
+    if timeout is None:
+        timeout = get_locking_config().lock_timeout
+
     if create_dirs:
         ensure_dir(file_path)
 
     with open(file_path, 'a+', encoding='utf-8') as f:
-        # Reuse the existing timeout logic pattern
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            try:
-                portalocker.lock(f, portalocker.LOCK_EX | portalocker.LOCK_NB)
-                break
-            except portalocker.LockException:
-                time.sleep(0.01)
-        else:
-            raise TimeoutError(f"Lock timeout on {file_path}")
+        _acquire_lock_with_timeout(f, portalocker.LOCK_EX, timeout, logger, file_path)
 
         # Read existing content
         f.seek(0)
@@ -91,30 +139,22 @@ def locked_json_operation(file_path: str, default_data: Optional[Dict] = None,
 
 
 class TimeoutLockedJSONStorage(JSONStorage):
-    """TinyDB storage with timeout-based file locking"""
+    """TinyDB storage with unified timeout-based file locking"""
 
-    def __init__(self, path: str, create_dirs: bool = True, lock_timeout: float = 5.0, **kwargs):
+    def __init__(self, path: str, create_dirs: bool = True,
+                 lock_timeout: float = None, **kwargs):
         self.path = path
-        self.lock_timeout = lock_timeout
+        self.lock_timeout = lock_timeout if lock_timeout is not None else get_locking_config().lock_timeout
+
         if create_dirs:
             os.makedirs(os.path.dirname(path), exist_ok=True)
         super().__init__(path, **kwargs)
 
-    def _lock_with_timeout(self, file_handle, lock_type):
-        """Acquire file lock with timeout"""
-        start_time = time.time()
-        while time.time() - start_time < self.lock_timeout:
-            try:
-                portalocker.lock(file_handle, lock_type | portalocker.LOCK_NB)
-                return
-            except portalocker.LockException:
-                time.sleep(0.01)
-        raise TimeoutError(f"Lock timeout on {self.path}")
-
     def read(self):
         try:
             with open(self.path, 'r', encoding='utf-8') as f:
-                self._lock_with_timeout(f, portalocker.LOCK_SH)
+                _acquire_lock_with_timeout(f, portalocker.LOCK_SH, self.lock_timeout,
+                                         file_path=self.path)
                 content = f.read().strip()
                 return json.loads(content) if content else {}
         except (FileNotFoundError, json.JSONDecodeError):
@@ -122,20 +162,29 @@ class TimeoutLockedJSONStorage(JSONStorage):
 
     def write(self, data):
         with open(self.path, 'w', encoding='utf-8') as f:
-            self._lock_with_timeout(f, portalocker.LOCK_EX)
+            _acquire_lock_with_timeout(f, portalocker.LOCK_EX, self.lock_timeout,
+                                     file_path=self.path)
             json.dump(data, f, indent=4)
 
 
 class DatabaseManager:
-    """Compact, deadlock-safe TinyDB manager with maximum code reuse"""
+    """Unified, deadlock-safe TinyDB manager with centralized configuration"""
 
     def __init__(self, get_db_path_func, config: Dict = None):
         self.config = config or {}
         self.logger = get_logger()
         self._get_db_path = get_db_path_func
 
-        # Configuration with defaults
-        set_attributes_from_config(self, self.config, ['lock_timeout', 'max_retries', 'retry_delay'])
+        # Initialize locking configuration
+        self.locking_config = LockingConfig(self.config)
+
+        # Set global locking config for other components
+        set_locking_config(self.locking_config)
+
+        # Legacy attribute access for backward compatibility
+        self.lock_timeout = self.locking_config.lock_timeout
+        self.max_retries = self.locking_config.max_retries
+        self.retry_delay = self.locking_config.retry_delay
 
     def _timestamp(self) -> str:
         """Generate ISO timestamp"""
@@ -143,9 +192,11 @@ class DatabaseManager:
 
     @contextmanager
     def _db_context(self, file_path: str, table_name: str = None):
-        """Database context with automatic cleanup"""
+        """Database context with automatic cleanup using unified locking"""
         db_path = self._get_db_path(file_path)
-        storage = CachingMiddleware(lambda path: TimeoutLockedJSONStorage(path, lock_timeout=self.lock_timeout))
+        storage = CachingMiddleware(
+            lambda path: TimeoutLockedJSONStorage(path, lock_timeout=self.lock_timeout)
+        )
         db = TinyDB(db_path, storage=storage)
 
         try:
@@ -156,23 +207,9 @@ class DatabaseManager:
             except Exception as e:
                 self.logger.error(f"Error closing database: {e}")
 
-    def _with_retry(self, operation: Callable, *args, **kwargs):
-        """Execute operation with retry logic"""
-        last_exception = None
-
-        for attempt in range(self.max_retries):
-            try:
-                return operation(*args, **kwargs)
-            except (TimeoutError, portalocker.LockException) as e:
-                last_exception = e
-                if attempt < self.max_retries - 1:
-                    self.logger.error(f"Lock timeout on attempt {attempt + 1}, retrying...")
-                    time.sleep(self.retry_delay * (2 ** attempt))
-                continue
-            except Exception:
-                raise
-
-        raise last_exception
+    def _with_retry(self, operation: Callable, operation_name: str = "database operation"):
+        """Execute operation with unified retry logic"""
+        return self.locking_config.with_retry(operation, self.logger, operation_name)
 
     def _enrich_data(self, data: Dict[str, Any], file_path: str) -> Dict[str, Any]:
         """Add metadata to data"""
@@ -213,7 +250,7 @@ class DatabaseManager:
             with self._db_context(file_path, table_name) as table:
                 return table.insert(enriched_data)
 
-        doc_id = self._with_retry(_store)
+        doc_id = self._with_retry(_store, f"store_data in {table_name}")
         self.logger.debug(f"Stored data with ID {doc_id} in '{table_name}'")
         return doc_id
 
@@ -231,7 +268,7 @@ class DatabaseManager:
 
             return self._sort_and_limit(results, order_by, descending, limit)
 
-        results = self._with_retry(_load)
+        results = self._with_retry(_load, f"load_data from {table_name}")
         self.logger.debug(f"Loaded {len(results)} records from '{table_name}'")
         return results
 
@@ -253,7 +290,7 @@ class DatabaseManager:
                 doc_ids = table.update(updates, query) if query else table.update(updates)
                 return doc_ids or []
 
-        doc_ids = self._with_retry(_update)
+        doc_ids = self._with_retry(_update, f"update_data in {table_name}")
         self.logger.debug(f"Updated {self._safe_len(doc_ids)} records in '{table_name}'")
         return doc_ids
 
@@ -277,7 +314,7 @@ class DatabaseManager:
                     self.logger.debug(f"Truncated {count} records from '{table_name}'")
                     return []
 
-        return self._with_retry(_delete)
+        return self._with_retry(_delete, f"delete_data from {table_name}")
 
     def count_data(self, file_path: str, table_name: str,
                   query_filter: Optional[Dict[str, Any]] = None) -> int:
@@ -290,7 +327,7 @@ class DatabaseManager:
                 query = self._build_query(query_filter)
                 return len(table.search(query) if query else table.all())
 
-        return self._with_retry(_count)
+        return self._with_retry(_count, f"count_data in {table_name}")
 
     def get_table_names(self, file_path: str) -> List[str]:
         """Get all table names"""
@@ -300,7 +337,7 @@ class DatabaseManager:
             with self._db_context(file_path) as db:
                 return db.tables()
 
-        return self._with_retry(_get_tables)
+        return self._with_retry(_get_tables, "get_table_names")
 
     def table_exists(self, file_path: str, table_name: str) -> bool:
         """Check if table exists"""
@@ -313,7 +350,7 @@ class DatabaseManager:
             with self._db_context(file_path, table_name) as table:
                 return table.insert_multiple(enriched_data)
 
-        doc_ids = self._with_retry(_bulk_insert)
+        doc_ids = self._with_retry(_bulk_insert, f"bulk_insert into {table_name}")
         self.logger.debug(f"Bulk inserted {len(doc_ids)} records into '{table_name}'")
         return doc_ids
 
@@ -324,7 +361,7 @@ class DatabaseManager:
                 with self._db_context(file_path, table_name) as table:
                     table.truncate()
 
-        self._with_retry(_clear)
+        self._with_retry(_clear, f"clear_table {table_name}")
         self.logger.debug(f"Cleared table '{table_name}'")
 
     def drop_table(self, file_path: str, table_name: str) -> None:
@@ -334,7 +371,7 @@ class DatabaseManager:
                 with self._db_context(file_path) as db:
                     db.drop_table(table_name)
 
-        self._with_retry(_drop)
+        self._with_retry(_drop, f"drop_table {table_name}")
         self.logger.debug(f"Dropped table '{table_name}'")
 
     def get_database_info(self, file_path: str) -> Dict[str, Any]:
@@ -359,7 +396,7 @@ class DatabaseManager:
                 'file_size_bytes': os.path.getsize(self._get_db_path(file_path))
             }
 
-        return self._with_retry(_get_info)
+        return self._with_retry(_get_info, "get_database_info")
 
     def backup_database(self, file_path: str, backup_path: str) -> bool:
         """Backup database"""
@@ -400,3 +437,7 @@ class DatabaseManager:
     def shutdown(self):
         """Shutdown - no cached connections to close"""
         self.logger.debug("DatabaseManager shutdown complete")
+
+        # Clear global locking config
+        global _locking_config
+        _locking_config = None

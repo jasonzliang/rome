@@ -78,22 +78,22 @@ class EditTestAction(Action):
             self.logger.error(f"Invalid response format from LLM: {response}")
             return False
 
-        new_test_code = result.get('test_code')
+        new_test_content = result.get('test_code')
         explanation = result.get('explanation', 'No explanation provided')
         test_changes = result.get('changes', [])
 
         # Validate the test code
-        if not new_test_code or not isinstance(new_test_code, str):
+        if not new_test_content or not isinstance(new_test_content, str):
             self.logger.error("Test code is missing or invalid")
             return False
 
-        if test_exists and new_test_code == test_content:
+        if test_exists and new_test_content == test_content:
             self.logger.info("No changes made to the test code")
             # Even if no changes, we'll continue to the next state
 
         # Update the selected file in the agent context with test information
         selected_file['test_path'] = test_path
-        selected_file['test_content'] = new_test_code
+        selected_file['test_content'] = new_test_content
 
         # Record the explanation and changes
         change_record = {
@@ -102,34 +102,19 @@ class EditTestAction(Action):
         }
         selected_file['test_changes'].append(change_record)
 
-        # Store test editing session in TinyDB
-        # test_edit_data = {
-        #     'test_path': test_path,
-        #     'test_existed': test_exists,
-        #     'original_test_content_hash': hash_string(test_content) if test_content else None,
-        #     'new_test_content_hash': hash_string(new_test_code),
-        #     'changes': test_changes,
-        #     'explanation': explanation,
-        #     'agent_id': agent.get_id(),
-        #     'content_changed': new_test_code != test_content
-        # }
-        # agent.version_manager.store_data(file_path, 'test_edits', test_edit_data)
-
         # Write the test code to disk
         with open(test_path, 'w', encoding='utf-8') as f:
-            f.write(new_test_code)
-        self.logger.info(f"Successfully wrote test code to {test_path}")
+            f.write(new_test_content)
 
         # Save version using agent's version manager
         version_number = agent.version_manager.save_test_version(
             test_file_path=test_path,
-            content=new_test_code,
+            content=new_test_content,
             changes=test_changes,
             explanation=explanation)
 
+        self.logger.info(f"Successfully edited and wrote test code to {test_path}")
         self.logger.info(f"Test editing completed for {file_path}")
-        self.logger.info(f"Test file: {test_path}")
-
         return True
 
     def _create_test_prompt(self, agent, file_path: str, file_content: str, test_path: str,

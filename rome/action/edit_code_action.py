@@ -9,16 +9,8 @@ from ..parsing import hash_string
 
 
 def create_analysis_prompt(agent, file_path: str) -> Optional[str]:
-    """
-    Create analysis context for code editing prompts by loading execution and analysis data.
+    """Create analysis context for code editing prompts by loading execution and analysis data."""
 
-    Args:
-        agent: Agent instance with version manager
-        file_path: Path to the main file
-
-    Returns:
-        Formatted analysis context string or None if no data available
-    """
     # Load the latest execution results
     execution_data = agent.version_manager.get_data(file_path, 'exec_result')
     if not execution_data:
@@ -122,21 +114,9 @@ class EditCodeAction(Action):
         }
         selected_file['change_record'] = change_record
 
-        # Store code editing session in TinyDB
-        # edit_data = {
-        #     'original_content_hash': hash_string(original_content),
-        #     'improved_content_hash': hash_string(improved_code),
-        #     'changes': changes,
-        #     'explanation': explanation,
-        #     'agent_id': agent.get_id(),
-        #     'content_changed': improved_code != original_content
-        # }
-        # agent.version_manager.store_data(file_path, 'code_edits', edit_data)
-
         # Write the improved code back to the file
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(improved_code)
-        self.logger.info(f"Successfully wrote improved code to {file_path}")
 
         # Save version using agent's version manager
         version_number = agent.version_manager.save_version(
@@ -144,10 +124,9 @@ class EditCodeAction(Action):
             content=improved_code,
             changes=changes,
             explanation=explanation)
-
         self.logger.info(f"Code editing completed for {file_path}")
-        self.logger.info(f"Changes made: {changes}")
 
+        self.logger.info(f"Successfully edited and wrote improved code to {file_path}")
         return True
 
     def _create_improvement_prompt(self, agent, file_path: str, content: str) -> str:

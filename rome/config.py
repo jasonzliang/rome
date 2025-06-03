@@ -139,8 +139,8 @@ DEFAULT_CONFIG = {
     # Database and version manager configuration
     "DatabaseManager": {
         "lock_timeout": 5.0, # Timeout for read/write lock
-        "max_retries": 5, # Num tries to acquire lock
-        "retry_delay": 0.1 # Delay between tries, exponential increase
+        "max_retries": 8, # Num tries to acquire lock
+        "retry_delay": 0.01 # Delay between tries, exponential increase
     },
     "VersionManager": {},
 }

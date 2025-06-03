@@ -40,6 +40,7 @@ class VersionManager:
         self.active_files: Set[str] = set()
 
         # Initialize TinyDBManager with database path function
+        # This will also initialize the global locking configuration
         self.db = DatabaseManager(
             get_db_path_func=self._get_database_path,
             config=db_config
@@ -185,6 +186,7 @@ class VersionManager:
         content_hash = hash_string(content)
         index_file_path = self._get_file_path(versions_dir, FileType.INDEX)
 
+        # Now uses unified locking configuration from DatabaseManager
         with locked_json_operation(index_file_path, {'versions': []}, logger=self.logger) as index:
             if main_file_path and 'main_file_path' not in index:
                 index['main_file_path'] = main_file_path
@@ -268,7 +270,8 @@ class VersionManager:
             return False
 
         try:
-            with locked_file_operation(active_file_path, 'r') as f:
+            # Now uses unified locking configuration
+            with locked_file_operation(active_file_path, 'r', logger=self.logger) as f:
                 active_data = json.load(f)
         except (json.JSONDecodeError, FileNotFoundError):
             self._cleanup_stale_active_file(active_file_path)
@@ -296,7 +299,7 @@ class VersionManager:
             self._set_active_file_pointer(file_path)
             self.logger.error(f"Agent {agent.get_id()} already has active file(s): {old_filepath}. Unflagging existing active file.")
 
-        # Use a single locked operation to check and set atomically
+        # Use unified locking operation to check and set atomically
         with locked_json_operation(self._get_file_path(meta_dir, FileType.ACTIVE), {}, logger=self.logger) as active_data:
             # Check for existing active state
             existing_pid = active_data.get('pid')
@@ -331,7 +334,8 @@ class VersionManager:
             return False
 
         try:
-            with locked_file_operation(active_file_path, 'r') as f:
+            # Now uses unified locking configuration
+            with locked_file_operation(active_file_path, 'r', logger=self.logger) as f:
                 active_data = json.load(f)
         except (json.JSONDecodeError, FileNotFoundError):
             self._remove_active_file_pointer(file_path)
@@ -372,6 +376,7 @@ class VersionManager:
         """Flag a file as finished, storing agent name for cross-session recognition."""
         meta_dir = self._get_meta_dir(file_path)
 
+        # Now uses unified locking configuration
         with locked_json_operation(self._get_file_path(meta_dir, FileType.FINISHED),
             {'agents': []}, logger=self.logger) as finished_data:
 
