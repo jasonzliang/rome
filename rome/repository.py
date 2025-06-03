@@ -94,7 +94,7 @@ class RepositoryManager:
             ("max limit", lambda f: self._filter_max_limit(f, self.max_files))
         ]
 
-        filtered_files = files
+        filtered_files = self.collect_all_files()
         for filter_name, filter_func in filters:
             original_count = len(filtered_files)
             filtered_files = filter_func(filtered_files)
@@ -226,7 +226,7 @@ class RepositoryManager:
         self.stats = {key: 0 for key in self.stats}
 
         # Collect all files
-        all_files = self.collect_all_files(self.file_types)
+        all_files = self.collect_all_files()
         self.logger.info(f"Found {len(all_files)} total files before filtering")
 
         # Apply filters

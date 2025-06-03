@@ -347,7 +347,7 @@ class VersionManager:
             return False
 
         # Use helper method for consistent file cleanup
-        self._cleanup_stale_active_file(active_file_path)  # <- Pass active_file_path, not file_path
+        self._cleanup_stale_active_file(active_file_path)
         self._remove_active_file_pointer(file_path)
         self.logger.debug(f"Unflagged {file_path} from agent {agent.get_id()} (PID {current_pid})")
         return True
