@@ -142,22 +142,6 @@ class VersionManager:
         versions = index.get('versions', [])
         return max((v.get('version', 0) for v in versions), default=0) + 1
 
-    def _create_version_metadata(self, file_path: str, content_hash: str, version_number: int,
-                               changes: Optional[List[Dict[str, str]]], explanation: Optional[str],
-                               main_file_path: Optional[str] = None) -> Dict:
-        """Create metadata entry for a version."""
-        metadata = {
-            'version': version_number,
-            'file_path': file_path,
-            'timestamp': self._get_timestamp(),
-            'hash': content_hash,
-            'changes': changes or [],
-            'explanation': explanation or "No explanation provided"
-        }
-        if main_file_path:
-            metadata['main_file_path'] = main_file_path
-        return metadata
-
     def _clean_file_path(self, file_path: str) -> str:
         """Remove meta directory extension from file path if present."""
         meta_ext_suffix = f".{META_DIR_EXT}"
@@ -175,7 +159,6 @@ class VersionManager:
         version_file_name = f"{file_base}_v{version_number}{file_ext}"
         return os.path.join(versions_dir, version_file_name)
 
-    # Core versioning methods
     def _create_version_metadata(self, file_path: str, content_hash: str, version_number: int,
                                changes: Optional[List[Dict[str, str]]], explanation: Optional[str],
                                main_file_path: Optional[str] = None,
@@ -377,29 +360,21 @@ class VersionManager:
 
     def flag_active(self, agent, file_path: str) -> bool:
         """Flag a file as being actively worked on."""
-        meta_dir = self._get_meta_dir(file_path)
-        current_pid = os.getpid()
-
-        # Handle existing active file pointer
-        if self._has_active_files_pointer():
-            old_filepath = self._get_active_files_pointer()[0]
-            self.unflag_active(agent, old_filepath)
-            self._set_active_file_pointer(file_path)
-            self.logger.error(f"Agent {agent.get_id()} already has active file(s): {old_filepath}. Unflagging existing active file.")
-
-        # Use unified locking operation to check and set atomically
         with locked_json_operation(self._get_file_path(meta_dir, FileType.ACTIVE), {}, logger=self.logger) as active_data:
-            # Check for existing active state
+            # Check existing active state INSIDE the lock
             existing_pid = active_data.get('pid')
-            if existing_pid:
-                if self._is_process_running(existing_pid):
-                    if existing_pid != current_pid:
-                        raise RuntimeError(f"File {file_path} is already being worked on by PID {existing_pid}")
-                    elif active_data.get('agent_id') != agent.get_id():
-                        raise RuntimeError(f"File {file_path} is already flagged by different agent {active_data.get('agent_id')}")
-                # If process is not running, we'll overwrite the stale data below
+            if existing_pid and self._is_process_running(existing_pid):
+                if existing_pid != current_pid:
+                    raise RuntimeError(f"File {file_path} is already being worked on by PID {existing_pid}")
 
-            # Set the active flag
+            # Handle old active file pointer inside lock
+            if self._has_active_files_pointer():
+                old_filepath = list(self._get_active_files_pointer())[0]
+                if old_filepath != file_path:
+                    self.logger.error(f"Agent {agent.get_id()} already has active file: {old_filepath}, setting to new active file: {file_path}")
+                    self.unflag_active(agent, old_filepath)
+
+            # Set the active flag atomically
             active_data.clear()
             active_data.update({
                 'agent_id': agent.get_id(),
@@ -407,8 +382,9 @@ class VersionManager:
                 'timestamp': self._get_timestamp(),
                 'file_path': file_path
             })
+            self._set_active_file_pointer(file_path)
 
-        self.logger.debug(f"Flagged {file_path} as active by agent {agent.get_id()} (PID {current_pid})")
+        self.logger.debug(f"Flagged active {file_path} for agent {agent.get_id()} (PID {current_pid})")
         return True
 
     def unflag_active(self, agent, file_path: str) -> bool:
@@ -437,7 +413,7 @@ class VersionManager:
         # Use helper method for consistent file cleanup
         self._cleanup_stale_active_file(active_file_path)
         self._remove_active_file_pointer(file_path)
-        self.logger.debug(f"Unflagged {file_path} from agent {agent.get_id()} (PID {current_pid})")
+        self.logger.debug(f"Unflagged active {file_path} for agent {agent.get_id()} (PID {current_pid})")
         return True
 
     def check_finished(self, agent, file_path: str) -> bool:

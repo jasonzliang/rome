@@ -230,25 +230,11 @@ class RepositoryManager:
         self.logger.info(f"Found {len(all_files)} total files before filtering")
 
         # Apply filters
-        filtered_files = self.apply_filters(agent, all_files)
+        filtered_files = self.apply_filters(agent)
 
         return filtered_files
 
     # === MOVED FROM VERSION MANAGER ===
-
-    def should_exclude_dir(self, dirname: str) -> bool:
-        """Check if directory should be excluded using wildcard patterns."""
-        exclude_patterns = [
-            ".*",                    # Hidden directories (starts with .)
-            "venv",                  # Virtual environment
-            "__*__",                 # __pycache__, __init__, etc.
-            "node_modules",          # Node.js modules
-            "env",                   # Environment directories
-            LOG_DIR_NAME,            # Agent log directory
-            f"*.{META_DIR_EXT}"      # Meta directories (e.g., *.rome)
-        ]
-
-        return any(fnmatch.fnmatch(dirname, pattern) for pattern in exclude_patterns)
 
     def get_repository_completion_stats(self, agent) -> Dict[str, int]:
         """

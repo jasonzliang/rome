@@ -31,14 +31,16 @@ class AdvancedResetAction(Action):
         Returns:
             True if LLM determines work is complete and correct, False otherwise
         """
-
-        execution_data = agent.version_manager.get_data(file_path, 'exec_result')
-        exit_code = execution_data['exec_exit_code']
-        output = execution_data['exec_output']
-        analysis = execution_data['exec_analysis']
-        if not execution_data:
-            self.logger.error("Cannot load latest execution data, assuming not complete")
-            return False
+        try:
+            execution_data = agent.version_manager.get_data(selected_file['path'], 'exec_result')
+            exit_code = execution_data['exec_exit_code']
+            output = execution_data['exec_output']
+            analysis = execution_data['exec_analysis']
+        except:
+            self.logger.error("Cannot load latest execution data, looking in selected_file instead")
+            exit_code = selected_file['exec_exit_code']
+            output = selected_file['exec_output']
+            analysis = selected_file['exec_analysis']
 
         prompt = f"""Examine the test execution results and analysis, use them to determine if the code and tests are now correct and complete.
 
