@@ -118,14 +118,8 @@ class EditCodeAction(Action):
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(improved_code)
 
-        # Save version using agent's version manager
-        version_number = agent.version_manager.save_version(
-            file_path=file_path,
-            content=improved_code,
-            changes=changes,
-            explanation=explanation)
+        # Note: Version saving is now handled in ExecuteCodeAction to include execution results
         self.logger.info(f"Code editing completed for {file_path}")
-
         self.logger.info(f"Successfully edited and wrote improved code to {file_path}")
         return True
 

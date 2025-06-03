@@ -65,6 +65,8 @@ Your analysis:
     """
         return agent.chat_completion(prompt=prompt, system_message=agent.role)
 
+
+
     def execute(self, agent, **kwargs) -> bool:
         """Execute tests for the current selected file"""
         self.logger.info("Starting ExecuteCodeAction execution")
@@ -112,6 +114,35 @@ Your analysis:
             'agent_id': agent.get_id()
         }
         agent.version_manager.store_data(file_path, 'exec_result', execution_data)
+
+        # Save code version with execution results if we have change record
+        if 'change_record' in selected_file:
+            change_record = selected_file['change_record']
+            code_version = agent.version_manager.save_version(
+                file_path=file_path,
+                content=selected_file['content'],
+                changes=change_record.get('changes', []),
+                explanation=change_record.get('explanation', 'No explanation provided'),
+                execution_output=result.output,
+                exit_code=result.exit_code,
+                execution_analysis=analysis
+            )
+            self.logger.info(f"Saved code version {code_version} with execution results for {file_path}")
+
+        # Save test version with execution results if we have test changes
+        if 'test_changes' in selected_file and selected_file['test_changes']:
+            # Get the most recent test change record
+            latest_test_change = selected_file['test_changes'][-1]
+            test_version = agent.version_manager.save_test_version(
+                test_file_path=test_path,
+                content=selected_file['test_content'],
+                changes=latest_test_change.get('changes', []),
+                explanation=latest_test_change.get('explanation', 'No explanation provided'),
+                execution_output=result.output,
+                exit_code=result.exit_code,
+                execution_analysis=analysis
+            )
+            self.logger.info(f"Saved test version {test_version} with execution results for {test_path}")
 
         self.logger.info(f"Test execution completed with exit code: {result.exit_code}")
         self.logger.info(f"Analysis summary: {analysis[:SUMMARY_LENGTH]}...")

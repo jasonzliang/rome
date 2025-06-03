@@ -106,13 +106,7 @@ class EditTestAction(Action):
         with open(test_path, 'w', encoding='utf-8') as f:
             f.write(new_test_content)
 
-        # Save version using agent's version manager
-        version_number = agent.version_manager.save_test_version(
-            test_file_path=test_path,
-            content=new_test_content,
-            changes=test_changes,
-            explanation=explanation)
-
+        # Note: Version saving is now handled in ExecuteCodeAction to include execution results
         self.logger.info(f"Successfully edited and wrote test code to {test_path}")
         self.logger.info(f"Test editing completed for {file_path}")
         return True

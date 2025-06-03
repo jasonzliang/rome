@@ -1,4 +1,4 @@
-# fsm.py
+# fsm_factory.py
 from abc import ABC, abstractmethod
 import os
 import sys
@@ -59,8 +59,8 @@ def create_simple_fsm(config):
         "3) CODE_EDITED → Write/edit tests → TEST_EDITED "
         "4) TEST_EDITED → Execute code with tests → CODE_EXECUTED_PASS (success) or CODE_EXECUTED_FAIL (failure) "
         "5) CODE_EXECUTED_PASS → Reset → IDLE (complete successful cycle) "
-        "6) CODE_EXECUTED_FAIL → Transition back to CODE_LOADED (retry) OR Reset → IDLE (start over). "
-        "The agent follows a complete development lifecycle: discover code → modify code → create tests → validate → iterate or complete."
+        "6) CODE_EXECUTED_FAIL → Analyze version history and potentially revert → CODE_LOADED (retry with better version) OR Reset → IDLE (start over). "
+        "The agent follows a complete development lifecycle with intelligent failure recovery: discover code → modify code → create tests → validate → recover smartly or complete."
     )
 
     # Create and add states
@@ -80,7 +80,9 @@ def create_simple_fsm(config):
     edit_test_action = EditTestAction(config.get('EditTestAction', {}))
     execute_code_action = ExecuteCodeAction(config.get('ExecuteCodeAction', {}),
         config.get('Executor', {}))
-    transition_action = TransitionAction(config.get('TransitionAction', {}))
+
+    # Replace TransitionAction with RevertCodeAction for intelligent failure recovery
+    revert_code_action = RevertCodeAction(config.get('RevertCodeAction', {}))
 
     # Add transitions from Idle state
     fsm.add_action(idle_state, code_loaded_state,
@@ -96,22 +98,22 @@ def create_simple_fsm(config):
     fsm.add_action(code_edited_state, test_edited_state, edit_test_action,
         fallback_state=idle_state)
 
-    # Add transitions from TestEdited state - THIS IS THE KEY CHANGE
+    # Add transitions from TestEdited state
     fsm.add_action(test_edited_state, code_executed_pass_state, execute_code_action,
         fallback_state=code_executed_fail_state)
 
     # Add transitions from CodeExecutedPass state
     fsm.add_action(code_executed_pass_state, idle_state, reset_action)
 
-    # Add transitions from CodeExecutedFail state
-    fsm.add_action(code_executed_fail_state, code_loaded_state, transition_action)
+    # Add transitions from CodeExecutedFail state - INTELLIGENT RECOVERY
+    fsm.add_action(code_executed_fail_state, code_loaded_state, revert_code_action)
     fsm.add_action(code_executed_fail_state, idle_state, reset_action)
 
     # Set initial state and validate
     fsm.set_initial_state(idle_state)
     fsm.validate_fsm()
 
-    logger.info("FSM created successfully with code editing, test writing, and execution capabilities")
+    logger.info("FSM created successfully with code editing, test writing, execution, and intelligent failure recovery")
     return fsm
 
 

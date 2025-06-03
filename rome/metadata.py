@@ -176,10 +176,41 @@ class VersionManager:
         return os.path.join(versions_dir, version_file_name)
 
     # Core versioning methods
+    def _create_version_metadata(self, file_path: str, content_hash: str, version_number: int,
+                               changes: Optional[List[Dict[str, str]]], explanation: Optional[str],
+                               main_file_path: Optional[str] = None,
+                               execution_output: Optional[str] = None,
+                               exit_code: Optional[int] = None,
+                               execution_analysis: Optional[str] = None) -> Dict:
+        """Create metadata entry for a version."""
+        metadata = {
+            'version': version_number,
+            'file_path': file_path,
+            'timestamp': self._get_timestamp(),
+            'hash': content_hash,
+            'changes': changes or [],
+            'explanation': explanation or "No explanation provided"
+        }
+        if main_file_path:
+            metadata['main_file_path'] = main_file_path
+
+        # Add execution results if provided
+        if execution_output is not None:
+            metadata['execution_output'] = execution_output
+        if exit_code is not None:
+            metadata['exit_code'] = exit_code
+        if execution_analysis is not None:
+            metadata['execution_analysis'] = execution_analysis
+
+        return metadata
+
     def _save_version_internal(self, file_path: str, content: str, versions_dir: str,
                              changes: Optional[List[Dict[str, str]]] = None,
                              explanation: Optional[str] = None,
-                             main_file_path: Optional[str] = None) -> int:
+                             main_file_path: Optional[str] = None,
+                             execution_output: Optional[str] = None,
+                             exit_code: Optional[int] = None,
+                             execution_analysis: Optional[str] = None) -> int:
         """Internal method to save a versioned snapshot."""
         assert os.path.exists(versions_dir), f"File meta dir {versions_dir} does not exist"
 
@@ -207,7 +238,8 @@ class VersionManager:
 
             # Update index
             metadata = self._create_version_metadata(
-                file_path, content_hash, version_number, changes, explanation, main_file_path
+                file_path, content_hash, version_number, changes, explanation, main_file_path,
+                execution_output, exit_code, execution_analysis
             )
             index['versions'].append(metadata)
             index['versions'].sort(key=lambda x: x.get('version', 0))
@@ -215,27 +247,26 @@ class VersionManager:
             self.logger.debug(f"Successfully saved version {version_number} with {len(changes or [])} documented changes")
             return version_number
 
-    def save_original(self, file_path: str, content: str) -> int:
-        """Save the original unedited file."""
-        self.logger.info(f"Saving original version for file: {file_path}")
-        return self.save_version(
-            file_path, content,
-            changes=[{"type": "initial", "description": "Original file content"}],
-            explanation="Initial version: Original unedited file"
-        )
-
     def save_version(self, file_path: str, content: str,
                     changes: Optional[List[Dict[str, str]]] = None,
-                    explanation: Optional[str] = None) -> int:
+                    explanation: Optional[str] = None,
+                    execution_output: Optional[str] = None,
+                    exit_code: Optional[int] = None,
+                    execution_analysis: Optional[str] = None) -> int:
         """Save a versioned snapshot of a main file."""
         self.logger.info(f"Saving version for file: {file_path}")
         versions_dir = self._get_meta_dir(file_path)
-        return self._save_version_internal(file_path, content, versions_dir, changes, explanation)
+        return self._save_version_internal(file_path, content, versions_dir, changes, explanation,
+                                         execution_output=execution_output, exit_code=exit_code,
+                                         execution_analysis=execution_analysis)
 
     def save_test_version(self, test_file_path: str, content: str,
                          changes: Optional[List[Dict[str, str]]] = None,
                          explanation: Optional[str] = None,
-                         main_file_path: Optional[str] = None) -> int:
+                         main_file_path: Optional[str] = None,
+                         execution_output: Optional[str] = None,
+                         exit_code: Optional[int] = None,
+                         execution_analysis: Optional[str] = None) -> int:
         """Save a versioned snapshot of a test file."""
         self.logger.info(f"Saving test version for file: {test_file_path}")
 
@@ -249,7 +280,64 @@ class VersionManager:
 
         test_meta_dir = self._get_test_meta_dir(test_file_path, main_file_path)
         return self._save_version_internal(
-            test_file_path, content, test_meta_dir, changes, explanation, main_file_path
+            test_file_path, content, test_meta_dir, changes, explanation, main_file_path,
+            execution_output, exit_code, execution_analysis
+        )
+
+    def _load_version_internal(self, file_path: str, versions_dir: str, k: int, include_content: bool):
+        """Internal method to load versions from any versions directory."""
+        index_file_path = self._get_file_path(versions_dir, FileType.INDEX)
+
+        if not os.path.exists(index_file_path):
+            return None if k == 1 else []
+
+        try:
+            with locked_json_operation(index_file_path, {'versions': []}, logger=self.logger) as index:
+                versions = sorted(index.get('versions', []), key=lambda x: x.get('version', 0), reverse=True)[:k]
+
+                if include_content:
+                    for version_data in versions:
+                        if version_num := version_data.get('version'):
+                            version_file_path = self._create_version_file_path(file_path, version_num, versions_dir)
+                            try:
+                                with open(version_file_path, 'r', encoding='utf-8') as f:
+                                    version_data['content'] = f.read()
+                            except (FileNotFoundError, IOError) as e:
+                                self.logger.warning(f"Could not load content for version {version_num}: {e}")
+                                version_data['content'] = None
+
+                return versions[0] if k == 1 and versions else (versions if k > 1 else None)
+
+        except (json.JSONDecodeError, FileNotFoundError) as e:
+            self.logger.error(f"Error loading versions from {index_file_path}: {e}")
+            return None if k == 1 else []
+
+    def load_version(self, file_path: str, k: int = 1, include_content: bool = False):
+        """Load the last K versions for a file. Returns Dict if k=1, List if k>1."""
+        return self._load_version_internal(file_path, self._get_meta_dir(file_path), k, include_content)
+
+    def load_test_version(self, test_file_path: str, k: int = 1, include_content: bool = False,
+                         main_file_path: Optional[str] = None):
+        """Load the last K versions for a test file. Returns Dict if k=1, List if k>1."""
+        if main_file_path is None:
+            main_file_path = self._infer_main_file_from_test(test_file_path)
+            if main_file_path is None:
+                self.logger.error(f"Could not infer main file path for test file {test_file_path}")
+                return None if k == 1 else []
+
+        if not os.path.exists(main_file_path):
+            self.logger.error(f"Main file does not exist: {main_file_path}")
+            return None if k == 1 else []
+
+        return self._load_version_internal(test_file_path, self._get_test_meta_dir(test_file_path, main_file_path), k, include_content)
+
+    def save_original(self, file_path: str, content: str) -> int:
+        """Save the original unedited file."""
+        self.logger.info(f"Saving original version for file: {file_path}")
+        return self.save_version(
+            file_path, content,
+            changes=[{"type": "initial", "description": "Original file content"}],
+            explanation="Initial version: Original unedited file"
         )
 
     # File status management
