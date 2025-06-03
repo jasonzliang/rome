@@ -91,10 +91,8 @@ class RepositoryManager:
             ("excluded directories", lambda f: self._filter_excluded_dirs(f, self.exclude_dirs)),
             ("excluded types", lambda f: self._filter_excluded_types(f, self.exclude_types)),
             ("flagged files", lambda f: self._filter_flagged_files(f, agent)),
+            ("max limit", lambda f: self._filter_max_limit(f, self.max_files))
         ]
-
-        if max_files is not None:
-            filters.append(("max limit", lambda f: self._filter_max_limit(f, self.max_files)))
 
         filtered_files = files
         for filter_name, filter_func in filters:

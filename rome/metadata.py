@@ -51,11 +51,10 @@ class VersionManager:
 
     def _get_meta_dir(self, file_path: str) -> str:
         meta_dir = f"{file_path}.{META_DIR_EXT}"
-        # FIXED: Use try-except to handle race conditions
+        # Another process created the directory
         try:
             os.makedirs(meta_dir, exist_ok=True)
         except FileExistsError:
-            # Another process created the directory
             pass
         return meta_dir
 
@@ -293,7 +292,7 @@ class VersionManager:
         # Handle existing active file pointer
         if self._has_active_files_pointer():
             old_filepath = self._get_active_files_pointer()[0]
-            self.unflag_active(old_filepath)
+            self.unflag_active(agent, old_filepath)
             self._set_active_file_pointer(file_path)
             self.logger.error(f"Agent {agent.get_id()} already has active file(s): {old_filepath}. Unflagging existing active file.")
 

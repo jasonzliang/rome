@@ -1,5 +1,5 @@
 import atexit
-import datetime
+from datetime import datetime
 import json
 import io
 import os
@@ -23,6 +23,8 @@ from .fsm import FSM
 from .fsm_factory import FSM_FACTORY
 # Import the new AgentHistory class
 from .history import AgentHistory
+# Import the Repository manager
+from .repository import RepositoryManager
 # Import the VersionManager class
 from .metadata import VersionManager
 # Import parsing utility functions
@@ -327,6 +329,11 @@ class Agent:
         self.logger.error(f"Could not extract valid action from response: {response}")
         raise ValueError(f"Could not extract valid action from response: {response}")
 
+    def _respository_summary(self):
+        summary = self.repository_manager.get_summary()
+        self.repository_managerprint_summary(summary)
+        self.repository_managerwrite_summary(summary)
+
     def run_loop(self, max_iterations: int = 10, stop_on_error: bool = True) -> Dict:
         """
         Main execution loop that continuously executes actions based on FSM state
@@ -357,7 +364,7 @@ class Agent:
                 self.version_manager.validate_active_files(self)
 
                 # Print summary and write to file
-                summary = self.get_summary(); self.print_summary(); self.write_summary()
+                self._respository_summary()
 
                 # Check agent context on first iteration to make sure state is valid
                 if iteration == 1: self.fsm.check_context(self)
@@ -451,8 +458,7 @@ class Agent:
         # Record final state and context
         self.curr_iteration = end_iteration
         self.history.set_final_state(self.fsm.current_state, self.context)
-
-        summary = self.get_summary(); self.print_summary(); self.write_summary()
+        self._respository_summary()
 
         if self.history.has_errors():
             self.logger.info(f"Loop completed with {len(self.history.errors)} errors")
