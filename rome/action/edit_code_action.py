@@ -165,7 +165,7 @@ Code file content:
 
 IMPORTANT:
 - Return the ENTIRE file content with your improvements, not just the changed parts
-- Make sure the improved code is valid Python syntax
+- Make sure the improved code is valid Python syntax and contains no markdown formatting like ```python...```
 - Be conservative with changes - prioritize correctness over style
 """
 

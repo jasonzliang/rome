@@ -330,38 +330,15 @@ class Agent:
             self.logger.error("Failed to parse Python code from response")
         return result
 
-    def _extract_action_from_response(self, response: str) -> tuple:
-        """
-        Extract the action name from the LLM response
-        """
-        reasoning = "No reasoning provided"
-
-        # Try to parse as JSON first
-        parsed_json = self.parse_json_response(response)
-
-        if parsed_json and 'selected_action' in parsed_json:
-            action = parsed_json['selected_action']
-            reasoning = parsed_json.get('reasoning', 'No reasoning provided')
-            self.logger.info(f"Selected action: {action} - {reasoning}")
-            return action, reasoning
-
-        # Fallback: look for action names in the response text
-        available_actions = self.fsm.get_available_actions()
-        for action in available_actions:
-            if action.lower() in response.lower():
-                self.logger.info(f"Extracted action from text: {action}")
-                return action, reasoning
-
-        # If no action found, log the issue and return None
-        self.logger.error(f"Could not extract valid action from response: {response}")
-        raise ValueError(f"Could not extract valid action from response: {response}")
-
     def _summary(self):
         summary = self.get_summary()
         self.print_summary(summary)
         self.save_summary(summary)
 
-    def run_loop(self, max_iterations: int = 10, stop_on_error: bool = True) -> Dict:
+    def run_loop(self,
+        max_iterations: int = 10,
+        stop_on_error: bool = True,
+        raise_exception: bool = False) -> Dict:
         """
         Main execution loop that continuously executes actions based on FSM state
         Now uses ActionSelector for cleaner action selection logic
@@ -369,6 +346,7 @@ class Agent:
         Args:
             max_iterations: Maximum number of iterations to prevent infinite loops
             stop_on_error: Whether to stop the loop on errors or continue
+            raise_exception: Whether to reraise exception if error encountered
 
         Returns:
             Dict containing loop execution results
@@ -433,10 +411,14 @@ class Agent:
                 self.logger.info(f"Action executed successfully. New state: {self.fsm.current_state}")
 
             except Exception as e:
+                if raise_exception:
+                    raise
                 error_msg = f"Error in loop iteration {iteration}: {str(e)}"
+                stack_trace = traceback.format_exc()
                 self.logger.error(error_msg)
-                self.logger.error(traceback.format_exc())
-                self.history.add_error(iteration, error_msg, self.fsm.current_state, str(e))
+                self.logger.error(stack_trace)
+                self.history.add_error(iteration, f"{error_msg}\n{stack_trace}",
+                    self.fsm.current_state, str(e))
                 if stop_on_error:
                     break
                 else:

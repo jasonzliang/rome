@@ -145,7 +145,8 @@ Code file content:
 ```
 """
         if test_exists:
-            prompt += f"""Test file path:
+            prompt += f"""
+Test file path:
 {test_path}
 Test file content:
 ```python
@@ -153,7 +154,8 @@ Test file content:
 ```
 """
         else:
-            prompt += f"""Create a new test file that will be saved at: {test_path}
+            prompt += f"""
+Create a new test file that will be saved at: {test_path}
 Include proper test setup, all necessary imports, and comprehensive test cases.
 """
 
@@ -162,7 +164,8 @@ Include proper test setup, all necessary imports, and comprehensive test cases.
         if analysis_prompt:
             prompt += f"\n{analysis_prompt}\n"
 
-        prompt += f"""Respond with a JSON object containing:
+        prompt += f"""
+Respond with a JSON object containing:
 {{
     "test_code": "The complete test code as a string",
     "explanation": "A clear explanation of the test approach and coverage",
@@ -176,7 +179,7 @@ Include proper test setup, all necessary imports, and comprehensive test cases.
 }}
 
 IMPORTANT:
-- Make sure the test code is valid Python syntax
+- Make sure the test code is valid Python syntax and contains no markdown formatting like ```python...```
 - Tests should be compatible with pytest and be sure to do "import pytest" first
 - Make sure to import the module being tested from the code file
 - Assume the code file and test file are both located in the root of the current working directory

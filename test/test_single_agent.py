@@ -13,8 +13,7 @@ from rome.logger import get_logger
 
 # Compact set of HumanEval problems for focused testing
 HUMAN_EVAL_SAMPLES = {
-    "HumanEval_0": """
-def has_close_elements(numbers, threshold):
+    "HumanEval_0": """def has_close_elements(numbers, threshold):
     \"\"\" Check if in given list of numbers, are any two numbers closer to each other than
     given threshold.
     >>> has_close_elements([1.0, 2.0, 3.0], 0.5)
@@ -24,8 +23,7 @@ def has_close_elements(numbers, threshold):
     \"\"\"
     pass
 """,
-    "HumanEval_1": """
-def separate_paren_groups(paren_string):
+    "HumanEval_1": """def separate_paren_groups(paren_string):
     \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to
     separate those group into separate strings and return the list of those.
     Separate groups are balanced (each open brace is properly closed) and not nested within each other
@@ -35,8 +33,7 @@ def separate_paren_groups(paren_string):
     \"\"\"
     pass
 """,
-    "HumanEval_2": """
-def truncate_number(number):
+    "HumanEval_2": """def truncate_number(number):
     \"\"\" Given a positive floating point number, it can be decomposed into
     and integer part (largest integer smaller than given number) and decimals
     (leftover part always smaller than 1).
@@ -74,7 +71,7 @@ def create_config():
         },
         "Agent": {
             "fsm_type": "simple",
-            "patience": 2,
+            "patience": 4,
             "action_select_strat": "smart",
             "agent_api": False,
         },
@@ -83,9 +80,15 @@ def create_config():
             "console": True,
             "include_caller_info": "rome"
         },
-        "PrioritySearchAction": {"batch_size": 2},
-        "TournamentSearchAction": {"batch_size": 2},
-        "RepositoryManager": {"file_types": [".py"]},
+        "PrioritySearchAction": {
+            "batch_size": 2
+        },
+        "TournamentSearchAction": {
+            "batch_size": 2
+        },
+        "RepositoryManager": {
+            "file_types": [".py"]
+        },
     }
 
 def run_test():
@@ -107,8 +110,8 @@ def run_test():
 
         # Create agent
         agent = Agent(
-            name="CodeSolver",
-            role="Expert Python developer that implements clean, efficient solutions for incomplete functions.",
+            name="CodeExpert",
+            role="You are an expert code expert that can analyze and write interesting algorithms and functions",
             repository=str(test_dir.absolute()),
             config=create_config()
         )

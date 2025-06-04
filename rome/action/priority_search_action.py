@@ -22,7 +22,7 @@ class PrioritySearchAction(Action):
         super().__init__(config)
         self.logger = get_logger()
 
-        check_attrs(self, ['selection_criteria', 'batch_size', 'batch_sampling'])
+        check_attrs(self, ['selection_criteria', 'batch_size'])
 
     def summary(self, agent) -> str:
         """Return a detailed summary of the search action"""
@@ -31,7 +31,7 @@ class PrioritySearchAction(Action):
         max_files = agent.repository_manager.max_files
         excluded_dirs_str = ', '.join(exclude_dirs) if exclude_dirs else 'none'
 
-        sampling_mode = "weighted sampling" if self.batch_sampling else "sequential"
+        # sampling_mode = "weighted sampling" if self.batch_sampling else "sequential"
 
         return (
             f"Multi-stage LLM repository search for {file_types_str} files: "
@@ -235,34 +235,34 @@ Respond with a JSON object:
 
         return batch_data
 
-    def _weighted_random_sample(self, prioritized_files: List[Dict], batch_size: int) -> List[Dict]:
-        """Sample complete file objects using weighted random sampling"""
-        weights = [file_info.get("priority", 1) for file_info in prioritized_files]
-        sample_size = min(batch_size, len(prioritized_files))
+    # def _weighted_random_sample(self, prioritized_files: List[Dict], batch_size: int) -> List[Dict]:
+    #     """Sample complete file objects using weighted random sampling"""
+    #     weights = [file_info.get("priority", 1) for file_info in prioritized_files]
+    #     sample_size = min(batch_size, len(prioritized_files))
 
-        sampled_indices = set()
-        sampled_files = []
+    #     sampled_indices = set()
+    #     sampled_files = []
 
-        for _ in range(sample_size):
-            available_indices = [i for i in range(len(prioritized_files)) if i not in sampled_indices]
-            if not available_indices:
-                break
+    #     for _ in range(sample_size):
+    #         available_indices = [i for i in range(len(prioritized_files)) if i not in sampled_indices]
+    #         if not available_indices:
+    #             break
 
-            available_weights = [weights[i] for i in available_indices]
-            total_weight = sum(available_weights)
+    #         available_weights = [weights[i] for i in available_indices]
+    #         total_weight = sum(available_weights)
 
-            if total_weight == 0:
-                chosen_idx = random.choice(available_indices)
-            else:
-                probabilities = [w/total_weight for w in available_weights]
-                chosen_relative_idx = random.choices(range(len(available_indices)),
-                    weights=probabilities)[0]
-                chosen_idx = available_indices[chosen_relative_idx]
+    #         if total_weight == 0:
+    #             chosen_idx = random.choice(available_indices)
+    #         else:
+    #             probabilities = [w/total_weight for w in available_weights]
+    #             chosen_relative_idx = random.choices(range(len(available_indices)),
+    #                 weights=probabilities)[0]
+    #             chosen_idx = available_indices[chosen_relative_idx]
 
-            sampled_indices.add(chosen_idx)
-            sampled_files.append(prioritized_files[chosen_idx])
+    #         sampled_indices.add(chosen_idx)
+    #         sampled_files.append(prioritized_files[chosen_idx])
 
-        return sampled_files
+    #     return sampled_files
 
     def _process_single_batch(self, agent, batch_file_info: List[Dict], batch_info: str) -> Optional[Dict]:
         """Process a single batch of files and return selected file if found"""
@@ -305,39 +305,39 @@ Respond with a JSON object:
         self.logger.info(f"Selected: {file_data['path']} - {selected_file['reason']}")
         return selected_file
 
-    def _process_file_batches(self, agent, prioritized_files: List[Dict]) -> Optional[Dict]:
-        """Process batches of files to find the most relevant match"""
-        self.logger.info(f"Processing batches using {'weighted sampling' if self.batch_sampling else 'sequential'} mode")
+    # def _process_file_batches(self, agent, prioritized_files: List[Dict]) -> Optional[Dict]:
+    #     """Process batches of files to find the most relevant match"""
+    #     self.logger.info(f"Processing batches using {'weighted sampling' if self.batch_sampling else 'sequential'} mode")
 
-        if self.batch_sampling:
-            remaining_files = prioritized_files.copy()
-            batch_count = 0
+    #     if self.batch_sampling:
+    #         remaining_files = prioritized_files.copy()
+    #         batch_count = 0
 
-            while remaining_files:
-                batch_count += 1
-                batch_file_info = self._weighted_random_sample(remaining_files, self.batch_size)
+    #         while remaining_files:
+    #             batch_count += 1
+    #             batch_file_info = self._weighted_random_sample(remaining_files, self.batch_size)
 
-                # Remove sampled files
-                for file_info in batch_file_info:
-                    remaining_files.remove(file_info)
+    #             # Remove sampled files
+    #             for file_info in batch_file_info:
+    #                 remaining_files.remove(file_info)
 
-                selected_file = self._process_single_batch(agent, batch_file_info, f"sampled batch {batch_count}")
-                if selected_file:
-                    return selected_file
-        else:
-            total_batches = (len(prioritized_files) + self.batch_size - 1) // self.batch_size
+    #             selected_file = self._process_single_batch(agent, batch_file_info, f"sampled batch {batch_count}")
+    #             if selected_file:
+    #                 return selected_file
+    #     else:
+    #         total_batches = (len(prioritized_files) + self.batch_size - 1) // self.batch_size
 
-            for batch_idx in range(total_batches):
-                start_idx = batch_idx * self.batch_size
-                end_idx = min((batch_idx + 1) * self.batch_size, len(prioritized_files))
-                batch_file_info = prioritized_files[start_idx:end_idx]
+    #         for batch_idx in range(total_batches):
+    #             start_idx = batch_idx * self.batch_size
+    #             end_idx = min((batch_idx + 1) * self.batch_size, len(prioritized_files))
+    #             batch_file_info = prioritized_files[start_idx:end_idx]
 
-                batch_info = f"batch {batch_idx + 1}/{total_batches}"
-                selected_file = self._process_single_batch(agent, batch_file_info, batch_info)
-                if selected_file:
-                    return selected_file
+    #             batch_info = f"batch {batch_idx + 1}/{total_batches}"
+    #             selected_file = self._process_single_batch(agent, batch_file_info, batch_info)
+    #             if selected_file:
+    #                 return selected_file
 
-        return None
+    #     return None
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute the search action"""

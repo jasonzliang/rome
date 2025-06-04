@@ -38,6 +38,7 @@ class AdvancedResetAction(Action):
             analysis = execution_data['exec_analysis']
         except:
             self.logger.error("Cannot load latest execution data, looking in selected_file instead")
+            self.logger.error(traceback.format_exc())
             exit_code = selected_file['exec_exit_code']
             output = selected_file['exec_output']
             analysis = selected_file['exec_analysis']

@@ -108,9 +108,9 @@ Your analysis:
         # Store execution results in TinyDB
         execution_data = {
             'test_path': test_path,
-            'output': result.output,
-            'analysis': analysis,
-            'exit_code': result.exit_code,
+            'exec_output': result.output,
+            'exec_analysis': analysis,
+            'exec_exit_code': result.exit_code,
             'agent_id': agent.get_id()
         }
         agent.version_manager.store_data(file_path, 'exec_result', execution_data)

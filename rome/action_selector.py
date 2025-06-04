@@ -5,6 +5,11 @@ from .logger import get_logger
 from .config import set_attributes_from_config
 
 
+class ActionSelectorError(Exception):
+    """Custom exception for action selection errors"""
+    pass
+
+
 class ActionSelectorBase(ABC):
     """Abstract base class for action selection strategies"""
 
@@ -18,6 +23,32 @@ class ActionSelectorBase(ABC):
         """Generate action selection prompt based on current FSM state and agent context"""
         pass
 
+    def _extract_action_from_response(self, agent, response: str) -> tuple:
+        """
+        Extract the action name from the LLM response
+        """
+        reasoning = "No reasoning provided"
+
+        # Try to parse as JSON first
+        parsed_json = agent.parse_json_response(response)
+
+        if parsed_json and 'selected_action' in parsed_json:
+            action = parsed_json['selected_action']
+            reasoning = parsed_json.get('reasoning', 'No reasoning provided')
+            self.logger.info(f"Selected action: {action} - {reasoning}")
+            return action, reasoning
+
+        # Fallback: look for action names in the response text
+        available_actions = agent.fsm.get_available_actions()
+        for action in available_actions:
+            if action.lower() in response.lower():
+                self.logger.info(f"Extracted action from text: {action}")
+                return action, reasoning
+
+        # If no action found, log the issue and return None
+        self.logger.error(f"Could not extract valid action from response: {response}")
+        raise ValueError(f"Could not extract valid action from response: {response}")
+
     def select_action(self, agent, iteration: int, stop_on_error: bool = True) -> Tuple[str, str, bool]:
         """
         Select an action for the agent to execute
@@ -25,22 +56,27 @@ class ActionSelectorBase(ABC):
         Args:
             agent: The agent instance
             iteration: Current iteration number
-            stop_on_error: Whether to stop on errors or continue
+            stop_on_error: Whether to raise exceptions on errors (True) or recover gracefully (False)
 
         Returns:
             Tuple of (chosen_action, reasoning, should_continue)
-            If should_continue is False, the loop should break/continue based on stop_on_error
+            If stop_on_error=False and error occurs, should_continue may be True (reset and continue)
+
+        Raises:
+            ActionSelectorError: When stop_on_error=True and action selection fails
         """
         # Check if there are available actions
         available_actions = agent.fsm.get_available_actions()
         if not available_actions:
-            self.logger.error("No available actions in current state. Stopping loop.")
+            error_msg = "No available actions in current state"
+            self.logger.error(f"{error_msg}. Stopping loop.")
+
             if stop_on_error:
-                return None, "No available actions", False
+                raise ActionSelectorError(error_msg)
             else:
                 agent.fsm.reset(agent)
                 agent.history.reset()
-                return None, "No available actions - reset and continue", True
+                return None, f"{error_msg} - reset and continue", True
         else:
             self.logger.info(f"Available actions from {agent.fsm.get_current_state()}: {available_actions}")
 
@@ -50,7 +86,9 @@ class ActionSelectorBase(ABC):
             reasoning = "only one action available - auto-selected"
             self.logger.info(f"Auto-selecting single available action: {chosen_action}")
             return chosen_action, reasoning, True
-        else:
+
+        # Multiple actions available - use LLM for selection
+        try:
             # Use strategy-specific prompt generation
             prompt = self.get_action_selection_prompt(agent.fsm, agent)
 
@@ -62,32 +100,47 @@ class ActionSelectorBase(ABC):
             )
 
             # Extract action from response
-            chosen_action, reasoning = agent._extract_action_from_response(response)
+            chosen_action, reasoning = self._extract_action_from_response(response)
 
-            if not chosen_action:
-                error_msg = f"Could not determine action from LLM response: {response}"
-                self.logger.error(error_msg)
-                agent.history.add_error(iteration, error_msg, agent.fsm.current_state)
-                if stop_on_error:
-                    return None, error_msg, False
-                else:
-                    agent.fsm.reset(agent)
-                    agent.history.reset()
-                    return None, error_msg + " - reset and continue", True
+        except Exception as e:
+            error_msg = f"LLM call failed during action selection: {str(e)}"
+            self.logger.error(error_msg)
+            agent.history.add_error(iteration, error_msg, agent.fsm.current_state, str(e))
 
-            # Validate action is available
-            if chosen_action not in available_actions:
-                error_msg = f"Action '{chosen_action}' not available in state '{agent.fsm.current_state}'. Available: {available_actions}"
-                self.logger.error(error_msg)
-                agent.history.add_error(iteration, error_msg, agent.fsm.current_state)
-                if stop_on_error:
-                    return None, error_msg, False
-                else:
-                    agent.fsm.reset(agent)
-                    agent.history.reset()
-                    return None, error_msg + " - reset and continue", True
+            if stop_on_error:
+                raise ActionSelectorError(error_msg) from e
+            else:
+                agent.fsm.reset(agent)
+                agent.history.reset()
+                return None, f"{error_msg} - reset and continue", True
 
-            return chosen_action, reasoning, True
+        # Validate action was extracted
+        if not chosen_action:
+            error_msg = f"Could not determine action from LLM response: {response}"
+            self.logger.error(error_msg)
+            agent.history.add_error(iteration, error_msg, agent.fsm.current_state)
+
+            if stop_on_error:
+                raise ActionSelectorError(error_msg)
+            else:
+                agent.fsm.reset(agent)
+                agent.history.reset()
+                return None, f"{error_msg} - reset and continue", True
+
+        # Validate action is available
+        if chosen_action not in available_actions:
+            error_msg = f"Action '{chosen_action}' not available in state '{agent.fsm.current_state}'. Available: {available_actions}"
+            self.logger.error(error_msg)
+            agent.history.add_error(iteration, error_msg, agent.fsm.current_state)
+
+            if stop_on_error:
+                raise ActionSelectorError(error_msg)
+            else:
+                agent.fsm.reset(agent)
+                agent.history.reset()
+                return None, f"{error_msg} - reset and continue", True
+
+        return chosen_action, reasoning, True
 
 
 class OriginalActionSelector(ActionSelectorBase):
@@ -163,8 +216,6 @@ class OriginalActionSelector(ActionSelectorBase):
 
         return "\n\n".join(prompt_parts)
 
-
-# Improved SmartActionSelector with simplified logic and proper patience integration
 
 class SmartActionSelector(ActionSelectorBase):
     """Enhanced action selection with intelligent loop detection and patience-based intervention"""
@@ -365,10 +416,10 @@ class SmartActionSelector(ActionSelectorBase):
 
         base_instruction = """Please select one of the available actions to execute. Respond with a JSON object containing:
 {
-    "initial_action": "initial considered action name",
-    "selected_action": "final selected action name",
-    "reasoning": "Short reason of why you choose this final action and why it is different from initial action"
-}"""
+    "selected_action": "selected action name",
+    "reasoning": "Short reason of why you choose this action"
+}
+"""
 
         if not pattern_analysis["needs_intervention"]:
             # Minimal guidance when no patterns detected
@@ -431,5 +482,18 @@ class ActionSelector:
         return self.selector.get_action_selection_prompt(fsm, agent)
 
     def select_action(self, agent, iteration: int, stop_on_error: bool = True) -> Tuple[str, str, bool]:
-        """Select an action using the configured strategy"""
+        """
+        Select an action using the configured strategy
+
+        Args:
+            agent: The agent instance
+            iteration: Current iteration number
+            stop_on_error: Whether to raise exceptions on errors (True) or recover gracefully (False)
+
+        Returns:
+            Tuple of (chosen_action, reasoning, should_continue)
+
+        Raises:
+            ActionSelectorError: When stop_on_error=True and action selection fails
+        """
         return self.selector.select_action(agent, iteration, stop_on_error)

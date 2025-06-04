@@ -115,9 +115,8 @@ DEFAULT_CONFIG = {
 
     # Search Actions
     "PrioritySearchAction": {
-        "selection_criteria": "Select the file that you have the most confidence in improving or fixing.",
         "batch_size": 10,  # Candidate batch size for selection
-        "batch_sampling": False  # If set to true, randomly sample batches
+        "selection_criteria": "Select the file that you have the most confidence in improving or fixing.",
     },
     "TournamentSearchAction": {
         "batch_size": 10,  # Number of files to randomly choose
@@ -134,7 +133,7 @@ DEFAULT_CONFIG = {
     "ExecuteCodeAction": {},
     "RevertCodeAction": {
         "custom_prompt": None,  # Override prompt for reverting code
-        "num_versions": 10,
+        "num_versions": 5,
     },
 
     # REPOSITORY & FILE MANAGEMENT
