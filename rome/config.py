@@ -53,6 +53,11 @@ DEFAULT_CONFIG = {
         "port": 8000  # Port number to query agent API
     },
 
+    "MultiAgent": {
+        "agent_role_json": None,  # Multi agent json, can be overwritten by constructor
+        "repository": None, # Multi agent repo, can be overwritten by constructor
+    },
+
     # LLM HANDLER CONFIGURATION
 
     "OpenAIHandler": {
@@ -60,7 +65,7 @@ DEFAULT_CONFIG = {
         "base_url": "https://api.openai.com/v1",  # Url for chat completion API
         "key_name": "OPENAI_API_KEY",  # API key name to find in env
         "timeout": 60,  # Time for allowing responses from API
-        "cost_limit": 500,  # Max budget ($) for running OpenAI chat completion
+        "cost_limit": 500.0,  # Max budget ($) for running OpenAI chat completion
 
         # Model Parameters
         "model": "gpt-4o",  # LLM model name
@@ -311,6 +316,31 @@ def merge_with_default_config(custom_config):
     result = _update_dict(merged_config, custom_config)
     logger.info("Configuration merged with defaults")
     return result
+
+
+def format_yaml_like(data, indent=0):
+    """Recursive function to format dict as YAML-like string"""
+    lines = []
+    spaces = "    " * indent
+
+    for key, value in sorted(data.items()):
+        if isinstance(value, dict):
+            lines.append(f"{spaces}{key}:")
+            lines.extend(format_yaml_like(value, indent + 1))
+        elif isinstance(value, list):
+            lines.append(f"{spaces}{key}:")
+            for item in value:
+                if isinstance(item, dict):
+                    lines.append(f"{spaces}  -")
+                    lines.extend(format_yaml_like(item, indent + 2))
+                else:
+                    lines.append(f"{spaces}  - {item}")
+        else:
+            # Handle None values and convert to string
+            display_value = value if value is not None else "null"
+            lines.append(f"{spaces}{key}: {display_value}")
+
+    return lines
 
 
 if __name__ == "__main__":

@@ -15,7 +15,7 @@ import yaml
 from .openai import OpenAIHandler
 # Import default config utilities
 from .config import DEFAULT_CONFIG, LOG_DIR_NAME, SUMMARY_LENGTH, AGENT_NAME_LENGTH
-from .config import set_attributes_from_config, load_config, merge_with_default_config
+from .config import set_attributes_from_config, load_config, merge_with_default_config, format_yaml_like
 # Import singleton logger
 from .logger import get_logger
 # Import FSM and factory
@@ -448,29 +448,21 @@ class Agent:
         self.history.set_final_state(self.fsm.current_state, self.context)
         if self.history.has_errors():
             self.logger.info(f"Loop completed with {len(self.history.errors)} errors")
-        self._summary()
 
         # Set current iteration for next run_loop call
         self.curr_iteration = end_iteration
 
-        # Return dictionary format for backward compatibility
-        return self.history.to_dict()
+        # Return agent summary
+        return self.get_summary()
 
     def _summary(self):
+        """Print and save summary history"""
         summary = self.get_summary()
-        self.print_summary(summary)
+        self._print_summary(summary)
+        self._save_summary(summary)
 
-        # Store summary in history
-        self.summary_history.append({
-            'iteration': self.curr_iteration,
-            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            'summary': summary
-        })
-
-        self.save_summary(summary)
-
-    def get_summary(self, recent_history=None) -> str:
-        """Get a comprehensive summary of the agent's current state."""
+    def get_summary(self, recent_hist_len=None) -> Dict:
+        """Get a comprehensive summary of the agent's current state as a dictionary."""
         def _get_context_keys(obj, prefix="", depth=0):
             if depth >= 2 or not isinstance(obj, dict):
                 return []
@@ -484,92 +476,112 @@ class Agent:
                     keys.append(full_key)
             return keys
 
-        if not recent_history:
-            recent_history = self.history_context_len
-
-        # Basic agent info
-        summary_lines = []
-        summary_lines.append(f"Agent: {self.name}")
-        summary_lines.append(f"Current State: {self.fsm.current_state}")
-        summary_lines.append(f"Iteration: {self.curr_iteration}")
-        summary_lines.append(f"Repository: {self.repository}")
+        if not recent_hist_len:
+            recent_hist_len = self.history_context_len
 
         # Context info
         ctx_keys = _get_context_keys(self.context)
-        summary_lines.append(f"Context Keys:\n  {'\n  '.join(ctx_keys)}")
-
 
         # Enhanced history summary with more details
         actions_count = len(self.history.actions_executed)
         errors_count = len(self.history.errors)
-        summary_lines.append(f"Actions Executed: {actions_count}")
-        summary_lines.append(f"Errors: {errors_count}")
 
         # Add recent actions summary
+        recent_actions_summary = {}
+        success_rate = 0.0
         if self.history.actions_executed:
-            recent_actions = self.history.actions_executed[-recent_history:]
+            recent_actions = self.history.actions_executed[-recent_hist_len:]
             action_summary = {}
             for action_data in recent_actions:
                 action_name = action_data.get('action', 'unknown')
                 action_summary[action_name] = action_summary.get(action_name, 0) + 1
+            recent_actions_summary = action_summary
 
-            summary_lines.append(f"Recent Actions ({len(recent_actions)} of {actions_count}):")
-            for action, count in action_summary.items():
-                summary_lines.append(f"  {action}: {count}")
-
-        # Add success rate if we have actions
-        if actions_count > 0:
+            # Calculate success rate
             successful_actions = sum(1 for action in self.history.actions_executed
                                    if action['action_result'] == 'success')
             success_rate = (successful_actions / actions_count) * 100
-            summary_lines.append(f"Action Success Rate: {success_rate:.1f}% ({successful_actions}/{actions_count})")
 
-        # Repository completion stats - SINGLE LINE FORMAT
+        # Repository completion stats
         completion = self.repository_manager.get_repository_completion_stats(self)
-        summary_lines.append(f"Repository Progress: {completion['finished_files']}/{completion['total_files']} files ({completion['completion_percentage']}% complete)")
 
         # OpenAI cost summary
-        summary_lines.append("OpenAI Cost Summary")
         cost_summary = self.openai_handler.get_cost_summary()
 
-        summary_lines.append(f"  Model: {cost_summary['model']} | Calls: {cost_summary['call_count']} | Cost: ${cost_summary['accumulated_cost']:.2f}")
+        return {
+            "agent_info": {
+                "name": self.name,
+                "current_state": self.fsm.current_state,
+                "iteration": self.curr_iteration,
+                "repository": self.repository
+            },
+            "context": {
+                "keys": ctx_keys,
+                "key_count": len(ctx_keys)
+            },
+            "execution_stats": {
+                "actions_executed": actions_count,
+                "errors": errors_count,
+                "success_rate": f"{success_rate:.1f}%",
+                "recent_actions": recent_actions_summary,
+                "recent_actions_count": len(self.history.actions_executed[-recent_hist_len:]) if self.history.actions_executed else 0
+            },
+            "repository_progress": {
+                "finished_files": completion['finished_files'],
+                "total_files": completion['total_files'],
+                "completion_percentage": completion['completion_percentage']
+            },
+            "openai_cost": {
+                "model": cost_summary['model'],
+                "call_count": cost_summary['call_count'],
+                "accumulated_cost": cost_summary['accumulated_cost'],
+                "cost_limit": cost_summary.get('cost_limit'),
+                "remaining_budget": cost_summary.get('remaining_budget'),
+                "usage_percentage": f"{(cost_summary['accumulated_cost'] / cost_summary['cost_limit']) * 100:.1f}%" if cost_summary.get('cost_limit') else None
+            }
+        }
 
-        if cost_summary['cost_limit']:
-            remaining = cost_summary['remaining_budget']
-            usage_pct = (cost_summary['accumulated_cost'] / cost_summary['cost_limit']) * 100
-            summary_lines.append(f"  Budget: ${remaining:.2f} remaining of ${cost_summary['cost_limit']:.2f} ({usage_pct:.1f}% used)")
-
-        return '\n'.join(summary_lines)
-
-    def print_summary(self, summary):
-        """Print agent summary to console."""
+    def _print_summary(self, summary):
+        """Print agent summary to console in YAML-like format."""
         self.logger.info("="*80)
         self.logger.info("AGENT SUMMARY")
         self.logger.info("="*80)
-        for line in summary.split('\n'):
+
+        # Format and print each line
+        yaml_lines = format_yaml_like(summary)
+        for line in yaml_lines:
             self.logger.info(line)
+
         self.logger.info("="*80)
 
-    def save_summary(self, current_summary, recent_history=None):
-        """Save last 10 summaries to file in log directory."""
-        if not recent_history:
-            recent_history = self.history_context_len
+    def _save_summary(self, summary, recent_hist_len=None):
+        """Save last N summaries to JSON file in log directory."""
+        self.summary_history.append({
+            'iteration': self.curr_iteration,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'summary': summary
+        })
+
+        if not recent_hist_len:
+            recent_hist_len = self.history_context_len
 
         log_dir = self.get_log_dir()
-        summary_file = os.path.join(log_dir, f"{self.get_id()}.summary.log")
+        summary_file = os.path.join(log_dir, f"{self.get_id()}.summary.json")
 
-        # Keep only last 10 summaries
-        recent_summaries = self.summary_history[-recent_history:]
+        # Keep only last N summaries
+        recent_summaries = self.summary_history[-recent_hist_len:]
 
-        # Write all recent summaries to file (overwrite mode)
-        with open(summary_file, 'w', encoding='utf-8') as f:
-            f.write("="*80 + "\n")
-            f.write(f"AGENT SUMMARY HISTORY (Last {len(recent_summaries)} iterations)\n")
-            f.write("="*80 + "\n\n")
+        # Prepare summary data structure
+        summary_data = {
+            "agent_id": self.get_id(),
+            "summary_count": len(recent_summaries),
+            "summary_history": recent_summaries
+        }
 
-            for summary_entry in recent_summaries:
-                f.write(f"[Iteration {summary_entry['iteration']} - {summary_entry['timestamp']}]\n")
-                f.write(summary_entry['summary'] + "\n")
-                f.write("-"*40 + "\n\n")
-
-        self.logger.debug(f"Summary history ({len(recent_summaries)} entries) saved to: {summary_file}")
+        # Write all recent summaries to JSON file (overwrite mode)
+        try:
+            with open(summary_file, 'w', encoding='utf-8') as f:
+                json.dump(summary_data, f, indent=4, default=str)
+            self.logger.debug(f"Summary history ({len(recent_summaries)} entries) saved to: {summary_file}")
+        except Exception as e:
+            self.logger.error(f"Failed to save summary: {e}")
