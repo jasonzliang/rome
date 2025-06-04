@@ -140,7 +140,7 @@ def main():
             if iterations == 0: raise
         except:
             logger.info("Exiting loop"); break
-        results = agent.run_loop(max_iterations=iterations)
+        results = agent.run_loop(max_iterations=iterations, stop_on_error=True)
 
     if not results: results = agent.run_loop(max_iterations=0)
 

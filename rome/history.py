@@ -20,16 +20,16 @@ class AgentHistory:
             self.states_visited.append(state)
             self.logger.info(f"Added initial state to history: {state}")
 
-    def add_action_execution(self, iteration: int, action: str, result: bool,
-                           reasoning: str, prev_state: str, curr_state: str):
+    def add_action_execution(self, iteration: int, action: str, action_result: bool,
+                           action_reason: str, prev_state: str, curr_state: str):
         """Record an action execution"""
-        action_result = "success" if result else "failure"
+        action_result = "success" if action_result else "failure"
 
         action_record = {
             'iteration': iteration,
             'action': action,
             'action_result': action_result,
-            'action_reason': reasoning,
+            'action_reason': action_reason,
             'prev_state': prev_state,
             'curr_state': curr_state,
         }
@@ -100,11 +100,11 @@ class AgentHistory:
             result = action_info.get('action_result', 'unknown')
             prev_state = action_info.get('prev_state', 'unknown')
             curr_state = action_info.get('curr_state', 'unknown')
-            reasoning = action_info.get('action_reason', 'No reason provided')
+            reason = action_info.get('action_reason', 'No reason provided')
 
             # Format the transition
             history_lines.extend([
-                f"[Iteration {iteration}] - selected action: {action_name}, reason: {reasoning}, action result: {result}",
+                f"[Iteration {iteration}] - selected action: {action_name}, reason: {reason}, action result: {result}",
                 f"[Iteration {iteration}] - changed state: {prev_state} --[{action_name}]--> {curr_state}"
             ])
 

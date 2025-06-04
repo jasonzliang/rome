@@ -34,8 +34,10 @@ class MinimalFSMBuilder(FSMBuilder):
     """Builder for minimal FSM with just two states"""
 
     def get_description(self) -> str:
-        return ("Minimal code analysis workflow with a simple 2-state workflow: "
-                "IDLE → CODE_LOADED → IDLE. Used for basic code examination and understanding.")
+        return ("This is a minimal code analysis worflow with a simple 2-state workflow: "
+            "1) Start in IDLE state → Search and load code files → Move to CODE_LOADED state "
+            "2) From CODE_LOADED state → Reset back to IDLE to start over. "
+            "The agent's purpose is to help users locate, examine, and understand code within a codebase through an iterative search-and-reset cycle.")
 
     def build_fsm(self, config: Dict) -> FSM:
         """Create minimal FSM with just two states"""
@@ -44,12 +46,7 @@ class MinimalFSMBuilder(FSMBuilder):
         fsm = FSM(config.get("FSM", {}))
 
         # Set overview for the minimal FSM
-        fsm.set_overview(
-            "This is a minimal code analysis worflow with a simple 2-state workflow: "
-            "1) Start in IDLE state → Search and load code files → Move to CODE_LOADED state "
-            "2) From CODE_LOADED state → Reset back to IDLE to start over. "
-            "The agent's purpose is to help users locate, examine, and understand code within a codebase through an iterative search-and-reset cycle."
-        )
+        fsm.set_overview(self.get_description())
 
         # Create and add states
         idle_state = fsm.add_state(IdleState(config.get('IdleState', {})))
@@ -75,9 +72,14 @@ class SimpleFSMBuilder(FSMBuilder):
     """Builder for comprehensive FSM with code editing, testing, and execution"""
 
     def get_description(self) -> str:
-        return ("Comprehensive code development workflow with 6 states: "
-                "IDLE → CODE_LOADED → CODE_EDITED/TEST_EDITED → CODE_EXECUTED_PASS/FAIL. "
-                "Includes intelligent failure recovery and complete development lifecycle.")
+        return ("This is a comprehensive code development workflow with 6-states: "
+            "1) IDLE → Search/load code → CODE_LOADED "
+            "2) CODE_LOADED → Edit code OR write tests → CODE_EDITED or TEST_EDITED "
+            "3) CODE_EDITED → Write/edit tests → TEST_EDITED "
+            "4) TEST_EDITED → Execute code with tests → CODE_EXECUTED_PASS (success) or CODE_EXECUTED_FAIL (failure) "
+            "5) CODE_EXECUTED_PASS → Reset → IDLE (complete successful cycle) "
+            "6) CODE_EXECUTED_FAIL → Analyze version history and potentially revert → CODE_LOADED (retry with better version) OR Reset → IDLE (start over). "
+            "The agent follows a complete development lifecycle with intelligent failure recovery: discover code → modify code → create tests → validate → recover smartly or complete.")
 
     def build_fsm(self, config: Dict) -> FSM:
         """Create simple FSM with code editing, writing tests, and executing tests"""
@@ -86,16 +88,7 @@ class SimpleFSMBuilder(FSMBuilder):
         fsm = FSM(config.get("FSM", {}))
 
         # Set overview for the simple FSM
-        fsm.set_overview(
-            "This is a comprehensive code development workflow with 6-states: "
-            "1) IDLE → Search/load code → CODE_LOADED "
-            "2) CODE_LOADED → Edit code OR write tests → CODE_EDITED or TEST_EDITED "
-            "3) CODE_EDITED → Write/edit tests → TEST_EDITED "
-            "4) TEST_EDITED → Execute code with tests → CODE_EXECUTED_PASS (success) or CODE_EXECUTED_FAIL (failure) "
-            "5) CODE_EXECUTED_PASS → Reset → IDLE (complete successful cycle) "
-            "6) CODE_EXECUTED_FAIL → Analyze version history and potentially revert → CODE_LOADED (retry with better version) OR Reset → IDLE (start over). "
-            "The agent follows a complete development lifecycle with intelligent failure recovery: discover code → modify code → create tests → validate → recover smartly or complete."
-        )
+        fsm.set_overview(self.get_description())
 
         # Create and add states
         idle_state = fsm.add_state(IdleState(config.get('IdleState', {})))
@@ -108,8 +101,8 @@ class SimpleFSMBuilder(FSMBuilder):
             CodeExecutedFailState(config.get('CodeExecutedFailState', {})))
 
         # Create actions with their respective configurations
-        search_action = TournamentSearchAction(config.get('TournamentSearchAction', {}))
-        search_action2 = PrioritySearchAction(config.get('PrioritySearchAction', {}))
+        search_action_t = TournamentSearchAction(config.get('TournamentSearchAction', {}))
+        search_action_p = PrioritySearchAction(config.get('PrioritySearchAction', {}))
         reset_action = AdvancedResetAction(config.get('AdvancedResetAction', {}))
         edit_code_action = EditCodeAction(config.get('EditCodeAction', {}))
         edit_test_action = EditTestAction(config.get('EditTestAction', {}))
@@ -121,9 +114,9 @@ class SimpleFSMBuilder(FSMBuilder):
 
         # Add transitions from Idle state
         fsm.add_action(idle_state, code_loaded_state,
-            search_action, fallback_state=idle_state)
+            search_action_t, fallback_state=idle_state)
         # fsm.add_action(idle_state, code_loaded_state,
-            # search_action2, fallback_state=idle_state)
+            # search_action_p, fallback_state=idle_state)
 
         # Add transitions from CodeLoaded state
         fsm.add_action(code_loaded_state, code_edited_state, edit_code_action,

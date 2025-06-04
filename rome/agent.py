@@ -50,8 +50,6 @@ class Agent:
 
         # Core initialization
         self.logger = get_logger()
-        self.shutdown_called = False
-        self.curr_iteration = 1
 
         # Configuration setup
         self._setup_config(config)
@@ -147,6 +145,8 @@ class Agent:
         """Initialize core agent components"""
         self.context = {}
         self.history = AgentHistory()
+        self.summary_history = []
+        self.curr_iteration = 1
 
         # Add initial FSM state to history if FSM is initialized
         if self.fsm and self.fsm.current_state:
@@ -202,6 +202,8 @@ class Agent:
 
     def _register_cleanup(self) -> None:
         """Register cleanup handlers for graceful shutdown"""
+        self.shutdown_called = False
+
         atexit.register(self.shutdown)
         signal.signal(signal.SIGTERM, self._signal_handler)
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -383,7 +385,7 @@ class Agent:
         for iteration in range(start_iteration, end_iteration):
             try:
                 # Increment iteration counter in history, show iteration
-                self.current_iteration = iteration
+                self.curr_iteration = iteration
                 self.history.set_iteration(iteration)
                 self.logger.info(f"Loop iteration {iteration}/{end_iteration-1}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
@@ -399,7 +401,7 @@ class Agent:
                     self.fsm.check_context(self)
 
                 # NEW: Use ActionSelector for all action selection logic
-                chosen_action, reasoning, should_continue = self.action_selector.select_action(
+                chosen_action, reason, should_continue = self.action_selector.select_action(
                     agent=self,
                     iteration=iteration,
                     stop_on_error=stop_on_error
@@ -422,8 +424,8 @@ class Agent:
                 self.history.add_action_execution(
                     iteration=iteration,
                     action=chosen_action,
-                    result=success,
-                    reasoning=reasoning,
+                    action_result=success,
+                    action_reason=reason,
                     prev_state=prev_state,
                     curr_state=self.fsm.current_state
                 )
@@ -454,30 +456,75 @@ class Agent:
         # Return dictionary format for backward compatibility
         return self.history.to_dict()
 
-    def get_summary(self, recent_history=20) -> str:
+    def _summary(self):
+        summary = self.get_summary()
+        self.print_summary(summary)
+
+        # Store summary in history
+        self.summary_history.append({
+            'iteration': self.curr_iteration,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'summary': summary
+        })
+
+        self.save_summary(summary)
+
+    def get_summary(self, recent_history=None) -> str:
         """Get a comprehensive summary of the agent's current state."""
-        summary_lines = []
+        if not recent_history:
+            recent_history = self.history_context_len
 
         # Basic agent info
+        summary_lines = []
         summary_lines.append(f"Agent: {self.name}")
         summary_lines.append(f"Current State: {self.fsm.current_state}")
         summary_lines.append(f"Iteration: {self.curr_iteration}")
         summary_lines.append(f"Repository: {self.repository}")
 
         # Context info
-        context_keys = list(self.context.keys())  # First 5 context keys
+        context_keys = list(self.context.keys())
         if context_keys:
             summary_lines.append(f"Context Keys: {', '.join(context_keys)}")
 
-        # History summary
+        # Enhanced history summary with more details
         actions_count = len(self.history.actions_executed)
         errors_count = len(self.history.errors)
         summary_lines.append(f"Actions Executed: {actions_count}")
         summary_lines.append(f"Errors: {errors_count}")
 
-        # Repository info
+        # Add recent actions summary
+        if self.history.actions_executed:
+            recent_actions = self.history.actions_executed[-recent_history:]
+            action_summary = {}
+            for action_data in recent_actions:
+                action_name = action_data.get('action', 'unknown')
+                action_summary[action_name] = action_summary.get(action_name, 0) + 1
+
+            summary_lines.append(f"Recent Actions ({len(recent_actions)} of {actions_count}):")
+            for action, count in action_summary.items():
+                summary_lines.append(f"  {action}: {count}")
+
+        # Add success rate if we have actions
+        if actions_count > 0:
+            successful_actions = sum(1 for action in self.history.actions_executed
+                                   if action['action_result'] == 'success')
+            success_rate = (successful_actions / actions_count) * 100
+            summary_lines.append(f"Action Success Rate: {success_rate:.1f}% ({successful_actions}/{actions_count})")
+
+        # Repository completion stats - SINGLE LINE FORMAT
         completion = self.repository_manager.get_repository_completion_stats(self)
-        summary_lines.append(f"Completed Files: {pprint.pformat(completion)}")
+        summary_lines.append(f"Repository Progress: {completion['finished_files']}/{completion['total_files']} files ({completion['completion_percentage']}% complete)")
+
+        # OpenAI cost summary
+        summary_lines.append("OpenAI Cost Summary")
+        cost_summary = self.openai_handler.get_cost_summary()
+
+        summary_lines.append(f"  Model: {cost_summary['model']} | Calls: {cost_summary['call_count']} | Cost: ${cost_summary['accumulated_cost']:.4f}")
+
+        if cost_summary['cost_limit']:
+            remaining = cost_summary['remaining_budget']
+            usage_pct = (cost_summary['accumulated_cost'] / cost_summary['cost_limit']) * 100
+            summary_lines.append(f"  Budget: ${remaining:.4f} remaining of ${cost_summary['cost_limit']:.4f} ({usage_pct:.1f}% used)")
 
         return '\n'.join(summary_lines)
 
@@ -490,17 +537,26 @@ class Agent:
             self.logger.info(line)
         self.logger.info("="*80)
 
-    def save_summary(self, summary):
-        """Save agent summary to file in log directory."""
+    def save_summary(self, current_summary, recent_history=None):
+        """Save last 10 summaries to file in log directory."""
+        if not recent_history:
+            recent_history = self.history_context_len
+
         log_dir = self.get_log_dir()
         summary_file = os.path.join(log_dir, f"{self.get_id()}.summary.log")
 
-        # Add timestamp
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        summary_with_timestamp = f"[{timestamp}]\n{summary}\n\n"
+        # Keep only last 10 summaries
+        recent_summaries = self.summary_history[-recent_history:]
 
-        # Append to file
-        with open(summary_file, 'a', encoding='utf-8') as f:
-            f.write(summary_with_timestamp)
+        # Write all recent summaries to file (overwrite mode)
+        with open(summary_file, 'w', encoding='utf-8') as f:
+            f.write("="*80 + "\n")
+            f.write(f"AGENT SUMMARY HISTORY (Last {len(recent_summaries)} iterations)\n")
+            f.write("="*80 + "\n\n")
 
-        self.logger.debug(f"Summary saved to: {summary_file}")
+            for summary_entry in recent_summaries:
+                f.write(f"[Iteration {summary_entry['iteration']} - {summary_entry['timestamp']}]\n")
+                f.write(summary_entry['summary'] + "\n")
+                f.write("-"*40 + "\n\n")
+
+        self.logger.debug(f"Summary history ({len(recent_summaries)} entries) saved to: {summary_file}")
