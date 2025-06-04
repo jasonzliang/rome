@@ -3,7 +3,7 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 from .action import Action
-from ..config import check_attrs
+from ..config import check_attrs, LONGEST_SUMMARY_LEN
 from ..logger import get_logger
 
 
@@ -68,6 +68,12 @@ Only recommend reversion if there is clear evidence that a previous version was 
         response = agent.chat_completion(prompt=prompt, system_message=agent.role, response_format={"type": "json_object"})
         return agent.parse_json_response(response)
 
+    def _truncate_to_limit(self, text: str, limit: int = LONGEST_SUMMARY_LEN) -> str:
+        """Truncate text to specified limit with ellipsis if needed"""
+        if len(text) <= limit:
+            return text
+        return text[:limit-3] + "..."
+
     def _create_version_summary(self, versions: List[Dict], file_type: str) -> str:
         """Create a formatted summary of version history"""
         if not versions:
@@ -91,13 +97,21 @@ Only recommend reversion if there is clear evidence that a previous version was 
                 summary += f"Execution: {status} (exit code: {exit_code})\n"
 
                 if execution_output:
-                    output_lines = execution_output.split('\n')[:3]
-                    summary += f"Output preview: {' | '.join(output_lines)}\n"
+                    # Show full execution output up to LONGEST_SUMMARY_LEN
+                    truncated_output = self._truncate_to_limit(execution_output)
+                    summary += f"Execution output:\n{truncated_output}\n"
 
             if changes:
-                summary += "Change details:\n"
-                for change in changes[:3]:
-                    summary += f"  - {change.get('type', 'Unknown')}: {change.get('description', 'No description')}\n"
+                summary += "All changes:\n"
+                # Show all changes, but truncate the entire change section if it gets too long
+                changes_text = ""
+                for i, change in enumerate(changes):
+                    change_desc = f"  {i+1}. {change.get('type', 'Unknown')}: {change.get('description', 'No description')}\n"
+                    if len(changes_text + change_desc) > LONGEST_SUMMARY_LEN:
+                        changes_text += f"  ... and {len(changes) - i} more changes (truncated)\n"
+                        break
+                    changes_text += change_desc
+                summary += changes_text
 
         return summary
 
@@ -154,6 +168,7 @@ Only recommend reversion if there is clear evidence that a previous version was 
         """Execute the revert analysis and potential reversion"""
         self.logger.info("Starting RevertCodeAction execution")
 
+        # Step 1: Validate inputs
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']
         test_path = selected_file.get('test_path')
@@ -162,9 +177,8 @@ Only recommend reversion if there is clear evidence that a previous version was 
             self.logger.error("No test path found in selected file context")
             return False
 
-        # Load version histories with content
+        # Step 2: Load version histories
         self.logger.info(f"Loading last {self.k_versions} versions for analysis")
-
         code_versions = agent.version_manager.load_version(file_path, k=self.k_versions, include_content=True)
         test_versions = agent.version_manager.load_test_version(test_path, k=self.k_versions, include_content=True)
 
@@ -176,7 +190,7 @@ Only recommend reversion if there is clear evidence that a previous version was 
             self.logger.warning("No version history found for analysis")
             return True
 
-        # Analyze version history with LLM
+        # Step 3: Analyze version history with LLM
         self.logger.info("Analyzing version history with LLM")
         analysis_result = self._analyze_version_history(agent, code_versions, test_versions)
 
@@ -187,16 +201,17 @@ Only recommend reversion if there is clear evidence that a previous version was 
         overall_assessment = analysis_result.get('overall_assessment', 'No assessment provided')
         self.logger.info(f"LLM Analysis: {overall_assessment}")
 
-        # Handle reversions
+        # Step 4: Execute reversions if recommended
         revert_code = analysis_result.get('revert_code', {})
         revert_test = analysis_result.get('revert_test', {})
 
-        success = (self._handle_reversion(agent, revert_code, code_versions, file_path, "code") and
-                   self._handle_reversion(agent, revert_test, test_versions, test_path, "test"))
+        code_success = self._handle_reversion(agent, revert_code, code_versions, file_path, "code")
+        test_success = self._handle_reversion(agent, revert_test, test_versions, test_path, "test")
 
-        if not success:
+        if not (code_success and test_success):
             return False
 
+        # Step 5: Log completion
         if not revert_code.get('should_revert') and not revert_test.get('should_revert'):
             self.logger.info("LLM analysis determined no reversion is necessary")
 

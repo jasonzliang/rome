@@ -391,7 +391,6 @@ class Agent:
                     prompt = self.fsm.get_action_selection_prompt(self)
 
                     # Get action choice from LLM
-                    self.logger.info("Requesting action selection from LLM")
                     response = self.chat_completion(
                         prompt=prompt,
                         system_message=self.role,
@@ -428,7 +427,6 @@ class Agent:
                 prev_state = self.fsm.current_state
 
                 # Execute the action through FSM
-                self.logger.info(f"Executing action: {chosen_action}")
                 success = self.fsm.execute_action(chosen_action, self)
 
                 # Record the execution in history
