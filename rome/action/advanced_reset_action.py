@@ -102,7 +102,7 @@ Set work_complete to true ONLY if:
         agent.version_manager.store_data(selected_file['path'], 'progress', progress)
 
         self.logger.info(f"LLM analysis - Work complete: {work_complete}, "
-                       f"Confidence: {confidence}/5, Reasoning: {reasoning}")
+                       f"Confidence: {confidence}/10, Reasoning: {reasoning}")
         if remaining_issues:
             self.logger.info(f"Remaining issues identified: {remaining_issues}")
 

@@ -19,7 +19,7 @@ class RevertCodeAction(Action):
         """Return a short summary of the revert action"""
         selected_file = agent.context['selected_file']
         filename = os.path.basename(selected_file['path'])
-        return f"analyze last {self.k_versions} versions of {filename} and revert to better version if needed"
+        return f"analyze last {self.k_versions} versions of {filename} and revert to a version with better correct and working code if needed"
 
     def _analyze_version_history(self, agent, code_versions: List[Dict], test_versions: List[Dict]) -> Dict:
         """Use LLM to analyze version history and decide if reversion is needed"""

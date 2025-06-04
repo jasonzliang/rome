@@ -360,6 +360,10 @@ class VersionManager:
 
     def flag_active(self, agent, file_path: str) -> bool:
         """Flag a file as being actively worked on."""
+        meta_dir = self._get_meta_dir(file_path)
+        active_file_path = self._get_file_path(meta_dir, FileType.ACTIVE)
+        current_pid = os.getpid()
+
         with locked_json_operation(self._get_file_path(meta_dir, FileType.ACTIVE), {}, logger=self.logger) as active_data:
             # Check existing active state INSIDE the lock
             existing_pid = active_data.get('pid')
