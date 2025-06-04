@@ -471,6 +471,19 @@ class Agent:
 
     def get_summary(self, recent_history=None) -> str:
         """Get a comprehensive summary of the agent's current state."""
+        def _get_context_keys(obj, prefix="", depth=0):
+            if depth >= 2 or not isinstance(obj, dict):
+                return []
+
+            keys = []
+            for k, v in obj.items():
+                full_key = f"{prefix}{k}"
+                if isinstance(v, dict):
+                    keys.extend(_get_context_keys(v, f"{full_key}.", depth + 1))
+                else:
+                    keys.append(full_key)
+            return keys
+
         if not recent_history:
             recent_history = self.history_context_len
 
@@ -482,9 +495,9 @@ class Agent:
         summary_lines.append(f"Repository: {self.repository}")
 
         # Context info
-        context_keys = list(self.context.keys())
-        if context_keys:
-            summary_lines.append(f"Context Keys: {', '.join(context_keys)}")
+        ctx_keys = _get_context_keys(self.context)
+        summary_lines.append(f"Context Keys:\n  {'\n  '.join(ctx_keys)}")
+
 
         # Enhanced history summary with more details
         actions_count = len(self.history.actions_executed)
@@ -519,12 +532,12 @@ class Agent:
         summary_lines.append("OpenAI Cost Summary")
         cost_summary = self.openai_handler.get_cost_summary()
 
-        summary_lines.append(f"  Model: {cost_summary['model']} | Calls: {cost_summary['call_count']} | Cost: ${cost_summary['accumulated_cost']:.4f}")
+        summary_lines.append(f"  Model: {cost_summary['model']} | Calls: {cost_summary['call_count']} | Cost: ${cost_summary['accumulated_cost']:.2f}")
 
         if cost_summary['cost_limit']:
             remaining = cost_summary['remaining_budget']
             usage_pct = (cost_summary['accumulated_cost'] / cost_summary['cost_limit']) * 100
-            summary_lines.append(f"  Budget: ${remaining:.4f} remaining of ${cost_summary['cost_limit']:.4f} ({usage_pct:.1f}% used)")
+            summary_lines.append(f"  Budget: ${remaining:.2f} remaining of ${cost_summary['cost_limit']:.2f} ({usage_pct:.1f}% used)")
 
         return '\n'.join(summary_lines)
 

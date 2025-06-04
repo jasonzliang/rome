@@ -16,9 +16,9 @@ class CostLimitExceededException(Exception):
         self.cost_limit = cost_limit
         self.accumulated_cost = accumulated_cost
         if accumulated_cost is not None:
-            super().__init__(f"Estimated cost ${estimated_cost:.4f} would bring total to ${accumulated_cost + estimated_cost:.4f}, exceeding limit ${cost_limit:.4f}")
+            super().__init__(f"Estimated cost ${estimated_cost:.4f} would bring total to ${accumulated_cost + estimated_cost:.2f}, exceeding limit ${cost_limit:.2f}")
         else:
-            super().__init__(f"Estimated cost ${estimated_cost:.4f} exceeds limit ${cost_limit:.4f}")
+            super().__init__(f"Estimated cost ${estimated_cost:.4f} exceeds limit ${cost_limit:.2f}")
 
 
 class OpenAIHandler:
@@ -116,7 +116,7 @@ class OpenAIHandler:
 
         self.logger.info(f"OpenAI handler initialized with model: {self.model}")
         if self.cost_limit:
-            self.logger.info(f"Cost limit enabled: ${self.cost_limit:.4f}")
+            self.logger.info(f"Cost limit enabled: ${self.cost_limit:.2f}")
 
     def _get_max_input_tokens(self) -> int:
         """Get max input tokens."""
@@ -285,7 +285,6 @@ class OpenAIHandler:
             'total_tokens': input_tokens + output_tokens,
             'accumulated_cost': self.accumulated_cost
         })
-        # self.logger.debug(f"Added ${actual_cost:.4f} to total cost. Total: ${self.accumulated_cost:.4f}")
 
     def _check_and_log_cost(self, messages: List[Dict], max_tokens: int, model: str):
         """Check cost limit including accumulated costs and log estimation."""
@@ -298,9 +297,6 @@ class OpenAIHandler:
 
         if total_projected_cost > self.cost_limit:
             raise CostLimitExceededException(estimated_cost, self.cost_limit, self.accumulated_cost)
-
-        # self.logger.debug(f"Estimated cost: ${estimated_cost:.4f} (input: {input_tokens}, max output: {max_tokens})")
-        # self.logger.debug(f"Total cost: ${self.accumulated_cost:.4f}, Projected total: ${total_projected_cost:.4f}")
 
     def _log_messages_with_multiline_support(self, messages):
         """Log messages with proper multiline string formatting"""
