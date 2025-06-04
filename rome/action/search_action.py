@@ -9,7 +9,7 @@ import time
 from typing import Dict, Optional, Any, Union, List
 
 from .action import Action
-from .repository_manager import RepositoryManager  # New import
+from ..repository import RepositoryManager  # New import
 from ..logger import get_logger
 from ..config import LOG_DIR_NAME, META_DIR_EXT, SUMMARY_LENGTH, TEST_FILE_EXT
 from ..config import check_attrs

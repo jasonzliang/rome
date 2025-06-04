@@ -112,9 +112,13 @@ def main():
 
         # SearchAction specific configuration
         "SearchAction": {
-            "file_types": [".py"],
             "batch_size": 1,
             "batch_sampling": True,
+        },
+
+        # Repository manager configuration
+        "RepositoryManager": {
+            "file_types": [".py"], # File types to search for
         },
     }
 

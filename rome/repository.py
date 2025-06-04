@@ -22,7 +22,8 @@ class RepositoryManager:
         """
         self.logger = get_logger()
         self.repository_path = repository_path
-        self.logger.assert_true(os.path.exists(self.repository_path))
+        self.logger.assert_true(os.path.exists(self.repository_path),
+            f"Repository path does not exist: {self.repository_path}")
 
         # Set configuration attributes
         set_attributes_from_config(
@@ -35,7 +36,8 @@ class RepositoryManager:
         self.config = config or {}
 
         # Add default exclusions if not already present
-        self.logger.assert_true(len(self.file_types) > 0)
+        self.logger.assert_true(len(self.file_types) > 0,
+            f"Provided file types is empty: {self.file_types}")
         if LOG_DIR_NAME not in self.exclude_dirs:
             self.exclude_dirs.append(LOG_DIR_NAME)
         if f"*.{META_DIR_EXT}" not in self.exclude_dirs:
@@ -88,10 +90,10 @@ class RepositoryManager:
             Filtered list of file paths
         """
         filters = [
-            ("excluded directories", lambda f: self._filter_excluded_dirs(f, self.exclude_dirs)),
-            ("excluded types", lambda f: self._filter_excluded_types(f, self.exclude_types)),
-            ("flagged files", lambda f: self._filter_flagged_files(f, agent)),
-            ("max limit", lambda f: self._filter_max_limit(f, self.max_files))
+            ("excluded directories", lambda files: self._filter_excluded_dirs(files)),
+            ("excluded types", lambda files: self._filter_excluded_types(files)),
+            ("flagged files", lambda files: self._filter_flagged_files(files, agent)),
+            ("max limit", lambda files: self._filter_max_limit(files))
         ]
 
         filtered_files = self.collect_all_files()
@@ -115,7 +117,7 @@ class RepositoryManager:
         self.stats['files_after_filtering'] = len(filtered_files)
         return filtered_files
 
-    def _filter_excluded_dirs(self, files: List[str], exclude_dirs: List[str]) -> List[str]:
+    def _filter_excluded_dirs(self, files: List[str]) -> List[str]:
         """
         Filter out files in excluded directories
 
@@ -126,11 +128,11 @@ class RepositoryManager:
         Returns:
             Filtered list of file paths
         """
-        if not exclude_dirs:
+        if not self.exclude_dirs:
             return files
 
         # Preprocess patterns for faster matching
-        patterns = [p.replace('\\', '/') for p in exclude_dirs]
+        patterns = [p.replace('\\', '/') for p in self.exclude_dirs]
 
         def is_excluded(file_path: str) -> bool:
             norm_path = file_path.replace('\\', '/')
@@ -155,7 +157,7 @@ class RepositoryManager:
 
         return [f for f in files if not is_excluded(f)]
 
-    def _filter_excluded_types(self, files: List[str], exclude_types: List[str]) -> List[str]:
+    def _filter_excluded_types(self, files: List[str]) -> List[str]:
         """
         Filter out files with excluded file types
 
@@ -166,10 +168,10 @@ class RepositoryManager:
         Returns:
             Filtered list of file paths
         """
-        if not exclude_types:
+        if not self.exclude_types:
             return files
 
-        return [f for f in files if not any(f.endswith(exclude_type) for exclude_type in exclude_types)]
+        return [f for f in files if not any(f.endswith(exclude_type) for exclude_type in self.exclude_types)]
 
     def _filter_flagged_files(self, files: List[str], agent) -> List[str]:
         """
@@ -199,7 +201,7 @@ class RepositoryManager:
 
         return filtered_files
 
-    def _filter_max_limit(self, files: List[str], max_files: int) -> List[str]:
+    def _filter_max_limit(self, files: List[str]) -> List[str]:
         """
         Filter out files if they exceed max file limit
 
@@ -210,9 +212,9 @@ class RepositoryManager:
         Returns:
             Filtered list of file paths (randomly sampled if over limit)
         """
-        if len(files) > max_files:
+        if len(files) > self.max_files:
             random.shuffle(files)
-            return files[:max_files]
+            return files[:self.max_files]
         return files
 
     def collect_and_filter_files(self, agent) -> List[str]:
@@ -249,11 +251,11 @@ class RepositoryManager:
         self.logger.info(f"Checking completion status in repository: {self.repository_path}")
 
         # Use collect_all_files to get all Python files
-        all_files = self.collect_all_files(self.file_types)
+        all_files = self.collect_all_files()
 
         # Apply directory and type filters but not file flags or max_files limit
-        filtered_files = self._filter_excluded_dirs(all_files, self.exclude_dirs)
-        filtered_files = self._filter_excluded_types(filtered_files, self.exclude_types)
+        filtered_files = self._filter_excluded_dirs(all_files)
+        filtered_files = self._filter_excluded_types(filtered_files)
 
         total_count = len(filtered_files)
         finished_count = 0

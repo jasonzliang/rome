@@ -4,5 +4,6 @@ from .edit_test_action import EditTestAction
 from .exec_code_action import ExecuteCodeAction
 from .reset_action import ResetAction
 from .advanced_reset_action import AdvancedResetAction
+from .revert_code_action import RevertCodeAction
 from .search_action import SearchAction
 from .transition_action import TransitionAction

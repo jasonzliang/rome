@@ -332,7 +332,7 @@ class Agent:
     def _summary(self):
         summary = self.get_summary()
         self.print_summary(summary)
-        self.write_summary(summary)
+        self.save_summary(summary)
 
     def run_loop(self, max_iterations: int = 10, stop_on_error: bool = True) -> Dict:
         """
@@ -488,7 +488,7 @@ class Agent:
         summary_lines.append(f"Errors: {errors_count}")
 
         # Repository info
-        completion = self.repository_manager.get_repository_completion_stats()
+        completion = self.repository_manager.get_repository_completion_stats(self)
         summary_lines.append(f"Completed Files: {pprint.pformat(completion)}")
 
         return '\n'.join(summary_lines)

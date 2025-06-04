@@ -108,13 +108,13 @@ DEFAULT_CONFIG = {
     "CodeExecutedFailState": {},
 
     # Action configuration
+    "ResetAction": {},
+    "AdvancedResetAction": {},
     "SearchAction": {
         "selection_criteria": "Select the file that you have the most confidence in improving or fixing.", # Criteria for selecting file from possible candidates
         "batch_size": 10, # Candidate batch size for selection
         "batch_sampling": False # If set to true, randomly sample batches
     },
-    "ResetAction": {},
-    "AdvancedResetAction": {},
     "EditCodeAction": {
         "custom_prompt": None # Override prompt for editing code
     },
@@ -122,7 +122,12 @@ DEFAULT_CONFIG = {
         "custom_prompt": None # Override prompt for editing tests
     },
     "ExecuteCodeAction": {},
+    "RevertCodeAction": {
+        "custom_prompt": None, # Override prompt for reverting code
+        "k_versions": 5
+    },
     "TransitionAction": {},
+
 
     # Code executor configuration
     "Executor": {
