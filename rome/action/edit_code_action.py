@@ -34,13 +34,13 @@ def create_analysis_prompt(agent, file_path: str) -> Optional[str]:
         return None
 
     # Create a clearly separated analysis section
-    analysis_context = "\n" + "="*80 + "\n"
+    analysis_context = "\n---\n"
     analysis_context += "Previous execution results and analysis:\n"
-    analysis_context += "="*80 + "\n\n"
+    analysis_context += "---\n\n"
     analysis_context += "\n\n".join(context_parts)
-    analysis_context += "\n\n" + "="*80 + "\n"
+    analysis_context += "\n---\n"
     analysis_context += "Please address any issues identified above\n"
-    analysis_context += "="*80 + "\n"
+    analysis_context += "---\n"
 
     return analysis_context
 

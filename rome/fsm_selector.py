@@ -122,8 +122,8 @@ class SimpleFSMBuilder(FSMBuilder):
         # Add transitions from Idle state
         fsm.add_action(idle_state, code_loaded_state,
             search_action, fallback_state=idle_state)
-        fsm.add_action(idle_state, code_loaded_state,
-            search_action2, fallback_state=idle_state)
+        # fsm.add_action(idle_state, code_loaded_state,
+            # search_action2, fallback_state=idle_state)
 
         # Add transitions from CodeLoaded state
         fsm.add_action(code_loaded_state, code_edited_state, edit_code_action,

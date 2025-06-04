@@ -38,7 +38,7 @@ class LockingConfig:
                 last_exception = e
                 if attempt < self.max_retries - 1:
                     if logger:
-                        logger.warning(f"{operation_name} lock timeout on attempt {attempt + 1}, retrying...")
+                        logger.error(f"{operation_name} lock timeout on attempt {attempt + 1}, retrying...")
                     time.sleep(self.retry_delay * (2 ** attempt))
                 continue
             except Exception:
@@ -206,6 +206,7 @@ class DatabaseManager:
                 db.close()
             except Exception as e:
                 self.logger.error(f"Error closing database: {e}")
+                raise
 
     def _with_retry(self, operation: Callable, operation_name: str = "database operation"):
         """Execute operation with unified retry logic"""
@@ -397,42 +398,6 @@ class DatabaseManager:
             }
 
         return self._with_retry(_get_info, "get_database_info")
-
-    def backup_database(self, file_path: str, backup_path: str) -> bool:
-        """Backup database"""
-        try:
-            db_path = self._get_db_path(file_path)
-            if not os.path.exists(db_path):
-                self.logger.error(f"Database does not exist: {db_path}")
-                return False
-
-            os.makedirs(os.path.dirname(backup_path), exist_ok=True)
-
-            import shutil
-            shutil.copy2(db_path, backup_path)
-            self.logger.info(f"Database backed up: {db_path} -> {backup_path}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Backup failed: {e}")
-            return False
-
-    def restore_database(self, file_path: str, backup_path: str) -> bool:
-        """Restore database from backup"""
-        try:
-            if not os.path.exists(backup_path):
-                self.logger.error(f"Backup file does not exist: {backup_path}")
-                return False
-
-            db_path = self._get_db_path(file_path)
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
-            import shutil
-            shutil.copy2(backup_path, db_path)
-            self.logger.info(f"Database restored: {backup_path} -> {db_path}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Restore failed: {e}")
-            return False
 
     def shutdown(self):
         """Shutdown - no cached connections to close"""

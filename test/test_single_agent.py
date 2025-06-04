@@ -114,6 +114,9 @@ def main():
         "TournamentSearchAction": {
             "batch_size": 2,
         },
+        "PrioritySearchAction": {
+            "batch_size": 2,
+        },
 
         # Repository manager configuration
         "RepositoryManager": {

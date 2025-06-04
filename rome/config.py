@@ -35,82 +35,65 @@ TEST_FILE_EXT = '_test.py'
 # Define the default configuration structure as a dictionary
 # This should show the complete configuration of every class
 DEFAULT_CONFIG = {
-    # OpenAIHandler settings - includes all OpenAI API configuration
-    "OpenAIHandler": {
-        # OpenAI API configuration
-        "base_url": "https://api.openai.com/v1", # Url for chat completion API
-        "key_name": "OPENAI_API_KEY", # API key name to find in env
-        "timeout": 60, # Time for allowing responses from API
-        "cost_limit": 500, # Max budget ($) for running OpenAI chat completion
+    # CORE AGENT CONFIGURATION
 
-        # General LLM parameters
-        "model": "gpt-4o", # LLM model name
-        "temperature": 0.1, # LLM temperature
-        "max_tokens": 8192, # LLM response max tokens
-        "top_p": 1.0, # LLM top-P
-        "seed": None, # LLM random seed
-
-        # Fall back system message for chat completions if none given
-        "system_message": "You are a helpful assistant",
-
-        # Context management parameters
-        "manage_context": True, # Prevent messages from overfilling context window
-        "max_input_tokens": None, # Set to manually override auto-calculated input token limit
-        "token_count_thres": 0.5, # Threshold when to use slow method to count number of tokens
-        "chars_per_token": 4 # Used for fast calculation of number of tokens
-    },
-
-    # Agent configuration
     "Agent": {
-        "name": None, # Agent name, can be overwritten by constructor
-        "role": None, # Agent description, can be overwritten by constructor
-        "repository": None, #  Repository base directory, can be overwritten by constructor
-        "fsm_type": "simple", # Which FSM to load (see fsm_factory.py)
-        "action_select_strat": "smart", # Which action selector to use (original or smart)
-        "agent_api": True, # Launch an REST API server for agent's internal state
-        "history_context_len": 15, # Length of history to use when selecting action
-        "patience": 3, # If same state/action chosen repeatedly, prompt to choose different action
+        "name": None,  # Agent name, can be overwritten by constructor
+        "role": None,  # Agent description, can be overwritten by constructor
+        "repository": None,  # Repository base directory, can be overwritten by constructor
+        "fsm_type": "simple",  # Which FSM to load (see fsm_factory.py)
+        "action_select_strat": "smart",  # Which action selector to use (original or smart)
+        "agent_api": True,  # Launch an REST API server for agent's internal state
+        "history_context_len": 20,  # Length of history to use when selecting action
+        "patience": 4  # If same state/action chosen repeatedly, prompt to choose different action
     },
 
     "AgentApi": {
-        "host": "localhost", # Url/hostname to query agent API
-        "port": 8000 # Port number to query agent API
+        "host": "localhost",  # Url/hostname to query agent API
+        "port": 8000  # Port number to query agent API
     },
 
-    # Repository manager configuration
-    "RepositoryManager": {
-        "file_types": [".py"], # File types to search for
-        "max_files": sys.maxsize, # Maximum number of candidates to select from after search
-        "exclude_types": [], # File types to not search for
-        "exclude_dirs": [".*", "venv", "__*__"], # Directories to not search in
+    # LLM HANDLER CONFIGURATION
+
+    "OpenAIHandler": {
+        # API Configuration
+        "base_url": "https://api.openai.com/v1",  # Url for chat completion API
+        "key_name": "OPENAI_API_KEY",  # API key name to find in env
+        "timeout": 60,  # Time for allowing responses from API
+        "cost_limit": 500,  # Max budget ($) for running OpenAI chat completion
+
+        # Model Parameters
+        "model": "gpt-4o",  # LLM model name
+        "temperature": 0.1,  # LLM temperature
+        "max_tokens": 8192,  # LLM response max tokens
+        "top_p": 1.0,  # LLM top-P
+        "seed": None,  # LLM random seed
+
+        # System Configuration
+        "system_message": "You are a helpful assistant",  # Fall back system message
+
+        # Context Management
+        "manage_context": True,  # Prevent messages from overfilling context window
+        "max_input_tokens": None,  # Set to manually override auto-calculated input token limit
+        "token_count_thres": 0.5,  # Threshold when to use slow method to count tokens
+        "chars_per_token": 4  # Used for fast calculation of number of tokens
     },
 
-    # Logging configuration
-    "Logger": {
-        "level": "ERROR", # Log level in increasing verbosity: INFO -> ERROR -> DEBUG
-        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s", # Formatting for log messages
-        "console": True, # Print to console if true
-        "include_caller_info": None, # Can be "rome", "rich", or None
-        "base_dir": None, # Directory for log files, overwrites agent's auto-generated values
-        "filename": None, # Log file name, overwrites agent's auto-generated values
-        "max_size_kb": 20000, # Max log size in kb, truncates after exceeding
-        "timezone": 'US/Pacific', # Default timezone to display
-    },
+    # STATE MACHINE & ACTION SELECTION
 
-    # FSM configuration
     "FSM": {},
 
-    # Action selection configuration
     "ActionSelector": {
-        "original": {}, # Config for original selector (empty for now)
-        "smart": { # Config for smart selector (empty for now)
-            "loop_detection_window": None, # Override window based on agent.history_context_len
-            "exploration_rate": 0.15, # Base probability for encouraging non-optimal actions
-            "overuse_threshold": 0.3 # Fraction of recent actions that triggers "overuse" warning
+        "original": {},  # Config for original selector (empty for now)
+        "smart": {  # Config for smart selector
+            "loop_detection_window": None,  # Override window based on agent.history_context_len
+            "exploration_rate": 0.15,  # Base probability for encouraging non-optimal actions
+            "overuse_threshold": 0.3  # Fraction of recent actions that triggers "overuse" warning
         }
     },
 
-    # State configurations
+    # STATES
+
     "IdleState": {},
     "CodeLoadedState": {},
     "CodeEditedState": {},
@@ -118,51 +101,79 @@ DEFAULT_CONFIG = {
     "CodeExecutedPassState": {},
     "CodeExecutedFailState": {},
 
-    # Action configuration
+    # ACTIONS
+
+    # Basic Actions
     "ResetAction": {},
     "AdvancedResetAction": {},
+    "TransitionAction": {},
+
+    # Search Actions
     "PrioritySearchAction": {
-        "selection_criteria": "Select the file that you have the most confidence in improving or fixing.", # Criteria for selecting file from possible candidates
-        "batch_size": 10, # Candidate batch size for selection
-        "batch_sampling": False # If set to true, randomly sample batches
+        "selection_criteria": "Select the file that you have the most confidence in improving or fixing.",
+        "batch_size": 10,  # Candidate batch size for selection
+        "batch_sampling": False  # If set to true, randomly sample batches
     },
     "TournamentSearchAction": {
-        "batch_size": 10, # Number of files to randomly choose
-        "selection_criteria": "Select the file that you have the most confidence in improving or fixing." # Same as above
+        "batch_size": 10,  # Number of files to randomly choose
+        "selection_criteria": "Select the file that you have the most confidence in improving or fixing."
     },
+
+    # Code Manipulation Actions
     "EditCodeAction": {
-        "custom_prompt": None # Override prompt for editing code
+        "custom_prompt": None  # Override prompt for editing code
     },
     "EditTestAction": {
-        "custom_prompt": None # Override prompt for editing tests
+        "custom_prompt": None  # Override prompt for editing tests
     },
     "ExecuteCodeAction": {},
     "RevertCodeAction": {
-        "custom_prompt": None, # Override prompt for reverting code
+        "custom_prompt": None,  # Override prompt for reverting code
         "num_versions": 10,
     },
-    "TransitionAction": {},
 
+    # REPOSITORY & FILE MANAGEMENT
 
-    # Code executor configuration
+    "RepositoryManager": {
+        "file_types": [".py"],  # File types to search for
+        "max_files": sys.maxsize,  # Maximum number of candidates to select from after search
+        "exclude_types": [],  # File types to not search for
+        "exclude_dirs": [".*", "venv", "__*__"],  # Directories to not search in
+    },
+
+    "DatabaseManager": {
+        "lock_timeout": 5.0,  # Timeout for read/write lock
+        "max_retries": 8,  # Num tries to acquire lock
+        "retry_delay": 0.01  # Delay between tries, exponential increase
+    },
+
+    "VersionManager": {},
+
+    # CODE EXECUTION
+
     "Executor": {
-        "timeout": 10, # Maximum time for code to run
-        "virtual_env_context": None, # Name of virtual env to run in
-        "work_dir": "./", # Working directory when running code directly (not code file)
-        "max_output_len": 5000, # Maximum tokens for execution output
-        "cmd_args": { # Additional useful flags when executing code
+        "timeout": 10,  # Maximum time for code to run
+        "virtual_env_context": None,  # Name of virtual env to run in
+        "work_dir": "./",  # Working directory when running code directly (not code file)
+        "max_output_len": 5000,  # Maximum tokens for execution output
+        "cmd_args": {  # Additional useful flags when executing code
             "pytest": ["-s", "--tb=short", "--no-header"],
             "python": ["-u"],
         }
     },
 
-    # Database and version manager configuration
-    "DatabaseManager": {
-        "lock_timeout": 5.0, # Timeout for read/write lock
-        "max_retries": 8, # Num tries to acquire lock
-        "retry_delay": 0.01 # Delay between tries, exponential increase
+    # LOGGING & MONITORING
+
+    "Logger": {
+        "level": "ERROR",  # Log level in increasing verbosity: INFO -> ERROR -> DEBUG
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Formatting
+        "console": True,  # Print to console if true
+        "include_caller_info": None,  # Can be "rome", "rich", or None
+        "base_dir": None,  # Directory for log files, overwrites agent's auto-generated values
+        "filename": None,  # Log file name, overwrites agent's auto-generated values
+        "max_size_kb": 20000,  # Max log size in kb, truncates after exceeding
+        "timezone": 'US/Pacific',  # Default timezone to display
     },
-    "VersionManager": {},
 }
 
 

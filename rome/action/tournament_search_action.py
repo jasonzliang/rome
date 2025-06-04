@@ -34,7 +34,7 @@ class TournamentSearchAction(Action):
         return (
             f"Tournament search for {file_types_str} files: "
             f"(1) randomly select {selection_desc}, "
-            f"(2) display full contents, "
+            f"(2) analyze full contents, "
             f"(3) LLM selects best match for '{self.selection_criteria}' "
             f"[max files: {max_files}, excluding: {excluded_dirs_str}]"
         )
@@ -124,11 +124,9 @@ Tournament Files ({len(tournament_data)} candidates):
 
         # Add complete file contents
         for i, file_info in enumerate(tournament_data, 1):
-            prompt += f"\n{'='*80}\n"
-            prompt += f"File {i}: {file_info['path']}\n"
-            prompt += f"{'='*80}\n"
+            prompt += f"\n---\nFile {i}: {file_info['path']}\n---\n"
             prompt += file_info['content']
-            prompt += f"\n{'='*80}\n"
+            prompt += "\n---\n"
 
         prompt += f"""
 Based on the selection criteria "{self.selection_criteria}", choose the most relevant file.

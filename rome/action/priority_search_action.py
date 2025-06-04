@@ -37,8 +37,7 @@ class PrioritySearchAction(Action):
             f"Multi-stage LLM repository search for {file_types_str} files: "
             f"(1) scan repository and extract metadata (size/age/definitions), "
             f"(2) LLM prioritizes {self.batch_size} files 1-10 based on '{self.selection_criteria}', "
-            f"(3) select from prioritized files using {sampling_mode} "
-            f"with full content analysis for optimal match selection "
+            f"(3) select best match from prioritized files after full content analysis "
             f"[max files: {max_files}, excluding: {excluded_dirs_str}]"
         )
 
@@ -150,7 +149,7 @@ IMPORTANT: Your response MUST be a valid JSON OBJECT where keys are file paths a
 
     def _prioritize_files(self, agent, file_overviews: List[Dict]) -> List[Dict]:
         """Use LLM to prioritize all files at once based on size, age, and function definitions"""
-        self.logger.info(f"Prioritizing all {len(file_overviews)} files at once")
+        self.logger.info(f"Prioritizing {min(len(file_overviews), self.batch_size)} files at once")
 
         prompt = self._create_prioritization_prompt(file_overviews)
         response = agent.chat_completion(prompt=prompt,
@@ -354,7 +353,8 @@ Respond with a JSON object:
         # Create overview, prioritize, and process batches
         file_overviews = self._create_global_overview(agent, filtered_files)
         prioritized_files = self._prioritize_files(agent, file_overviews)
-        selected_file = self._process_file_batches(agent, prioritized_files)
+        selected_file = self._process_single_batch(agent, prioritized_files, "single batch")
+        # selected_file = self._process_file_batches(agent, prioritized_files)
 
         if selected_file:
             # Save original file and update agent context
