@@ -79,7 +79,7 @@ class RepositoryManager:
         self.stats['total_files_found'] = len(all_files)
         return all_files
 
-    def apply_filters(self, agent) -> List[str]:
+    def apply_filters(self, agent, all_files: List[str]) -> List[str]:
         """
         Apply all file filters in sequence
 
@@ -96,7 +96,7 @@ class RepositoryManager:
             ("max limit", lambda files: self._filter_max_limit(files))
         ]
 
-        filtered_files = self.collect_all_files()
+        filtered_files = all_files
         for filter_name, filter_func in filters:
             original_count = len(filtered_files)
             filtered_files = filter_func(filtered_files)
@@ -232,7 +232,7 @@ class RepositoryManager:
         self.logger.info(f"Found {len(all_files)} total files before filtering")
 
         # Apply filters
-        filtered_files = self.apply_filters(agent)
+        filtered_files = self.apply_filters(agent, all_files)
 
         return filtered_files
 

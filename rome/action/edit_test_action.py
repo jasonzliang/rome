@@ -21,9 +21,10 @@ class EditTestAction(Action):
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']
         filename = os.path.basename(file_path)
-        test_exists = 'test_path' in selected_file and os.path.exists(selected_file.get('test_path', ''))
+        test_exists = 'test_path' in selected_file and \
+            os.path.exists(selected_file.get('test_path', ''))
         action_type = "update existing tests" if test_exists else "create comprehensive unit tests"
-        return f"{action_type} for {filename} covering edge cases and error conditions"
+        return f"{action_type} for {filename}, covering edge cases, error conditions, and test failures"
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute test editing action to create or improve tests for the current selected file"""

@@ -25,7 +25,7 @@ class ExecuteCodeAction(Action):
         selected_file = agent.context['selected_file']
         test_path = selected_file['test_path']
         test_filename = os.path.basename(test_path)
-        return f"execute {test_filename} and analyze results for failures or issues"
+        return f"execute {test_filename}, analyze results for failures/issues, and save execution data with version history"
 
     def _analyze_execution_result(self,
         agent,

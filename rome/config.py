@@ -66,6 +66,7 @@ DEFAULT_CONFIG = {
         "role": None, # Agent description, can be overwritten by constructor
         "repository": None, #  Repository base directory, can be overwritten by constructor
         "fsm_type": "simple", # Which FSM to load (see fsm_factory.py)
+        "action_select_strat": "smart", # Which action selector to use (original or smart)
         "agent_api": True, # Launch an REST API server for agent's internal state
         "history_context_len": 15, # Length of history to use when selecting action
         "patience": 3, # If same state/action chosen repeatedly, prompt to choose different action
@@ -99,6 +100,16 @@ DEFAULT_CONFIG = {
     # FSM configuration
     "FSM": {},
 
+    # Action selection configuration
+    "ActionSelector": {
+        "original": {}, # Config for original selector (empty for now)
+        "smart": { # Config for smart selector (empty for now)
+            "loop_detection_window": None, # Override window based on agent.history_context_len
+            "exploration_rate": 0.15, # Base probability for encouraging non-optimal actions
+            "overuse_threshold": 0.3 # Fraction of recent actions that triggers "overuse" warning
+        }
+    },
+
     # State configurations
     "IdleState": {},
     "CodeLoadedState": {},
@@ -110,10 +121,14 @@ DEFAULT_CONFIG = {
     # Action configuration
     "ResetAction": {},
     "AdvancedResetAction": {},
-    "SearchAction": {
+    "PrioritySearchAction": {
         "selection_criteria": "Select the file that you have the most confidence in improving or fixing.", # Criteria for selecting file from possible candidates
         "batch_size": 10, # Candidate batch size for selection
         "batch_sampling": False # If set to true, randomly sample batches
+    },
+    "TournamentSearchAction": {
+        "batch_size": 10, # Number of files to randomly choose
+        "selection_criteria": "Select the file that you have the most confidence in improving or fixing." # Same as above
     },
     "EditCodeAction": {
         "custom_prompt": None # Override prompt for editing code
@@ -124,7 +139,7 @@ DEFAULT_CONFIG = {
     "ExecuteCodeAction": {},
     "RevertCodeAction": {
         "custom_prompt": None, # Override prompt for reverting code
-        "k_versions": 5
+        "num_versions": 10,
     },
     "TransitionAction": {},
 
@@ -134,7 +149,7 @@ DEFAULT_CONFIG = {
         "timeout": 10, # Maximum time for code to run
         "virtual_env_context": None, # Name of virtual env to run in
         "work_dir": "./", # Working directory when running code directly (not code file)
-        "max_output_len": 10000, # Maximum tokens for execution output
+        "max_output_len": 5000, # Maximum tokens for execution output
         "cmd_args": { # Additional useful flags when executing code
             "pytest": ["-s", "--tb=short", "--no-header"],
             "python": ["-u"],

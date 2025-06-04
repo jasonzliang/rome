@@ -20,7 +20,7 @@ from .config import set_attributes_from_config, load_config, merge_with_default_
 from .logger import get_logger
 # Import FSM and factory
 from .fsm import FSM
-from .fsm_factory import FSM_FACTORY
+from .fsm_selector import FSMSelector
 # Import the new AgentHistory class
 from .history import AgentHistory
 # Import the Repository manager
@@ -29,6 +29,8 @@ from .repository import RepositoryManager
 from .metadata import VersionManager
 # Import parsing utility functions
 from .parsing import parse_python_response, parse_json_response
+# Import the new ActionSelector
+from .action_selector import ActionSelector
 
 # Make yaml use compact representation for lists
 yaml.add_representer(list, lambda dumper, data: dumper.represent_sequence(
@@ -59,10 +61,20 @@ class Agent:
         self._setup_repository_and_logging(repository)
 
         # Initialize core components
-        self._setup_components()
+        self._setup_fsm()
+        self._setup_context_history()
+        self._setup_repository_manager()
+        self._setup_version_manager()
+        self._setup_openai_handler()
+        self._setup_action_selection()
+        self._setup_agent_api()
 
         # Register cleanup handlers
         self._register_cleanup()
+
+        # Export agent configuration and draw graph
+        self.export_config()
+        self.draw_fsm_graph()
 
         self.logger.info(f"Agent {self.name} initialized with role:\n{self.role}")
 
@@ -78,7 +90,7 @@ class Agent:
         # Set attributes from Agent config
         agent_config = self.config.get('Agent', {})
         set_attributes_from_config(self, agent_config,
-            ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience'])
+            ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience', 'action_select_strat'])
 
     def _validate_name_role(self, name: str, role: str) -> None:
         """Validates and formats the agent's role string"""
@@ -124,46 +136,69 @@ class Agent:
         get_logger().configure(log_config)
         self.logger.info(f"Logging configured. Log directory: {log_config['base_dir']}")
 
-    def _setup_components(self) -> None:
-        """Initialize all agent components"""
-        # FSM setup
-        self._setup_fsm()
+    def _setup_fsm(self):
+        """Initialize the Finite State Machine using FSMSelector"""
+        fsm_selector = FSMSelector(fsm_type=self.fsm_type, config=self.config)
+        self.fsm = fsm_selector.create_fsm(self.config)
+        self.logger.info(f"Initialized {self.fsm_type} FSM using FSMSelector: {self.fsm.get_current_state()}")
+        self.logger.info(f"FSM Description: {fsm_selector.get_description()}")
 
-        # Core components
+    def _setup_context_history(self) -> None:
+        """Initialize core agent components"""
         self.context = {}
         self.history = AgentHistory()
 
-        # Add initial FSM state to history
+        # Add initial FSM state to history if FSM is initialized
         if self.fsm and self.fsm.current_state:
             self.history.add_initial_state(self.fsm.current_state)
 
-        # Setup repository manager
+    def _setup_repository_manager(self) -> None:
+        """Initialize repository manager with configuration"""
         repository_config = self.config.get('RepositoryManager', {})
         self.repository_manager = RepositoryManager(
             repository_path=self.repository,
             config=repository_config
         )
+        self.logger.debug("Repository manager initialized")
 
-        # Version manager
+    def _setup_version_manager(self) -> None:
+        """Initialize version manager with database configuration"""
         version_config = self.config.get('VersionManager', {})
         db_config = self.config.get('DatabaseManager', {})
-        self.version_manager = VersionManager(config=version_config, db_config=db_config)
+        self.version_manager = VersionManager(
+            config=version_config,
+            db_config=db_config
+        )
+        self.logger.debug("Version manager initialized")
 
-        # OpenAI handler
+    def _setup_openai_handler(self) -> None:
+        """Initialize OpenAI handler with configuration"""
         openai_config = self.config.get('OpenAIHandler', {})
         self.openai_handler = OpenAIHandler(config=openai_config)
+        self.logger.debug("OpenAI handler initialized")
 
-        # Optional API setup
-        self._setup_agent_api()
+    def _setup_action_selection(self) -> None:
+        """Setup action selection strategy"""
+        selection_config = self.config.get('ActionSelector', {})
+        strategy_config = selection_config.get(self.action_select_strat, {})
+
+        self.action_selector = ActionSelector(
+            strategy=self.action_select_strat,
+            config=strategy_config
+        )
+        self.logger.info(f"Action selector: {self.action_select_strat}")
 
     def _setup_agent_api(self) -> None:
         """Setup agent API if enabled"""
         if not self.agent_api:
+            self.logger.debug("Agent API disabled, skipping initialization")
             return
+
         from .agent_api import AgentApi
         api_config = self.config.get('AgentApi', {})
         self.agent_api = AgentApi(agent=self, config=api_config)
         self.agent_api.run()
+        self.logger.info("Agent API initialized and running")
 
     def _register_cleanup(self) -> None:
         """Register cleanup handlers for graceful shutdown"""
@@ -193,16 +228,6 @@ class Agent:
 
         self.shutdown()
         sys.exit(0)
-
-    def _setup_fsm(self):
-        """Initialize the Finite State Machine"""
-        self.logger.assert_true(
-            self.fsm_type in FSM_FACTORY,
-            f"{self.fsm_type} FSM is not defined in FSM_FACTORY, cannot be loaded"
-        )
-
-        self.fsm = FSM_FACTORY[self.fsm_type](self.config)
-        self.logger.info(f"Initialized {self.fsm_type} FSM with state: {self.fsm.get_current_state()}")
 
     def get_id(self):
         """Unique id for identifying agent in file system"""
@@ -337,6 +362,7 @@ class Agent:
     def run_loop(self, max_iterations: int = 10, stop_on_error: bool = True) -> Dict:
         """
         Main execution loop that continuously executes actions based on FSM state
+        Now uses ActionSelector for cleaner action selection logic
 
         Args:
             max_iterations: Maximum number of iterations to prevent infinite loops
@@ -351,11 +377,13 @@ class Agent:
         )
 
         self.logger.info(f"Starting agent loop for {max_iterations} iterations")
+        start_iteration = self.curr_iteration
         end_iteration = self.curr_iteration + max_iterations
 
-        for iteration in range(self.curr_iteration, end_iteration):
+        for iteration in range(start_iteration, end_iteration):
             try:
                 # Increment iteration counter in history, show iteration
+                self.current_iteration = iteration
                 self.history.set_iteration(iteration)
                 self.logger.info(f"Loop iteration {iteration}/{end_iteration-1}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
@@ -367,61 +395,22 @@ class Agent:
                 self._summary()
 
                 # Check agent context on first iteration to make sure state is valid
-                if iteration == 1: self.fsm.check_context(self)
-                # Check if there are available actions
-                available_actions = self.fsm.get_available_actions()
-                if not available_actions:
-                    self.logger.error("No available actions in current state. Stopping loop.")
-                    if stop_on_error:
-                        break
+                if iteration == 1:
+                    self.fsm.check_context(self)
+
+                # NEW: Use ActionSelector for all action selection logic
+                chosen_action, reasoning, should_continue = self.action_selector.select_action(
+                    agent=self,
+                    iteration=iteration,
+                    stop_on_error=stop_on_error
+                )
+
+                # Handle action selection results
+                if not should_continue:
+                    if chosen_action is None:
+                        break  # Exit loop due to error or no actions
                     else:
-                        self.fsm.reset(self)
-                        self.history.reset()
-                        continue
-                else:
-                    self.logger.info(f"Available actions from {self.fsm.get_current_state()}: {available_actions}")
-
-                # If only one action available, select it directly without LLM call
-                if len(available_actions) == 1:
-                    chosen_action = available_actions[0]
-                    reasoning = "only one action available - auto-selected"
-                    self.logger.info(f"Auto-selecting single available action: {chosen_action}")
-                else:
-                    # Construct prompt combining role, state prompt, and available actions
-                    prompt = self.fsm.get_action_selection_prompt(self)
-
-                    # Get action choice from LLM
-                    response = self.chat_completion(
-                        prompt=prompt,
-                        system_message=self.role,
-                        response_format={"type": "json_object"}
-                    )
-
-                    # Extract action from response
-                    chosen_action, reasoning = self._extract_action_from_response(response)
-
-                    if not chosen_action:
-                        error_msg = f"Could not determine action from LLM response: {response}"
-                        self.logger.error(error_msg)
-                        self.history.add_error(iteration, error_msg, self.fsm.current_state)
-                        if stop_on_error:
-                            break
-                        else:
-                            self.fsm.reset(self)
-                            self.history.reset()
-                            continue
-
-                    # Validate action is available
-                    if chosen_action not in available_actions:
-                        error_msg = f"Action '{chosen_action}' not available in state '{self.fsm.current_state}'. Available: {available_actions}"
-                        self.logger.error(error_msg)
-                        self.history.add_error(iteration, error_msg, self.fsm.current_state)
-                        if stop_on_error:
-                            break
-                        else:
-                            self.fsm.reset(self)
-                            self.history.reset()
-                            continue
+                        continue  # Continue to next iteration (reset case)
 
                 # Store previous state for history
                 prev_state = self.fsm.current_state
@@ -454,12 +443,13 @@ class Agent:
                     continue
 
         # Record final state and context
-        self.curr_iteration = end_iteration
         self.history.set_final_state(self.fsm.current_state, self.context)
-        self._summary()
-
         if self.history.has_errors():
             self.logger.info(f"Loop completed with {len(self.history.errors)} errors")
+        self._summary()
+
+        # Set current iteration for next run_loop call
+        self.curr_iteration = end_iteration
 
         # Return dictionary format for backward compatibility
         return self.history.to_dict()
@@ -493,17 +483,17 @@ class Agent:
 
     def print_summary(self, summary):
         """Print agent summary to console."""
-        self.logger.info("=" * 80)
+        self.logger.info("="*80)
         self.logger.info("AGENT SUMMARY")
-        self.logger.info("=" * 80)
+        self.logger.info("="*80)
         for line in summary.split('\n'):
             self.logger.info(line)
-        self.logger.info("=" * 80)
+        self.logger.info("="*80)
 
     def save_summary(self, summary):
         """Save agent summary to file in log directory."""
         log_dir = self.get_log_dir()
-        summary_file = os.path.join(log_dir, f"{self.get_id()}.summary")
+        summary_file = os.path.join(log_dir, f"{self.get_id()}.summary.log")
 
         # Add timestamp
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

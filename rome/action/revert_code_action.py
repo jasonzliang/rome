@@ -13,13 +13,13 @@ class RevertCodeAction(Action):
     def __init__(self, config: Dict = None):
         super().__init__(config)
         self.logger = get_logger()
-        check_attrs(self, ['custom_prompt', 'k_versions'])
+        check_attrs(self, ['custom_prompt', 'num_versions'])
 
     def summary(self, agent) -> str:
         """Return a short summary of the revert action"""
         selected_file = agent.context['selected_file']
         filename = os.path.basename(selected_file['path'])
-        return f"analyze last {self.k_versions} versions of {filename} and revert to a version with better correct and working code if needed"
+        return f"analyze last {self.num_versions} versions of {filename} and revert to a previous version with better, working code if needed"
 
     def _analyze_version_history(self, agent, code_versions: List[Dict], test_versions: List[Dict]) -> Dict:
         """Use LLM to analyze version history and decide if reversion is needed"""
@@ -178,16 +178,16 @@ Only recommend reversion if there is clear evidence that a previous version was 
             return False
 
         # Step 2: Load version histories
-        self.logger.info(f"Loading last {self.k_versions} versions for analysis")
-        code_versions = agent.version_manager.load_version(file_path, k=self.k_versions, include_content=True)
-        test_versions = agent.version_manager.load_test_version(test_path, k=self.k_versions, include_content=True)
+        self.logger.info(f"Loading last {self.num_versions} versions for analysis")
+        code_versions = agent.version_manager.load_version(file_path, k=self.num_versions, include_content=True)
+        test_versions = agent.version_manager.load_test_version(test_path, k=self.num_versions, include_content=True)
 
         # Normalize to lists
         code_versions = [code_versions] if isinstance(code_versions, dict) else (code_versions or [])
         test_versions = [test_versions] if isinstance(test_versions, dict) else (test_versions or [])
 
         if not code_versions and not test_versions:
-            self.logger.warning("No version history found for analysis")
+            self.logger.error("No version history found for analysis")
             return True
 
         # Step 3: Analyze version history with LLM

@@ -97,12 +97,6 @@ class EvalPlusBenchmark:
         """Run agent on benchmark problems"""
         self.agent = Agent(repository=self.benchmark_dir, config=self.config)
 
-        try:
-            self.agent.export_config()
-            self.agent.draw_fsm_graph()
-        except Exception as e:
-            self.logger.error(f"Agent setup error: {e}")
-
         self.logger.info(f"Running agent for {max_iterations} iterations")
         results = self.agent.run_loop(max_iterations=max_iterations, stop_on_error=stop_on_error)
 

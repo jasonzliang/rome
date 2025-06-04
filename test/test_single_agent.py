@@ -111,9 +111,8 @@ def main():
         },
 
         # SearchAction specific configuration
-        "SearchAction": {
-            "batch_size": 1,
-            "batch_sampling": True,
+        "TournamentSearchAction": {
+            "batch_size": 2,
         },
 
         # Repository manager configuration
@@ -129,7 +128,6 @@ def main():
         repository=str(test_dir.absolute()),
         config=config
     )
-    agent.draw_fsm_graph()
 
     # Get user input for number of iterations
     results = None

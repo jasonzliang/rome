@@ -58,7 +58,7 @@ class EditCodeAction(Action):
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']
         filename = os.path.basename(file_path)
-        return f"analyze and improve code in {filename} focusing on bugs, performance, and readability"
+        return f"analyze and improve code in {filename}, addressing execution issues, bugs, performance, and readability"
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute code editing action to improve the current selected file"""

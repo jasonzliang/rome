@@ -5,5 +5,6 @@ from .exec_code_action import ExecuteCodeAction
 from .reset_action import ResetAction
 from .advanced_reset_action import AdvancedResetAction
 from .revert_code_action import RevertCodeAction
-from .search_action import SearchAction
+from .priority_search_action import PrioritySearchAction
+from .tournament_search_action import TournamentSearchAction
 from .transition_action import TransitionAction

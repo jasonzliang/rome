@@ -15,7 +15,7 @@ from ..config import LOG_DIR_NAME, META_DIR_EXT, SUMMARY_LENGTH, TEST_FILE_EXT
 from ..config import check_attrs
 from ..parsing import extract_all_definitions
 
-class SearchAction(Action):
+class PrioritySearchAction(Action):
     """Action to search the repository for code files using OpenAI selection"""
 
     def __init__(self, config: Dict = None):
@@ -26,17 +26,21 @@ class SearchAction(Action):
 
     def summary(self, agent) -> str:
         """Return a detailed summary of the search action"""
-        repo_config = agent.repository_manager.config
-        file_types_str = ', '.join(repo_config.get('file_types', ['.py']))
-        exclude_dirs = repo_config.get('exclude_dirs', [])
-        max_files = repo_config.get('max_files', sys.maxsize)
+        file_types_str = ', '.join(agent.repository_manager.file_types)
+        exclude_dirs = agent.repository_manager.exclude_dirs
+        max_files = agent.repository_manager.max_files
         excluded_dirs_str = ', '.join(exclude_dirs) if exclude_dirs else 'none'
 
-        return (f"search repository for {file_types_str} files using multi-stage LLM selection: "
-                f"(1) scan all files and create overview with size/age/function definitions, "
-                f"(2) LLM prioritizes all files 1-5 based on {self.selection_criteria}, "
-                f"(3) process top files in batches of {self.batch_size} with full content for LLM to select best match "
-                f"(max files: {max_files}, excluding dirs: {excluded_dirs_str})")
+        sampling_mode = "weighted sampling" if self.batch_sampling else "sequential"
+
+        return (
+            f"Multi-stage LLM repository search for {file_types_str} files: "
+            f"(1) scan repository and extract metadata (size/age/definitions), "
+            f"(2) LLM prioritizes {self.batch_size} files 1-10 based on '{self.selection_criteria}', "
+            f"(3) select from prioritized files using {sampling_mode} "
+            f"with full content analysis for optimal match selection "
+            f"[max files: {max_files}, excluding: {excluded_dirs_str}]"
+        )
 
     def _truncate_text(self, text: str, max_length: int = SUMMARY_LENGTH) -> str:
         """Truncate text to specified length with ellipsis if needed"""
@@ -133,7 +137,7 @@ Files to prioritize:
                 prompt += "No function/class definitions found\n"
 
         prompt += f"""
-Return a JSON OBJECT with {self.batch_size} files like below. These files should be chosen semi-randomly and should be mostly high and medium priority files, with occasionally a few low priority ones.
+Return a JSON OBJECT with {min(len(file_overviews), self.batch_size)} files like below. These files should be the ones which you think have the highest priority. For files with same priority, randomly choose one.
 {{
   "path/to/file1.py": 8,
   "path/to/file2.py": 6,
@@ -338,13 +342,7 @@ Respond with a JSON object:
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute the search action"""
-        self.logger.info("Starting SearchAction execution")
-
-        # Validate OpenAI handler
-        if not (hasattr(agent, 'openai_handler') and agent.openai_handler is not None):
-            error_msg = "Agent must have an openai_handler attribute initialized"
-            self.logger.error(error_msg)
-            raise ValueError(error_msg)
+        self.logger.info("Starting PrioritySearchAction execution")
 
         # Use the agent's repository manager to collect and filter files
         filtered_files = agent.repository_manager.collect_and_filter_files(agent=agent)
