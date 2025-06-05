@@ -554,6 +554,7 @@ class Agent:
         self.summary_history.append({
             'iteration': self.curr_iteration,
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'epoch_time': time.time(),
             'summary': summary
         })
 

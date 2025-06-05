@@ -177,7 +177,7 @@ class EvalplusEvaluator:
         solutions_file = solutions_file.resolve()
         script = (self.eval_dir / "eval.sh").resolve()
         sanitized = Path(str(solutions_file).replace('.jsonl', '-sanitized.jsonl')).resolve()
-        output_file = (self.eval_dir / "eval.output.txt").resolve()
+        output_file = (self.eval_dir / f"eval.{int(time.time())}.out.txt").resolve()
 
         content = f"""#!/bin/bash
 CMD=$(command -v evalplus || echo "python -m evalplus")
