@@ -19,13 +19,13 @@ def create_analysis_prompt(agent, file_path: str) -> Optional[str]:
     context_parts = []
 
     # Add execution output
-    context_parts.append(f"1. Test Execution Output:**\n```\n{execution_data['exec_output']}\n```")
+    context_parts.append(f"1. Test Execution Output:\n```\n{execution_data['exec_output']}\n```")
 
     # Add exit code info
-    context_parts.append(f"2. Exit Code:** {execution_data['exec_exit_code']}")
+    context_parts.append(f"2. Exit Code: {execution_data['exec_exit_code']}")
 
     # Add analysis if available
-    context_parts.append(f"3. Automated Code Analysis:**\n{execution_data['exec_analysis']}")
+    context_parts.append(f"3. Automated Code Analysis:\n{execution_data['exec_analysis']}")
 
     if not context_parts:
         return None
