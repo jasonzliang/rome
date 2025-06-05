@@ -50,7 +50,7 @@ class AgentHistory:
             error_record['exception'] = exception
 
         self.errors.append(error_record)
-        self.logger.info(f"Recorded error in iteration {iteration}: {error_msg}")
+        # self.logger.debug(f"Recorded error in iteration {iteration}: {error_msg}")
 
     def increment_iteration(self):
         """Increment the iteration counter"""

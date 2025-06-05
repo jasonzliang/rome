@@ -1,9 +1,11 @@
 # RUN MANUALLY ONLY
 import os
+import pprint
 import sys
 import shutil
 import json
 from pathlib import Path
+import traceback
 
 # Add the parent directory to sys.path to import from the module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,6 +45,7 @@ HUMAN_EVAL_SAMPLES = {
     pass"""
 }
 
+
 def setup_test_dir():
     """Create test directory with HumanEval samples"""
     test_dir = Path("result/test_single_agent")
@@ -56,6 +59,7 @@ def setup_test_dir():
         (problem_dir / f"{problem_name}.py").write_text(content)
 
     return test_dir
+
 
 def create_config():
     """Compact, efficient configuration"""
@@ -71,6 +75,7 @@ def create_config():
             "patience": 1,
             "action_select_strat": "smart",
             "agent_api": False,
+            "foo": 5
         },
         "Logger": {
             "level": "DEBUG",
@@ -87,6 +92,7 @@ def create_config():
             "file_types": [".py"]
         },
     }
+
 
 def run_test():
     """Main test execution with minimal interaction"""
@@ -122,15 +128,12 @@ def run_test():
 
                 results = agent.run_loop(max_iterations=iterations, stop_on_error=True)
 
-                # Quick summary
-                stats = results.get('execution_stats', {})
-                progress = results.get('repository_progress', {})
-                cost = results.get('openai_cost', {})
-
-                print(f"Actions: {stats.get('actions_executed', 0)}, "
-                      f"Success: {stats.get('success_rate', 'N/A')}, "
-                      f"Files: {progress.get('finished_files', 0)}/{progress.get('total_files', 0)}, "
-                      f"Cost: ${cost.get('accumulated_cost', 0):.3f}")
+                summary = results.get('summary', {})
+                if summary:
+                   for line in pprint.pformat(summary, width=80).split('\n'):
+                       logger.info(line)
+                else:
+                   logger.info("No summary data available")
 
             except (ValueError, KeyboardInterrupt):
                 break
@@ -147,10 +150,12 @@ def run_test():
 
     except Exception as e:
         logger.error(f"Test error: {e}")
+        logger.error(traceback.format_exc())
         return None
     finally:
         if agent:
             agent.shutdown()
+
 
 if __name__ == "__main__":
     run_test()

@@ -1,13 +1,96 @@
-# action_selector.py
+# action_selector.py - Enhanced with backoff decorator
+import time
+import functools
+import backoff
 from abc import ABC, abstractmethod
 from typing import Dict, List, Tuple, Optional
 from .logger import get_logger
-from .config import set_attributes_from_config
+from .config import set_attributes_from_config, check_attrs
 
 
 class ActionSelectorError(Exception):
     """Custom exception for action selection errors"""
     pass
+
+
+class ActionTooFrequentError(Exception):
+    """Exception raised when max backoff attempts exceeded"""
+    def __init__(self, action_name: str, attempts: int, max_tries: int):
+        self.action_name = action_name
+        self.attempts = attempts
+        self.max_tries = max_tries
+        super().__init__(f"Action '{action_name}' blocked after {attempts} backoff attempts (max: {max_tries})")
+
+
+def action_frequency_backoff(func=None):
+    """
+    Compact backoff: doubles wait time on retry, raises exception after max_tries
+    """
+    def decorator(f):
+        @functools.wraps(f)
+        def wrapper(self, agent, iteration: int, stop_on_error: bool = True):
+            # Initialize tracking
+            if not hasattr(self, 'last_execution'):
+                self.last_execution = {}
+            if not hasattr(self, 'skip_next_check'):
+                self.skip_next_check = set()
+            if not hasattr(self, 'backoff_attempts'):
+                self.backoff_attempts = {}
+
+            if not getattr(self, 'backoff_enabled', True):
+                return f(self, agent, iteration, stop_on_error)
+
+            # Get action result
+            result = f(self, agent, iteration, stop_on_error)
+            if not result or len(result) != 3:
+                return result
+
+            action_name, reason, should_continue = result
+            if not action_name or not should_continue:
+                return result
+
+            # Skip check if action just completed backoff
+            if action_name in self.skip_next_check:
+                self.skip_next_check.remove(action_name)
+                self.last_execution[action_name] = time.time()
+                self.logger.debug(f"Skipping frequency check for {action_name} (post-backoff)")
+                return result
+
+            # Check frequency
+            now = time.time()
+            last_time = self.last_execution.get(action_name, 0)
+            elapsed = now - last_time
+
+            if elapsed < self.min_interval:
+                # Track backoff attempts
+                attempts = self.backoff_attempts.get(action_name, 0) + 1
+                self.backoff_attempts[action_name] = attempts
+
+                # Check if max tries exceeded
+                if attempts > self.max_tries:
+                    self.logger.error(f"Action {action_name} blocked after {attempts} attempts")
+                    raise ActionTooFrequentError(action_name, attempts, self.max_tries)
+
+                # Calculate exponentially increasing wait time: min_interval * 2^attempts
+                wait_time = self.min_interval * (2 ** attempts)
+
+                self.logger.debug(f"Action {action_name} backing off {wait_time:.1f}s "
+                                f"(attempt {attempts}/{self.max_tries})")
+
+                # Sleep and mark to skip next check
+                time.sleep(wait_time)
+                self.skip_next_check.add(action_name)
+            else:
+                # Reset attempts counter on successful execution within interval
+                self.backoff_attempts[action_name] = 0
+
+            # Record execution time
+            self.last_execution[action_name] = time.time()
+            return result
+
+        return wrapper
+
+    return decorator if func is None else decorator(func)
 
 
 class ActionSelectorBase(ABC):
@@ -24,9 +107,7 @@ class ActionSelectorBase(ABC):
         pass
 
     def _extract_action_from_response(self, agent, response: str) -> tuple:
-        """
-        Extract the action name from the LLM response
-        """
+        """Extract the action name from the LLM response"""
         reasoning = "No reasoning provided"
 
         # Try to parse as JSON first
@@ -50,21 +131,7 @@ class ActionSelectorBase(ABC):
         raise ValueError(f"Could not extract valid action from response: {response}")
 
     def select_action(self, agent, iteration: int, stop_on_error: bool = True) -> Tuple[str, str, bool]:
-        """
-        Select an action for the agent to execute
-
-        Args:
-            agent: The agent instance
-            iteration: Current iteration number
-            stop_on_error: Whether to raise exceptions on errors (True) or recover gracefully (False)
-
-        Returns:
-            Tuple of (chosen_action, reasoning, should_continue)
-            If stop_on_error=False and error occurs, should_continue may be True (reset and continue)
-
-        Raises:
-            ActionSelectorError: When stop_on_error=True and action selection fails
-        """
+        """Select an action with frequency-based exponential backoff"""
         # Check if there are available actions
         available_actions = agent.fsm.get_available_actions()
         if not available_actions:
@@ -141,6 +208,29 @@ class ActionSelectorBase(ABC):
                 return None, f"{error_msg} - reset and continue", True
 
         return chosen_action, reasoning, True
+
+    # def get_backoff_status(self) -> Dict:
+    #     """Get current backoff status"""
+    #     if hasattr(self, 'last_execution'):
+    #         current_time = time.time()
+    #         return {
+    #             action: {
+    #                 'time_since_last': current_time - last_exec,
+    #                 'can_execute': (current_time - last_exec) >= self.min_interval
+    #             }
+    #             for action, last_exec in self.last_execution.items()
+    #         }
+    #     return {}
+
+    # def reset_backoff(self, action_name: str = None):
+    #     """Reset backoff tracking"""
+    #     if hasattr(self, 'last_execution'):
+    #         if action_name:
+    #             self.last_execution.pop(action_name, None)
+    #             self.logger.info(f"Reset backoff for '{action_name}'")
+    #         else:
+    #             self.last_execution.clear()
+    #             self.logger.info("Reset all backoff tracking")
 
 
 class OriginalActionSelector(ActionSelectorBase):
@@ -224,14 +314,11 @@ class SmartActionSelector(ActionSelectorBase):
         """Initialize SmartActionSelector with configurable parameters"""
         super().__init__(config)
 
-        # Set attributes from config with required and optional parameters
-        set_attributes_from_config(self, self.config,
-            required_attrs=[
-                'loop_detection_window',      # None = use agent.history_context_len
-                'exploration_rate',           # Base exploration probability
-                'overuse_threshold'           # Fraction triggering overuse warning
-            ]
-        )
+        check_attrs(self, [
+            'loop_detection_window', # None = use agent.history_context_len
+            'exploration_rate', # Base exploration probability
+            'overuse_threshold' # Fraction triggering overuse warning
+        ])
 
         self.logger.info(f"SmartActionSelector initialized with config: {self.config}")
 
@@ -453,47 +540,35 @@ class SmartActionSelector(ActionSelectorBase):
 
 
 class ActionSelector:
-    """Factory class for action selection strategies"""
-
+    """Factory class for action selection strategies with backoff support"""
     SELECTORS = {
         "original": OriginalActionSelector,
         "smart": SmartActionSelector
     }
 
     def __init__(self, strategy: str = "original", config: Dict = None):
-        """
-        Initialize action selection with specified strategy
-
-        Args:
-            strategy: Selection strategy ("original" or "smart")
-            config: Configuration dictionary for the selector
-        """
+        """Initialize action selection with specified strategy"""
+        self.strategy = strategy
+        self.config = config or {}
         self.logger = get_logger()
 
+        set_attributes_from_config(self, self.config, ['min_interval', 'max_tries', 'backoff_enabled'])
+
+        # Run selector constructor
         if strategy not in self.SELECTORS:
             raise ValueError(f"Unknown action selection strategy: {strategy}. Available: {list(self.SELECTORS.keys())}")
 
-        self.strategy = strategy
-        self.selector = self.SELECTORS[strategy](config)
-        self.logger.info(f"Initialized {strategy} action selection strategy")
+        strategy_config = self.config.get(strategy, {})
+        self.selector = self.SELECTORS[self.strategy](strategy_config)
+
+        self.logger.info(f"Initialized {strategy} action selection strategy with backoff "
+            f"enabled: {self.backoff_enabled}")
 
     def get_action_selection_prompt(self, fsm, agent) -> str:
         """Generate action selection prompt using the configured strategy"""
         return self.selector.get_action_selection_prompt(fsm, agent)
 
+    @action_frequency_backoff()
     def select_action(self, agent, iteration: int, stop_on_error: bool = True) -> Tuple[str, str, bool]:
-        """
-        Select an action using the configured strategy
-
-        Args:
-            agent: The agent instance
-            iteration: Current iteration number
-            stop_on_error: Whether to raise exceptions on errors (True) or recover gracefully (False)
-
-        Returns:
-            Tuple of (chosen_action, reasoning, should_continue)
-
-        Raises:
-            ActionSelectorError: When stop_on_error=True and action selection fails
-        """
+        """Select an action using the configured strategy with automatic backoff"""
         return self.selector.select_action(agent, iteration, stop_on_error)

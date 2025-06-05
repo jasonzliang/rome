@@ -179,12 +179,12 @@ class Agent:
 
     def _setup_action_selection(self) -> None:
         """Setup action selection strategy"""
-        selection_config = self.config.get('ActionSelector', {})
-        strategy_config = selection_config.get(self.action_select_strat, {})
+        # Get the entire ActionSelector config block
+        action_selector_config = self.config.get('ActionSelector', {})
 
         self.action_selector = ActionSelector(
             strategy=self.action_select_strat,
-            config=strategy_config
+            config=action_selector_config  # Pass entire config block
         )
         self.logger.info(f"Action selector: {self.action_select_strat}")
 
@@ -378,7 +378,7 @@ class Agent:
                 if iteration == 1:
                     self.fsm.check_context(self)
 
-                # NEW: Use ActionSelector for all action selection logic
+                # Use ActionSelector for all action selection logic
                 chosen_action, reason, should_continue = self.action_selector.select_action(
                     agent=self,
                     iteration=iteration,

@@ -1,9 +1,11 @@
 # RUN MANUALLY ONLY
 import os
+import pprint
 import sys
 import shutil
 import json
 from pathlib import Path
+import traceback
 
 # Add parent directory to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -43,17 +45,6 @@ HUMAN_EVAL_SAMPLES = {
     0.5
     """
     pass''',
-
-    "HumanEval_3": '''def below_zero(operations):
-    """ You're given a list of deposit and withdrawal operations on a bank account that starts with
-    zero balance. Your task is to detect if at any point the balance of account fallls below zero, and
-    at that point function should return True. Otherwise it should return False.
-    >>> below_zero([1, 2, 3])
-    False
-    >>> below_zero([1, 2, -4, 5])
-    True
-    """
-    pass'''
 }
 
 # Simplified agent configurations (2 agents)
@@ -61,6 +52,7 @@ AGENT_CONFIGS = {
     "MathSolver": "You are an expert mathematician that specializes in implementing mathematical algorithms and numerical computations with high precision.",
     "StringProcessor": "You are a string processing expert that excels at parsing, manipulating, and analyzing text and string patterns."
 }
+
 
 def setup_test_environment():
     """Setup test directory with HumanEval samples and agent config"""
@@ -84,6 +76,7 @@ def setup_test_environment():
     config_file.write_text(json.dumps(AGENT_CONFIGS, indent=4))
 
     return test_dir, str(config_file)
+
 
 def create_config():
     """Create compact configuration for multi-agent system"""
@@ -114,6 +107,7 @@ def create_config():
             "file_types": [".py"]
         },
     }
+
 
 def main():
     """Main execution function"""
@@ -176,7 +170,6 @@ def main():
 
     summary = results.get('summary', {})
     if summary:
-       import pprint
        for line in pprint.pformat(summary, width=80).split('\n'):
            logger.info(line)
     else:
@@ -189,9 +182,10 @@ def main():
         with open(log_dir / "multi_agent_results.json", "w") as f:
             json.dump(results, f, indent=4, default=str)
         logger.info(f"Results saved to: {log_dir}")
-
     except Exception as e:
         logger.error(f"Failed to save results: {e}")
+        logger.error(traceback.format_exc())
+
 
 if __name__ == "__main__":
     main()

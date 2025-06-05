@@ -89,6 +89,10 @@ DEFAULT_CONFIG = {
     "FSM": {},
 
     "ActionSelector": {
+        "min_interval": 1, # Backoff detection interval (also backoff initial delay time)
+        "max_tries": 5, # Number of times to try before backoff error raised
+        "backoff_enabled": True, # Whether to enable backoff or not
+
         "original": {},  # Config for original selector (empty for now)
         "smart": {  # Config for smart selector
             "loop_detection_window": None,  # Override window based on agent.history_context_len
@@ -306,10 +310,13 @@ def merge_with_default_config(custom_config):
 
     def _update_dict(d, u):
         for k, v in u.items():
+            # If dict, recursively update it
             if isinstance(v, dict) and k in d and isinstance(d[k], dict):
                 d[k] = _update_dict(d[k], v)
-            else:
+            elif k in d: # If key in orig dict, validate it
                 d[k] = _validate(k, d[k], v)
+            else: # If key not in orig dict, just add it
+                d[k] = v
         return d
 
     logger = get_logger()
