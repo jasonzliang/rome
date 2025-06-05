@@ -182,13 +182,14 @@ def main():
     parser = argparse.ArgumentParser(description="Benchmark agent on HumanEval+ dataset")
     parser.add_argument("benchmark_dir", help="Path to benchmark directory")
     parser.add_argument("config_file", help="Path to agent configuration YAML file")
+
     parser.add_argument("--dataset", choices=["humaneval", "mbpp"], default="humaneval")
-    parser.add_argument("--num-samples", type=int, help="Number of samples to include")
-    parser.add_argument("--task-ids", nargs="+", help="Specific task IDs to include")
-    parser.add_argument("--max-iterations", type=int, default=0, help="Iterations for agent to run")
-    parser.add_argument("--stop-on-error", action="store_true", help="Stop agent if exception thrown")
-    parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
     parser.add_argument("--eval-interval", type=int, default=1800, help="Periodic evaluation interval in seconds")
+    parser.add_argument("--max-iterations", type=int, default=0, help="Iterations for agent to run")
+    parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
+    parser.add_argument("--num-samples", type=int, help="Number of samples to include")
+    parser.add_argument("--stop-on-error", action="store_true", help="Stop agent if exception thrown")
+    parser.add_argument("--task-ids", nargs="+", help="Specific task IDs to include")
 
     args = parser.parse_args()
 

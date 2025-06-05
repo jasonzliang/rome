@@ -59,6 +59,7 @@ DEFAULT_CONFIG = {
     "MultiAgent": {
         "agent_role_json": None,  # Multi agent json, can be overwritten by constructor
         "repository": None,  # Multi agent repo, can be overwritten by constructor
+        "suppress_output": True, # Suppress individual agent console output
     },
 
     # LLM HANDLER CONFIGURATION

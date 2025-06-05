@@ -1,6 +1,7 @@
 import multiprocessing as mp
 import json
 import os
+import sys
 import time
 import traceback
 from pathlib import Path
@@ -13,9 +14,18 @@ from .process import process_managed
 
 
 def _agent_worker(agent_name: str, agent_role: str, repository: str, config: Dict,
-                  max_iterations: int, result_queue: mp.Queue):
+                  max_iterations: int, result_queue: mp.Queue, suppress_output: bool = False):
     """Simplified worker - process_managed decorator handles main process cleanup"""
     agent = None
+
+    # Suppress output if requested
+    if suppress_output:
+        original_stdout, original_stderr = sys.stdout, sys.stderr
+        try:
+            devnull = open(os.devnull, 'w')
+            sys.stdout = sys.stderr = devnull
+        except:
+            pass  # Fallback to normal operation if redirection fails
 
     try:
         result_queue.put(('starting', agent_name, 'Initializing'))
@@ -40,6 +50,14 @@ def _agent_worker(agent_name: str, agent_role: str, repository: str, config: Dic
             except:
                 pass
 
+        # Restore output streams if suppressed
+        if suppress_output:
+            try:
+                sys.stdout, sys.stderr = original_stdout, original_stderr
+                devnull.close()
+            except:
+                pass
+
 
 @process_managed  # Let decorator handle process cleanup
 class MultiAgent:
@@ -51,15 +69,14 @@ class MultiAgent:
         # Config setup
         if config:
             set_attributes_from_config(self, config.get('MultiAgent', {}),
-                                     ['agent_role_json', 'repository'])
-
+                ['agent_role_json', 'repository', 'suppress_output'])
         self.agent_role_json = agent_role_json or getattr(self, 'agent_role_json', None)
         self.repository = repository or getattr(self, 'repository', None)
 
         # Validate and load
         self._validate_paths()
-        self.agents_config = self._load_config()
-        self.base_config = config or {}
+        self.agent_role_config = self._load_role_config()
+        self.agent_config = config or {}
 
         # Runtime state - process_managed will handle cleanup automatically
         self.agent_processes: Dict[str, mp.Process] = {}
@@ -73,7 +90,7 @@ class MultiAgent:
             if not os.path.exists(path):
                 raise FileNotFoundError(f"{name} not found: {path}")
 
-    def _load_config(self) -> Dict[str, str]:
+    def _load_role_config(self) -> Dict[str, str]:
         """Load and validate agent configuration"""
         try:
             with open(self.agent_role_json, 'r') as f:
@@ -95,7 +112,7 @@ class MultiAgent:
         self._setup_queue()
 
         # Initialize agent status
-        self.agent_status = {name: 'pending' for name in self.agents_config}
+        self.agent_status = {name: 'pending' for name in self.agent_role_config}
 
         try:
             self._start_processes(max_iterations)
@@ -106,7 +123,7 @@ class MultiAgent:
         # No finally block needed - process_managed handles cleanup
 
         return {
-            'total_agents': len(self.agents_config),
+            'total_agents': len(self.agent_role_config),
             'completed_agents': len(self.results),
             'agent_results': self.results,
             'agent_status': self.agent_status,
@@ -127,12 +144,12 @@ class MultiAgent:
 
     def _start_processes(self, max_iterations: int):
         """Start all agent processes"""
-        for agent_name, agent_role in self.agents_config.items():
+        for agent_name, agent_role in self.agent_role_config.items():
             try:
                 process = mp.Process(
                     target=_agent_worker,
-                    args=(agent_name, agent_role, self.repository, self.base_config,
-                          max_iterations, self.result_queue),
+                    args=(agent_name, agent_role, self.repository, self.agent_config,
+                          max_iterations, self.result_queue, self.suppress_output),
                     daemon=False
                 )
                 process.start()
@@ -144,14 +161,17 @@ class MultiAgent:
     def _collect_results(self, timeout_per_agent: int):
         """Collect results from all agents with timeout handling"""
         completed = 0
-        total = len(self.agents_config)
+        total = len(self.agent_role_config)
         start_time = time.time()
 
         while completed < total:
             try:
                 # Calculate remaining timeout
                 elapsed = time.time() - start_time
-                remaining = max(30, timeout_per_agent - elapsed) if timeout_per_agent > 0 else 30
+                if timeout_per_agent > 0:
+                    remaining = max(30, timeout_per_agent - elapsed)
+                else:
+                    remaining = 1e6
 
                 result_type, agent_name, data = self.result_queue.get(timeout=remaining)
 
@@ -224,7 +244,7 @@ class MultiAgent:
         summary = {
             "type": "MultiAgent Summary",
             "repository": self.repository,
-            "total_agents": len(self.agents_config),
+            "total_agents": len(self.agent_role_config),
             "successful_agents": successful,
             "failed_agents": len(self.results) - successful,
             "success_rate": f"{(successful/len(self.results)*100):.1f}%" if self.results else "0.0%",

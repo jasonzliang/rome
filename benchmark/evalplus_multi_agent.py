@@ -156,10 +156,10 @@ class MultiAgentEvalPlusBenchmark:
         raise RuntimeError("Failed to save results to any location")
 
 
-    async def run_benchmark_async(self, max_iterations: int = 10, stop_on_error: bool = False,
-                                 num_samples: Optional[int] = None, task_ids: Optional[List[str]] = None,
-                                 run_evaluation: bool = True) -> Tuple[Dict, Path]:
-        """Complete async benchmark pipeline with cleanup"""
+    def run_benchmark(self, max_iterations: int = 10, stop_on_error: bool = False,
+                 num_samples: Optional[int] = None, task_ids: Optional[List[str]] = None,
+                 run_evaluation: bool = True) -> Tuple[List[Dict], Path]:
+        """Complete synchronous benchmark pipeline with non-blocking evaluation"""
         agent_results = []
         evaluation_results = {}
 
@@ -169,14 +169,15 @@ class MultiAgentEvalPlusBenchmark:
             if not problems_dict:
                 raise ValueError("No problems were set up")
 
-            # Start periodic evaluation
+            # Start periodic evaluation (non-blocking)
             if run_evaluation and self.periodic_evaluator:
-                await self.periodic_evaluator.start_async()
+                self.periodic_evaluator.start_background()
 
-            # Run agents and evaluate
+            # Run agents synchronously (original approach)
             agent_results = self.run_agents(max_iterations, stop_on_error)
 
             if run_evaluation:
+                # Final evaluation (non-blocking)
                 self.evaluator.evaluate(blocking=False)
 
             # Save and return results
@@ -196,7 +197,7 @@ class MultiAgentEvalPlusBenchmark:
         finally:
             # Cleanup
             if self.periodic_evaluator:
-                await self.periodic_evaluator.stop_async()
+                self.periodic_evaluator.stop_background()
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -204,14 +205,15 @@ def create_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Multi-agent EvalPlus benchmark")
     parser.add_argument("benchmark_dir", help="Shared benchmark directory")
     parser.add_argument("config_file", help="Agent configuration YAML")
+
     parser.add_argument("--agents-config", help="Agents configuration JSON")
     parser.add_argument("--dataset", choices=["humaneval", "mbpp"], default="humaneval")
-    parser.add_argument("--num-samples", type=int, help="Number of samples")
-    parser.add_argument("--task-ids", nargs="+", help="Specific task IDs")
-    parser.add_argument("--eval-interval", type=int, help="Evaluation interval (seconds)")
+    parser.add_argument("--eval-interval", type=int, default=1800, help="Evaluation interval (seconds)")
     parser.add_argument("--max-iterations", type=int, default=0, help="Max iterations per agent")
-    parser.add_argument("--stop-on-error", action="store_true", help="Stop on errors")
     parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
+    parser.add_argument("--num-samples", type=int, help="Number of samples")
+    parser.add_argument("--stop-on-error", action="store_true", help="Stop on errors")
+    parser.add_argument("--task-ids", nargs="+", help="Specific task IDs")
     return parser
 
 
@@ -225,11 +227,11 @@ def main():
         args.dataset, args.eval_interval
     )
 
-    results_file = asyncio.run(benchmark.run_benchmark_async(
+    results_file = benchmark.run_benchmark(
         max_iterations=args.max_iterations, stop_on_error=args.stop_on_error,
         num_samples=args.num_samples, task_ids=args.task_ids,
         run_evaluation=not args.no_evaluation
-    ))
+    )
     # benchmark.logger.info(f"Results: {results_file}")
 
 if __name__ == "__main__":

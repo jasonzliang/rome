@@ -7,6 +7,7 @@ import signal
 import sys
 import subprocess
 import traceback
+import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Callable
@@ -85,43 +86,47 @@ class EvalplusEvaluator:
             eval_script = self._create_script(solutions_file)
 
             if blocking:
+                self.logger.info("Running evalplus.evaluate (blocking)")
                 return self._run_blocking(eval_script, timeout)
             else:
+                self.logger.info("Running evalplus.evaluate (non-blocking)")
                 return {"success": self._run_non_blocking(eval_script)}
         except Exception as e:
             self.logger.error(f"Evaluate failed: {e}")
             self.logger.error(traceback.format_exc())
             return {"error": str(e), "success": False}
 
-    async def evaluate_async(self, timeout: int = 1800) -> Dict:
-        """Run async evaluation"""
+    # async def evaluate_async(self, timeout: int = 1800) -> Dict:
+    #     """Run async evaluation"""
 
-        try:
-            solutions = self._extract_solutions()
-            solutions_file = self._prepare_eval(solutions)
-            eval_script = self._create_script(solutions_file)
+    #     try:
+    #         self.logger.info("Running evalplus.evaluate (async version)")
+    #         solutions = self._extract_solutions()
+    #         solutions_file = self._prepare_eval(solutions)
+    #         eval_script = self._create_script(solutions_file)
 
-            process = await asyncio.create_subprocess_shell(
-                f"bash {eval_script}",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                cwd=self.eval_dir  # FIXED: added self.
-            )
+    #         process = await asyncio.create_subprocess_shell(
+    #             f"bash {eval_script}",
+    #             stdout=asyncio.subprocess.PIPE,
+    #             stderr=asyncio.subprocess.PIPE,
+    #             cwd=self.eval_dir  # FIXED: added self.
+    #         )
 
-            stdout, stderr = await asyncio.wait_for(process.communicate(), timeout)
-            output = f"{stdout.decode()}\n{stderr.decode()}\nEXIT_CODE:{process.returncode}"
-            return self._parse_result(output, process.returncode)
+    #         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout)
+    #         output = f"{stdout.decode()}\n{stderr.decode()}\nEXIT_CODE:{process.returncode}"
+    #         # self.logger.info(output)
+    #         return self._parse_result(output, process.returncode)
 
-        except asyncio.TimeoutError:
-            if 'process' in locals():
-                process.kill()
-            self.logger.error("Async evaluate timed out")
-            self.logger.error(traceback.format_exc())
-            return {"error": "timeout", "success": False}
-        except Exception as e:
-            self.logger.error(f"Async evaluate failed: {e}")
-            self.logger.error(traceback.format_exc())
-            return {"error": str(e), "success": False}
+    #     except asyncio.TimeoutError:
+    #         if 'process' in locals():
+    #             process.kill()
+    #         self.logger.error("Async evaluate timed out")
+    #         self.logger.error(traceback.format_exc())
+    #         return {"error": "timeout", "success": False}
+    #     except Exception as e:
+    #         self.logger.error(f"Async evaluate failed: {e}")
+    #         self.logger.error(traceback.format_exc())
+    #         return {"error": str(e), "success": False}
 
     def shutdown(self):
         """Terminate running evaluation"""
@@ -193,6 +198,7 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
             timeout=timeout, cwd=script.parent
         )
         output = f"{result.stdout}\n{result.stderr}\nEXIT_CODE:{result.returncode}"
+        self.logger.info(output)
         return self._parse_result(output, result.returncode)
 
     def _run_non_blocking(self, script: Path) -> bool:
@@ -239,58 +245,85 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
 
 
 class PeriodicEvaluator:
-    """Periodic evaluation wrapper"""
+    """Fixed PeriodicEvaluator with immediate first evaluation"""
 
-    def __init__(self, evaluator: EvalplusEvaluator, interval: int):
+    def __init__(self, evaluator, interval: int):
         self.evaluator = evaluator
         self.interval = interval
+        self.logger = evaluator.logger
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._last_eval = 0
 
-        self.logger = get_logger()
-        self.last_eval_time = 0
-        self._task = None
-        self._stop = asyncio.Event()
-
-    async def start_async(self):
-        """Start async periodic evaluation"""
-        if self._task:
+    def start_background(self):
+        """Start periodic evaluation with immediate first run"""
+        if self._thread and self._thread.is_alive():
+            self.logger.error("PeriodicEvaluator already running")
             return
 
-        self._stop.clear()
-        self._task = asyncio.create_task(self._eval_worker())
+        self.logger.info(f"Starting PeriodicEvaluator with {self.interval}s ({self.interval/60:.1f} min) interval")
+        self._stop_event.clear()
+        self._last_eval = time.time() - self.interval
 
-    async def _eval_worker(self):
-        """Async evaluation worker"""
-        while not self._stop.is_set():
-            try:
-                await asyncio.sleep(self.interval)
-                if time.time() - self.last_eval_time >= self.interval:
-                    await self.evaluator.evaluate_async()
-                    self.last_eval_time = time.time()
+        self._thread = threading.Thread(target=self._worker, daemon=True)
+        self._thread.start()
 
-            except asyncio.CancelledError:
+        time.sleep(0.1)
+        if not self._thread.is_alive():
+            self.logger.error("Failed to start PeriodicEvaluator thread")
+
+    def stop_background(self):
+        """Stop periodic evaluation"""
+        if not self._thread:
+            return
+
+        self._stop_event.set()
+
+        if self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+
+        self._thread = None
+        self.logger.info("PeriodicEvaluator stopped")
+
+    def _worker(self):
+        """Worker that runs first evaluation immediately, then at intervals"""
+        # self.logger.info("Worker started")
+        evaluation_count = 0
+
+        while not self._stop_event.is_set():
+            current_time = time.time()
+            time_since_last = current_time - self._last_eval
+
+            # Check if it's time to evaluate
+            if time_since_last >= self.interval:
+                evaluation_count += 1
+                self.logger.info(f"Starting evaluation #{evaluation_count}")
+                self._run_evaluation()
+                self._last_eval = current_time
+                # self.logger.info(f"Next evaluation in {self.interval}s ({self.interval/60:.1f} minutes)")
+
+            # Wait for stop signal with short timeout to check timing frequently
+            if self._stop_event.wait(timeout=min(60, self.interval/10)):  # Check every minute or 1/10 interval
                 break
-            except Exception as e:
-                self.logger.error(f"Periodic evaluation failed: {e}")
-                self.logger.error(traceback.format_exc())
+        # self.logger.info(f"Worker stopped after {evaluation_count} evaluations")
 
-    async def stop_async(self):
-            """Stop periodic evaluation"""
-            if self._task:
-                self._stop.set()
-                self._task.cancel()
-                try:
-                    await self._task
-                except asyncio.CancelledError:
-                    pass
-                self._task = None
+    def _run_evaluation(self):
+        """Run single evaluation with error handling"""
+        try:
+            result = self.evaluator.evaluate(blocking=False)
+            if not result.get("success"):
+                self.logger.error(f"Background evaluation failed: {result.get('error', 'unknown')}")
+        except Exception as e:
+            self.logger.error(f"Background evaluation error: {e}")
 
-    def set_callback(self, set_callback_fn: Callable):
-        """Start callback-based periodic evaluation"""
+    def set_callback(self, set_callback_fn):
+        """Set callback-based evaluation for agent integration"""
         def callback(agent, iteration):
-            if time.time() - self.last_eval_time < self.interval:
+            if time.time() - self._last_eval < self.interval:
                 return
-            if self.evaluator.evaluate(blocking=False)["success"]:
-                self.logger.info(f"Background eval started (iteration {iteration})")
-                self.last_eval_time = time.time()
+
+            if self.evaluator.evaluate(blocking=False).get("success"):
+                self.logger.info(f"Background evaluation started (iteration {iteration})")
+                self._last_eval = time.time()
 
         set_callback_fn(callback)

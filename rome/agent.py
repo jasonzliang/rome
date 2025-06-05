@@ -5,7 +5,6 @@ import io
 import os
 import pprint
 import re
-import signal
 import sys
 import traceback
 from typing import Dict, List, Callable
@@ -211,9 +210,9 @@ class Agent:
         """Register cleanup handlers for graceful shutdown"""
         self.shutdown_called = False
 
-        # atexit.register(self.shutdown)
-        # signal.signal(signal.SIGTERM, self._signal_handler)
-        # signal.signal(signal.SIGINT, self._signal_handler)
+    #     atexit.register(self.shutdown)
+    #     signal.signal(signal.SIGTERM, self._signal_handler)
+    #     signal.signal(signal.SIGINT, self._signal_handler)
 
     # def _signal_handler(self, signum, frame):
     #     """Handle termination signals gracefully with clean stacktrace"""
