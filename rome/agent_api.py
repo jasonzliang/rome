@@ -1,9 +1,10 @@
 import logging
+import socket
 from typing import Optional, Dict, Any
 import threading
 
 from .logger import get_logger
-from .config import set_attributes_from_config
+from .config import API_PORT_RANGE, set_attributes_from_config
 
 
 class AgentApi:
@@ -27,8 +28,8 @@ class AgentApi:
         # Set attributes from config if provided
         set_attributes_from_config(self, self.config, ['host', 'port'])
 
-        self.app = FastAPI(title="Agent API", description="API to expose agent state.", version="1.2")
-        self._add_routes()
+        self._setup_port()
+        self._setup_fastapi()
 
         # Disable Uvicorn's default loggers
         logging.getLogger("uvicorn").setLevel(logging.WARNING)
@@ -49,9 +50,31 @@ class AgentApi:
 
         self.logger.info(f"AgentApi initialized")
 
-    def _add_routes(self):
+    def _setup_port(self):
+        """Check for a valid port to use"""
+        def _is_port_in_use(port: int) -> bool:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                return s.connect_ex(('localhost', port)) == 0
+
+        min_port, max_port = API_PORT_RANGE
+        self.logger.assert_true(min_port <= self.port <= max_port,
+            f"Ports must be within {min_port}-{max_port} range")
+
+        new_port = self.port
+        while _is_port_in_use(new_port):
+            if new_port > max_port:
+                raise ValueError("Cannot find a valid unused port for API server")
+            new_port += 1
+
+        if new_port != self.port:
+            self.logger.info(f"Port {self.port} is used already, using {new_port} instead")
+            self.port = new_port
+
+    def _setup_fastapi(self):
         """Add API routes to the FastAPI app"""
         from fastapi.responses import JSONResponse
+
+        self.app = FastAPI(title="Agent API", description="API to expose agent state.", version="1.2")
         @self.app.get("/agent", response_class=JSONResponse)
         async def get_state():
             try:

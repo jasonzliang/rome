@@ -9,6 +9,9 @@ from typing import Dict, Any
 from .logger import get_logger
 
 ######## These constants are not intended to be user modifiable ########
+# Agent API allowed port range
+API_PORT_RANGE = (40000, 41000)
+
 # Min and max allowed lengths for agent names
 AGENT_NAME_LENGTH = (8, 24)
 
@@ -50,7 +53,7 @@ DEFAULT_CONFIG = {
 
     "AgentApi": {
         "host": "localhost",  # Url/hostname to query agent API
-        "port": 8000  # Port number to query agent API
+        "port": 40000  # Port number to query agent API
     },
 
     "MultiAgent": {
