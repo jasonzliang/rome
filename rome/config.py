@@ -55,7 +55,7 @@ DEFAULT_CONFIG = {
 
     "MultiAgent": {
         "agent_role_json": None,  # Multi agent json, can be overwritten by constructor
-        "repository": None, # Multi agent repo, can be overwritten by constructor
+        "repository": None,  # Multi agent repo, can be overwritten by constructor
     },
 
     # LLM HANDLER CONFIGURATION
@@ -89,9 +89,9 @@ DEFAULT_CONFIG = {
     "FSM": {},
 
     "ActionSelector": {
-        "min_interval": 1, # Backoff detection interval (also backoff initial delay time)
-        "max_tries": 5, # Number of times to try before backoff error raised
-        "backoff_enabled": True, # Whether to enable backoff or not
+        "min_interval": 1,  # Backoff detection interval (also backoff initial delay time)
+        "max_tries": 5,  # Number of times to try before backoff error raised
+        "backoff_enabled": True,  # Whether to enable backoff or not
 
         "original": {},  # Config for original selector (empty for now)
         "smart": {  # Config for smart selector
@@ -164,7 +164,7 @@ DEFAULT_CONFIG = {
     "Executor": {
         "timeout": 10,  # Maximum time for code to run
         "virtual_env_context": None,  # Name of virtual env to run in
-        "work_dir": "./",  # Working directory when running code directly (not code file)
+        "work_dir": "./", # Working directory when running code directly (not code file)
         "max_output_len": 5000,  # Maximum tokens for execution output
         "cmd_args": {  # Additional useful flags when executing code
             "pytest": ["-s", "--tb=short", "--no-header"],
@@ -181,7 +181,7 @@ DEFAULT_CONFIG = {
         "include_caller_info": None,  # Can be "rome", "rich", or None
         "base_dir": None,  # Directory for log files, overwrites agent's auto-generated values
         "filename": None,  # Log file name, overwrites agent's auto-generated values
-        "max_size_kb": 20000,  # Max log size in kb, truncates after exceeding
+        "max_size_kb": 10000,  # Max log size in kb, truncates after exceeding
         "timezone": 'US/Pacific',  # Default timezone to display
     },
 }

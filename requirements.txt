@@ -1,5 +1,4 @@
 # Library required pkgs
-backoff
 colorama
 numpy
 openai

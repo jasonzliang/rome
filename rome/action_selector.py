@@ -1,7 +1,6 @@
 # action_selector.py - Enhanced with backoff decorator
 import time
 import functools
-import backoff
 from abc import ABC, abstractmethod
 from typing import Dict, List, Tuple, Optional
 from .logger import get_logger

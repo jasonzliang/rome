@@ -170,8 +170,8 @@ class MultiAgent:
                     error_msg = data.get('error_message', 'No message')
                     traceback_str = data.get('traceback', 'No traceback available')
 
-                    print(f"ERROR: Agent '{agent_name}' failed: {error_type} - {error_msg}")
-                    print(f"Traceback:\n{traceback_str}")
+                    self.logger.error(f"Agent '{agent_name}' failed: {error_type} - {error_msg}")
+                    self.logger.error(f"Traceback:\n{traceback_str}")
 
                     completed += 1
 
@@ -199,9 +199,8 @@ class MultiAgent:
         self.agent_status[agent_name] = 'failed_to_start' if 'start' in error_type.lower() else 'timeout'
 
         # Print error to console with traceback
-        print(f"ERROR: Agent '{agent_name}' {error_type}: {error_message}")
-        if 'traceback' in locals():
-            print(f"Traceback:\n{traceback.format_exc()}")
+        self.logger.error(f"Agent '{agent_name}' {error_type}: {error_message}")
+        self.logger.error(f"Traceback:\n{traceback.format_exc()}")
 
     def _cleanup_processes(self):
         """Cleanup all processes with escalating termination"""
@@ -270,7 +269,7 @@ class MultiAgent:
             with open(summary_file, 'w') as f:
                 json.dump(summary, f, indent=4, default=str)
         except Exception as e:
-            print(f"ERROR: Failed to save summary: {e}")
+            self.logger.error(f"Failed to save summary: {e}")
 
         return summary
 
