@@ -165,10 +165,13 @@ class MultiAgent:
                     self.results[agent_name] = {'error': data}
                     self.agent_status[agent_name] = 'failed'
 
-                    # Only print errors to console
+                    # Print full error details to console
                     error_type = data.get('error_type', 'Unknown')
                     error_msg = data.get('error_message', 'No message')
+                    traceback_str = data.get('traceback', 'No traceback available')
+
                     print(f"ERROR: Agent '{agent_name}' failed: {error_type} - {error_msg}")
+                    print(f"Traceback:\n{traceback_str}")
 
                     completed += 1
 
@@ -195,8 +198,10 @@ class MultiAgent:
         }
         self.agent_status[agent_name] = 'failed_to_start' if 'start' in error_type.lower() else 'timeout'
 
-        # Print error to console
+        # Print error to console with traceback
         print(f"ERROR: Agent '{agent_name}' {error_type}: {error_message}")
+        if 'traceback' in locals():
+            print(f"Traceback:\n{traceback.format_exc()}")
 
     def _cleanup_processes(self):
         """Cleanup all processes with escalating termination"""

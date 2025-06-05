@@ -90,20 +90,12 @@ Only recommend reversion if there is clear evidence that a previous version was 
             execution_output = version.get('execution_output', '')
 
             summary += f"\n--- Version {version_num} ({timestamp}) ---\n"
-            summary += f"Explanation: {explanation}\nChanges: {len(changes)} modifications\n"
 
-            if exit_code is not None:
-                status = "PASSED" if exit_code == 0 else "FAILED"
-                summary += f"Execution: {status} (exit code: {exit_code})\n"
+            summary += f"1. Explanation: {explanation}\n"
+            summary += "\n"
 
-                if execution_output:
-                    # Show full execution output up to LONGEST_SUMMARY_LEN
-                    truncated_output = self._truncate_to_limit(execution_output)
-                    summary += f"Execution output:\n{truncated_output}\n"
-
+            summary += f"2. Changes: {len(changes)} modifications\n"
             if changes:
-                summary += "All changes:\n"
-                # Show all changes, but truncate the entire change section if it gets too long
                 changes_text = ""
                 for i, change in enumerate(changes):
                     change_desc = f"  {i+1}. {change.get('type', 'Unknown')}: {change.get('description', 'No description')}\n"
@@ -112,6 +104,16 @@ Only recommend reversion if there is clear evidence that a previous version was 
                         break
                     changes_text += change_desc
                 summary += changes_text
+            summary += "\n"
+
+            if exit_code is not None:
+                status = "PASSED" if exit_code == 0 else "FAILED"
+                summary += f"3. Execution: {status} (exit code: {exit_code})\n"
+
+                if execution_output:
+                    truncated_output = self._truncate_to_limit(execution_output)
+                    summary += f"Output:\n{truncated_output}\n"
+                summary += "─" * 60 + "\n"
 
         return summary
 
