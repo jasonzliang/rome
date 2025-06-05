@@ -110,6 +110,7 @@ class ProcessManager:
             return False
 
     def _is_python(self, proc: psutil.Process) -> bool:
+        """Check if process is Python"""
         try:
             name = proc.name().lower()
             if any(p in name for p in ['python', 'py']):
@@ -119,7 +120,8 @@ class ProcessManager:
         except:
             return False
 
-    def _terminate(self, proc: psutil.Process) -> bool:
+    def _terminate_process(self, proc: psutil.Process) -> bool:
+        """Terminate a process"""
         try:
             if not proc.is_running():
                 return True
@@ -138,6 +140,7 @@ class ProcessManager:
             return False
 
     def cleanup_zombies(self, children_only: bool = True, logger=None) -> int:
+        """"Finad and terminate all zombie processes"""
         zombies = self.get_zombie_pythons(children_only)
         if not zombies:
             return 0
@@ -180,7 +183,7 @@ class ProcessManager:
             self.cleanup_zombies(logger=logger)
 
         for child in self.get_children():
-            self._terminate(child)
+            self._terminate_process(child)
 
     def shutdown(self, cleanup_zombies: bool = True):
         with self._lock:
