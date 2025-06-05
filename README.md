@@ -2,101 +2,125 @@
 
 <p align="center"><img src="https://image.cdn2.seaart.me/2024-09-10/crg9uvle878c73cansn0/af22c8e52bb422f09e6813670d8b8166_high.webp" width="40%" alt="Rome"></p>
 
-Rome is a Python library for building intelligent agents with Finite State Machine (FSM) architecture. This library provides a structured way to create AI-powered agents that can analyze, edit, and test code with LLM assistance.
+Rome is a Python library for building intelligent AI agents with Finite State Machine (FSM) architecture. This library provides a structured framework for creating AI-powered agents that can analyze, edit, test, and execute code with LLM assistance, specifically designed for automated software development workflows.
 
 ## Overview
 
-Rome is designed around a Finite State Machine architecture that allows AI agents to navigate through different states while performing operations on code. The library includes components for:
+Rome is built around a configurable Finite State Machine architecture that enables AI agents to navigate through different operational states while performing complex software development tasks. The library includes comprehensive components for:
 
-- State management
-- Code analysis and editing
-- Test creation and execution
-- Visualization of agent state
-- Versioning of code changes
+- **FSM-based agent orchestration** with configurable workflows
+- **Code repository analysis and management**
+- **Intelligent code editing and improvement**
+- **Automated test creation and execution**
+- **Version control and file management**
+- **Multi-agent coordination** for collaborative workflows
+- **Benchmark evaluation** against coding datasets like HumanEval+
 
-### FSM Workflow
+### FSM Workflows
 
-Rome’s default FSM supports a comprehensive 6-state development lifecycle:
+Rome supports multiple FSM types for different use cases:
 
-1. **IDLE → CODE_LOADED**: Load or search for code to work on.
-2. **CODE_LOADED → CODE_EDITED or TEST_EDITED**: Modify code or write tests.
-3. **CODE_EDITED → TEST_EDITED**: After editing code, proceed to write/edit tests.
-4. **TEST_EDITED → CODE_EXECUTED_PASS / CODE_EXECUTED_FAIL**: Execute tests; transition based on pass/fail.
-5. **CODE_EXECUTED_PASS → IDLE**: Successful cycle completed.
-6. **CODE_EXECUTED_FAIL → CODE_LOADED or IDLE**: Retry or restart.
+#### Simple FSM (6-State Development Lifecycle)
+The comprehensive workflow for full development cycles:
 
-This FSM ensures a structured agent behavior from discovery through validation.
+1. **IDLE → CODE_LOADED**: Search and load code files using tournament/priority search
+2. **CODE_LOADED → CODE_EDITED or TEST_EDITED**: Edit code or write tests based on analysis
+3. **CODE_EDITED → TEST_EDITED**: After code changes, create comprehensive tests
+4. **TEST_EDITED → CODE_EXECUTED_PASS/FAIL**: Execute code with tests and validate results
+5. **CODE_EXECUTED_PASS → IDLE**: Successful completion, reset for next task
+6. **CODE_EXECUTED_FAIL → CODE_LOADED/IDLE**: Intelligent recovery with version revert or restart
 
-## How It Works
+#### Minimal FSM (2-State Analysis Cycle)
+Lightweight workflow for code exploration and analysis:
 
-Rome takes in a Python code file and performs the following:
+1. **IDLE → CODE_LOADED**: Search and examine code files
+2. **CODE_LOADED → IDLE**: Reset and repeat for iterative analysis
 
-1. **Analyzes the code structure**: Identifies function stubs, incomplete logic, and poor practices.
-2. **Creates LLM prompts**: Generates structured prompts for agents to improve code quality.
-3. **Executes & Evaluates**: Optionally runs the code or tests, gathers output, and suggests fixes.
-4. **Generates unit tests**: Focuses on complete coverage including edge cases and error handling.
+## Key Features
 
-## Key Components
+### Advanced Agent Capabilities
+
+- **Smart Action Selection**: Tournament-based and priority-driven action selection strategies
+- **Context Management**: Maintains execution context and history across iterations
+- **Intelligent Recovery**: Automatic fallback states and version management for failure scenarios
+- **Cost Management**: Built-in OpenAI API cost tracking and limits
+- **Patience System**: Prevents infinite loops with configurable retry limits
+
+### Repository Management
+
+- **File Type Filtering**: Configurable file type support (`.py`, etc.)
+- **Version Control**: Automatic versioning of code changes with metadata tracking
+- **Completion Tracking**: Progress monitoring across repository files
+- **Database Integration**: Persistent storage for agent state and history
+
+### Benchmarking & Evaluation
+
+- **HumanEval+ Integration**: Built-in support for coding benchmark evaluation
+- **EvalPlus Compatibility**: Seamless integration with EvalPlus evaluation framework
+- **Periodic Evaluation**: Background evaluation during agent execution
+- **Multi-Dataset Support**: Support for HumanEval and MBPP datasets
+
+## Architecture
 
 ### Core Components
 
-- **Agent**: Main class that orchestrates the entire workflow
-- **FSM (Finite State Machine)**: Controls state transitions and available actions
-- **States**: Different operational states the agent can be in (Idle, CodeLoaded, etc.)
-- **Actions**: Operations that can be performed by the agent (Search, Edit, Execute)
-- **OpenAI Handler**: Interface for LLM interactions
+- **Agent**: Main orchestrator with FSM management, context handling, and execution control
+- **FSMSelector**: Factory for creating different FSM types (`minimal`, `simple`)
+- **ActionSelector**: Configurable strategies for intelligent action selection
+- **RepositoryManager**: File system operations and repository analysis
+- **VersionManager**: Code versioning and change tracking with database backend
+- **OpenAIHandler**: LLM interface with cost management and response parsing
+- **AgentHistory**: Execution tracking and performance analytics
 
-### States
+### States & Actions
 
-The library implements several states:
-
-- `IdleState`: Initial state waiting for tasks
-- `CodeLoadedState`: A file has been selected for processing
+**Available States:**
+- `IdleState`: Waiting for tasks, ready to search
+- `CodeLoadedState`: File selected and loaded for processing
 - `CodeEditedState`: Code has been modified
-- `TestEditedState`: Tests have been created/edited
-- `CodeExecutedState`: Code or tests have been executed
+- `TestEditedState`: Tests created or updated
+- `CodeExecutedPassState`: Successful test execution
+- `CodeExecutedFailState`: Failed execution requiring recovery
 
-### Actions
-
-Available actions include:
-
-- `SearchAction`: Find code files to work with in a repository
-- `EditCodeAction`: Modify code with AI assistance
-- `EditTestAction`: Create or improve tests
-- `ExecuteCodeAction`: Run code and tests
-- `RetryAction`: Reset and start over
-
-### Visualization
-
-The library includes a Streamlit-based visualization tool (`web_app.py`) that provides:
-
-- Real-time FSM state visualization
-- Agent context information
-- Interactive configuration
-- Graph representation of the state machine
+**Key Actions:**
+- `TournamentSearchAction`: Advanced search with ranking algorithms
+- `PrioritySearchAction`: Priority-based file selection
+- `EditCodeAction`: AI-assisted code modification
+- `EditTestAction`: Comprehensive test generation
+- `ExecuteCodeAction`: Code and test execution with validation
+- `RevertCodeAction`: Intelligent version recovery
+- `AdvancedResetAction`: Context cleanup and state reset
 
 ## Getting Started
 
 ### Prerequisites
 
-- Linux or MacOS with Python 3.10+ installed
-- API key compatible with OpenAI's chat completion API
+- Linux or macOS with Python 3.10+
+- OpenAI API key or compatible LLM endpoint
+- Optional: `graphviz` for FSM visualization
 
 ### Installation
 
-#### From Source (Development)
+#### From Source
 
 ```bash
 git clone https://github.com/yourusername/rome.git
 cd rome
-pip install -e .        # Basic install
-pip install -e .[dev]   # With dev tools
+pip install -e .
+pip install -e .[dev]  # Include development dependencies
 ```
 
-#### From PyPI (Coming Soon)
+#### Dependencies
 
 ```bash
-pip install rome
+# Core dependencies
+pip install openai pyyaml
+
+# Benchmarking (optional)
+pip install evalplus
+
+# Visualization (optional)
+pip install graphviz streamlit
 ```
 
 ### Environment Setup
@@ -105,123 +129,302 @@ pip install rome
 export OPENAI_API_KEY=your_api_key_here
 ```
 
-### Configuration
-
-Rome uses a YAML-based configuration system. You can create your own `config.yaml` or generate one:
-
-```python
-# Generate a default configuration file
-python -c "from config import generate_default_config; generate_default_config()"
-```
-
-Key configuration options:
-
-- OpenAI model and parameters
-- Repository path
-- FSM type (`minimal`, `simple`, or custom)
-- Logging settings
-- API server settings (`host`, `port`)
-- Patience setting to avoid stuck loops
-
-Example snippet from a config:
-
-```yaml
-Agent:
-  repository: "./"
-  fsm_type: "simple"
-  agent_api: true
-  history_context_len: 15
-  patience: 3
-
-AgentApi:
-  host: "localhost"
-  port: 8000
-```
-
 ### Basic Usage
 
-```python
-from agent import Agent
+#### Single Agent Workflow
 
+```python
+from rome.agent import Agent
+
+# Create agent with simple FSM
 agent = Agent(
-    name="CodingAgent",
-    role="You are an expert Python developer focused on code quality and testing",
-    config_dict={
+    name="CodeExpert",
+    role="You are an expert Python developer focused on writing clean, efficient, and well-tested code",
+    repository="./my_project",
+    config={
         "Agent": {
-            "repository": "./my_project",
-            "fsm_type": "simple"
+            "fsm_type": "simple",
+            "patience": 3,
+            "action_select_strat": "smart"
+        },
+        "OpenAIHandler": {
+            "model": "gpt-4o",
+            "cost_limit": 10.0
         }
     }
 )
 
-agent.run_loop(max_iterations=10)
+# Run agent for specified iterations
+results = agent.run_loop(max_iterations=20, stop_on_error=False)
+agent.shutdown()
 ```
 
-### Visualizing Agent State
+#### Multi-Agent Coordination
 
-```bash
-streamlit run web_app/streamlit_app.py
+```python
+from rome.multi_agent import MultiAgent
+
+# Define agent roles
+agent_roles = {
+    "MathSolver": "Expert in mathematical algorithms and numerical computations",
+    "StringProcessor": "Specialist in text processing and string manipulation",
+    "TestExpert": "Focused on comprehensive test coverage and edge cases"
+}
+
+# Create multi-agent system
+multi_agent = MultiAgent(
+    agent_role_json="agent_roles.json",
+    repository="./project",
+    config=config
+)
+
+results = multi_agent.run_loop(max_iterations=30)
+```
+
+#### Benchmark Evaluation
+
+```python
+from evalplus_single_agent import EvalPlusBenchmark
+
+# Run HumanEval+ benchmark
+benchmark = EvalPlusBenchmark(
+    benchmark_dir="./benchmark_results",
+    config_path="single_agent_basic.yaml",
+    dataset="humaneval"
+)
+
+# Complete benchmark with evaluation
+results, results_file = benchmark.run_complete_benchmark(
+    max_iterations=50,
+    num_samples=10,
+    run_evaluation=True,
+    eval_interval=1800  # Periodic evaluation every 30 minutes
+)
+
+benchmark.print_summary(results)
+```
+
+### Configuration
+
+Rome uses YAML-based configuration with extensive customization options:
+
+```yaml
+# Agent Configuration
+Agent:
+  name: "CodeExpert"
+  fsm_type: "simple"  # or "minimal"
+  patience: 3
+  action_select_strat: "smart"
+  agent_api: true
+  history_context_len: 15
+
+# OpenAI Configuration
+OpenAIHandler:
+  model: "gpt-4o"
+  temperature: 0.1
+  max_tokens: 8192
+  cost_limit: 50.0
+
+# Action Configuration
+TournamentSearchAction:
+  batch_size: 5
+
+EditCodeAction:
+  max_iterations: 3
+
+ExecuteCodeAction:
+  timeout: 30
+
+# Repository Settings
+RepositoryManager:
+  file_types: [".py", ".js", ".ts"]
+  exclude_patterns: ["__pycache__", ".git"]
+
+# Logging
+Logger:
+  level: "DEBUG"
+  console: true
+  include_caller_info: "rome"
 ```
 
 ## Advanced Features
 
-### Code Versioning
+### FSM Visualization
 
-Rome automatically versions code files as they are modified, storing metadata in a `.rome/` directory.
-
-### Custom FSMs
-
-Define your own FSM logic:
+Generate visual representations of your agent's state machine:
 
 ```python
-def create_custom_fsm(config):
-    # Custom FSM logic here...
-    return fsm_instance
+# Automatic graph generation
+agent.draw_fsm_graph()  # Saves to .rome/agent_name_pid.fsm.png
 
-FSM_FACTORY["custom"] = create_custom_fsm
+# Custom path
+agent.draw_fsm_graph("/path/to/output.png")
 ```
 
-### Extending with New Actions
+### Custom FSM Development
 
-Create custom actions by subclassing `Action`:
+Extend Rome with custom state machines:
 
 ```python
-class MyCustomAction(Action):
-    def execute(self, agent, **kwargs) -> bool:
-        # Custom logic here
-        return True
+from rome.fsm_selector import FSMBuilder
+from rome.fsm import FSM
+
+class CustomFSMBuilder(FSMBuilder):
+    def get_description(self) -> str:
+        return "Custom FSM for specialized workflow"
+
+    def build_fsm(self, config: Dict) -> FSM:
+        fsm = FSM(config.get("FSM", {}))
+        # Add custom states and transitions
+        return fsm
+
+# Register custom FSM
+FSMSelector.BUILDERS['custom'] = CustomFSMBuilder
 ```
 
-Add the action to your FSM in the configuration.
+### Action Selection Strategies
 
-## API Reference
+Configure different action selection approaches:
 
-Rome includes an HTTP API for agent introspection:
+```python
+# Smart selection with context awareness
+"action_select_strat": "smart"
 
-- `GET /agent`: Returns current state, context, and FSM details.
+# Random selection for exploration
+"action_select_strat": "random"
 
-## Development
-
-### Run Tests
-
-```bash
-pytest               # All tests
-pytest --cov=rome    # With coverage report
-pytest test/test_*.py  # Specific test file
+# Tournament-based competitive selection
+"action_select_strat": "tournament"
 ```
 
-### Format & Lint Code
+### Callback Integration
+
+Add custom behavior during agent execution:
+
+```python
+def evaluation_callback(agent, iteration):
+    if iteration % 10 == 0:
+        # Custom evaluation logic
+        results = evaluate_agent_progress(agent)
+        log_results(results)
+
+agent.set_callback(evaluation_callback)
+agent.run_loop(max_iterations=100)
+```
+
+## Benchmarking & Evaluation
+
+### HumanEval+ Integration
+
+Rome includes built-in support for evaluating agents against coding benchmarks:
 
 ```bash
-black .
+# Run benchmark from command line
+python evalplus_single_agent.py ./results single_agent_basic.yaml \
+    --dataset humaneval \
+    --num-samples 20 \
+    --max-iterations 50 \
+    --eval-interval 1800
+```
+
+### Performance Metrics
+
+Track agent performance with comprehensive metrics:
+
+- **Success Rate**: Percentage of successful action executions
+- **Completion Rate**: Repository file completion percentage
+- **Cost Efficiency**: API cost per successful task
+- **Execution Time**: Time per iteration and total runtime
+- **Error Recovery**: Success rate of failure recovery mechanisms
+
+## Development & Testing
+
+### Running Tests
+
+```bash
+# Manual testing scripts
+python test_single_agent.py   # Single agent testing
+python test_multi_agent.py    # Multi-agent testing
+
+# Custom test scenarios
+pytest tests/ -v
+```
+
+### Development Tools
+
+```bash
+# Code formatting
+black rome/
+isort rome/
+
+# Type checking
 mypy rome/
+
+# Linting
 flake8 rome/
 ```
 
+## API Reference
+
+### Agent API
+
+When `agent_api: true`, Rome exposes an HTTP API:
+
+```bash
+# Agent introspection
+GET /agent
+GET /agent/context
+GET /agent/history
+GET /agent/fsm
+
+# Control operations
+POST /agent/action
+POST /agent/reset
+```
+
+### Key Classes
+
+- **Agent**: Main orchestrator class
+- **MultiAgent**: Coordination of multiple agents
+- **FSMSelector**: FSM factory and builder
+- **EvalPlusBenchmark**: Benchmark evaluation framework
+- **ActionSelector**: Configurable action selection strategies
+
+## Examples & Use Cases
+
+### Code Quality Improvement
+- Analyze existing codebases for improvement opportunities
+- Automatically generate comprehensive test suites
+- Refactor code following best practices
+
+### Automated Development
+- Complete partial function implementations
+- Generate documentation and comments
+- Fix bugs and logical errors
+
+### Benchmark Evaluation
+- Evaluate agent performance on coding challenges
+- Compare different FSM configurations
+- Measure improvement over time
+
+## Limitations & Considerations
+
+- **LLM Dependencies**: Requires access to OpenAI API or compatible endpoints
+- **Cost Management**: Monitor API usage with built-in cost limits and tracking
+- **File System Access**: Agents modify files directly (use with version control)
+- **Execution Safety**: Code execution happens in local environment (use containers for isolation)
+- **Port Requirements**: Agent API uses ports 40000-41000 range for web interface
+- **Real-time Monitoring**: Streamlit dashboard requires agent API to be enabled
+
 ## Contributing
 
-Contributions will be accepted once the project reaches a stable state.
+Contributions are welcome once the project reaches stable release. Focus areas:
+
+- New FSM types and workflows
+- Additional action implementations
+- Enhanced benchmarking capabilities
+- Performance optimizations
 
 ## License
 
-See LICENSE file.
+See LICENSE file for details.
