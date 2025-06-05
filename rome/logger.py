@@ -1,63 +1,86 @@
-from datetime import datetime
-import inspect
+# Modified logger.py - Update the get_logger function and Logger class
+
 import logging
-import pytz
+import sys
+import threading
+import tempfile
 import os
 import subprocess
-import tempfile
-import threading
-import traceback
-from typing import Optional, Dict, Any, Type, Callable
-
+import pytz
+from datetime import datetime
+from typing import Optional
 from rich.console import Console
 from rich.logging import RichHandler
-from rich.text import Text
+
+# Global bootstrap logger instance
+_bootstrap_logger = None
+_bootstrap_lock = threading.Lock()
+
+# Global instances
+_main_logger_instance = None
+_bootstrap_logger_instance = None
 
 
-def check_attrs(obj, required_attrs):
-    """Helper function to check if required attributes have been set"""
-    for attr in required_attrs:
-        assert hasattr(obj, attr), f"{attr} not provided in {obj.__class__.__name__} config"
+def _get_bootstrap_logger():
+    """Create a simple bootstrap logger for use before main logger is configured"""
+    global _bootstrap_logger
 
+    if _bootstrap_logger is None:
+        with _bootstrap_lock:
+            if _bootstrap_logger is None:
+                _bootstrap_logger = logging.getLogger('bootstrap')
 
-def check_opt_attrs(obj, optional_attrs):
-    """Helper function to check if optional attributes have been set"""
-    for attr in optional_attrs:
-        if not hasattr(obj, attr):
-            setattr(obj, attr, None), f"{attr} (optional) not provided in {obj.__class__.__name__} config"
+                # Only configure if not already configured
+                if not _bootstrap_logger.handlers:
+                    _bootstrap_logger.setLevel(logging.INFO)
 
+                    # Simple console handler
+                    handler = logging.StreamHandler(sys.stdout)
+                    formatter = logging.Formatter('BOOTSTRAP: %(levelname)s - %(message)s')
+                    handler.setFormatter(formatter)
 
-def set_attributes_from_config(obj, config=None, required_attrs=None, optional_attrs=None):
-    """Helper function to convert configuration dictionary entries to object attributes"""
-    if config:
-        for key, value in config.items():
-            setattr(obj, key, value)
+                    _bootstrap_logger.addHandler(handler)
+                    _bootstrap_logger.propagate = False
+
+    return _bootstrap_logger
 
 
 class SizeRotatingFileHandler(logging.FileHandler):
-    """Compact, efficient size-rotating file handler with cross-platform support"""
+    """Deadlock-safe size-rotating file handler with cross-platform support"""
 
     def __init__(self, filename, max_size_kb, keep_ratio=0.7, *args, **kwargs):
         self.max_size_kb = max_size_kb
         self.max_size_bytes = max_size_kb * 1024
         self.keep_ratio = max(0.1, min(0.9, keep_ratio))
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # Use RLock for reentrant locking
+        self._rotating = False  # Track rotation state
         super().__init__(filename, *args, **kwargs)
 
     def emit(self, record):
-        """Emit record with size-based rotation"""
+        """Emit record with deadlock-safe rotation"""
         with self._lock:
             try:
-                if (self.max_size_bytes and os.path.exists(self.baseFilename) and
+                # Check if rotation needed (but don't rotate during rotation)
+                if (not self._rotating and
+                    self.max_size_bytes and
+                    os.path.exists(self.baseFilename) and
                     os.path.getsize(self.baseFilename) >= self.max_size_bytes):
                     self._rotate()
+
                 super().emit(record)
+
             except Exception:
-                self.handleError(record)
+                # Handle errors without triggering more logging
+                try:
+                    import sys
+                    sys.stderr.write(f"Logging error: {record.getMessage()}\n")
+                except:
+                    pass
 
     def _rotate(self):
         """Rotate log efficiently with Unix tools fallback to Python"""
         try:
+            self._rotating = True  # Set rotation flag
             self.stream and self.stream.close()
             self.stream = None
 
@@ -66,11 +89,13 @@ class SizeRotatingFileHandler(logging.FileHandler):
 
             self.stream = self._open()
         except Exception as e:
-            # print(f"Log rotation failed: {e}")
+            # Emergency: ensure we have a working stream
             self.stream = self.stream or self._open()
+        finally:
+            self._rotating = False  # Clear rotation flag
 
     def _unix_rotate(self) -> bool:
-        """Fast Unix-based rotation"""
+        """Fast Unix-based rotation with timeout protection"""
         if os.name != 'posix':
             return False
         try:
@@ -79,8 +104,10 @@ class SizeRotatingFileHandler(logging.FileHandler):
             with os.fdopen(fd, 'w') as f:
                 f.write(f"[ROTATED - {self.max_size_kb}KB limit]\n")
                 f.write(subprocess.run(['tail', '-n', str(lines), self.baseFilename],
-                                     capture_output=True, text=True, check=True, timeout=10).stdout)
-            subprocess.run(['mv', tmp, self.baseFilename], check=True, timeout=5)
+                                     capture_output=True, text=True, check=True,
+                                     timeout=5).stdout)  # Reduced timeout
+            subprocess.run(['mv', tmp, self.baseFilename], check=True,
+                          timeout=2)  # Reduced timeout
             return True
         except:
             try: os.unlink(tmp)
@@ -117,6 +144,7 @@ class ParentPathRichHandler(RichHandler):
     def emit(self, record):
         """Add parent path info before emitting."""
         # Get the current call stack
+        import inspect
         stack = inspect.stack()
 
         # Find the parent caller (1 level above the logging call)
@@ -149,32 +177,42 @@ class ParentPathRichHandler(RichHandler):
 
 
 class Logger:
-    """Thread-safe singleton logger with Rich console output and caller information"""
-    _instance: Optional['Logger'] = None
-    _lock = threading.Lock()
-    _logger = None
+    """Thread-safe logger with Rich console output and caller information"""
 
-    def __new__(cls):
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    cls._instance = super(Logger, cls).__new__(cls)
-        return cls._instance
+    def __init__(self, logger_name='Agent'):
+        """Initialize logger with specified name"""
+        self.logger_name = logger_name
+        self._logger = logging.getLogger(logger_name)
+        self._logger.setLevel(logging.INFO)
+        self._logger.propagate = False
+        self._configured = False
+        self._lock = threading.Lock()
 
-    def __init__(self):
-        # Only initialize once per instance
-        if self._logger is not None:
-            return
+    def is_configured(self) -> bool:
+        """Check if the logger has been properly configured"""
+        return (self._configured and
+                self._logger is not None and
+                len(self._logger.handlers) > 0)
+
+    def configure_simple(self):
+        """Configure as a simple bootstrap logger"""
         with self._lock:
-            if self._logger is not None:
+            if self._configured:
                 return
-            # Create logger with default settings
-            self._logger = logging.getLogger('Agent')
-            self._logger.setLevel(logging.INFO)
-            # Prevent propagation to avoid duplicate logs
-            self._logger.propagate = False
 
-    def configure(self, log_config: Dict):
+            # Clear any existing handlers
+            for handler in self._logger.handlers[:]:
+                self._logger.removeHandler(handler)
+
+            # Simple console handler
+            handler = logging.StreamHandler(sys.stdout)
+            formatter = logging.Formatter('BOOTSTRAP: %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+
+            self._logger.addHandler(handler)
+            self._configured = True
+
+    def configure(self, log_config: dict):
         """Configure logger with provided settings, sets up console and file handlers."""
         with self._lock:
             # Clear existing handlers to avoid duplicates
@@ -185,204 +223,202 @@ class Logger:
             for filter_obj in self._logger.filters[:]:
                 self._logger.removeFilter(filter_obj)
 
-            # Set attributes from config
-            set_attributes_from_config(self, log_config)
-            check_attrs(self, ['level', 'format', 'console'])
-            check_opt_attrs(self, ['include_caller_info', 'base_dir', 'filename', 'max_size_kb', 'timezone'])
+            # Set attributes from config - we need to import this function
+            # For now, manually set attributes
+            if log_config:
+                for key, value in log_config.items():
+                    setattr(self, key, value)
 
-            # Set log level
-            level = getattr(logging, self.level.upper())
-            self._logger.setLevel(level)
+            # Handle missing config gracefully with defaults
+            self.level = getattr(self, 'level', 'INFO')
+            self.format = getattr(self, 'format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            self.console = getattr(self, 'console', True)
+            self.include_caller_info = getattr(self, 'include_caller_info', None)
+            self.base_dir = getattr(self, 'base_dir', None)
+            self.filename = getattr(self, 'filename', None)
+            self.max_size_kb = getattr(self, 'max_size_kb', None)
+            self.timezone = getattr(self, 'timezone', 'US/Pacific')
 
-            # Set up to use timezone (default 'US/Pacific')
-            if not self.timezone: self.timezone = 'US/Pacific'
-            pacific_tz = pytz.timezone(self.timezone)
-            class PacificTimezoneFilter(logging.Filter):
-                def filter(self, record):
-                    # Convert timestamp to Pacific time
-                    dt = datetime.fromtimestamp(record.created, tz=pacific_tz)
-                    record.created = dt.timestamp()
-                    return True
-            pacific_filter = PacificTimezoneFilter()
-            self._logger.addFilter(pacific_filter)
+            try:
+                # Set log level
+                level = getattr(logging, self.level.upper())
+                self._logger.setLevel(level)
 
-            # Create formatter (no custom formatTime needed since filter handles timezone)
-            formatter = logging.Formatter(self.format, datefmt="%H:%M:%S")
+                # Set up timezone filter
+                if hasattr(self, 'timezone') and self.timezone:
+                    pacific_tz = pytz.timezone(self.timezone)
+                    class PacificTimezoneFilter(logging.Filter):
+                        def filter(self, record):
+                            dt = datetime.fromtimestamp(record.created, tz=pacific_tz)
+                            record.created = dt.timestamp()
+                            return True
+                    pacific_filter = PacificTimezoneFilter()
+                    self._logger.addFilter(pacific_filter)
 
-            # Add file handler if base_dir and filename are specified
-            if self.base_dir:
-                # Create log directory if it doesn't exist
-                os.makedirs(self.base_dir, exist_ok=True)
+                # Create formatter
+                formatter = logging.Formatter(self.format, datefmt="%H:%M:%S")
 
-                if self.filename:
-                    # Construct full log file path
-                    log_file_path = os.path.join(self.base_dir, self.filename)
+                # Add file handler if base_dir and filename are specified
+                if self.base_dir:
+                    os.makedirs(self.base_dir, exist_ok=True)
 
-                    # Use custom size-rotating handler if max_log_size is specified
-                    if self.max_size_kb:
-                        file_handler = SizeRotatingFileHandler(
-                            log_file_path,
-                            max_size_kb=max(self.max_size_kb, 1024),
-                            mode='a'
-                        )
-                        self.info(f"Logging to file: {log_file_path} (max size: {self.max_size_kb}KB)")
-                    else:
-                        file_handler = logging.FileHandler(log_file_path, mode='a')
-                        self.info(f"Logging to file: {log_file_path}")
+                    if self.filename:
+                        log_file_path = os.path.join(self.base_dir, self.filename)
 
-                    file_handler.setFormatter(formatter)
-                    file_handler.setLevel(level)
-                    self._logger.addHandler(file_handler)
+                        if self.max_size_kb:
+                            file_handler = SizeRotatingFileHandler(
+                                log_file_path,
+                                max_size_kb=max(self.max_size_kb, 1024),
+                                mode='a'
+                            )
+                        else:
+                            file_handler = logging.FileHandler(log_file_path, mode='a')
 
-            # Add Rich console handler if enabled
-            if self.console:
-                console = Console()
+                        file_handler.setFormatter(formatter)
+                        file_handler.setLevel(level)
+                        self._logger.addHandler(file_handler)
 
-                # Determine handler type based on include_caller_info setting
-                caller_info = self.include_caller_info
-                self.assert_true(caller_info in ["rome", "rich", None],
-                    f"Invalid value set for caller info: {caller_info}")
+                # Add Rich console handler if enabled
+                if self.console:
+                    self._add_console_handler(level, formatter)
 
-                if caller_info == "rome":
-                    # Use custom handler that shows parent caller path
-                    rich_handler = ParentPathRichHandler(
-                        console=console,
-                        show_time=True,
-                        show_path=False,  # We handle path info ourselves
-                        show_level=True,
-                        rich_tracebacks=True,
-                        markup=True,
-                        log_time_format="[%H:%M:%S]"
-                    )
-                elif caller_info == "rich":
-                    # Use standard RichHandler with built-in path display
-                    rich_handler = RichHandler(
-                        console=console,
-                        show_time=True,
-                        show_path=True,  # Show Rich's default path info
-                        show_level=True,
-                        rich_tracebacks=True,
-                        markup=True,
-                        log_time_format="[%H:%M:%S]"
-                    )
-                else:
-                    # include_caller_info is None or other values - no caller info
-                    rich_handler = RichHandler(
-                        console=console,
-                        show_time=True,
-                        show_path=False,  # No path info
-                        show_level=True,
-                        rich_tracebacks=True,
-                        markup=True,
-                        log_time_format="[%H:%M:%S]"
-                    )
+                # Mark as configured
+                self._configured = True
 
-                rich_handler.setLevel(level)
-                self._logger.addHandler(rich_handler)
+                # Log successful configuration
+                self.info("Main logger configured successfully")
 
-    def get_log_dir(self) -> Optional[str]:
-        """Get the current log directory, creating it if needed."""
-        if not os.path.exists(self.base_dir):
-            os.makedirs(self.base_dir, exist_ok=True)
-        return self.base_dir
+            except Exception as e:
+                # Emergency fallback - create basic working logger
+                print(f"Logger configuration failed: {e}")
+                handler = logging.StreamHandler()
+                formatter = logging.Formatter('%(levelname)s: %(message)s')
+                handler.setFormatter(formatter)
+                handler.setLevel(logging.DEBUG)
+                self._logger.addHandler(handler)
+                self._configured = True
 
-    def get_log_file_size(self) -> Optional[int]:
-        """Get the current log file size in bytes, returns None if no file logging or file doesn't exist."""
-        if self.base_dir and self.filename:
-            log_path = os.path.join(self.base_dir, self.filename)
-            if os.path.exists(log_path):
-                return os.path.getsize(log_path)
-        return None
+    def _add_console_handler(self, level, formatter):
+        """Add appropriate console handler based on caller_info setting"""
+        console = Console()
+        caller_info = getattr(self, 'include_caller_info', None)
 
-    def get_log_file_size_kb(self) -> Optional[float]:
-        """Get the current log file size in KB, returns None if no file logging or file doesn't exist."""
-        size_bytes = self.get_log_file_size()
-        return round(size_bytes / 1024, 2) if size_bytes is not None else None
+        # Validate caller_info value safely
+        if caller_info not in ["rome", "rich", None]:
+            print(f"Warning: Invalid caller_info '{caller_info}', using None")
+            caller_info = None
 
+        try:
+            if caller_info == "rome":
+                rich_handler = ParentPathRichHandler(
+                    console=console,
+                    show_time=True,
+                    show_path=False,
+                    show_level=True,
+                    rich_tracebacks=True,
+                    markup=True,
+                    log_time_format="[%H:%M:%S]"
+                )
+            elif caller_info == "rich":
+                rich_handler = RichHandler(
+                    console=console,
+                    show_time=True,
+                    show_path=True,
+                    show_level=True,
+                    rich_tracebacks=True,
+                    markup=True,
+                    log_time_format="[%H:%M:%S]"
+                )
+            else:
+                rich_handler = RichHandler(
+                    console=console,
+                    show_time=True,
+                    show_path=False,
+                    show_level=True,
+                    rich_tracebacks=True,
+                    markup=True,
+                    log_time_format="[%H:%M:%S]"
+                )
+
+            rich_handler.setLevel(level)
+            self._logger.addHandler(rich_handler)
+            return rich_handler
+
+        except Exception as e:
+            # Fallback to basic console handler
+            print(f"Failed to create RichHandler: {e}")
+            basic_handler = logging.StreamHandler()
+            basic_handler.setFormatter(formatter)
+            basic_handler.setLevel(level)
+            self._logger.addHandler(basic_handler)
+            return basic_handler
+
+    # Standard logging methods
     def info(self, message: str):
-        """Log info message with caller information"""
         self._logger.info(message)
 
     def warning(self, message: str):
-        """Log warning message with caller information"""
         self._logger.warning(message)
 
     def error(self, message: str):
-        """Log error message with caller information"""
         self._logger.error(message)
 
     def debug(self, message: str):
-        """Log debug message with caller information"""
         self._logger.debug(message)
 
     def critical(self, message: str):
-        """Log critical message with caller information"""
         self._logger.critical(message)
 
-    # IMPORTANT: Do not use logger asserts for code executed from agent.run_loop(...)
     def assert_true(self, condition: bool, message: str,
-                    exception_type: Type[Exception] = ValueError,
+                    exception_type = ValueError,
                     log_only: bool = True) -> None:
-        """
-        Assert condition is true, log error with traceback if false.
-
-        Args:
-            condition: The condition to check
-            message: Error message to log if condition is False
-            exception_type: Exception type to pass to the caller
-            log_only: If True, logs the error and exits program without raising exception
-        """
+        """Assert condition is true, log error with traceback if false."""
         if condition:
             return
 
-        # Condition failed - capture stack trace
-        stack = traceback.extract_stack()[:-1]  # Exclude this function from trace
-        stack_trace = ''.join(traceback.format_list(stack))
-
-        # Log the error with stack trace
-        self.error(f"{message}\nStack trace:\n{stack_trace}")
-
-        # If we're just logging, don't raise an exception but exit program
         if log_only:
-            self.critical(f"Exiting program due to assertion failure: {message}")
-            exit(1)  # Exit with error code 1
-
-        # Raise the exception
-        try:
+            try:
+                self.error(f"ASSERTION FAILED: {message}")
+            except:
+                print(f"ASSERTION FAILED: {message}")
+            exit(1)
+        else:
             raise exception_type(message)
-        except exception_type as e:
-            # Re-raise with the original message but without a new traceback
-            # The caller will see the exception but Python won't print a duplicate stack trace
-            raise exception_type(str(e)) from None
 
-    def assert_attribute(self, obj: Any, attr_name: str,
+    def assert_attribute(self, obj, attr_name: str,
                          message: str = None,
-                         exception_type: Type[Exception] = ValueError) -> None:
-        """Assert object has specified attribute, generates default message if none provided."""
+                         exception_type = ValueError) -> None:
+        """Assert object has specified attribute"""
         if message is None:
             obj_name = obj.__class__.__name__
             message = f"'{attr_name}' not provided in {obj_name} configuration"
 
         self.assert_true(hasattr(obj, attr_name), message, exception_type)
 
-    def assert_condition(self, condition: Callable[[], bool],
-                      message: str,
-                      exception_type: Type[Exception] = ValueError) -> None:
-        """Assert callable returns True, useful for lazy evaluation of complex conditions."""
-        self.assert_true(condition(), message, exception_type)
 
+def get_logger():
+    """
+    Get the appropriate logger instance:
+    - Returns bootstrap logger if main logger not configured
+    - Returns main logger if it has been configured
+    - Automatically transitions when main logger becomes available
+    """
+    global _main_logger_instance, _bootstrap_logger_instance
 
-# Global instance and convenience functions
-_logger_instance = None
+    # Create main logger instance if it doesn't exist (singleton pattern)
+    if _main_logger_instance is None:
+        _main_logger_instance = Logger('Agent')  # Main logger uses 'Agent' name
 
-def get_logger() -> Logger:
-    """Get the singleton logger instance"""
-    global _logger_instance
-    if _logger_instance is None:
-        _logger_instance = Logger()
-    return _logger_instance
-
-
-# Example usage and testing
-if __name__ == "__main__":
-    pass
+    # Check if main logger is configured
+    if _main_logger_instance.is_configured():
+        # Log transition message only once
+        if _bootstrap_logger_instance is not None:
+            _main_logger_instance.info("Transitioned from bootstrap to main logger")
+            _bootstrap_logger_instance = None  # Clear bootstrap reference
+        return _main_logger_instance
+    else:
+        # Create bootstrap logger only once
+        if _bootstrap_logger_instance is None:
+            _bootstrap_logger_instance = Logger('bootstrap')  # Bootstrap uses 'bootstrap' name
+            _bootstrap_logger_instance.configure_simple()      # Configure with simple settings
+        return _bootstrap_logger_instance

@@ -2,8 +2,10 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
+import traceback
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -42,6 +44,7 @@ class EvalPlusBenchmark:
 
         # Simple periodic evaluation state
         self.eval_interval = None
+        self.eval_process = None
         self.last_eval_time = 0
 
     def _load_config(self, config_path: str) -> Dict:
@@ -60,6 +63,10 @@ class EvalPlusBenchmark:
 
         return config
 
+    # =========================================================================
+    # UNIFIED EVALUATION METHODS - MAXIMIZED CODE REUSE
+    # =========================================================================
+
     def _get_dataset(self) -> Dict:
         """Get dataset problems"""
         datasets = {'humaneval': get_human_eval_plus, 'mbpp': get_mbpp_plus}
@@ -71,6 +78,100 @@ class EvalPlusBenchmark:
         """Convert task_id to filesystem-safe identifier"""
         safe_id = task_id.replace("/", "_").replace("\\", "_")
         return f"task_{safe_id}" if safe_id and safe_id[0].isdigit() else safe_id
+
+    def _prepare_evaluation(self, solutions: List[Dict]) -> Optional[Path]:
+        """Prepare evaluation directory and files, return eval_dir or None if failed"""
+        if not solutions:
+            return None
+
+        eval_dir = Path(self.agent.get_log_dir()) / "evaluation"
+        eval_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save solutions
+        solutions_file = eval_dir / "solutions.jsonl"
+        write_jsonl(str(solutions_file), solutions)
+
+        # Remove existing eval results
+        for eval_results_file in eval_dir.glob("*.eval_results.json"):
+            eval_results_file.unlink()
+
+        return eval_dir
+
+    def _run_eval_script(self, eval_script: Path, blocking: bool = True, timeout: int = 1800) -> Optional[str]:
+        """Run evaluation script and return combined output"""
+        env = os.environ.copy()
+        cmd = ["bash", str(eval_script.absolute())]
+
+        if blocking:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                env=env
+            )
+            output = f"{result.stdout}\n{result.stderr}\nEXIT_CODE:{result.returncode}"
+            return output.strip()
+        else:
+            # Check if previous process is still running
+            if self.eval_process and self.eval_process.poll() is None:
+                self.logger.info("Evaluation already running, skipping")
+                return None
+
+            self.logger.info(f"Running eval script: {' '.join(cmd)}")
+            self.eval_process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+                env=env
+            )
+            return None
+
+    def _create_eval_script(self, eval_dir: Path, solutions_file: Path) -> Path:
+        """Create compact evaluation script"""
+        eval_script = eval_dir / "eval_script.sh"
+
+        # Use absolute paths
+        eval_dir = eval_dir.absolute()
+        solutions_file = solutions_file.absolute()
+        sanitized_file = str(solutions_file).replace('.jsonl', '-sanitized.jsonl')
+        output_file = eval_dir / "eval_script.output.txt"
+
+        script_content = f"""#!/bin/bash
+cd "{eval_dir}" || exit 1
+CMD=$(command -v evalplus >/dev/null && echo "evalplus" || echo "python -m evalplus")
+echo "=== EVALPLUS: {self.dataset} | $(wc -l < '{solutions_file}') solutions ===" | tee {output_file}
+$CMD.sanitize --samples "{solutions_file}" 2>&1 | tee -a {output_file} || true
+EVAL_FILE=$([ -f "{sanitized_file}" ] && echo "{sanitized_file}" || echo "{solutions_file}")
+$CMD.evaluate --dataset {self.dataset} --samples "$EVAL_FILE" | tee -a {output_file}
+"""
+        eval_script.write_text(script_content)
+        eval_script.chmod(0o755)
+        return eval_script
+
+    def _parse_evaluation_scores(self, combined_output: str) -> Optional[Dict]:
+        """Parse pass@k scores from EvalPlus output"""
+        try:
+            lines = combined_output.strip().split('\n')
+            scores = {}
+
+            for i, line in enumerate(lines[:-1]):
+                lower_line = line.lower()
+                next_line = lines[i + 1].strip()
+
+                if next_line.startswith("pass@") and '\t' in next_line:
+                    key, value = next_line.split('\t', 1)
+                    score = {key.rstrip(':'): float(value)}
+
+                    if "base tests" in lower_line:
+                        scores["base"] = score
+                    elif "base + extra" in lower_line:
+                        scores["base_plus_extra"] = score
+
+            return scores or None
+        except Exception:
+            return None
 
     def setup_problems(self, num_samples: Optional[int] = None,
                       task_ids: Optional[List[str]] = None) -> Dict:
@@ -97,32 +198,6 @@ class EvalPlusBenchmark:
         self.logger.info(f"Setup {len(self.problems)} problems in {self.benchmark_dir}")
         return self.problems
 
-    def run_agent(self, max_iterations: int = 10, stop_on_error: bool = False) -> Dict:
-        """Run agent on benchmark problems"""
-        agent_config = self.config.get('Agent', {})
-        if not agent_config.get('name'):
-            raise ValueError("Agent name must be specified in config")
-        if not agent_config.get('role'):
-            raise ValueError("Agent role must be specified in config")
-
-        self.logger.info(f"Creating agent '{agent_config['name']}'")
-
-        self.agent = Agent(
-            name=agent_config['name'],
-            role=agent_config['role'],
-            repository=str(self.benchmark_dir),
-            config=self.config
-        )
-
-        self.logger.info(f"Running agent for {max_iterations} iterations")
-        results = self.agent.run_loop(max_iterations=max_iterations, stop_on_error=stop_on_error)
-
-        actions = results.get('execution_stats', {}).get('actions_executed', 0)
-        state = results.get('agent_info', {}).get('current_state', 'unknown')
-        self.logger.info(f"Agent completed: {actions} actions, final state: {state}")
-
-        return results
-
     def extract_solutions(self) -> List[Dict]:
         """Extract solutions from problem directories"""
         solutions = []
@@ -142,97 +217,113 @@ class EvalPlusBenchmark:
         return solutions
 
     def run_evaluation(self, solutions: List[Dict]) -> Dict:
-        """Run EvalPlus evaluation on solutions"""
-        if not solutions:
-            return {"error": "No solutions found"}
+        """Run EvalPlus evaluation on solutions (blocking)"""
+        self.logger.info("Starting evaluation")
 
         try:
-            eval_dir = Path(self.agent.get_log_dir()) / "evaluation"
-            eval_dir.mkdir(parents=True, exist_ok=True)
+            # Prepare evaluation
+            eval_dir = self._prepare_evaluation(solutions)
+            if not eval_dir:
+                self.logger.error("Failed to prepare evaluation - no solutions found")
+                return {"error": "No solutions found"}
 
-            # Save solutions
             solutions_file = eval_dir / "solutions.jsonl"
-            write_jsonl(str(solutions_file), solutions)
 
-            # Run evaluation
-            result = subprocess.run(
-                ["evalplus.evaluate", "--dataset", self.dataset, "--samples", str(solutions_file)],
-                cwd=eval_dir,
-                capture_output=True,
-                text=True,
-                timeout=900
-            )
+            # Verify solutions file exists
+            if not solutions_file.exists():
+                self.logger.error(f"Solutions file was not created: {solutions_file}")
+                return {"error": f"Solutions file not created: {solutions_file}"}
 
-            if result.returncode == 0:
-                scores = self._parse_evaluation_scores(result.stdout)
-                return {"stdout": result.stdout, "scores": scores} if scores else {"stdout": result.stdout}
+            self.logger.info(f"Created solutions file: {solutions_file}")
+
+            # Create and run script
+            eval_script = self._create_eval_script(eval_dir, solutions_file)
+            self.logger.info(f"Created evaluation script: {eval_script}")
+
+            self.logger.info("Executing evaluation script...")
+            combined_output = self._run_eval_script(eval_script)
+
+            if combined_output is None:
+                self.logger.error("Script execution returned None")
+                return {"error": "evaluation script execution failed"}
+
+            # Extract exit code
+            exit_code_match = re.search(r'EXIT_CODE:(\d+)', combined_output)
+            exit_code = int(exit_code_match.group(1)) if exit_code_match else 1
+            self.logger.info(f"Evaluation completed with exit code: {exit_code}")
+
+            if exit_code == 0:
+                scores = self._parse_evaluation_scores(combined_output)
+                if scores:
+                    self.logger.info(f"Successfully parsed scores: {scores}")
+                    return {"output": combined_output, "scores": scores}
+                else:
+                    self.logger.warning("Evaluation completed but no scores found")
+                    return {"output": combined_output}
             else:
-                return {"error": "evaluation failed", "stderr": result.stderr}
+                self.logger.error(f"Evaluation failed with exit code {exit_code}")
+                return {"error": "evaluation failed", "output": combined_output, "exit_code": exit_code}
 
         except subprocess.TimeoutExpired:
+            self.logger.error("Evaluation timeout exceeded")
             return {"error": "evaluation timeout"}
         except Exception as e:
+            self.logger.error(f"Evaluation exception: {e}")
+            self.logger.error(traceback.format_exc())
             return {"error": str(e)}
 
-    def _parse_evaluation_scores(self, stdout: str) -> Optional[Dict]:
-        """Parse pass@k scores from EvalPlus output"""
-        try:
-            lines = stdout.strip().split('\n')
-            scores = {}
+    # =========================================================================
+    # AGENT EXECUTION WITH CALLBACK-BASED PERIODIC EVALUATION
+    # =========================================================================
 
-            for i, line in enumerate(lines[:-1]):
-                lower_line = line.lower()
-                next_line = lines[i + 1].strip()
+    def run_agent_with_eval_checks(self, max_iterations: int, stop_on_error: bool) -> Dict:
+        """Run agent with periodic evaluation using minimal callback system"""
+        agent_config = self.config.get('Agent', {})
 
-                if next_line.startswith("pass@") and '\t' in next_line:
-                    key, value = next_line.split('\t', 1)
-                    score = {key.rstrip(':'): float(value)}
+        self.agent = Agent(
+            name=agent_config['name'],
+            role=agent_config['role'],
+            repository=str(self.benchmark_dir),
+            config=self.config
+        )
 
-                    if "base tests" in lower_line:
-                        scores["base"] = score
-                    elif "base + extra" in lower_line:
-                        scores["base_plus_extra"] = score
+        # Set up periodic evaluation callback if enabled
+        if self.eval_interval:
+            self.agent.set_callback(self._evaluation_callback)
+            self.logger.info(f"Enabled periodic evaluation every {self.eval_interval}s using callback")
 
-            return scores or None
-        except Exception:
-            return None
+        # Run agent normally - callback will handle periodic evaluation
+        return self.agent.run_loop(max_iterations=max_iterations, stop_on_error=stop_on_error)
 
-    def check_and_run_periodic_eval(self):
-        """Check if it's time for evaluation and run it in background if needed"""
-        if not self.eval_interval:
-            return
-
+    def _evaluation_callback(self, agent, iteration):
+        """Callback executed for evaluation at the end of each iteration"""
         current_time = time.time()
         if current_time - self.last_eval_time < self.eval_interval:
             return
 
-        # Quick check if we have solutions
         solutions = self.extract_solutions()
         if not any(sol["solution"].strip() for sol in solutions):
             return
 
-        # Run evaluation in completely detached background process
         try:
-            eval_dir = Path(self.agent.get_log_dir()) / "evaluation"
-            eval_dir.mkdir(parents=True, exist_ok=True)
+            eval_dir = self._prepare_evaluation(solutions)
+            if not eval_dir:
+                return
 
             solutions_file = eval_dir / "solutions.jsonl"
-            write_jsonl(str(solutions_file), solutions)
+            eval_script = self._create_eval_script(eval_dir, solutions_file)
+            self._run_eval_script(eval_script, blocking=False)
 
-            # Start detached subprocess - fire and forget
-            subprocess.Popen(
-                ["evalplus.evaluate", "--dataset", self.dataset, "--samples", str(solutions_file)],
-                cwd=eval_dir,
-                stdout=open(eval_dir / "eval_output.txt", "w"),
-                stderr=subprocess.DEVNULL,
-                start_new_session=True  # Fully detach from parent
-            )
-
-            self.logger.info("Started background evaluation")
+            self.logger.info(f"Started background evaluation at iteration {iteration}")
             self.last_eval_time = current_time
 
         except Exception as e:
-            self.logger.debug(f"Failed to start background evaluation: {e}")
+            self.logger.error(f"Failed to start background evaluation: {e}")
+            self.logger.error(traceback.format_exc())
+
+    # =========================================================================
+    # WORKFLOW AND RESULT MANAGEMENT
+    # =========================================================================
 
     def save_results(self, agent_results: Dict, evaluation_results: Dict) -> Path:
         """Save benchmark results"""
@@ -254,7 +345,7 @@ class EvalPlusBenchmark:
             }
         }
 
-        results_file = eval_dir / "benchmark_results.json"
+        results_file = eval_dir / "benchmark.results.json"
         try:
             results_file.write_text(json.dumps(results, indent=4, default=str))
             return results_file
@@ -265,7 +356,7 @@ class EvalPlusBenchmark:
     def run_complete_benchmark(self, max_iterations: int = 10, stop_on_error: bool = False,
                               num_samples: Optional[int] = None, task_ids: Optional[List[str]] = None,
                               run_evaluation: bool = True, eval_interval: Optional[int] = None) -> Tuple[Dict, Path]:
-        """Run complete benchmark pipeline"""
+        """Run complete benchmark pipeline with callback-based evaluation"""
         try:
             # Setup problems
             self.setup_problems(num_samples, task_ids)
@@ -274,9 +365,9 @@ class EvalPlusBenchmark:
             if eval_interval and run_evaluation:
                 self.eval_interval = eval_interval
                 self.last_eval_time = 0
-                self.logger.info(f"Enabled periodic evaluation every {eval_interval}s")
+                self.logger.info(f"Enabled periodic evaluation every {eval_interval}s using callbacks")
 
-            # Run agent with periodic evaluation checks
+            # Run agent with callback-based evaluation
             agent_results = self.run_agent_with_eval_checks(max_iterations, stop_on_error)
 
             # Run final evaluation
@@ -303,40 +394,6 @@ class EvalPlusBenchmark:
         finally:
             if self.agent:
                 self.agent.shutdown()
-
-    def run_agent_with_eval_checks(self, max_iterations: int, stop_on_error: bool) -> Dict:
-        """Run agent with optional periodic evaluation checks"""
-        agent_config = self.config.get('Agent', {})
-
-        self.agent = Agent(
-            name=agent_config['name'],
-            role=agent_config['role'],
-            repository=str(self.benchmark_dir),
-            config=self.config
-        )
-
-        # Run agent one iteration at a time for periodic eval checks
-        for i in range(max_iterations):
-            try:
-                # Check for periodic evaluation (non-blocking)
-                self.check_and_run_periodic_eval()
-
-                # Run one agent iteration
-                results = self.agent.run_loop(max_iterations=1, stop_on_error=stop_on_error)
-
-                # Check if done
-                if results.get('agent_info', {}).get('current_state') == 'idle':
-                    self.logger.info(f"Agent reached idle after {i+1} iterations")
-                    break
-
-            except Exception as e:
-                if stop_on_error:
-                    self.logger.error(f"Stopping on error: {e}")
-                    break
-                else:
-                    self.logger.warning(f"Continuing after error: {e}")
-
-        return self.agent.get_summary()
 
     def print_summary(self, results: Dict):
         """Print benchmark summary"""
@@ -368,10 +425,10 @@ def main():
     parser.add_argument("--dataset", choices=["humaneval", "mbpp"], default="humaneval")
     parser.add_argument("--num-samples", type=int, help="Number of samples to include")
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs to include")
-    parser.add_argument("--max-iterations", type=int, default=10, help="Iterations for agent to run")
+    parser.add_argument("--max-iterations", type=int, default=0, help="Iterations for agent to run")
     parser.add_argument("--stop-on-error", action="store_true", help="Stop agent if exception thrown")
     parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
-    parser.add_argument("--eval-interval", type=int, default=30, help="Periodic evaluation interval in seconds")
+    parser.add_argument("--eval-interval", type=int, default=1800, help="Periodic evaluation interval in seconds")
 
     args = parser.parse_args()
 

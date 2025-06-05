@@ -8,7 +8,7 @@ import re
 import signal
 import sys
 import traceback
-from typing import Dict, List
+from typing import Dict, List, Callable
 import yaml
 
 # Import the OpenAIHandler we created
@@ -66,6 +66,7 @@ class Agent:
         self._setup_openai_handler()
         self._setup_action_selection()
         self._setup_agent_api()
+        self._setup_callback()
 
         # Register cleanup handlers
         self._register_cleanup()
@@ -200,6 +201,10 @@ class Agent:
         self.agent_api.run()
         self.logger.info("Agent API initialized and running")
 
+    def _setup_callback(self):
+        """Setup a callback variable for running at end of iteration"""
+        self.callback = None
+
     def _register_cleanup(self) -> None:
         """Register cleanup handlers for graceful shutdown"""
         self.shutdown_called = False
@@ -330,10 +335,10 @@ class Agent:
             self.logger.error("Failed to parse Python code from response")
         return result
 
-    def _summary(self):
-        summary = self.get_summary()
-        self.print_summary(summary)
-        self.save_summary(summary)
+    def set_callback(self, callback: Callable[[int], None]):
+        """Set a callback function to be called at the end of each iteration"""
+        self.logger.assert_true(callable(callback), f"Callback must be callable, got {type(callback)}")
+        self.callback = callback
 
     def run_loop(self,
         max_iterations: int = 10,
@@ -351,6 +356,12 @@ class Agent:
         Returns:
             Dict containing loop execution results
         """
+
+        def _process_summary():
+            summary = self.get_summary()
+            self._print_summary(summary)
+            self._save_summary(summary)
+
         self.logger.assert_true(
             self.fsm is not None,
             "FSM has not been properly initialized"
@@ -371,7 +382,7 @@ class Agent:
                 self.version_manager.validate_active_files(self)
 
                 # Print summary and write to file
-                self._summary()
+                _process_summary()
 
                 # Check agent context on first iteration to make sure state is valid
                 if iteration == 1:
@@ -396,6 +407,7 @@ class Agent:
 
                 # Execute the action through FSM
                 success = self.fsm.execute_action(chosen_action, self)
+                self.logger.info(f"Action executed (success: {success}), new state: {self.fsm.current_state}")
 
                 # Record the execution in history
                 self.history.add_action_execution(
@@ -407,7 +419,13 @@ class Agent:
                     curr_state=self.fsm.current_state
                 )
 
-                self.logger.info(f"Action executed successfully. New state: {self.fsm.current_state}")
+                # Handle callbacks at end of iteration
+                if self.callback:
+                    try:
+                        self.callback(self, iteration)
+                    except Exception as e:
+                        self.logger.error(f"Callback error: {e}")
+                        self.logger.error(traceback.format_exc())
 
             except Exception as e:
                 if raise_exception:
@@ -435,12 +453,6 @@ class Agent:
 
         # Return agent summary
         return self.get_summary()
-
-    def _summary(self):
-        """Print and save summary history"""
-        summary = self.get_summary()
-        self._print_summary(summary)
-        self._save_summary(summary)
 
     def get_summary(self, recent_hist_len=None) -> Dict:
         """Get a comprehensive summary of the agent's current state as a dictionary."""

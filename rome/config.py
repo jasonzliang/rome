@@ -178,7 +178,7 @@ DEFAULT_CONFIG = {
     # LOGGING & MONITORING
 
     "Logger": {
-        "level": "ERROR",  # Log level in increasing verbosity: INFO -> ERROR -> DEBUG
+        "level": "DEBUG",  # Log level in increasing verbosity: INFO -> ERROR -> DEBUG
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Formatting
         "console": True,  # Print to console if true
         "include_caller_info": None,  # Can be "rome", "rich", or None
@@ -297,7 +297,7 @@ def merge_with_default_config(custom_config):
         if old_v is not None:
             logger.assert_true(type(old_v) == type(new_v), f"Type mismatch for old {type(old_v).__name__} and new value {type(new_v).__name__} for config parameter '{key}'")
         else:
-            logger.debug(f"Type matching skipped for config parameter '{key}' ({old_v} -> {new_v})")
+            logger.debug(f"Type checking skipped for config parameter '{key}' ({old_v} -> {new_v})")
 
         # Key value must be >= 0 or length >= 0 (exception for 'exclude_' keys)
         for v in [old_v, new_v]:

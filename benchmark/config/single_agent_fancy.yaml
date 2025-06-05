@@ -15,3 +15,6 @@ Agent:
     - **Additional Information**: Work closely with other team members such as Python_Experts, Algorithm_Experts, and Security_Experts to ensure that refactored code is not only efficient but also integrates seamlessly with other systems and meets security standards. Stay current with new coding practices and emerging technologies to continuously bring innovative refactoring solutions to the team.
   agent_api: false  # Disabled for benchmarking
   patience: 4
+
+Logger:
+  "include_caller_info": "rome"
