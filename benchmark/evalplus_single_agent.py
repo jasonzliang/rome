@@ -1,11 +1,9 @@
-# evalplus_single_agent.py - Updated EvalPlusBenchmark class
+# evalplus_single_agent.py - Clean and simple EvalPlus benchmark
 import argparse
 import json
 import os
-import shutil
 import subprocess
 import sys
-import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -25,7 +23,7 @@ except ImportError:
 
 
 class EvalPlusBenchmark:
-    """Efficient benchmark runner for HumanEval+ with EvalPlus integration"""
+    """Simple benchmark runner for HumanEval+ with optional background evaluation"""
 
     def __init__(self, benchmark_dir: str, config_path: str, dataset: str = "humaneval"):
         self.logger = get_logger()
@@ -42,11 +40,9 @@ class EvalPlusBenchmark:
         self.agent = None
         self.problems = {}
 
-        # Evaluation threading attributes
-        self.eval_thread = None
-        self.eval_stop_event = threading.Event()
+        # Simple periodic evaluation state
         self.eval_interval = None
-        self.eval_lock = threading.Lock()
+        self.last_eval_time = 0
 
     def _load_config(self, config_path: str) -> Dict:
         """Load and merge configuration"""
@@ -57,8 +53,9 @@ class EvalPlusBenchmark:
         config = merge_with_default_config(config)
 
         # Ensure Agent config exists and set repository
-        if 'Agent' not in config:
-            config['Agent'] = {}
+        self.logger.assert_true('Agent' in config, "Agent not in config")
+        self.logger.assert_true('agent_api' in config['Agent'] \
+            and not config['Agent']['agent_api'], "Agent API not disabled")
         config['Agent']['repository'] = str(self.benchmark_dir.absolute())
 
         return config
@@ -78,8 +75,6 @@ class EvalPlusBenchmark:
     def setup_problems(self, num_samples: Optional[int] = None,
                       task_ids: Optional[List[str]] = None) -> Dict:
         """Setup benchmark directory with problems"""
-        self.benchmark_dir.mkdir(parents=True, exist_ok=True)
-
         problems = self._get_dataset()
         if task_ids:
             problems = {tid: problems[tid] for tid in task_ids if tid in problems}
@@ -92,6 +87,7 @@ class EvalPlusBenchmark:
             problem_dir = self.benchmark_dir / safe_id
             problem_dir.mkdir(exist_ok=True)
 
+            # Make sure not to overwrite any existing problem code
             problem_file = problem_dir / f"{safe_id}.py"
             if not problem_file.exists():
                 problem_file.write_text(problem["prompt"], encoding="utf-8")
@@ -103,7 +99,17 @@ class EvalPlusBenchmark:
 
     def run_agent(self, max_iterations: int = 10, stop_on_error: bool = False) -> Dict:
         """Run agent on benchmark problems"""
+        agent_config = self.config.get('Agent', {})
+        if not agent_config.get('name'):
+            raise ValueError("Agent name must be specified in config")
+        if not agent_config.get('role'):
+            raise ValueError("Agent role must be specified in config")
+
+        self.logger.info(f"Creating agent '{agent_config['name']}'")
+
         self.agent = Agent(
+            name=agent_config['name'],
+            role=agent_config['role'],
             repository=str(self.benchmark_dir),
             config=self.config
         )
@@ -111,8 +117,10 @@ class EvalPlusBenchmark:
         self.logger.info(f"Running agent for {max_iterations} iterations")
         results = self.agent.run_loop(max_iterations=max_iterations, stop_on_error=stop_on_error)
 
-        self.logger.info(f"Agent completed: {len(results.get('execution_stats', {}).get('actions_executed', 0))} actions, "
-                        f"final state: {results.get('agent_info', {}).get('current_state')}")
+        actions = results.get('execution_stats', {}).get('actions_executed', 0)
+        state = results.get('agent_info', {}).get('current_state', 'unknown')
+        self.logger.info(f"Agent completed: {actions} actions, final state: {state}")
+
         return results
 
     def extract_solutions(self) -> List[Dict]:
@@ -134,61 +142,37 @@ class EvalPlusBenchmark:
         return solutions
 
     def run_evaluation(self, solutions: List[Dict]) -> Dict:
-        """Run EvalPlus evaluation on solutions with proper thread safety"""
+        """Run EvalPlus evaluation on solutions"""
         if not solutions:
             return {"error": "No solutions found"}
 
-        with self.eval_lock:  # Ensure thread safety
-            try:
-                eval_dir = Path(self.agent.get_log_dir()) / "evaluation"
-                eval_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            eval_dir = Path(self.agent.get_log_dir()) / "evaluation"
+            eval_dir.mkdir(parents=True, exist_ok=True)
 
-                # Save solutions
-                solutions_file = eval_dir / "solutions.jsonl"
-                write_jsonl(str(solutions_file), solutions)
+            # Save solutions
+            solutions_file = eval_dir / "solutions.jsonl"
+            write_jsonl(str(solutions_file), solutions)
 
-                # Remove existing eval results
-                for eval_results_file in eval_dir.glob("*.eval_results.json"):
-                    eval_results_file.unlink()
+            # Run evaluation
+            result = subprocess.run(
+                ["evalplus.evaluate", "--dataset", self.dataset, "--samples", str(solutions_file)],
+                cwd=eval_dir,
+                capture_output=True,
+                text=True,
+                timeout=900
+            )
 
-                # Try sanitization first
-                try:
-                    subprocess.run(
-                        ["evalplus.sanitize", "--samples", str(solutions_file)],
-                        cwd=eval_dir,
-                        capture_output=True,
-                        timeout=300,
-                        check=False
-                    )
-                    sanitized_file = eval_dir / "solutions-sanitized.jsonl"
-                    if sanitized_file.exists():
-                        solutions_file = sanitized_file
-                except Exception as e:
-                    self.logger.debug(f"Sanitization failed: {e}")
+            if result.returncode == 0:
+                scores = self._parse_evaluation_scores(result.stdout)
+                return {"stdout": result.stdout, "scores": scores} if scores else {"stdout": result.stdout}
+            else:
+                return {"error": "evaluation failed", "stderr": result.stderr}
 
-                # Run evaluation
-                try:
-                    result = subprocess.run(
-                        ["evalplus.evaluate", "--dataset", self.dataset, "--samples", str(solutions_file)],
-                        cwd=eval_dir,
-                        capture_output=True,
-                        text=True,
-                        timeout=1800
-                    )
-
-                    if result.returncode == 0:
-                        scores = self._parse_evaluation_scores(result.stdout)
-                        return {"stdout": result.stdout, "scores": scores} if scores else {"stdout": result.stdout}
-                    else:
-                        return {"error": "evaluation failed", "stderr": result.stderr}
-
-                except subprocess.TimeoutExpired:
-                    return {"error": "evaluation timeout"}
-                except Exception as e:
-                    return {"error": str(e)}
-
-            except Exception as e:
-                return {"error": f"Evaluation setup failed: {e}"}
+        except subprocess.TimeoutExpired:
+            return {"error": "evaluation timeout"}
+        except Exception as e:
+            return {"error": str(e)}
 
     def _parse_evaluation_scores(self, stdout: str) -> Optional[Dict]:
         """Parse pass@k scores from EvalPlus output"""
@@ -210,78 +194,48 @@ class EvalPlusBenchmark:
                         scores["base_plus_extra"] = score
 
             return scores or None
-        except Exception as e:
-            self.logger.debug(f"Score parsing failed: {e}")
+        except Exception:
             return None
 
-    def _periodic_evaluation_worker(self):
-        """Worker thread for periodic evaluation"""
-        self.logger.info("Periodic evaluation thread started")
-
-        while not self.eval_stop_event.is_set():
-            try:
-                # Wait for the interval or stop signal
-                if self.eval_stop_event.wait(self.eval_interval):
-                    break  # Stop event was set
-
-                self.logger.debug("Running periodic evaluation...")
-                solutions = self.extract_solutions()
-
-                if solutions and any(sol["solution"].strip() for sol in solutions):
-                    evaluation_results = self.run_evaluation(solutions)
-
-                    if "scores" in evaluation_results:
-                        scores = evaluation_results["scores"]
-                        score_summary = []
-                        for score_type, metrics in scores.items():
-                            if "pass@1" in metrics:
-                                score_summary.append(f"{score_type}: {metrics['pass@1']:.3f}")
-                        if score_summary:
-                            self.logger.info(f"Periodic eval - {', '.join(score_summary)}")
-                    elif "error" in evaluation_results:
-                        self.logger.debug(f"Periodic eval error: {evaluation_results['error']}")
-
-            except Exception as e:
-                self.logger.error(f"Periodic evaluation failed: {e}")
-
-        self.logger.info("Periodic evaluation thread stopped")
-
-    def start_periodic_evaluation(self, eval_interval: int):
-        """Start periodic evaluation in background thread"""
-        if not eval_interval or eval_interval <= 0:
+    def check_and_run_periodic_eval(self):
+        """Check if it's time for evaluation and run it in background if needed"""
+        if not self.eval_interval:
             return
 
-        if self.eval_thread and self.eval_thread.is_alive():
-            self.logger.warning("Periodic evaluation already running")
+        current_time = time.time()
+        if current_time - self.last_eval_time < self.eval_interval:
             return
 
-        self.eval_interval = eval_interval
-        self.eval_stop_event.clear()
+        # Quick check if we have solutions
+        solutions = self.extract_solutions()
+        if not any(sol["solution"].strip() for sol in solutions):
+            return
 
-        self.eval_thread = threading.Thread(
-            target=self._periodic_evaluation_worker,
-            daemon=True,
-            name="EvalPlusPeriodicEval"
-        )
-        self.eval_thread.start()
-        self.logger.info(f"Started periodic evaluation (interval: {eval_interval}s)")
+        # Run evaluation in completely detached background process
+        try:
+            eval_dir = Path(self.agent.get_log_dir()) / "evaluation"
+            eval_dir.mkdir(parents=True, exist_ok=True)
 
-    def stop_periodic_evaluation(self):
-        """Stop periodic evaluation thread"""
-        if self.eval_interval and self.eval_thread:
-            self.logger.info("Stopping periodic evaluation...")
-            self.eval_stop_event.set()
+            solutions_file = eval_dir / "solutions.jsonl"
+            write_jsonl(str(solutions_file), solutions)
 
-            # Wait for thread to finish with timeout
-            if self.eval_thread.is_alive():
-                self.eval_thread.join(timeout=5.0)
-                if self.eval_thread.is_alive():
-                    self.logger.warning("Periodic evaluation thread did not stop gracefully")
-                else:
-                    self.logger.info("Periodic evaluation stopped successfully")
+            # Start detached subprocess - fire and forget
+            subprocess.Popen(
+                ["evalplus.evaluate", "--dataset", self.dataset, "--samples", str(solutions_file)],
+                cwd=eval_dir,
+                stdout=open(eval_dir / "eval_output.txt", "w"),
+                stderr=subprocess.DEVNULL,
+                start_new_session=True  # Fully detach from parent
+            )
+
+            self.logger.info("Started background evaluation")
+            self.last_eval_time = current_time
+
+        except Exception as e:
+            self.logger.debug(f"Failed to start background evaluation: {e}")
 
     def save_results(self, agent_results: Dict, evaluation_results: Dict) -> Path:
-        """Save complete benchmark results"""
+        """Save benchmark results"""
         eval_dir = Path(self.agent.get_log_dir()) / "evaluation"
         eval_dir.mkdir(parents=True, exist_ok=True)
 
@@ -295,7 +249,6 @@ class EvalPlusBenchmark:
             "summary": {
                 "total_actions": agent_results.get('execution_stats', {}).get('actions_executed', 0),
                 "final_state": agent_results.get('agent_info', {}).get('current_state', 'unknown'),
-                "errors": agent_results.get('execution_stats', {}).get('errors', 0),
                 "evaluation_success": "scores" in evaluation_results,
                 "scores": evaluation_results.get("scores")
             }
@@ -312,29 +265,28 @@ class EvalPlusBenchmark:
     def run_complete_benchmark(self, max_iterations: int = 10, stop_on_error: bool = False,
                               num_samples: Optional[int] = None, task_ids: Optional[List[str]] = None,
                               run_evaluation: bool = True, eval_interval: Optional[int] = None) -> Tuple[Dict, Path]:
-        """Run complete benchmark pipeline with optional periodic evaluation"""
+        """Run complete benchmark pipeline"""
         try:
             # Setup problems
             self.setup_problems(num_samples, task_ids)
 
-            # Start periodic evaluation if requested
-            if eval_interval:
-                self.start_periodic_evaluation(eval_interval)
+            # Enable periodic evaluation if requested
+            if eval_interval and run_evaluation:
+                self.eval_interval = eval_interval
+                self.last_eval_time = 0
+                self.logger.info(f"Enabled periodic evaluation every {eval_interval}s")
 
-            # Run agent
-            agent_results = self.run_agent(max_iterations, stop_on_error)
-
-            # Stop periodic evaluation
-            if eval_interval:
-                self.stop_periodic_evaluation()
+            # Run agent with periodic evaluation checks
+            agent_results = self.run_agent_with_eval_checks(max_iterations, stop_on_error)
 
             # Run final evaluation
             evaluation_results = {}
             if run_evaluation:
+                self.logger.info("Running final evaluation...")
                 solutions = self.extract_solutions()
                 evaluation_results = self.run_evaluation(solutions)
 
-            # Save and return results
+            # Save results
             results_file = self.save_results(agent_results, evaluation_results)
 
             return {
@@ -348,13 +300,43 @@ class EvalPlusBenchmark:
                 }
             }, results_file
 
-        except Exception as e:
-            if eval_interval:
-                self.stop_periodic_evaluation()
-            raise
         finally:
             if self.agent:
                 self.agent.shutdown()
+
+    def run_agent_with_eval_checks(self, max_iterations: int, stop_on_error: bool) -> Dict:
+        """Run agent with optional periodic evaluation checks"""
+        agent_config = self.config.get('Agent', {})
+
+        self.agent = Agent(
+            name=agent_config['name'],
+            role=agent_config['role'],
+            repository=str(self.benchmark_dir),
+            config=self.config
+        )
+
+        # Run agent one iteration at a time for periodic eval checks
+        for i in range(max_iterations):
+            try:
+                # Check for periodic evaluation (non-blocking)
+                self.check_and_run_periodic_eval()
+
+                # Run one agent iteration
+                results = self.agent.run_loop(max_iterations=1, stop_on_error=stop_on_error)
+
+                # Check if done
+                if results.get('agent_info', {}).get('current_state') == 'idle':
+                    self.logger.info(f"Agent reached idle after {i+1} iterations")
+                    break
+
+            except Exception as e:
+                if stop_on_error:
+                    self.logger.error(f"Stopping on error: {e}")
+                    break
+                else:
+                    self.logger.warning(f"Continuing after error: {e}")
+
+        return self.agent.get_summary()
 
     def print_summary(self, results: Dict):
         """Print benchmark summary"""
@@ -370,7 +352,7 @@ class EvalPlusBenchmark:
         self.logger.info(f"Final State: {summary.get('final_state', 'unknown')}")
 
         if scores:
-            self.logger.info("\nEvalPlus evaluation results:")
+            self.logger.info("\nEvaluation results:")
             for score_type, metrics in scores.items():
                 if isinstance(metrics, dict):
                     for metric, value in metrics.items():
@@ -388,8 +370,8 @@ def main():
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs to include")
     parser.add_argument("--max-iterations", type=int, default=10, help="Iterations for agent to run")
     parser.add_argument("--stop-on-error", action="store_true", help="Stop agent if exception thrown")
-    parser.add_argument("--no-evaluation", action="store_true", help="Skip final evaluation")
-    parser.add_argument("--eval-interval", type=int, help="Periodic evaluation interval in seconds")
+    parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
+    parser.add_argument("--eval-interval", type=int, default=30, help="Periodic evaluation interval in seconds")
 
     args = parser.parse_args()
 
@@ -406,7 +388,7 @@ def main():
 
     benchmark.print_summary(results)
     if results_file:
-        benchmark.logger.info(f"\nDetailed results: {results_file}")
+        benchmark.logger.info(f"Results saved to: {results_file}")
 
 
 if __name__ == "__main__":

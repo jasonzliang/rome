@@ -367,7 +367,6 @@ class Agent:
                 self.history.set_iteration(iteration)
                 self.logger.info(f"Loop iteration {iteration}/{end_iteration-1}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
-
                 # Validate active file state for consistency
                 self.version_manager.validate_active_files(self)
 
