@@ -1,0 +1,14 @@
+# HumanEval Benchmark Configuration - Fancy
+
+OpenAIHandler:
+  cost_limit: 200.0
+
+Agent:
+  agent_api: false
+  patience: 4
+
+Logger:
+  include_caller_info: "rome"
+
+MultiAgent:
+  agent_role_json: config/8_3_evolved_roles.json

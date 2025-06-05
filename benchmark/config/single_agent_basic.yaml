@@ -10,4 +10,4 @@ Agent:
   patience: 4
 
 Logger:
-  "include_caller_info": "rome"
+  include_caller_info: "rome"
