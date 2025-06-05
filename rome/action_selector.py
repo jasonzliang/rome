@@ -100,7 +100,7 @@ class ActionSelectorBase(ABC):
             )
 
             # Extract action from response
-            chosen_action, reasoning = self._extract_action_from_response(response)
+            chosen_action, reasoning = self._extract_action_from_response(agent, response)
 
         except Exception as e:
             error_msg = f"LLM call failed during action selection: {str(e)}"

@@ -68,10 +68,6 @@ class EditCodeAction(Action):
         file_path = selected_file['path']
         original_content = selected_file['content']
 
-        # Initialize changes list if it doesn't exist
-        if 'changes' not in selected_file:
-            selected_file['changes'] = []
-
         # Prepare prompt for code improvement
         prompt = self._create_improvement_prompt(agent, file_path, original_content)
 
@@ -91,7 +87,7 @@ class EditCodeAction(Action):
             self.logger.error(f"Invalid response format from LLM: {response}")
             return False
 
-        improved_code = result['improved_code']
+        improved_code = result.get('improved_code')
         explanation = result.get('explanation', 'No explanation provided')
         changes = result.get('changes', [])
 
@@ -139,7 +135,8 @@ class EditCodeAction(Action):
 5. Documentation improvements
 """
         # Add file info and original code
-        prompt += f"""Code file path: {file_path}
+        prompt += f"""
+Code file path: {file_path}
 Code file content:
 ```python
 {content}
@@ -150,9 +147,10 @@ Code file content:
         if analysis_prompt:
             prompt += f"\n{analysis_prompt}\n"
 
-        prompt += """Respond with a JSON object containing:
+        prompt += """
+Respond with a JSON object containing:
 {{
-    "improved_code": "The complete improved code as a string, including all original code with your improvements",
+    "improved_code": "The new and improved code with changes or edits made to it",
     "explanation": "A clear explanation of the changes you made and why",
     "changes": [
         {{
@@ -167,6 +165,8 @@ IMPORTANT:
 - Return the ENTIRE file content with your improvements, not just the changed parts
 - Make sure the improved code is valid Python syntax and contains no markdown formatting like ```python...```
 - Be conservative with changes - prioritize correctness over style
+- List improvements you made in "changes" and summarize the changes in "explanation"
+- If improved code is unchanged, be sure give an empty list for "changes" and mention it in "explanation"
 """
 
         if analysis_prompt:

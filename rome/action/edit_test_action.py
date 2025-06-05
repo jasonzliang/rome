@@ -75,26 +75,26 @@ class EditTestAction(Action):
         # Parse the response to get test code
         result = agent.parse_json_response(response)
 
-        if not result or "test_code" not in result:
+        if not result or "improved_test_code" not in result:
             self.logger.error(f"Invalid response format from LLM: {response}")
             return False
 
-        new_test_content = result.get('test_code')
+        improved_test_content = result.get('improved_test_code')
         explanation = result.get('explanation', 'No explanation provided')
         test_changes = result.get('changes', [])
 
         # Validate the test code
-        if not new_test_content or not isinstance(new_test_content, str):
+        if not improved_test_content or not isinstance(improved_test_content, str):
             self.logger.error("Test code is missing or invalid")
             return False
 
-        if test_exists and new_test_content == test_content:
-            self.logger.info("No changes made to the test code")
+        if test_exists and improved_test_content == test_content:
+            self.logger.error("No changes made to the test code")
             # Even if no changes, we'll continue to the next state
 
         # Update the selected file in the agent context with test information
         selected_file['test_path'] = test_path
-        selected_file['test_content'] = new_test_content
+        selected_file['test_content'] = improved_test_content
 
         # Record the explanation and changes
         change_record = {
@@ -105,7 +105,7 @@ class EditTestAction(Action):
 
         # Write the test code to disk
         with open(test_path, 'w', encoding='utf-8') as f:
-            f.write(new_test_content)
+            f.write(improved_test_content)
 
         # Note: Version saving is now handled in ExecuteCodeAction to include execution results
         self.logger.info(f"Successfully edited and wrote test code to {test_path}")
@@ -167,8 +167,8 @@ Include proper test setup, all necessary imports, and comprehensive test cases.
         prompt += f"""
 Respond with a JSON object containing:
 {{
-    "test_code": "The complete test code as a string",
-    "explanation": "A clear explanation of the test approach and coverage",
+    "improved_test_code": "The new and improved test code with changes or edits made to it",
+    "explanation": "A clear explanation of the changes you made and why",
     "changes": [
         {{
             "type": "test type (unit test, integration test, etc.)",
@@ -185,6 +185,8 @@ IMPORTANT:
 - Assume the code file and test file are both located in the root of the current working directory
 - Include all necessary imports that are required by the tests
 - Avoid external dependencies that are unnecessary for testing
+- List improvements you made in "changes" and summarize the changes in "explanation"
+- If improved code is unchanged, be sure give an empty list for "changes" and mention it in "explanation"
 """
 
         if analysis_prompt:

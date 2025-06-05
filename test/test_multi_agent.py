@@ -91,7 +91,7 @@ def create_config():
         "OpenAIHandler": {
             "model": "gpt-4o",
             "temperature": 0.1,
-            "max_tokens": 4096
+            "max_tokens": 8192
         },
         "Agent": {
             "fsm_type": "simple",

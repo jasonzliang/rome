@@ -21,8 +21,7 @@ HUMAN_EVAL_SAMPLES = {
     >>> has_close_elements([1.0, 2.8, 3.0, 4.0, 5.0, 2.0], 0.3)
     True
     \"\"\"
-    pass
-""",
+    pass""",
     "HumanEval_1": """def separate_paren_groups(paren_string):
     \"\"\" Input to this function is a string containing multiple groups of nested parentheses. Your goal is to
     separate those group into separate strings and return the list of those.
@@ -31,8 +30,7 @@ HUMAN_EVAL_SAMPLES = {
     >>> separate_paren_groups('( ) (( )) (( )( ))')
     ['()', '(())', '(()())']
     \"\"\"
-    pass
-""",
+    pass""",
     "HumanEval_2": """def truncate_number(number):
     \"\"\" Given a positive floating point number, it can be decomposed into
     and integer part (largest integer smaller than given number) and decimals
@@ -42,8 +40,7 @@ HUMAN_EVAL_SAMPLES = {
     >>> truncate_number(3.5)
     0.5
     \"\"\"
-    pass
-"""
+    pass"""
 }
 
 def setup_test_dir():
@@ -66,7 +63,7 @@ def create_config():
         "OpenAIHandler": {
             "model": "gpt-4o",
             "temperature": 0.1,
-            "max_tokens": 4096,
+            "max_tokens": 8192,
             "cost_limit": 3.0,
         },
         "Agent": {
