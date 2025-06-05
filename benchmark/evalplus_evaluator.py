@@ -128,7 +128,7 @@ class EvalplusEvaluator:
         if self._is_running():
             self._process.terminate()
             try:
-                self._process.wait(timeout=5)  # Wait up to 10 seconds
+                self._process.wait(timeout=5)  # Wait up to 5 seconds
             except subprocess.TimeoutExpired:
                 self._process.kill()
                 self._process.wait()

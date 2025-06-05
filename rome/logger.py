@@ -21,30 +21,6 @@ _main_logger_instance = None
 _bootstrap_logger_instance = None
 
 
-def _get_bootstrap_logger():
-    """Create a simple bootstrap logger for use before main logger is configured"""
-    global _bootstrap_logger
-
-    if _bootstrap_logger is None:
-        with _bootstrap_lock:
-            if _bootstrap_logger is None:
-                _bootstrap_logger = logging.getLogger('bootstrap')
-
-                # Only configure if not already configured
-                if not _bootstrap_logger.handlers:
-                    _bootstrap_logger.setLevel(logging.INFO)
-
-                    # Simple console handler
-                    handler = logging.StreamHandler(sys.stdout)
-                    formatter = logging.Formatter('BOOTSTRAP: %(levelname)s - %(message)s')
-                    handler.setFormatter(formatter)
-
-                    _bootstrap_logger.addHandler(handler)
-                    _bootstrap_logger.propagate = False
-
-    return _bootstrap_logger
-
-
 class SizeRotatingFileHandler(logging.FileHandler):
     """Deadlock-safe size-rotating file handler with cross-platform support"""
 
@@ -196,21 +172,7 @@ class Logger:
 
     def configure_simple(self):
         """Configure as a simple bootstrap logger"""
-        with self._lock:
-            if self._configured:
-                return
-
-            # Clear any existing handlers
-            for handler in self._logger.handlers[:]:
-                self._logger.removeHandler(handler)
-
-            # Simple console handler
-            handler = logging.StreamHandler(sys.stdout)
-            formatter = logging.Formatter('BOOTSTRAP: %(levelname)s - %(message)s')
-            handler.setFormatter(formatter)
-
-            self._logger.addHandler(handler)
-            self._configured = True
+        self.configure({})
 
     def configure(self, log_config: dict):
         """Configure logger with provided settings, sets up console and file handlers."""
@@ -391,7 +353,7 @@ class Logger:
         """Assert object has specified attribute"""
         if message is None:
             obj_name = obj.__class__.__name__
-            message = f"'{attr_name}' not provided in {obj_name} configuration"
+            message = f"'{attr_name}' not provided in {obj_name} configuration, did you merge your config with default config?"
 
         self.assert_true(hasattr(obj, attr_name), message, exception_type)
 

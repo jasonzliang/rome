@@ -2,6 +2,7 @@
 import argparse
 import asyncio
 import json
+import pprint
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 import yaml
@@ -10,7 +11,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from rome.config import LOG_DIR_NAME
+from rome.config import LOG_DIR_NAME, merge_with_default_config
 from rome.logger import get_logger
 from rome.multi_agent import MultiAgent
 from benchmark.evalplus_evaluator import EvalplusEvaluator, PeriodicEvaluator
@@ -28,13 +29,19 @@ class MultiAgentEvalPlusBenchmark:
 
         # Initialize components
         self.logger = get_logger()
+        self.logger.configure({
+            "level": "DEBUG",
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "console": True
+        })
+
         self.config = self._load_config()
         self.agents_config_path = self._resolve_agents_config(agents_config_path)
         self.evaluator = self._create_evaluator()
         self.periodic_evaluator = PeriodicEvaluator(self.evaluator, eval_interval) if eval_interval else None
         self.multi_agent = None
 
-        self.logger.info(f"Multi-agent benchmark initialized: {self.dataset}, {len(self.agents_config_path)} chars config")
+        self.logger.info(f"Multi-agent benchmark initialized: {self.dataset}, {self.agents_config_path}")
 
     def _load_config(self) -> Dict:
         """Load and validate YAML configuration"""
@@ -44,6 +51,7 @@ class MultiAgentEvalPlusBenchmark:
             with open(self.config_path) as f:
                 config = yaml.safe_load(f) or {}
             config['_config_file_path'] = str(self.config_path)
+            config = merge_with_default_config(config)
             return config
         except yaml.YAMLError as e:
             raise ValueError(f"Invalid YAML in {self.config_path}: {e}")
@@ -53,18 +61,16 @@ class MultiAgentEvalPlusBenchmark:
         # Command line argument takes priority
         if agents_config_path:
             self._validate_file(agents_config_path, "Agents config")
-            return agents_config_path
+            return Path(agents_config_path)
 
         # Fallback to config file
         config_path = self.config.get('MultiAgent', {}).get('agent_role_json')
         if not config_path:
             raise ValueError("Agents config required: use --agents-config or set MultiAgent.agent_role_json")
 
-        if not Path(config_path).is_absolute():
-            config_path = self.config_path.parent / config_path
-
+        config_path = Path(config_path)
         self._validate_file(config_path, "Agents config from config file")
-        return str(config_path)
+        return config_path
 
     def _get_eval_dir(self) -> Path:
         """Get evaluation directory"""
@@ -134,8 +140,10 @@ class MultiAgentEvalPlusBenchmark:
             "scores": evaluation_results.get("scores")
         }
 
+        self.logger.info(f"Benchmark results:\n{pprint.pformat(results)}")
+
         # Try primary location, fallback to backup
-        path = self.benchmark_dir / LOG_DIR_NAME / "multi_agent_results.json",
+        path = self.benchmark_dir / LOG_DIR_NAME / "multi_agent_results.json"
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             with open(path, 'w') as f:
@@ -147,32 +155,6 @@ class MultiAgentEvalPlusBenchmark:
 
         raise RuntimeError("Failed to save results to any location")
 
-    def print_summary(self, results: Dict):
-        """Print compact benchmark summary"""
-        scores = results.get("scores", {})
-        agent_results = results.get("agent_results", [])
-
-        # Header
-        header = f"Multi-Agent {self.dataset.upper()} | Problems: {len(self.evaluator.problems)} | " \
-                f"Agents: {results.get('successful_agents', 0)}/{results.get('total_agents', 0)}"
-
-        # Scores
-        score_line = f"Scores: {self._format_scores(scores)}" if scores else "Scores: No evaluation"
-
-        # Agent status
-        success_agents = [r["agent_name"] for r in agent_results if r["success"]]
-        failed_agents = [f"{r['agent_name']}({r.get('error_type', 'error')})"
-                        for r in agent_results if not r["success"]]
-
-        # Print summary
-        self.logger.info("=" * 80)
-        self.logger.info(header)
-        self.logger.info(score_line)
-        if success_agents:
-            self.logger.info(f"Success: {', '.join(success_agents)}")
-        if failed_agents:
-            self.logger.info(f"Failed: {', '.join(failed_agents)}")
-        self.logger.info("=" * 80)
 
     async def run_benchmark_async(self, max_iterations: int = 10, stop_on_error: bool = False,
                                  num_samples: Optional[int] = None, task_ids: Optional[List[str]] = None,
@@ -200,7 +182,7 @@ class MultiAgentEvalPlusBenchmark:
             # Save and return results
             results_file = self.save_results(agent_results, evaluation_results)
 
-            return results_file
+            return agent_results, results_file
 
         except Exception as e:
             self.logger.error(f"Benchmark failed: {e}")
@@ -238,32 +220,17 @@ def main():
     parser = create_parser()
     args = parser.parse_args()
 
-    try:
-        benchmark = MultiAgentEvalPlusBenchmark(
-            args.benchmark_dir, args.config_file, args.agents_config,
-            args.dataset, args.eval_interval
-        )
+    benchmark = MultiAgentEvalPlusBenchmark(
+        args.benchmark_dir, args.config_file, args.agents_config,
+        args.dataset, args.eval_interval
+    )
 
-        results, results_file = asyncio.run(benchmark.run_benchmark_async(
-            max_iterations=args.max_iterations, stop_on_error=args.stop_on_error,
-            num_samples=args.num_samples, task_ids=args.task_ids,
-            run_evaluation=not args.no_evaluation
-        ))
-
-        benchmark.print_summary(results)
-        benchmark.logger.info(f"Results: {results_file}")
-        return 0
-
-    except (FileNotFoundError, ValueError) as e:
-        print(f"Configuration error: {e}")
-        return 1
-    except KeyboardInterrupt:
-        print("\nInterrupted")
-        return 1
-    except Exception as e:
-        print(f"Unexpected error: {e}")
-        return 1
-
+    results_file = asyncio.run(benchmark.run_benchmark_async(
+        max_iterations=args.max_iterations, stop_on_error=args.stop_on_error,
+        num_samples=args.num_samples, task_ids=args.task_ids,
+        run_evaluation=not args.no_evaluation
+    ))
+    # benchmark.logger.info(f"Results: {results_file}")
 
 if __name__ == "__main__":
-    exit(main())
+    main()

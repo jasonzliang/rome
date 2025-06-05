@@ -4,6 +4,7 @@ Process management utility with automatic child process cleanup and signal handl
 Provides a decorator that adds robust process management to any class:
 - Automatic discovery and cleanup of all child processes
 - Signal handling (SIGTERM, SIGINT) with graceful shutdown
+- Detailed stack trace logging on interruption
 - Preserves existing shutdown() methods while adding process management
 - Zero changes required to existing code
 
@@ -17,7 +18,7 @@ Usage:
     # Both manual and automatic shutdown work:
     obj = MyClass()
     obj.shutdown()  # Manual shutdown
-    # SIGTERM/SIGINT also trigger automatic shutdown
+    # SIGTERM/SIGINT also trigger automatic shutdown with stack traces
 
 Dependencies:
     pip install psutil
@@ -26,12 +27,14 @@ import signal
 import sys
 import os
 import threading
+import traceback
+import io
 from typing import List, Callable, Optional
 import psutil
 
 
 class ProcessManager:
-    """Automatic process management with signal handling"""
+    """Automatic process management with signal handling and stack trace logging"""
 
     def __init__(self, name: str = "ProcessManager", timeout: int = 10):
         self.name = name
@@ -47,15 +50,35 @@ class ProcessManager:
             self.cleanup_callbacks.append(callback)
 
     def setup_signal_handlers(self, logger=None) -> None:
-        """Setup signal handlers for graceful shutdown"""
-        def signal_handler(signum, frame):
+        """Setup signal handlers for graceful shutdown with stack trace logging"""
+        def enhanced_signal_handler(signum, frame):
             if logger:
                 logger.info(f"{self.name} received signal {signum}, initiating shutdown")
+
+                # Log detailed interruption context
+                if frame:
+                    filename = frame.f_code.co_filename
+                    line_number = frame.f_lineno
+                    function_name = frame.f_code.co_name
+                    logger.info(f"Interrupted at: {filename}:{line_number} in {function_name}()")
+
+                # Capture and log full stack trace
+                try:
+                    string_buffer = io.StringIO()
+                    traceback.print_stack(frame, file=string_buffer)
+                    stacktrace = string_buffer.getvalue()
+                    string_buffer.close()
+
+                    logger.info("Execution stack when interrupted:")
+                    logger.info(stacktrace)
+                except Exception as e:
+                    logger.warning(f"Failed to capture stack trace: {e}")
+
             self.shutdown()
             sys.exit(0)
 
-        signal.signal(signal.SIGTERM, signal_handler)
-        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, enhanced_signal_handler)
+        signal.signal(signal.SIGINT, enhanced_signal_handler)
 
     def get_child_processes(self) -> List[psutil.Process]:
         """Discover all child processes automatically"""
@@ -132,7 +155,7 @@ class ProcessManager:
 
 def process_managed(timeout: int = 10, auto_signal_handling: bool = True):
     """
-    Decorator to add automatic process management to any class.
+    Decorator to add automatic process management to any class with stack trace logging.
 
     Args:
         timeout: Timeout in seconds for process termination (default: 10)
@@ -151,7 +174,8 @@ def process_managed(timeout: int = 10, auto_signal_handling: bool = True):
             pass
 
     The decorator preserves existing shutdown() methods and enhances them with
-    automatic process cleanup. Both manual and signal-triggered shutdown work.
+    automatic process cleanup and detailed signal logging. Both manual and
+    signal-triggered shutdown work with full stack traces.
     """
 
     def decorator(cls):
