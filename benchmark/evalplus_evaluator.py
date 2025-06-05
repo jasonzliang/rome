@@ -297,7 +297,7 @@ class PeriodicEvaluator:
             # Check if it's time to evaluate
             if time_since_last >= self.interval:
                 evaluation_count += 1
-                self.logger.info(f"Starting evaluation #{evaluation_count}")
+                self.logger.info(f"Running background evaluation #{evaluation_count}")
                 self._run_evaluation()
                 self._last_eval = current_time
                 # self.logger.info(f"Next evaluation in {self.interval}s ({self.interval/60:.1f} minutes)")

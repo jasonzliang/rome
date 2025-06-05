@@ -72,6 +72,7 @@ class MultiAgent:
                 ['agent_role_json', 'repository', 'suppress_output'])
         self.agent_role_json = agent_role_json or getattr(self, 'agent_role_json', None)
         self.repository = repository or getattr(self, 'repository', None)
+        os.makedirs(self.repository, exist_ok=True)
 
         # Validate and load
         self._validate_paths()
@@ -86,7 +87,7 @@ class MultiAgent:
 
     def _validate_paths(self):
         """Validate required paths exist"""
-        for path, name in [(self.agent_role_json, "Agent config"), (self.repository, "Repository")]:
+        for path, name in [(self.agent_role_json, "Agent config")]:
             if not os.path.exists(path):
                 raise FileNotFoundError(f"{name} not found: {path}")
 

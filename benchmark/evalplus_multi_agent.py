@@ -37,9 +37,8 @@ class MultiAgentEvalPlusBenchmark:
 
         self.config = self._load_config()
         self.agents_config_path = self._resolve_agents_config(agents_config_path)
-        self.evaluator = self._create_evaluator()
-        self.periodic_evaluator = PeriodicEvaluator(self.evaluator, eval_interval) if eval_interval else None
-        self.multi_agent = None
+        self.multi_agent = MultiAgent(self.agents_config_path, str(self.benchmark_dir), self.config)
+        self._setup_evaluator()
 
         self.logger.info(f"Multi-agent benchmark initialized: {self.dataset}, {self.agents_config_path}")
 
@@ -76,10 +75,10 @@ class MultiAgentEvalPlusBenchmark:
         """Get evaluation directory"""
         return self.benchmark_dir / LOG_DIR_NAME / "evaluation"
 
-    def _create_evaluator(self) -> EvalplusEvaluator:
+    def _setup_evaluator(self) -> EvalplusEvaluator:
         """Create evaluator with proper directory structure"""
-        self.benchmark_dir.mkdir(parents=True, exist_ok=True)
-        return EvalplusEvaluator(self.benchmark_dir, self._get_eval_dir(), self.dataset)
+        self.evaluator = EvalplusEvaluator(self.benchmark_dir, self._get_eval_dir(), self.dataset)
+        self.periodic_evaluator = PeriodicEvaluator(self.evaluator, self.eval_interval) if self.eval_interval else None
 
     def _validate_file(self, path: Path | str, description: str):
         """Validate file exists with descriptive error"""
@@ -105,7 +104,6 @@ class MultiAgentEvalPlusBenchmark:
     def run_agents(self, max_iterations: int, stop_on_error: bool) -> List[Dict]:
         """Run agents with error handling and result formatting"""
         try:
-            self.multi_agent = MultiAgent(self.agents_config_path, str(self.benchmark_dir), self.config)
             results = self.multi_agent.run_loop(max_iterations=max_iterations, timeout_per_agent=0)
 
             # Format results using helper

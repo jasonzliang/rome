@@ -86,7 +86,6 @@ class EvalPlusBenchmark:
     def _save_results(self, agent_results: Dict, evaluation_results: Dict) -> Optional[Path]:
         """Save benchmark results"""
         eval_dir = self._get_eval_dir()
-        eval_dir.mkdir(parents=True, exist_ok=True)
 
         results = {
             "agent_name": self.agent.name if self.agent else "unknown",
