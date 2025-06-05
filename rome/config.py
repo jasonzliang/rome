@@ -147,11 +147,13 @@ DEFAULT_CONFIG = {
 
     "DatabaseManager": {
         "lock_timeout": 5.0,  # Timeout for read/write lock
-        "max_retries": 8,  # Num tries to acquire lock
-        "retry_delay": 0.01  # Delay between tries, exponential increase
+        "max_retries": 5,  # Num tries to acquire lock
+        "retry_delay": 0.05  # Delay between tries, exponential increase
     },
 
-    "VersionManager": {},
+    "VersionManager": {
+        "lock_active_file": False, # Set to true to make each file have only 1 agent working on it
+    },
 
     # CODE EXECUTION
 

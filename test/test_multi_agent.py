@@ -23,37 +23,37 @@ HUMAN_EVAL_SAMPLES = {
     """
     pass''',
 
-    # "HumanEval_1": '''def separate_paren_groups(paren_string):
-    # """ Input to this function is a string containing multiple groups of nested parentheses. Your goal is to
-    # separate those group into separate strings and return the list of those.
-    # Separate groups are balanced (each open brace is properly closed) and not nested within each other
-    # Ignore any spaces in the input string.
-    # >>> separate_paren_groups('( ) (( )) (( )( ))')
-    # ['()', '(())', '(()())']
-    # """
-    # pass''',
+    "HumanEval_1": '''def separate_paren_groups(paren_string):
+    """ Input to this function is a string containing multiple groups of nested parentheses. Your goal is to
+    separate those group into separate strings and return the list of those.
+    Separate groups are balanced (each open brace is properly closed) and not nested within each other
+    Ignore any spaces in the input string.
+    >>> separate_paren_groups('( ) (( )) (( )( ))')
+    ['()', '(())', '(()())']
+    """
+    pass''',
 
-    # "HumanEval_2": '''def truncate_number(number):
-    # """ Given a positive floating point number, it can be decomposed into
-    # and integer part (largest integer smaller than given number) and decimals
-    # (leftover part always smaller than 1).
+    "HumanEval_2": '''def truncate_number(number):
+    """ Given a positive floating point number, it can be decomposed into
+    and integer part (largest integer smaller than given number) and decimals
+    (leftover part always smaller than 1).
 
-    # Return the decimal part of the number.
-    # >>> truncate_number(3.5)
-    # 0.5
-    # """
-    # pass''',
+    Return the decimal part of the number.
+    >>> truncate_number(3.5)
+    0.5
+    """
+    pass''',
 
-    # "HumanEval_3": '''def below_zero(operations):
-    # """ You're given a list of deposit and withdrawal operations on a bank account that starts with
-    # zero balance. Your task is to detect if at any point the balance of account fallls below zero, and
-    # at that point function should return True. Otherwise it should return False.
-    # >>> below_zero([1, 2, 3])
-    # False
-    # >>> below_zero([1, 2, -4, 5])
-    # True
-    # """
-    # pass'''
+    "HumanEval_3": '''def below_zero(operations):
+    """ You're given a list of deposit and withdrawal operations on a bank account that starts with
+    zero balance. Your task is to detect if at any point the balance of account fallls below zero, and
+    at that point function should return True. Otherwise it should return False.
+    >>> below_zero([1, 2, 3])
+    False
+    >>> below_zero([1, 2, -4, 5])
+    True
+    """
+    pass'''
 }
 
 # Simplified agent configurations (2 agents)
@@ -151,7 +151,7 @@ def main():
                 break
 
             logger.info(f"Running {iterations} iterations")
-            results = multi_agent.run_loop(max_iterations=iterations, stop_on_error=True)
+            results = multi_agent.run_loop(max_iterations=iterations)
 
         except (ValueError, KeyboardInterrupt):
             logger.info("Exiting")
@@ -174,10 +174,13 @@ def main():
     logger.info("EXECUTION COMPLETED")
     logger.info("=" * 80)
 
-    summary = results.get('summary', multi_agent.get_summary())
-    import pprint
-    for line in pprint.pformat(summary, width=80).split('\n'):
-        logger.info(line)
+    summary = results.get('summary', {})
+    if summary:
+       import pprint
+       for line in pprint.pformat(summary, width=80).split('\n'):
+           logger.info(line)
+    else:
+       logger.info("No summary data available")
 
     # Save results
     log_dir = Path(results['log_dir'])

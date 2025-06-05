@@ -244,7 +244,7 @@ class MultiAgent:
                     "final_status": self.agent_status.get(name, 'unknown')
                 }
             else:
-                actions = len(result.get('execution_stats', {}).get('actions_executed', []))
+                actions = result.get('execution_stats', {}).get('actions_executed', 0)
                 agent_summaries[name] = {
                     "status": "SUCCESS",
                     "actions_executed": actions,

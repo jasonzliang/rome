@@ -218,12 +218,16 @@ Respond with a JSON object:
         selected_file = self._select_winner(agent, tournament_data)
 
         if selected_file:
-            # Save original file and update agent context
-            agent.version_manager.save_original(selected_file['path'], selected_file['content'])
-            agent.context['selected_file'] = selected_file
-            agent.version_manager.flag_active(agent, selected_file['path'])
-            self.logger.info(f"Tournament completed with selected file: {selected_file['path']}")
-            return True
+            # Try to reserve the file with retry logic (3 attempts with backoff)
+            if agent.version_manager.try_reserve_file(agent, selected_file['path']):
+                agent.version_manager.save_original(selected_file['path'], selected_file['content'])
+                agent.context['selected_file'] = selected_file
+                self.logger.info(f"Search completed with selected file: {selected_file['path']}")
+                return True
+            else:
+                # All attempts failed
+                self.logger.error(f"Could not reserve {selected_file['path']} after multiple attempts")
+                return False
         else:
-            self.logger.error("Tournament completed but no file was selected by LLM")
+            self.logger.error("Search completed but no file was selected by LLM")
             return False

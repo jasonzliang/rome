@@ -1,7 +1,9 @@
 import datetime
 import fnmatch
+import random
 import json
 import os
+import time
 from typing import List, Dict, Any, Optional, Set
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -9,10 +11,10 @@ from enum import Enum
 
 import psutil
 
-from .config import LOG_DIR_NAME, META_DIR_EXT, TEST_FILE_EXT
+from .config import LOG_DIR_NAME, META_DIR_EXT, TEST_FILE_EXT, set_attributes_from_config
 from .logger import get_logger
 from .parsing import hash_string
-from .database import DatabaseManager, locked_file_operation, locked_json_operation
+from .database import DatabaseManager, locked_file_operation, locked_json_operation, get_locking_config
 
 
 class FileType(Enum):
@@ -38,6 +40,12 @@ class VersionManager:
         self.config = config or {}
         self.logger = get_logger()
         self.active_files: Set[str] = set()
+
+        set_attributes_from_config(
+            self,
+            config,
+            required_attrs=['lock_active_file']
+        )
 
         # Initialize TinyDBManager with database path function
         # This will also initialize the global locking configuration
@@ -331,14 +339,16 @@ class VersionManager:
         except (FileNotFoundError, PermissionError):
             pass
 
-    def check_active(self, file_path: str, ignore_self: bool = True) -> bool:
-        """Returns true if file is being worked on by an agent (active.json)
-        If ignore_self is True, will return false if being worked on by self"""
+    def check_avaliable(self, file_path: str) -> bool:
+        """Returns false if file is being worked on by an agent (active.json),
+        will return true if being worked on by self"""
+        if not self.lock_active_file: return True
+
         meta_dir = self._get_meta_dir(file_path)
         active_file_path = self._get_file_path(meta_dir, FileType.ACTIVE)
 
         if not os.path.exists(active_file_path):
-            return False
+            return True
 
         try:
             # Now uses unified locking configuration
@@ -346,17 +356,39 @@ class VersionManager:
                 active_data = json.load(f)
         except (json.JSONDecodeError, FileNotFoundError):
             self._cleanup_stale_active_file(active_file_path)
-            return False
+            return True
 
         stored_pid = active_data.get('pid')
         if not stored_pid or not self._is_process_running(stored_pid):
             self._cleanup_stale_active_file(active_file_path)
-            return False
+            return True
 
-        if ignore_self and stored_pid == os.getpid():
-            return False
+        if stored_pid == os.getpid():
+            return True
 
-        return True
+        return False
+
+    def try_reserve_file(self, agent, file_path: str, max_attempts: int = None) -> bool:
+        """Try to reserve a file with exponential backoff using global locking config."""
+        locking_config = get_locking_config()
+        if max_attempts is None:
+            max_attempts = locking_config.max_retries
+
+        for attempt in range(max_attempts):
+            try:
+                return self.flag_active(agent, file_path)
+            except RuntimeError as e:
+                if "already being worked on" not in str(e):
+                    raise  # Re-raise unexpected errors
+                if attempt == max_attempts - 1:
+                    return False  # Final attempt failed
+
+                # Exponential backoff with jitter
+                base_delay = locking_config.retry_delay
+                backoff_time = base_delay * (2 ** attempt) + random.uniform(0, base_delay)
+                time.sleep(backoff_time)
+
+        return False
 
     def flag_active(self, agent, file_path: str) -> bool:
         """Flag a file as being actively worked on."""
@@ -368,7 +400,7 @@ class VersionManager:
             # Check existing active state INSIDE the lock
             existing_pid = active_data.get('pid')
             if existing_pid and self._is_process_running(existing_pid):
-                if existing_pid != current_pid:
+                if self.lock_active_file and existing_pid != current_pid:
                     raise RuntimeError(f"File {file_path} is already being worked on by PID {existing_pid}")
 
             # Handle old active file pointer inside lock
@@ -487,6 +519,8 @@ class VersionManager:
 
     def validate_active_files(self, agent) -> None:
         """Validate agent's active files and meta directory structure."""
+        if not self.lock_active_file: return
+
         agent_id = agent.get_id()
         active_files = self._get_active_files_pointer()
 
