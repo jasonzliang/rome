@@ -137,18 +137,18 @@ class EditTestAction(Action):
         prompt = f"""{base_prompt}
 I need you to {action_type} unit tests for the following Python code.
 
-Code file path:
+# Code file path:
 {file_path}
-Code file content:
+# Code file content:
 ```python
 {file_content}
 ```
 """
         if test_exists:
             prompt += f"""
-Test file path:
+# Test file path:
 {test_path}
-Test file content:
+# Test file content:
 ```python
 {test_content}
 ```

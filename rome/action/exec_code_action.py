@@ -36,17 +36,17 @@ class ExecuteCodeAction(Action):
         """Generate analysis of test execution results using LLM."""
         prompt = f"""Analyze the following test execution results and provide comprehensive feedback:
 
-Code file content:
+# Code file content:
 ```python
 {original_file_content}
 ```
 
-Test file content:
+# Test file content:
 ```python
 {test_file_content}
 ```
 
-Execution output:
+# Execution output:
 ```
 {output}
 ```
@@ -61,7 +61,7 @@ Please provide an analysis covering:
 5. Suggestions for fixing identified problems
 6. Recommendations for improving test coverage
 
-Your analysis:
+# Your analysis:
     """
         return agent.chat_completion(prompt=prompt, system_message=agent.role)
 

@@ -91,10 +91,10 @@ Only recommend reversion if there is clear evidence that a previous version was 
 
             summary += f"\n--- Version {version_num} ({timestamp}) ---\n"
 
-            summary += f"1. Explanation: {explanation}\n"
+            summary += f"# Explanation: {explanation}\n"
             summary += "\n"
 
-            summary += f"2. Changes: {len(changes)} modifications\n"
+            summary += f"# Changes: {len(changes)} modifications\n"
             if changes:
                 changes_text = ""
                 for i, change in enumerate(changes):
@@ -108,7 +108,7 @@ Only recommend reversion if there is clear evidence that a previous version was 
 
             if exit_code is not None:
                 status = "PASSED" if exit_code == 0 else "FAILED"
-                summary += f"3. Execution: {status} (exit code: {exit_code})\n"
+                summary += f"# Execution: {status} (exit code: {exit_code})\n"
 
                 if execution_output:
                     truncated_output = self._truncate_to_limit(execution_output)
