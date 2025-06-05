@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 from .agent import Agent
 from .config import set_attributes_from_config
 from .logger import get_logger
+from .process import process_managed
 
 
 def _agent_worker(agent_name: str, agent_role: str, repository: str, config: Dict,
@@ -44,6 +45,7 @@ def _agent_worker(agent_name: str, agent_role: str, repository: str, config: Dic
                 result_queue.put(('warning', agent_name, f'Shutdown error: {str(e)}'))
 
 
+@process_managed
 class MultiAgent:
     """Multi-agent manager with robust process handling"""
 

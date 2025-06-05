@@ -1,286 +1,228 @@
-# evalplus_multi_agent.py - Compact multi-agent benchmark with asyncio
+# evalplus_multi_agent_refactored.py - Compact multi-agent benchmark
 import argparse
 import asyncio
 import json
-import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
+import yaml
 
 import sys
+import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from evalplus_single_agent import EvalPlusBenchmark
+from rome.config import LOG_DIR_NAME
+from rome.logger import get_logger
 from rome.multi_agent import MultiAgent
+from benchmark.evalplus_evaluator import EvalplusEvaluator, PeriodicEvaluator
 
 
-class EvalPlusMultiAgentBenchmark(EvalPlusBenchmark):
-    """Compact multi-agent benchmark with asyncio periodic evaluation"""
+class MultiAgentEvalPlusBenchmark:
+    """Compact multi-agent benchmark with periodic evaluation"""
 
     def __init__(self, benchmark_dir: str, config_path: str, agents_config_path: Optional[str] = None,
                  dataset: str = "humaneval", eval_interval: Optional[int] = None):
-        super().__init__(benchmark_dir, config_path, dataset)
-
-        # Resolve agents config path with priority: parse arg > config file > error
-        self.agents_config_path = self._resolve_agents_config_path(agents_config_path)
-
+        self.benchmark_dir = Path(benchmark_dir)
+        self.config_path = Path(config_path)
+        self.dataset = dataset
         self.eval_interval = eval_interval
+
+        # Initialize components
+        self.logger = get_logger()
+        self.config = self._load_config()
+        self.agents_config_path = self._resolve_agents_config(agents_config_path)
+        self.evaluator = self._create_evaluator()
+        self.periodic_evaluator = PeriodicEvaluator(self.evaluator, eval_interval) if eval_interval else None
         self.multi_agent = None
-        self.eval_task = None
-        self.eval_stop_event = asyncio.Event()
 
-        self.logger.info(f"Multi-agent benchmark initialized: {self.agents_config_path}")
+        self.logger.info(f"Multi-agent benchmark initialized: {self.dataset}, {len(self.agents_config_path)} chars config")
 
-    def _resolve_agents_config_path(self, agents_config_path: Optional[str]) -> str:
-        """Resolve agents config path with priority: parse arg > config file > error"""
-        # Priority 1: Command line argument
+    def _load_config(self) -> Dict:
+        """Load and validate YAML configuration"""
+        self._validate_file(self.config_path, "Config file")
+
+        try:
+            with open(self.config_path) as f:
+                config = yaml.safe_load(f) or {}
+            config['_config_file_path'] = str(self.config_path)
+            return config
+        except yaml.YAMLError as e:
+            raise ValueError(f"Invalid YAML in {self.config_path}: {e}")
+
+    def _resolve_agents_config(self, agents_config_path: Optional[str]) -> str:
+        """Resolve agents config with fallback to config file"""
+        # Command line argument takes priority
         if agents_config_path:
-            if not Path(agents_config_path).exists():
-                raise FileNotFoundError(f"Agents config file not found: {agents_config_path}")
-            self.logger.info(f"Using agents config from command line: {agents_config_path}")
+            self._validate_file(agents_config_path, "Agents config")
             return agents_config_path
 
-        # Priority 2: Config file
-        multi_agent_config = self.config.get('MultiAgent', {})
-        config_agents_path = multi_agent_config.get('agent_role_json')
+        # Fallback to config file
+        config_path = self.config.get('MultiAgent', {}).get('agent_role_json')
+        if not config_path:
+            raise ValueError("Agents config required: use --agents-config or set MultiAgent.agent_role_json")
 
-        if config_agents_path:
-            # Handle relative paths from config file directory
-            config_dir = Path(self.config.get('_config_file_path', '.')).parent
-            resolved_path = config_dir / config_agents_path if not Path(config_agents_path).is_absolute() else Path(config_agents_path)
+        if not Path(config_path).is_absolute():
+            config_path = self.config_path.parent / config_path
 
-            if resolved_path.exists():
-                self.logger.info(f"Using agents config from config file: {resolved_path}")
-                return str(resolved_path)
-            else:
-                self.logger.error(f"Agents config path from config file not found: {resolved_path}")
+        self._validate_file(config_path, "Agents config from config file")
+        return str(config_path)
 
-        # Priority 3: Error if neither provided
-        raise ValueError(
-            "Agents configuration path required. Provide either:\n"
-            "  1. Command line argument: --agents-config path/to/agents.json\n"
-            "  2. Config file setting: MultiAgent.agent_role_json"
-        )
+    def _get_eval_dir(self) -> Path:
+        """Get evaluation directory"""
+        return self.benchmark_dir / LOG_DIR_NAME / "evaluation"
 
-    async def _run_evaluation_async(self, solutions: List[Dict]) -> Optional[Dict]:
-        """Run evaluation asynchronously using subprocess"""
-        if not solutions:
-            return None
+    def _create_evaluator(self) -> EvalplusEvaluator:
+        """Create evaluator with proper directory structure"""
+        self.benchmark_dir.mkdir(parents=True, exist_ok=True)
+        return EvalplusEvaluator(self.benchmark_dir, self._get_eval_dir(), self.dataset)
 
+    def _validate_file(self, path: Path | str, description: str):
+        """Validate file exists with descriptive error"""
+        if not Path(path).exists():
+            raise FileNotFoundError(f"{description} not found: {path}")
+
+    def _format_scores(self, scores: Dict, prefix: str = "") -> str:
+        """Format scores for logging"""
+        return ", ".join(f"{k.replace('_', '+').title()}: {v.get('pass@1', 0):.3f}"
+                        for k, v in scores.items() if isinstance(v, dict) and 'pass@1' in v) or "No scores"
+
+    def _format_agent_result(self, name: str, result: Dict) -> Dict:
+        """Format single agent result"""
+        if 'error' in result:
+            error = result['error']
+            return {
+                "success": False, "agent_name": name,
+                "error": error.get('error_message', str(error)),
+                "error_type": error.get('error_type', 'unknown')
+            }
+        return {"success": True, "agent_name": name, "agent_results": result}
+
+    def run_agents(self, max_iterations: int, stop_on_error: bool) -> List[Dict]:
+        """Run agents with error handling and result formatting"""
         try:
-            eval_dir = self._prepare_evaluation(solutions)
-            if not eval_dir:
-                return None
-
-            solutions_file = eval_dir / "solutions.jsonl"
-            eval_script = self._create_eval_script(eval_dir, solutions_file)
-
-            # Run evaluation script asynchronously
-            process = await asyncio.create_subprocess_shell(
-                f"bash {eval_script.absolute()}",
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-                # cwd=eval_dir
-            )
-
-            stdout, stderr = await process.communicate()
-            combined_output = f"{stdout.decode()}\n{stderr.decode()}\nEXIT_CODE:{process.returncode}"
-
-            if process.returncode == 0:
-                scores = self._parse_evaluation_scores(combined_output)
-                return {"output": combined_output, "scores": scores} if scores else {"output": combined_output}
-            else:
-                return {"error": "evaluation failed", "output": combined_output, "exit_code": process.returncode}
-
-        except Exception as e:
-            self.logger.error(f"Async evaluation failed: {e}")
-            return {"error": str(e)}
-
-    async def _periodic_evaluation_worker(self):
-        """Asyncio-based periodic evaluation worker"""
-        last_solution_count = 0
-
-        while not self.eval_stop_event.is_set():
-            try:
-                await asyncio.sleep(self.eval_interval)
-
-                solutions = self.extract_solutions()
-                solution_count = len([s for s in solutions if s["solution"].strip()])
-
-                # Skip if no new solutions
-                if solution_count == 0 or solution_count == last_solution_count:
-                    continue
-
-                last_solution_count = solution_count
-                results = await self._run_evaluation_async(solutions)
-
-                if results and "scores" in results:
-                    scores = [f"{k}: {v.get('pass@1', 0):.3f}"
-                             for k, v in results["scores"].items() if "pass@1" in v]
-                    if scores:
-                        agent_count = len(self.multi_agent.agents_config) if self.multi_agent else 0
-                        self.logger.info(f"Async eval ({agent_count} agents, {solution_count} solutions) - {', '.join(scores)}")
-
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                self.logger.error(f"Periodic evaluation failed: {e}")
-
-    def _start_eval_task(self):
-        """Start asyncio evaluation task"""
-        if not self.eval_interval or self.eval_interval <= 0:
-            return
-        self.eval_stop_event.clear()
-        self.eval_task = asyncio.create_task(self._periodic_evaluation_worker())
-        self.logger.info(f"Started async evaluation task (interval: {self.eval_interval}s)")
-
-    async def _stop_eval_task(self):
-        """Stop asyncio evaluation task"""
-        if self.eval_task and not self.eval_task.done():
-            self.eval_stop_event.set()
-            self.eval_task.cancel()
-            try:
-                await self.eval_task
-            except asyncio.CancelledError:
-                pass
-
-    def run_agents_parallel(self, max_iterations: int, stop_on_error: bool) -> List[Dict]:
-        """Run agents using MultiAgent class"""
-        self.multi_agent = MultiAgent(self.agents_config_path, str(self.benchmark_dir), self.config)
-
-        try:
+            self.multi_agent = MultiAgent(self.agents_config_path, str(self.benchmark_dir), self.config)
             results = self.multi_agent.run_loop(max_iterations=max_iterations, timeout_per_agent=0)
 
-            # Convert to expected format
-            agent_results = []
-            for name, result in results['agent_results'].items():
-                if 'error' in result:
-                    agent_results.append({
-                        "success": False, "agent_name": name,
-                        "error": result['error']['error_message'],
-                        "error_type": result['error']['error_type']
-                    })
-                else:
-                    agent_results.append({
-                        "success": True, "agent_name": name, "agent_results": result
-                    })
+            # Format results using helper
+            agent_results = [self._format_agent_result(name, result)
+                           for name, result in results.get('agent_results', {}).items()]
 
             success_count = sum(1 for r in agent_results if r["success"])
-            self.logger.info(f"Completed: {success_count}/{len(agent_results)} agents")
+            self.logger.info(f"Agents completed: {success_count}/{len(agent_results)}")
+
+            if not agent_results:
+                raise ValueError("No agents executed")
             return agent_results
 
+        except Exception as e:
+            self.logger.error(f"Agent execution failed: {e}")
+            raise
         finally:
             if self.multi_agent:
-                self.multi_agent.shutdown()
-
-    async def run_final_evaluation_async(self, agent_results: List[Dict]) -> Dict:
-        """Run final evaluation asynchronously"""
-        try:
-            solutions = self.extract_solutions()
-            evaluation_results = await self._run_evaluation_async(solutions)
-            if not evaluation_results:
-                evaluation_results = {}
-
-            for result in agent_results:
-                if result["success"]:
-                    result.update({
-                        "evaluation_results": evaluation_results,
-                        "evaluation_success": "scores" in evaluation_results,
-                        "scores": evaluation_results.get("scores")
-                    })
-            return evaluation_results
-        except Exception as e:
-            self.logger.error(f"Final evaluation failed: {e}")
-            return {"error": str(e)}
+                try:
+                    self.multi_agent.shutdown()
+                except Exception as e:
+                    self.logger.warning(f"Shutdown error: {e}")
 
     def save_results(self, agent_results: List[Dict], evaluation_results: Dict) -> Path:
-        """Save compact results"""
+        """Save results with backup fallback"""
         results = {
             "benchmark_type": "multi_agent", "dataset": self.dataset,
             "benchmark_dir": str(self.benchmark_dir), "agents_config": self.agents_config_path,
-            "problems_count": len(self.problems), "total_agents": len(agent_results),
+            "problems_count": len(self.evaluator.problems), "total_agents": len(agent_results),
             "successful_agents": sum(1 for r in agent_results if r["success"]),
             "evaluation_results": evaluation_results, "agent_results": agent_results,
             "scores": evaluation_results.get("scores")
         }
 
-        results_file = Path(self.benchmark_dir) / "__rome__" / "multi_agent_results.json"
-        results_file.parent.mkdir(exist_ok=True)
-        results_file.write_text(json.dumps(results, indent=2, default=str))
-        return results_file
+        # Try primary location, fallback to backup
+        path = self.benchmark_dir / LOG_DIR_NAME / "multi_agent_results.json",
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, 'w') as f:
+                json.dump(results, f, indent=2, default=str)
+            self.logger.info(f"Results saved: {path}")
+            return path
+        except Exception as e:
+            self.logger.warning(f"Save failed for {path}: {e}")
+
+        raise RuntimeError("Failed to save results to any location")
 
     def print_summary(self, results: Dict):
-        """Print compact summary"""
+        """Print compact benchmark summary"""
         scores = results.get("scores", {})
         agent_results = results.get("agent_results", [])
 
-        self.logger.info("="*60)
-        self.logger.info(f"Multi-Agent {self.dataset.upper()} | Problems: {len(self.problems)} | "
-                        f"Agents: {results.get('successful_agents', 0)}/{results.get('total_agents', 0)}")
+        # Header
+        header = f"Multi-Agent {self.dataset.upper()} | Problems: {len(self.evaluator.problems)} | " \
+                f"Agents: {results.get('successful_agents', 0)}/{results.get('total_agents', 0)}"
 
-        if scores:
-            score_strs = [f"{k.replace('_', '+').title()}: {v.get('pass@1', 0):.3f}"
-                         for k, v in scores.items() if isinstance(v, dict) and 'pass@1' in v]
-            if score_strs:
-                self.logger.info(f"Scores: {' | '.join(score_strs)}")
+        # Scores
+        score_line = f"Scores: {self._format_scores(scores)}" if scores else "Scores: No evaluation"
 
-        # Agent status summary
-        if agent_results:
-            success_agents = [r["agent_name"] for r in agent_results if r["success"]]
-            failed_agents = [f"{r['agent_name']}({r.get('error_type', 'error')})"
-                           for r in agent_results if not r["success"]]
-            if success_agents:
-                self.logger.info(f"Success: {', '.join(success_agents)}")
-            if failed_agents:
-                self.logger.info(f"Failed: {', '.join(failed_agents)}")
-        self.logger.info("="*60)
+        # Agent status
+        success_agents = [r["agent_name"] for r in agent_results if r["success"]]
+        failed_agents = [f"{r['agent_name']}({r.get('error_type', 'error')})"
+                        for r in agent_results if not r["success"]]
 
-    async def run_complete_benchmark_async(self, max_iterations: int = 10, stop_on_error: bool = False,
-                                          num_samples: Optional[int] = None, task_ids: Optional[List[str]] = None,
-                                          run_evaluation: bool = True) -> Tuple[Dict, Path]:
-        """Complete benchmark pipeline with asyncio"""
+        # Print summary
+        self.logger.info("=" * 80)
+        self.logger.info(header)
+        self.logger.info(score_line)
+        if success_agents:
+            self.logger.info(f"Success: {', '.join(success_agents)}")
+        if failed_agents:
+            self.logger.info(f"Failed: {', '.join(failed_agents)}")
+        self.logger.info("=" * 80)
+
+    async def run_benchmark_async(self, max_iterations: int = 10, stop_on_error: bool = False,
+                                 num_samples: Optional[int] = None, task_ids: Optional[List[str]] = None,
+                                 run_evaluation: bool = True) -> Tuple[Dict, Path]:
+        """Complete async benchmark pipeline with cleanup"""
+        agent_results = []
+        evaluation_results = {}
+
         try:
-            # Setup problems
-            self.setup_problems(num_samples, task_ids)
+            # Setup and run
+            problems_dict = self.evaluator.setup_problems(num_samples, task_ids)
+            if not problems_dict:
+                raise ValueError("No problems were set up")
 
-            # Start async evaluation if enabled
-            if run_evaluation and self.eval_interval:
-                self._start_eval_task()
+            # Start periodic evaluation
+            if run_evaluation and self.periodic_evaluator:
+                await self.periodic_evaluator.start_async()
 
-            # Run agents (still synchronous as MultiAgent doesn't support async)
-            agent_results = self.run_agents_parallel(max_iterations, stop_on_error)
+            # Run agents and evaluate
+            agent_results = self.run_agents(max_iterations, stop_on_error)
 
-            # Stop evaluation task
-            await self._stop_eval_task()
+            if run_evaluation:
+                self.evaluator.evaluate(blocking=False)
 
-            # Run final evaluation asynchronously
-            evaluation_results = await self.run_final_evaluation_async(agent_results) if run_evaluation else {}
+            # Save and return results
             results_file = self.save_results(agent_results, evaluation_results)
 
-            return {
-                "agent_results": agent_results, "evaluation_results": evaluation_results,
-                "scores": evaluation_results.get("scores"), "total_agents": len(agent_results),
-                "successful_agents": sum(1 for r in agent_results if r["success"])
-            }, results_file
+            return results_file
 
-        except KeyboardInterrupt:
-            self.logger.info("Benchmark interrupted")
-            await self._stop_eval_task()
+        except Exception as e:
+            self.logger.error(f"Benchmark failed: {e}")
+            # Try to save partial results
+            if agent_results:
+                try:
+                    self.save_results(agent_results, evaluation_results)
+                except Exception:
+                    pass
             raise
-
-    def run_complete_benchmark(self, max_iterations: int = 10, stop_on_error: bool = False,
-                              num_samples: Optional[int] = None, task_ids: Optional[List[str]] = None,
-                              run_evaluation: bool = True) -> Tuple[Dict, Path]:
-        """Sync wrapper for async benchmark"""
-        return asyncio.run(self.run_complete_benchmark_async(
-            max_iterations, stop_on_error, num_samples, task_ids, run_evaluation
-        ))
+        finally:
+            # Cleanup
+            if self.periodic_evaluator:
+                await self.periodic_evaluator.stop_async()
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Multi-agent EvalPlus benchmark with AsyncIO")
+def create_parser() -> argparse.ArgumentParser:
+    """Create argument parser"""
+    parser = argparse.ArgumentParser(description="Multi-agent EvalPlus benchmark")
     parser.add_argument("benchmark_dir", help="Shared benchmark directory")
     parser.add_argument("config_file", help="Agent configuration YAML")
-    parser.add_argument("--agents-config", help="Agents configuration JSON (overrides config file)")
+    parser.add_argument("--agents-config", help="Agents configuration JSON")
     parser.add_argument("--dataset", choices=["humaneval", "mbpp"], default="humaneval")
     parser.add_argument("--num-samples", type=int, help="Number of samples")
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs")
@@ -288,21 +230,29 @@ def main():
     parser.add_argument("--max-iterations", type=int, default=0, help="Max iterations per agent")
     parser.add_argument("--stop-on-error", action="store_true", help="Stop on errors")
     parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
+    return parser
 
+
+def main():
+    """Main entry point with error handling"""
+    parser = create_parser()
     args = parser.parse_args()
 
     try:
-        benchmark = EvalPlusMultiAgentBenchmark(
+        benchmark = MultiAgentEvalPlusBenchmark(
             args.benchmark_dir, args.config_file, args.agents_config,
             args.dataset, args.eval_interval
         )
 
-        results, results_file = benchmark.run_complete_benchmark(
-            args.max_iterations, args.stop_on_error, args.num_samples,
-            args.task_ids, not args.no_evaluation
-        )
+        results, results_file = asyncio.run(benchmark.run_benchmark_async(
+            max_iterations=args.max_iterations, stop_on_error=args.stop_on_error,
+            num_samples=args.num_samples, task_ids=args.task_ids,
+            run_evaluation=not args.no_evaluation
+        ))
+
         benchmark.print_summary(results)
         benchmark.logger.info(f"Results: {results_file}")
+        return 0
 
     except (FileNotFoundError, ValueError) as e:
         print(f"Configuration error: {e}")
@@ -310,9 +260,10 @@ def main():
     except KeyboardInterrupt:
         print("\nInterrupted")
         return 1
-
-    return 0
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    exit(main())

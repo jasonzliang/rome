@@ -31,13 +31,15 @@ from .metadata import VersionManager
 from .parsing import parse_python_response, parse_json_response
 # Import the new ActionSelector
 from .action_selector import ActionSelector
+# Import the process management decorator
+from .process import process_managed
 
 # Make yaml use compact representation for lists
 yaml.add_representer(list, lambda dumper, data: dumper.represent_sequence(
     'tag:yaml.org,2002:seq', data, flow_style=True))
 
 
-# TODO: create a repository manager object that keeps track of global statistics like file completion, eligible files for editing, number of attempts on each file, etc, take off some of the load from version manager
+@process_managed
 class Agent:
     """Agent class using OpenAI API, YAML config, and FSM architecture"""
 
@@ -260,14 +262,15 @@ class Agent:
         if self.shutdown_called: return
         self.shutdown_called = True
         try:
-            if hasattr(self, 'agent_api') and self.agent_api:
+            if self.agent_api:
                 self.agent_api.shutdown()
-            if hasattr(self, 'repository_manager'):
-                self.logger.info("Repository manager shutdown completed")
-            if hasattr(self, 'version_manager'):
-                self.version_manager.shutdown(self)
-            self.logger.info("Agent shutdown completed successfully")
+            self.version_manager.shutdown(self)
 
+            # for obj in self.shutdown_list:
+            #     if hasattr(obj, 'shutdown') and callable(obj.shutdown):
+            #         obj.shutdown()
+
+            self.logger.info("Agent shutdown completed successfully")
         except Exception as e:
             self.logger.error(f"Error during agent shutdown: {e}")
             raise
