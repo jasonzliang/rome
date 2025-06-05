@@ -65,7 +65,7 @@ class ProcessManager:
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             return []
 
-    def get_zombie_pythons(self, children_only: bool = True) -> List[psutil.Process]:
+    def get_zombies_python(self, children_only: bool = True) -> List[psutil.Process]:
         zombies = []
         try:
             if children_only:
@@ -141,7 +141,7 @@ class ProcessManager:
 
     def cleanup_zombies(self, children_only: bool = True, logger=None) -> int:
         """"Finad and terminate all zombie processes"""
-        zombies = self.get_zombie_pythons(children_only)
+        zombies = self.get_zombies_python(children_only)
         if not zombies:
             return 0
 
