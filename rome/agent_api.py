@@ -62,12 +62,12 @@ class AgentApi:
 
         new_port = self.port
         while _is_port_in_use(new_port):
+            new_port += 1
             if new_port > max_port:
                 raise ValueError("Cannot find a valid unused port for API server")
-            new_port += 1
 
         if new_port != self.port:
-            self.logger.info(f"Port {self.port} is used already, using {new_port} instead")
+            self.logger.error(f"Port {self.port} is used already, using {new_port} instead")
             self.port = new_port
 
     def _setup_fastapi(self):
