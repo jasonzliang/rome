@@ -73,7 +73,7 @@ Respond with a JSON object:
 
 Set work_complete to true ONLY if:
 - Exit code is 0 (success)
-- All tests are passing
+- All tests are passing (unless the failing test(s) are clearly incorrect or unnecessary)
 - No critical errors or failures
 - Code appears to be functioning correctly
 - You are confident (confidence >= 8) that no further work is needed
