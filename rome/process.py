@@ -1,240 +1,259 @@
 """
-Process management utility with automatic child process cleanup and signal handling.
-
-Provides a decorator that adds robust process management to any class:
-- Automatic discovery and cleanup of all child processes
-- Signal handling (SIGTERM, SIGINT) with graceful shutdown
-- Detailed stack trace logging on interruption
-- Preserves existing shutdown() methods while adding process management
-- Zero changes required to existing code
+Compact process management with automatic cleanup, signal handling, and zombie prevention.
 
 Usage:
     @process_managed
     class MyClass:
-        def shutdown(self):
-            # Your existing cleanup code
-            pass
+        def shutdown(self): pass  # Optional existing cleanup
 
-    # Both manual and automatic shutdown work:
-    obj = MyClass()
-    obj.shutdown()  # Manual shutdown
-    # SIGTERM/SIGINT also trigger automatic shutdown with stack traces
+    # Auto-cleanup on SIGTERM/SIGINT with zombie prevention
+    # Manual: obj.shutdown() or obj.cleanup_zombies()
 
-Dependencies:
-    pip install psutil
+Dependencies: pip install psutil
 """
-import signal
-import sys
-import os
-import threading
-import traceback
-import io
+import signal, sys, os, threading, traceback, io
 from typing import List, Callable, Optional
 import psutil
 
 
 class ProcessManager:
-    """Automatic process management with signal handling and stack trace logging"""
+    """Compact process manager with zombie prevention"""
 
     def __init__(self, name: str = "ProcessManager", timeout: int = 10):
-        self.name = name
-        self.timeout = timeout
-        self.cleanup_callbacks: List[Callable] = []
+        self.name, self.timeout = name, timeout
+        self.callbacks: List[Callable] = []
         self.shutdown_called = False
         self._lock = threading.Lock()
         self.parent_pid = os.getpid()
 
-    def add_cleanup_callback(self, callback: Callable) -> None:
-        """Add callback to run during cleanup"""
+    def add_callback(self, callback: Callable) -> None:
         if callback and callable(callback):
-            self.cleanup_callbacks.append(callback)
+            self.callbacks.append(callback)
 
-    def setup_signal_handlers(self, logger=None) -> None:
-        """Setup signal handlers for graceful shutdown with stack trace logging"""
-        def enhanced_signal_handler(signum, frame):
+    def setup_signals(self, logger=None) -> None:
+        def handler(signum, frame):
             if logger:
                 logger.info(f"{self.name} received signal {signum}, initiating shutdown")
-
-                # Log detailed interruption context
                 if frame:
                     filename = frame.f_code.co_filename
                     line_number = frame.f_lineno
                     function_name = frame.f_code.co_name
                     logger.info(f"Interrupted at: {filename}:{line_number} in {function_name}()")
-
-                # Capture and log full stack trace
                 try:
-                    string_buffer = io.StringIO()
-                    traceback.print_stack(frame, file=string_buffer)
-                    stacktrace = string_buffer.getvalue()
-                    string_buffer.close()
-
+                    buf = io.StringIO()
+                    traceback.print_stack(frame, file=buf)
                     logger.info("Execution stack when interrupted:")
-                    logger.info(stacktrace)
+                    logger.info(buf.getvalue())
+                    buf.close()
                 except Exception as e:
                     logger.warning(f"Failed to capture stack trace: {e}")
 
-            self.shutdown()
-            sys.exit(0)
+            try:
+                self.shutdown()
+            except Exception as e:
+                if logger: logger.error(f"Shutdown error: {e}")
+                self._force_cleanup()
+            finally:
+                sys.exit(0)
 
-        signal.signal(signal.SIGTERM, enhanced_signal_handler)
-        signal.signal(signal.SIGINT, enhanced_signal_handler)
+        signal.signal(signal.SIGTERM, handler)
+        signal.signal(signal.SIGINT, handler)
 
-    def get_child_processes(self) -> List[psutil.Process]:
-        """Discover all child processes automatically"""
+    def get_children(self) -> List[psutil.Process]:
         try:
-            parent = psutil.Process(self.parent_pid)
-            return parent.children(recursive=True)
+            return psutil.Process(self.parent_pid).children(recursive=True)
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             return []
 
-    def terminate_process(self, process: psutil.Process, timeout: Optional[int] = None) -> bool:
-        """Terminate a process with escalating force"""
-        if timeout is None:
-            timeout = self.timeout
-
+    def get_zombie_pythons(self, children_only: bool = True) -> List[psutil.Process]:
+        zombies = []
         try:
-            if not process.is_running():
-                return True
-        except (psutil.NoSuchProcess, psutil.ZombieProcess):
-            return True
+            if children_only:
+                # Check children only
+                processes = [p for p in self.get_children() if self._is_zombie_python(p)]
+                return processes
+            else:
+                # Check system-wide (children + others)
+                processes = psutil.process_iter(['pid', 'name', 'cmdline', 'status'])
 
-        try:
-            # Escalating termination: terminate -> kill
-            process.terminate()
-            try:
-                process.wait(timeout=min(5, timeout))
-                return True
-            except psutil.TimeoutExpired:
-                process.kill()
+            for proc_info in processes:
                 try:
-                    process.wait(timeout=timeout)
-                    return True
-                except psutil.TimeoutExpired:
-                    return False
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            return True
+                    if proc_info.info['status'] != psutil.STATUS_ZOMBIE:
+                        continue
+
+                    proc = psutil.Process(proc_info.info['pid'])
+                    if self._is_python_info(proc_info.info):
+                        zombies.append(proc)
+                except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                    continue
         except Exception:
+            # Fallback: just check children
+            zombies.extend([p for p in self.get_children() if self._is_zombie_python(p)])
+        return zombies
+
+    def _is_python_info(self, proc_info: dict) -> bool:
+        """Check if process info indicates Python process"""
+        name = proc_info.get('name', '').lower()
+        if any(p in name for p in ['python', 'py']):
+            return True
+        cmdline = proc_info.get('cmdline', [])
+        if cmdline:
+            cmd_str = ' '.join(cmdline).lower()
+            return any(p in cmd_str for p in ['python', '.py'])
+        return False
+
+    def _is_zombie_python(self, proc: psutil.Process) -> bool:
+        """Check if process is zombie Python"""
+        try:
+            return proc.status() == psutil.STATUS_ZOMBIE and self._is_python(proc)
+        except:
             return False
 
-    def shutdown_all_processes(self, timeout: Optional[int] = None) -> None:
-        """Shutdown all child processes automatically"""
-        if timeout is None:
-            timeout = self.timeout
+    def _is_python(self, proc: psutil.Process) -> bool:
+        try:
+            name = proc.name().lower()
+            if any(p in name for p in ['python', 'py']):
+                return True
+            cmdline = ' '.join(proc.cmdline()).lower()
+            return any(p in cmdline for p in ['python', '.py'])
+        except:
+            return False
 
-        children = self.get_child_processes()
-        if not children:
-            return
+    def _terminate(self, proc: psutil.Process) -> bool:
+        try:
+            if not proc.is_running():
+                return True
 
-        # Terminate all children with escalating force
-        for child in children:
+            proc.terminate()
             try:
-                self.terminate_process(child, timeout)
-            except Exception:
-                # Continue with other processes even if one fails
-                continue
+                proc.wait(timeout=min(3, self.timeout))
+                return True
+            except psutil.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=self.timeout)
+                return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            return True
+        except:
+            return False
 
-    def shutdown(self) -> None:
-        """Complete shutdown with callbacks and process cleanup"""
+    def cleanup_zombies(self, children_only: bool = True, logger=None) -> int:
+        zombies = self.get_zombie_pythons(children_only)
+        if not zombies:
+            return 0
+
+        if logger:
+            logger.info(f"Cleaning {len(zombies)} zombie Python processes")
+
+        cleaned = 0
+        for zombie in zombies:
+            try:
+                if zombie.is_running():
+                    zombie.terminate()
+                    zombie.wait(timeout=1)
+                cleaned += 1
+            except:
+                try:
+                    zombie.kill()
+                    cleaned += 1
+                except:
+                    pass
+
+        if logger and cleaned:
+            logger.info(f"Cleaned {cleaned} zombies")
+        return cleaned
+
+    def _force_cleanup(self):
+        """Emergency cleanup without error handling"""
+        try:
+            for child in self.get_children():
+                try:
+                    child.kill()
+                    child.wait(timeout=1)
+                except:
+                    pass
+        except:
+            pass
+
+    def shutdown_processes(self, cleanup_zombies: bool = True, logger=None):
+        if cleanup_zombies:
+            self.cleanup_zombies(logger=logger)
+
+        for child in self.get_children():
+            self._terminate(child)
+
+    def shutdown(self, cleanup_zombies: bool = True):
         with self._lock:
             if self.shutdown_called:
                 return
             self.shutdown_called = True
 
-        # Run cleanup callbacks first (user's shutdown logic)
-        for callback in self.cleanup_callbacks:
+        logger = getattr(self, 'logger', None)
+
+        # Run callbacks
+        for callback in self.callbacks:
             try:
                 callback()
-            except Exception:
-                # Silent failure for callbacks to prevent cascade failures
+            except:
                 pass
 
-        # Shutdown all child processes
-        self.shutdown_all_processes()
+        # Cleanup processes
+        self.shutdown_processes(cleanup_zombies, logger)
 
 
-def process_managed(timeout: int = 10, auto_signal_handling: bool = True):
+def process_managed(timeout: int = 10, auto_signals: bool = True, cleanup_zombies: bool = True):
     """
-    Decorator to add automatic process management to any class with stack trace logging.
+    Compact decorator for automatic process management with zombie prevention.
 
     Args:
-        timeout: Timeout in seconds for process termination (default: 10)
-        auto_signal_handling: Whether to setup SIGTERM/SIGINT handlers (default: True)
-
-    Usage:
-        @process_managed
-        class MyClass:
-            def shutdown(self):
-                # Your cleanup code here
-                pass
-
-        # Or with configuration:
-        @process_managed(timeout=30, auto_signal_handling=True)
-        class MyClass:
-            pass
-
-    The decorator preserves existing shutdown() methods and enhances them with
-    automatic process cleanup and detailed signal logging. Both manual and
-    signal-triggered shutdown work with full stack traces.
+        timeout: Process termination timeout (default: 10)
+        auto_signals: Setup SIGTERM/SIGINT handlers (default: True)
+        cleanup_zombies: Cleanup zombie processes (default: True)
     """
-
     def decorator(cls):
         original_init = cls.__init__
 
         def new_init(self, *args, **kwargs):
-            # Initialize the original class first
             original_init(self, *args, **kwargs)
 
-            # Add process manager with custom timeout
-            manager_name = f"{cls.__name__}_{getattr(self, 'name', 'unknown')}"
-            self.process_manager = ProcessManager(name=manager_name, timeout=timeout)
+            # Setup manager
+            name = f"{cls.__name__}_{getattr(self, 'name', 'unknown')}"
+            self.process_manager = ProcessManager(name, timeout)
 
-            # Preserve original shutdown method if it exists
-            self._original_shutdown = None
+            # Preserve existing shutdown
             if hasattr(self, 'shutdown') and callable(self.shutdown):
-                self._original_shutdown = self.shutdown
-                # Add it as a cleanup callback
-                self.process_manager.add_cleanup_callback(self._original_shutdown)
+                self.process_manager.add_callback(self.shutdown)
 
-            # Replace shutdown with enhanced version
-            self.shutdown = self._enhanced_shutdown
+            # Replace shutdown
+            self.shutdown = lambda: self.process_manager.shutdown(cleanup_zombies)
 
-            # Setup signal handlers if requested
-            if auto_signal_handling:
-                logger = getattr(self, 'logger', None)
-                self.process_manager.setup_signal_handlers(logger)
+            # Setup signals
+            if auto_signals:
+                self.process_manager.setup_signals(getattr(self, 'logger', None))
 
-        def _enhanced_shutdown(self):
-            """Enhanced shutdown that handles both processes and user cleanup"""
-            self.process_manager.shutdown()
+        def cleanup_zombies_method(self, children_only: bool = True):
+            logger = getattr(self, 'logger', None)
+            return self.process_manager.cleanup_zombies(children_only, logger)
 
-        # Add methods to the class
-        cls._enhanced_shutdown = _enhanced_shutdown
         cls.__init__ = new_init
+        cls.cleanup_zombies = cleanup_zombies_method
         return cls
 
-    # Support both @process_managed and @process_managed() syntax
+    # Support @process_managed and @process_managed()
     if callable(timeout):
-        # Called as @process_managed (no parentheses)
         cls = timeout
         timeout = 10
         return decorator(cls)
-    else:
-        # Called as @process_managed() or @process_managed(timeout=5)
-        return decorator
+    return decorator
 
 
-# Convenience function for manual process management
-def cleanup_child_processes(timeout: int = 10) -> None:
-    """
-    Standalone function to cleanup all child processes.
+# Standalone functions
+def cleanup_child_processes(timeout: int = 10, cleanup_zombies: bool = True):
+    """Cleanup all child processes and optionally zombies"""
+    manager = ProcessManager("manual", timeout)
+    manager.shutdown_processes(cleanup_zombies)
 
-    Args:
-        timeout: Timeout in seconds for process termination
 
-    Usage:
-        # Manual cleanup anywhere in your code
-        cleanup_child_processes()
-    """
-    manager = ProcessManager("manual_cleanup", timeout)
-    manager.shutdown_all_processes()
+def cleanup_zombie_python_processes(children_only: bool = True) -> int:
+    """Find and cleanup zombie Python processes"""
+    return ProcessManager("zombie").cleanup_zombies(children_only)
