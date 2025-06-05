@@ -52,8 +52,8 @@ DEFAULT_CONFIG = {
     },
 
     "AgentApi": {
-        "host": "localhost",  # Url/hostname to query agent API
-        "port": 40000  # Port number to query agent API
+        "host": None,  # API url/hostname will be set to localhost if None
+        "port": None  # API port, will be set automatically from 40000 if None
     },
 
     "MultiAgent": {
