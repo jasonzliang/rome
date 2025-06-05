@@ -68,7 +68,7 @@ def create_config():
         },
         "Agent": {
             "fsm_type": "simple",
-            "patience": 4,
+            "patience": 1,
             "action_select_strat": "smart",
             "agent_api": False,
         },

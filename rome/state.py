@@ -24,9 +24,28 @@ def validate_selected_file_context(agent, required_keys: List[str]) -> Dict:
     return selected_file
 
 
-def validate_file_exists(file_path: str) -> None:
-    """Validate that a file path exists"""
-    assert os.path.exists(file_path), f"File path does not exist: {file_path}"
+def validate_file(file_path: str, expected_content: str) -> str:
+    """Validate that file exists and expected_content matches disk, return actual content"""
+    logger = get_logger()
+
+    # Check if file exists
+    if not os.path.exists(file_path):
+        raise AssertionError(f"File path does not exist: {file_path}")
+
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            actual_content = f.read()
+
+        if actual_content != expected_content:
+            logger.error(f"Content mismatch in {file_path}! Expected content is out of sync with disk. "
+                        f"Expected {len(expected_content)} chars, found {len(actual_content)} chars. "
+                        f"Returning actual disk content.")
+
+        return actual_content
+
+    except Exception as e:
+        logger.error(f"Failed to validate file for {file_path}: {e}")
+        raise
 
 
 def get_file_size_info(file_path: str) -> str:
@@ -109,7 +128,7 @@ class CodeLoadedState(State):
     def check_context(self, agent, **kwargs) -> bool:
         """Check if we have a selected file in context"""
         selected_file = validate_selected_file_context(agent, ['path', 'content', 'reason'])
-        validate_file_exists(selected_file['path'])
+        selected_file['content'] = validate_file(selected_file['path'], selected_file['content'])
         return True
 
     def summary(self, agent) -> str:
@@ -137,7 +156,7 @@ class CodeEditedState(State):
 
         # Validate nested change_record structure
         validate_context_keys(selected_file['change_record'], ['changes', 'explanation'], 'change record')
-        validate_file_exists(selected_file['path'])
+        selected_file['content'] = validate_file(selected_file['path'], selected_file['content'])
         return True
 
     def summary(self, agent) -> str:
@@ -166,9 +185,10 @@ class TestEditedState(State):
         required_keys = ['path', 'content', 'changes', 'test_path', 'test_content', 'test_changes']
         selected_file = validate_selected_file_context(agent, required_keys)
 
-        # Validate both file paths exist
-        for path in [selected_file['path'], selected_file['test_path']]:
-            validate_file_exists(path)
+        # Validate both files exist and content matches disk
+        selected_file['content'] = validate_file(selected_file['path'], selected_file['content'])
+        selected_file['test_content'] = validate_file(selected_file['test_path'], selected_file['test_content'])
+
         return True
 
     def summary(self, agent) -> str:
@@ -194,10 +214,9 @@ class CodeExecutedPassState(State):
         required_keys = ['path', 'content', 'test_path', 'test_content', 'exec_output', 'exec_exit_code', 'exec_analysis']
         selected_file = validate_selected_file_context(agent, required_keys)
 
-        # Validate file paths exist
-        paths_to_check = [selected_file['path'], selected_file['test_path']]
-        for path in paths_to_check:
-            validate_file_exists(path)
+        # Validate both files exist and content matches disk
+        selected_file['content'] = validate_file(selected_file['path'], selected_file['content'])
+        selected_file['test_content'] = validate_file(selected_file['test_path'], selected_file['test_content'])
 
         # Validate that execution was successful
         exit_code = selected_file['exec_exit_code']
@@ -231,10 +250,9 @@ class CodeExecutedFailState(State):
         required_keys = ['path', 'content', 'test_path', 'test_content', 'exec_output', 'exec_exit_code', 'exec_analysis']
         selected_file = validate_selected_file_context(agent, required_keys)
 
-        # Validate file paths exist
-        paths_to_check = [selected_file['path'], selected_file['test_path']]
-        for path in paths_to_check:
-            validate_file_exists(path)
+        # Validate both files exist and content matches disk
+        selected_file['content'] = validate_file(selected_file['path'], selected_file['content'])
+        selected_file['test_content'] = validate_file(selected_file['test_path'], selected_file['test_content'])
 
         # Validate that execution failed
         exit_code = selected_file['exec_exit_code']
