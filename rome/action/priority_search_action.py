@@ -137,7 +137,8 @@ Return a JSON OBJECT with {min(len(file_overviews), self.batch_size)} files like
 {{
   "path/to/file1.py": 8,
   "path/to/file2.py": 6,
-  "path/to/file3.py": 3
+  "path/to/file3.py": 3,
+  ...
 }}
 
 IMPORTANT: Your response MUST be a valid JSON OBJECT where keys are file paths and values are priority scores (1-10).
