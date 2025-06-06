@@ -3,9 +3,18 @@
 Download experiment results from remote server with wildcard support.
 
 USAGE:
-  ./download.py 'bert*' --server biggpu-vpn    # Download matching dirs
-  ./download.py --ls 'bert*' -s biggpu-vpn     # List matching dirs
-  ./download.py --ls -s biggpu-vpn              # List all dirs
+  ./download.py 'bert*' -s biggpu-vpn -r ~/experiments    # Download matching dirs
+  ./download.py --ls 'bert*' -s biggpu-vpn               # List matching dirs
+  ./download.py --ls -s biggpu-vpn -r /data/models       # List all dirs
+
+COMMON OPTIONS:
+  -s, --server       Server hostname (default: biggpu)
+  -r, --remote-dir   Remote directory path (default: ~/Desktop/rome/benchmark/result)
+  -l, --local-dir    Local directory path (default: ~/Desktop/rome/benchmark/result)
+  -e, --exclude      Exclude pattern (can be used multiple times)
+  -w, --no-wildcard  Don't auto-append * to experiment name
+  -n, --dry-run      Show what would be transferred without doing it
+  --ls               List remote directories instead of downloading
 
 Quote wildcards to prevent local shell expansion!
 """
@@ -25,7 +34,7 @@ SERVER_IP = "biggpu"
 SERVER_DIR = "~/Desktop/rome/benchmark/result"
 LOCAL_DIR = "~/Desktop/rome/benchmark/result"
 
-def run_cmd(cmd, capture=True, timeout=None):
+def run_cmd(cmd, capture=True, timeout=15):
     """Execute command with timeout and error handling."""
     console.print(f"[blue]Executing:[/blue] {cmd}")
     try:
@@ -45,10 +54,10 @@ def run_cmd(cmd, capture=True, timeout=None):
         console.print("[yellow]⚠ Interrupted by user[/yellow]")
         return None, False
 
-def list_remote(server, pattern="*"):
+def list_remote(server, remote_dir, pattern="*"):
     """List remote directories matching pattern."""
-    cmd = f"ssh {server} 'ls -1dt {SERVER_DIR}/{pattern} 2>/dev/null | head -20'"
-    output, success = run_cmd(cmd, timeout=5)
+    cmd = f"ssh {server} 'ls -1dt {remote_dir}/{pattern} 2>/dev/null | head -20'"
+    output, success = run_cmd(cmd, timeout=10)
 
     if not success or not output:
         console.print(f"[yellow]⚠ No directories found matching '{pattern}'[/yellow]")
@@ -60,7 +69,7 @@ def list_remote(server, pattern="*"):
     console.print(f"[cyan]ℹ Found {len(dirs)} directories[/cyan]")
     return True
 
-def download(server, pattern, local_dir, excludes, dry_run=False):
+def download(server, remote_dir, pattern, local_dir, excludes, dry_run=False):
     """Download files via rsync."""
     Path(local_dir).mkdir(parents=True, exist_ok=True)
 
@@ -68,7 +77,7 @@ def download(server, pattern, local_dir, excludes, dry_run=False):
     opts = "-ahvzAPX --no-i-r --stats --progress"
     if dry_run: opts += " --dry-run"
 
-    cmd = f"rsync {opts} {exclude_str} {server}:{SERVER_DIR}/{pattern} {local_dir}"
+    cmd = f"rsync {opts} {exclude_str} {server}:{remote_dir}/{pattern} {local_dir}"
 
     if dry_run:
         console.print("[yellow]⚠ DRY RUN - No files will be transferred[/yellow]")
@@ -102,10 +111,11 @@ Always quote wildcards to prevent local shell expansion!
     )
     parser.add_argument("experiment", nargs="?", help="Experiment pattern")
     parser.add_argument("-s", "--server", default=SERVER_IP, help=f"Server (default: {SERVER_IP})")
+    parser.add_argument("-r", "--remote-dir", default=SERVER_DIR, help=f"Remote directory (default: {SERVER_DIR})")
     parser.add_argument("-n", "--dry-run", action="store_true", help="Dry run")
-    parser.add_argument("--exclude", action="append", default=[], help="Exclude pattern")
-    parser.add_argument("--local-dir", default=LOCAL_DIR, help="Local directory")
-    parser.add_argument("--no-wildcard", action="store_true", help="Don't auto-append *")
+    parser.add_argument("-e", "--exclude", action="append", default=[], help="Exclude pattern")
+    parser.add_argument("-l", "--local-dir", default=LOCAL_DIR, help="Local directory")
+    parser.add_argument("-w", "--no-wildcard", action="store_true", help="Don't auto-append *")
     parser.add_argument("--ls", action="store_true", help="List remote directories")
 
     args = parser.parse_args()
@@ -118,18 +128,18 @@ Always quote wildcards to prevent local shell expansion!
 
     # List or download
     if args.ls:
-        success = list_remote(args.server, pattern)
+        success = list_remote(args.server, args.remote_dir, pattern)
     else:
         if not args.experiment:
             console.print("[red]✗ Experiment name required for download (use --ls to list)[/red]")
             sys.exit(1)
 
         # Show config
-        config = f"Server: {args.server}\nRemote: {SERVER_DIR}/{pattern}\nLocal: {args.local_dir}"
+        config = f"Server: {args.server}\nRemote: {args.remote_dir}/{pattern}\nLocal: {args.local_dir}"
         if args.exclude: config += f"\nExcludes: {', '.join(args.exclude)}"
         console.print(Panel(config, title="[bold]Download Configuration[/bold]", border_style="cyan"))
 
-        success = download(args.server, pattern, args.local_dir, args.exclude, args.dry_run)
+        success = download(args.server, args.remote_dir, pattern, args.local_dir, args.exclude, args.dry_run)
 
     sys.exit(0 if success else 1)
 
