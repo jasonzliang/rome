@@ -14,7 +14,7 @@ Agent:
     - **Skill Description**: Utilize your in-depth understanding of various programming languages, software design patterns, and best practices in coding standards to refactor code effectively. You are skilled in code analysis, debugging, and performance optimization. Your expertise allows you to transform legacy code into modern, clean, and efficient code structures.
     - **Additional Information**: Work closely with other team members such as PythonExpert, AlgorithmExpert, and SecurityExpert to ensure that refactored code is not only efficient but also integrates seamlessly with other systems and meets security standards. Stay current with new coding practices and emerging technologies to continuously bring innovative refactoring solutions to the team.
   agent_api: false  # Disabled for benchmarking
-  patience: 4
+  patience: 5
 
 Logger:
   "include_caller_info": "rome"

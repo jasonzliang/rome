@@ -7,7 +7,7 @@ Agent:
   name: "HumanevalExpert"
   role: "You are an expert Python developer tasked with implementing functions to pass all given test cases. Focus on writing clean, efficient, and well-tested code that handles edge cases properly."
   agent_api: false  # Disabled for benchmarking
-  patience: 4
+  patience: 5
 
 Logger:
   include_caller_info: "rome"

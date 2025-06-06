@@ -113,7 +113,7 @@ Only recommend reversion if there is clear evidence that a previous version was 
                 if execution_output:
                     truncated_output = self._truncate_to_limit(execution_output)
                     summary += f"Output:\n{truncated_output}\n"
-                summary += "─" * 60 + "\n"
+                summary += "-" * 50 + "\n"
 
         return summary
 
