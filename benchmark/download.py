@@ -34,6 +34,7 @@ SERVER_IP = "biggpu"
 SERVER_DIR = "~/Desktop/rome/benchmark/result"
 LOCAL_DIR = "~/Desktop/rome/benchmark/result"
 
+
 def run_cmd(cmd, capture=True, timeout=None):
     """Execute command with timeout and error handling."""
     console.print(f"[blue]Executing:[/blue] {cmd}")
@@ -54,6 +55,7 @@ def run_cmd(cmd, capture=True, timeout=None):
         console.print("[yellow]⚠ Interrupted by user[/yellow]")
         return None, False
 
+
 def list_remote(server, remote_dir, pattern="*"):
     """List remote directories matching pattern."""
     cmd = f"ssh {server} 'ls -1dt {remote_dir}/{pattern} 2>/dev/null | head -20'"
@@ -68,6 +70,7 @@ def list_remote(server, remote_dir, pattern="*"):
     console.print(Columns(dirs, equal=True, expand=True))
     console.print(f"[cyan]ℹ Found {len(dirs)} directories[/cyan]")
     return True
+
 
 def download(server, remote_dir, pattern, local_dir, excludes, dry_run=False):
     """Download files via rsync."""
@@ -87,6 +90,7 @@ def download(server, remote_dir, pattern, local_dir, excludes, dry_run=False):
     status = "Dry run completed" if dry_run else "Transfer completed"
     console.print(f"[green]✓ {status}[/green]" if success else f"[red]✗ Transfer failed[/red]")
     return success
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -143,6 +147,7 @@ Always quote wildcards to prevent local shell expansion!
         success = download(args.server, args.remote_dir, pattern, args.local_dir, args.exclude, args.dry_run)
 
     sys.exit(0 if success else 1)
+
 
 if __name__ == "__main__":
     main()
