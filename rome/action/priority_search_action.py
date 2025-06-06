@@ -9,12 +9,12 @@ import time
 from typing import Dict, Optional, Any, Union, List
 
 from .action import Action
-from .state import truncate_text
 from ..repository import RepositoryManager  # New import
 from ..logger import get_logger
 from ..config import LOG_DIR_NAME, META_DIR_EXT, SUMMARY_LENGTH, TEST_FILE_EXT
 from ..config import check_attrs
 from ..parsing import extract_all_definitions
+from ..state import truncate_text
 
 class PrioritySearchAction(Action):
     """Action to search the repository for code files using OpenAI selection"""
