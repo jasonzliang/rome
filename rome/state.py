@@ -58,8 +58,8 @@ def get_file_size_info(file_path: str) -> str:
 
 
 def truncate_text(text: str, length: int = LONG_SUMMARY_LEN) -> str:
-    """Truncate text with ellipsis if it exceeds max_length"""
-    return text[:max_length] + '...' if len(text) > max_length else text
+    """Truncate text with ellipsis if it exceeds length"""
+    return text[:length] + '...' if len(text) > length else text
 
 
 class State(ABC):
