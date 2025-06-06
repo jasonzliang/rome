@@ -9,6 +9,7 @@ import time
 from typing import Dict, Optional, Any, Union, List
 
 from .action import Action
+from .state import truncate_text
 from ..repository import RepositoryManager  # New import
 from ..logger import get_logger
 from ..config import LOG_DIR_NAME, META_DIR_EXT, SUMMARY_LENGTH, TEST_FILE_EXT
@@ -40,10 +41,6 @@ class PrioritySearchAction(Action):
             f"(3) select best match from prioritized files after full content analysis "
             f"[max files: {max_files}, excluding: {excluded_dirs_str}]"
         )
-
-    def _truncate_text(self, text: str, max_length: int = SUMMARY_LENGTH) -> str:
-        """Truncate text to specified length with ellipsis if needed"""
-        return text[:max_length] + "..." if len(text) > max_length else text
 
     def _get_file_stats(self, file_path: str) -> Dict[str, Any]:
         """Get file statistics and content analysis"""
@@ -78,7 +75,7 @@ class PrioritySearchAction(Action):
             if docstring_lines:
                 # Join lines with space and truncate to SUMMARY_LENGTH
                 docstring_text = ' '.join(docstring_lines)
-                truncated_docstring = self._truncate_text(docstring_text)
+                truncated_docstring = truncate_text(docstring_text)
                 summary += f" # {truncated_docstring}"
 
         if definition['type'] == 'class' and definition.get('methods'):

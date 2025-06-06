@@ -3,6 +3,7 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 from .action import Action
+from .state import truncate_text
 from ..config import check_attrs, LONGEST_SUMMARY_LEN
 from ..logger import get_logger
 
@@ -68,12 +69,6 @@ Only recommend reversion if there is clear evidence that a previous version was 
         response = agent.chat_completion(prompt=prompt, system_message=agent.role, response_format={"type": "json_object"})
         return agent.parse_json_response(response)
 
-    def _truncate_to_limit(self, text: str, limit: int = LONGEST_SUMMARY_LEN) -> str:
-        """Truncate text to specified limit with ellipsis if needed"""
-        if len(text) <= limit:
-            return text
-        return text[:limit-3] + "..."
-
     def _create_version_summary(self, versions: List[Dict], file_type: str) -> str:
         """Create a formatted summary of version history"""
         if not versions:
@@ -111,7 +106,7 @@ Only recommend reversion if there is clear evidence that a previous version was 
                 summary += f"# Execution: {status} (exit code: {exit_code})\n"
 
                 if execution_output:
-                    truncated_output = self._truncate_to_limit(execution_output)
+                    truncated_output = truncate_text(execution_output, length=LONGEST_SUMMARY_LEN)
                     summary += f"Output:\n{truncated_output}\n"
                 summary += "-" * 50 + "\n"
 

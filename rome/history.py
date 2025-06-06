@@ -1,6 +1,8 @@
 # history.py
 from typing import Dict, List, Optional, Any
+
 from .logger import get_logger
+from .state import truncate_text
 
 class AgentHistory:
     """Manages agent execution history and provides summary functionality"""
@@ -101,6 +103,7 @@ class AgentHistory:
             prev_state = action_info.get('prev_state', 'unknown')
             curr_state = action_info.get('curr_state', 'unknown')
             reason = action_info.get('action_reason', 'No reason provided')
+            reason = truncate_text(reason)
 
             # Format the transition
             history_lines.extend([
