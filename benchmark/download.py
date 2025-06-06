@@ -34,7 +34,7 @@ SERVER_IP = "biggpu"
 SERVER_DIR = "~/Desktop/rome/benchmark/result"
 LOCAL_DIR = "~/Desktop/rome/benchmark/result"
 
-def run_cmd(cmd, capture=True, timeout=15):
+def run_cmd(cmd, capture=True, timeout=None):
     """Execute command with timeout and error handling."""
     console.print(f"[blue]Executing:[/blue] {cmd}")
     try:
