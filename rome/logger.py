@@ -193,7 +193,8 @@ class Logger:
 
             # Handle missing config gracefully with defaults
             self.level = getattr(self, 'level', 'INFO')
-            self.format = getattr(self, 'format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            self.format = getattr(self,
+                'format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
             self.console = getattr(self, 'console', True)
             self.include_caller_info = getattr(self, 'include_caller_info', None)
             self.base_dir = getattr(self, 'base_dir', None)

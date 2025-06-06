@@ -185,8 +185,8 @@ DEFAULT_CONFIG = {
         "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",  # Formatting
         "console": True,  # Print to console if true
         "include_caller_info": None,  # Can be "rome", "rich", or None
-        "base_dir": None,  # Directory for log files, overwrites agent's auto-generated values
-        "filename": None,  # Log file name, overwrites agent's auto-generated values
+        "base_dir": None,  # Directory for log files, overwritten by agent if set to None
+        "filename": None,  # Log file name, overwritten by agent if set to None
         "max_size_kb": 10000,  # Max log size in kb, truncates after exceeding
         "timezone": 'US/Pacific',  # Default timezone to display
     },
