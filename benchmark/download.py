@@ -32,7 +32,7 @@ console = Console()
 # Configuration
 SERVER_IP = "biggpu"
 SERVER_DIR = "~/Desktop/rome/benchmark/result"
-LOCAL_DIR = "./result"  # Use relative path instead of ~
+LOCAL_DIR = "~/Desktop/rome/benchmark/result"
 
 def run_cmd(cmd, capture=True, timeout=15):
     """Execute command with timeout and error handling."""
