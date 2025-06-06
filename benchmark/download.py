@@ -25,15 +25,21 @@ SERVER_IP = "biggpu"
 SERVER_DIR = "~/Desktop/rome/benchmark/result"
 LOCAL_DIR = "~/Desktop/rome/benchmark/result"
 
-def run_cmd(cmd, capture=True):
-    """Execute command with error handling."""
+def run_cmd(cmd, capture=True, timeout=None):
+    """Execute command with timeout and error handling."""
     console.print(f"[blue]Executing:[/blue] {cmd}")
     try:
         result = subprocess.run(cmd, shell=True, check=True,
-                              capture_output=capture, text=True)
+                              capture_output=capture, text=True, timeout=timeout)
         return result.stdout if capture else None, True
+    except subprocess.TimeoutExpired:
+        console.print(f"[red]✗ Command timed out after {timeout}s[/red]")
+        return None, False
     except subprocess.CalledProcessError as e:
-        console.print(f"[red]✗ Command failed (exit {e.returncode})[/red]", file=sys.stderr)
+        if e.returncode == 255:  # SSH connection error
+            console.print(f"[red]✗ Connection failed - check server name and network[/red]")
+        else:
+            console.print(f"[red]✗ Command failed (exit {e.returncode})[/red]")
         return None, False
     except KeyboardInterrupt:
         console.print("[yellow]⚠ Interrupted by user[/yellow]")
@@ -42,7 +48,7 @@ def run_cmd(cmd, capture=True):
 def list_remote(server, pattern="*"):
     """List remote directories matching pattern."""
     cmd = f"ssh {server} 'ls -1dt {SERVER_DIR}/{pattern} 2>/dev/null | head -20'"
-    output, success = run_cmd(cmd)
+    output, success = run_cmd(cmd, timeout=5)
 
     if not success or not output:
         console.print(f"[yellow]⚠ No directories found matching '{pattern}'[/yellow]")
@@ -59,13 +65,15 @@ def download(server, pattern, local_dir, excludes, dry_run=False):
     Path(local_dir).mkdir(parents=True, exist_ok=True)
 
     exclude_str = " ".join(f"--exclude={x}" for x in excludes)
-    opts = "-ahvzAPX --no-i-r --stats" + (" --dry-run" if dry_run else "") + " --progress"
+    opts = "-ahvzAPX --no-i-r --stats --progress"
+    if dry_run: opts += " --dry-run"
+
     cmd = f"rsync {opts} {exclude_str} {server}:{SERVER_DIR}/{pattern} {local_dir}"
 
     if dry_run:
         console.print("[yellow]⚠ DRY RUN - No files will be transferred[/yellow]")
 
-    _, success = run_cmd(cmd, capture=False)
+    _, success = run_cmd(cmd, capture=False, timeout=300)  # 5 minutes for transfers
     status = "Dry run completed" if dry_run else "Transfer completed"
     console.print(f"[green]✓ {status}[/green]" if success else f"[red]✗ Transfer failed[/red]")
     return success
