@@ -33,6 +33,8 @@ LOG_DIR_NAME = "__rome__"
 # Default extension for test files:
 TEST_FILE_EXT = '_test.py'
 
+# Graphviz DPI for drawing stuff
+GRAPHVIZ_DPI = 200
 ######## These constants are not intended to be user modifiable ########
 
 # Define the default configuration structure as a dictionary
@@ -134,16 +136,14 @@ DEFAULT_CONFIG = {
     },
 
     # Code Manipulation Actions
-    "EditCodeAction": {
-        "custom_prompt": None  # Override prompt for editing code
-    },
-    "EditTestAction": {
-        "custom_prompt": None  # Override prompt for editing tests
-    },
+    "EditCodeAction": { "custom_prompt": None },
+    "EditTestAction": { "custom_prompt": None },
+    "EditCodeAction2": { "custom_prompt": None },
+    "EditTestAction2": { "custom_prompt": None },
     "ExecuteCodeAction": {},
     "RevertCodeAction": {
         "custom_prompt": None,  # Override prompt for reverting code
-        "num_versions": 5,
+        "num_versions": 8,
     },
 
     # REPOSITORY & FILE MANAGEMENT

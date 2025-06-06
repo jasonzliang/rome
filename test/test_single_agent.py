@@ -71,7 +71,7 @@ def create_config():
             "cost_limit": 3.0,
         },
         "Agent": {
-            "fsm_type": "simple",
+            "fsm_type": "intermediate",
             "patience": 1,
             "action_select_strat": "smart",
             "agent_api": True,

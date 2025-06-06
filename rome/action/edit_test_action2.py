@@ -8,7 +8,7 @@ from ..config import check_attrs
 from ..logger import get_logger
 from ..parsing import hash_string
 
-class EditTestAction(Action):
+class EditTestAction2(Action):
     """Action to create or edit tests for the selected file - now inherits from Action"""
 
     def __init__(self, config: Dict = None):
@@ -24,7 +24,7 @@ class EditTestAction(Action):
         test_exists = 'test_path' in selected_file and \
             os.path.exists(selected_file.get('test_path', ''))
         action_type = "update existing tests" if test_exists else "create comprehensive unit tests"
-        return f"{action_type} for {filename}, covering edge cases, error conditions, and test failures"
+        return f"{action_type} for {filename}, covering edge cases, error conditions, and test failures using a different prompt modified by LLM"
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute test editing action to create or improve tests for the current selected file"""
@@ -114,7 +114,7 @@ class EditTestAction(Action):
 
     def _create_test_prompt(self, agent, file_path: str, file_content: str, test_path: str,
                            test_content: str, test_exists: bool) -> str:
-        """Create a prompt for the LLM to create or improve tests"""
+        """Create a structured prompt for comprehensive test creation using evidence-based strategies"""
 
         # Extract file and module information for proper imports
         file_name = os.path.basename(file_path)
@@ -124,72 +124,82 @@ class EditTestAction(Action):
         if self.custom_prompt is not None:
             base_prompt = self.custom_prompt
         else:
-            # Base prompt
-            base_prompt = """Create comprehensive unit tests for the provided code file. Focus on:
-1. Testing all public methods and functions
-2. Edge cases and error conditions
-3. Integration between components
-4. Good test organization and documentation
-"""
+            action_type = "improve existing" if test_exists else "create comprehensive"
+            base_prompt = f"""Analyze the code and {action_type} unit tests using this approach:
 
-        action_type = "improve the existing" if test_exists else "create new"
+1. **Identify what to test**: Functions, methods, edge cases, error conditions
+2. **Extract requirements**: Analyze docstrings for behavioral specs and constraints
+3. **Plan coverage**: Normal cases, boundaries, exceptions, integration points"""
+
+            if test_exists:
+                base_prompt += """
+4. **Evaluate existing tests**: Find coverage gaps and quality issues"""
+            else:
+                base_prompt += """
+4. **Design test structure**: Organize by function/class with clear naming"""
 
         prompt = f"""{base_prompt}
-I need you to {action_type} unit tests for the following Python code.
 
-# Code file path:
-{file_path}
-# Code file content:
+# Source Code Information
+**File Path**: {file_path}
+**Module Name**: {module_name}
+**Source Code**:
 ```python
 {file_content}
 ```
 """
+
         if test_exists:
             prompt += f"""
-# Test file path:
-{test_path}
-# Test file content:
+# Existing Test Information
+**Test File Path**: {test_path}
+**Current Test Code**:
 ```python
 {test_content}
 ```
 """
         else:
             prompt += f"""
-Create a new test file that will be saved at: {test_path}
-Include proper test setup, all necessary imports, and comprehensive test cases.
+# Test File Creation
+**Target Test Path**: {test_path}
+**Requirements**: Create a new comprehensive test file with proper imports and test structure
 """
 
         # Get analysis context using the static function
         analysis_prompt = create_analysis_prompt(agent, file_path)
         if analysis_prompt:
             prompt += f"\n{analysis_prompt}\n"
+            prompt += "\n**Address execution issues**: Focus on creating tests that prevent the reported errors.\n"
 
-        prompt += f"""
-Respond with a JSON object containing:
-{{
-    "improved_test_code": "The new and improved test code with changes or edits made to it",
-    "explanation": "A clear explanation of the changes you made and why",
+        prompt += """
+## Requirements
+Write comprehensive tests covering:
+- **Functionality**: All public methods with normal inputs
+- **Edge Cases**: Boundaries, empty inputs, extreme values
+- **Errors**: Invalid inputs and exception handling
+- **Integration**: Component interactions where applicable
+
+Respond with JSON:
+{
+    "improved_test_code": "Complete test file with comprehensive coverage",
+    "explanation": "Key testing decisions and coverage strategy",
     "changes": [
-        {{
-            "type": "test type (unit test, integration test, etc.)",
-            "description": "Description of what this test verifies"
-        }},
-        ...
+        {
+            "type": "test_category",
+            "description": "What this test verifies",
+            "reasoning": "Why this test matters"
+        }
     ]
-}}
+}
 
-IMPORTANT:
-- Make sure the test code is valid Python syntax and contains no markdown formatting like ```python...```
-- Tests should be compatible with pytest and be sure to do "import pytest" first
-- Make sure to import the module being tested from the code file
-- Assume the code file and test file are both located in the root of the current working directory
-- Include all necessary imports that are required by the tests
-- Avoid external dependencies that are unnecessary for testing
-- List improvements you made in "changes" and summarize the changes in "explanation"
-- If improved test code is unchanged, be sure give an empty list for "changes" and mention it in "explanation"
+## Critical Technical Requirements
+1. **Complete Test File**: Return the ENTIRE test file content with all tests included
+2. **Pytest Compatibility**: Use pytest conventions and include `import pytest` at the top
+3. **Proper Imports**: Import the module under test correctly using `from {module_name} import *`
+4. **Valid Python**: Ensure all syntax is correct and tests will execute without errors
+5. **No Markdown**: Do not include ```python``` code block formatting in the improved_test_code field
+6. **Clear Organization**: Group related tests together with logical structure and helpful comments
+7. **File Locations**: Assume the code and test files are in the root of the current working directory
+8. **Accountability**: If improved test code is unchanged, mention it in "explanation" and "changes"
 """
-
-        if analysis_prompt:
-            prompt += "- Pay special attention to addressing any test failures or issues identified in the code analysis"
-
         return prompt

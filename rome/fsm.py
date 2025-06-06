@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Callable, Union, Tuple
 from .action import *
 from .state import *
 from .logger import get_logger
-from .config import set_attributes_from_config
+from .config import GRAPHVIZ_DPI, set_attributes_from_config
 
 class FSM:
     """Finite State Machine as a directed graph"""
@@ -187,7 +187,7 @@ class FSM:
 
         # Create and configure graph
         dot = graphviz.Digraph('FSM', format='png')
-        dot.attr(rankdir='LR', size='11,8')
+        dot.attr(rankdir='LR', size='11,8', dpi=str(GRAPHVIZ_DPI))
         dot.attr('node', shape='circle', style='filled', color='lightblue2')
 
         # Add states as nodes
@@ -197,7 +197,8 @@ class FSM:
         # Add transitions as edges
         for transition in self.get_graph()["transitions"]:
             edge_style = {"style": "dashed", "color": "red"} if transition["type"] == "fallback" else {}
-            dot.edge(transition["from"], transition["to"], label=transition["action"], **edge_style)
+            fontcolor = 'red' if transition["type"] == "fallback" else 'black'
+            dot.edge(transition["from"], transition["to"], label=transition["action"], fontcolor=fontcolor, **edge_style)
 
         # Determine output path
         if output_path is None:
