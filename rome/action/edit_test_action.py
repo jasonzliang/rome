@@ -169,6 +169,7 @@ class EditTestAction(Action):
         analysis_prompt = create_analysis_prompt(agent, file_path)
         if analysis_prompt:
             prompt += f"\n{analysis_prompt}\n"
+            prompt += "\n**Address execution issues**: Focus on creating tests that prevent the reported errors.\n"
 
         prompt += """
 ## Requirements
@@ -201,10 +202,4 @@ Respond with JSON:
 7. **File Locations**: Assume the code and test files are in the root of the current working directory
 8. **Accountability**: If improved test code is unchanged, mention it in "explanation" and "changes"
 """
-
-        if analysis_prompt:
-            prompt += "Focus on creating tests that prevent the reported errors.\n"
-
-        prompt += f"Import the module: `from {module_name} import *` and include `import pytest`."
-
         return prompt

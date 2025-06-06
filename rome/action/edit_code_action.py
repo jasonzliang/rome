@@ -145,7 +145,7 @@ class EditCodeAction(Action):
         analysis_prompt = create_analysis_prompt(agent, file_path)
         if analysis_prompt:
             prompt += f"\n{analysis_prompt}\n"
-            prompt += "5. **Address execution issues**: Fix errors identified in test results above\n"
+            prompt += "\n**Address execution issues**: Fix errors identified in test results above, including any execution errors and test failures.\n"
 
         prompt += """
 Focus improvements on: correctness, completeness, robustness, performance, readability.
@@ -171,8 +171,4 @@ Respond with JSON:
 5. **Consistent Style**: Follow existing code style and naming conventions where appropriate
 6. **Accountability**: If improved code is unchanged, mention it in "explanation" and "changes"
 """
-
-        if analysis_prompt:
-            prompt += "Prioritize fixing execution errors and test failures.\n"
-
         return prompt
