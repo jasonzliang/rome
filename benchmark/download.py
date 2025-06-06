@@ -40,7 +40,7 @@ except ImportError:
 SERVER_IP = "biggpu"
 SERVER_DIR = "~/Desktop/rome/benchmark/result"
 EXCLUDE_DIRS = []
-LOCAL_DIR = os.path.dirname(os.path.abspath(__file__))
+LOCAL_DIR = "~/Desktop/rome/benchmark/result"
 
 def run_rsync(server_ip, server_dir, local_dir, exclude_dirs, dry_run=False, progress=True):
     """Execute rsync with error handling and validation."""
