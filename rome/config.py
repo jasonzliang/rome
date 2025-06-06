@@ -13,7 +13,7 @@ from .logger import get_logger
 API_PORT_RANGE = (40000, 41000)
 
 # Min and max allowed lengths for agent names
-AGENT_NAME_LENGTH = (8, 24)
+AGENT_NAME_LENGTH = (8, 32)
 
 # Default hash function to use for check file versions and AST cache
 DEFAULT_HASH_FUNC = "sha256"
@@ -44,11 +44,13 @@ DEFAULT_CONFIG = {
         "name": None,  # Agent name, can be overwritten by constructor
         "role": None,  # Agent description, can be overwritten by constructor
         "repository": None,  # Repository base directory, can be overwritten by constructor
+
         "fsm_type": "simple",  # Which FSM to load (see fsm_factory.py)
         "action_select_strat": "smart",  # Which action selector to use (original or smart)
         "agent_api": True,  # Launch an REST API server for agent's internal state
         "history_context_len": 20,  # Length of history to use when selecting action
-        "patience": 4  # If same state/action chosen repeatedly, prompt to choose different action
+        "patience": 4,  # If same state/action chosen repeatedly, prompt to choose different action
+        'log_pid': False  # Whether to include PID in agent log file names
     },
 
     "AgentApi": {

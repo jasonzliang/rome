@@ -91,7 +91,7 @@ class Agent:
         # Set attributes from Agent config
         agent_config = self.config.get('Agent', {})
         set_attributes_from_config(self, agent_config,
-            ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience', 'action_select_strat'])
+            ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience', 'action_select_strat', 'log_pid'])
 
     def _validate_name_role(self, name: str, role: str) -> None:
         """Validates and formats the agent's role string"""
@@ -107,9 +107,8 @@ class Agent:
             self.logger.info("Role string does not contain 'your role', reformatting")
             self.role = f"Your role as an agent:\n{self.role}"
 
-        # Name must be between 8 and 24 char long and alphanum only
+        # Name must be between 8 and 32 char long and alphanum only
         a, b = AGENT_NAME_LENGTH
-        # FIXED: Handle name validation properly
         clean_name = ''.join(re.findall(r'[a-zA-Z0-9]+', self.name))
         self.logger.assert_true(clean_name and a <= len(clean_name) <= b,
             f"Agent name must be {a}-{b} alphanumeric characters, got: '{self.name}' -> '{clean_name}'")
@@ -241,7 +240,10 @@ class Agent:
     def get_id(self):
         """Unique id for identifying agent in file system"""
         # safe_name = ''.join(c if c.isalnum() else '_' for c in self.name).lower()
-        return f'agent_{self.name}_{os.getpid()}'
+        if self.log_pid:
+            return f'agent_{self.name}_{os.getpid()}'
+        else:
+            return f'agent_{self.name}'
 
     def get_log_dir(self):
         """Get agent log directory and create if it doesn't exist"""
