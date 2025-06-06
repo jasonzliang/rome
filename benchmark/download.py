@@ -57,7 +57,7 @@ def run_cmd(cmd, capture=True, timeout=None):
 def list_remote(server, remote_dir, pattern="*"):
     """List remote directories matching pattern."""
     cmd = f"ssh {server} 'ls -1dt {remote_dir}/{pattern} 2>/dev/null | head -20'"
-    output, success = run_cmd(cmd, timeout=10)
+    output, success = run_cmd(cmd, timeout=5)
 
     if not success or not output:
         console.print(f"[yellow]⚠ No directories found matching '{pattern}'[/yellow]")
