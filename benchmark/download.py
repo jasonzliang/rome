@@ -32,7 +32,7 @@ console = Console()
 # Configuration
 SERVER_IP = "biggpu"
 SERVER_DIR = "~/Desktop/rome/benchmark/result"
-LOCAL_DIR = os.path.expanduser("~/Desktop/rome/benchmark/result")
+LOCAL_DIR = "./result"  # Use relative path instead of ~
 
 def run_cmd(cmd, capture=True, timeout=15):
     """Execute command with timeout and error handling."""
@@ -71,8 +71,8 @@ def list_remote(server, remote_dir, pattern="*"):
 
 def download(server, remote_dir, pattern, local_dir, excludes, dry_run=False):
     """Download files via rsync."""
-    local_dir = os.path.expanduser(local_dir)
-    Path(local_dir).mkdir(parents=True, exist_ok=True)
+    # Let shell handle tilde expansion in mkdir
+    subprocess.run(f"mkdir -p '{local_dir}'", shell=True, check=True)
 
     exclude_str = " ".join(f"--exclude={x}" for x in excludes)
     opts = "-ahvzAPX --no-i-r --stats --progress"
