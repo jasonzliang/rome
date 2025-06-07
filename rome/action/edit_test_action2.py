@@ -120,86 +120,107 @@ class EditTestAction2(Action):
         file_name = os.path.basename(file_path)
         module_name, _ = os.path.splitext(file_name)
 
-        # Use custom prompt if provided in config
+        # Build dynamic sections
+        existing_test_section = self._build_existing_test_section(test_path, test_content, test_exists)
+        analysis_context = self._build_analysis_context(agent, file_path)
+
+        # Use custom prompt if provided, otherwise use optimized default
         if self.custom_prompt is not None:
             base_prompt = self.custom_prompt
         else:
-            action_type = "improve existing" if test_exists else "create comprehensive"
-            base_prompt = f"""Analyze the code and {action_type} unit tests using this approach:
+            base_prompt = self._get_prompt_template()
 
-1. **Identify what to test**: Functions, methods, edge cases, error conditions
-2. **Extract requirements**: Analyze docstrings for behavioral specs and constraints
-3. **Plan coverage**: Normal cases, boundaries, exceptions, integration points"""
+        # Format the complete prompt
+        return base_prompt.format(
+            file_path=file_path,
+            module_name=module_name,
+            file_content=file_content,
+            existing_test_section=existing_test_section,
+            analysis_context=analysis_context
+        )
 
-            if test_exists:
-                base_prompt += """
-4. **Evaluate existing tests**: Find coverage gaps and quality issues"""
-            else:
-                base_prompt += """
-4. **Design test structure**: Organize by function/class with clear naming"""
-
-        prompt = f"""{base_prompt}
-
-# Source Code Information
-**File Path**: {file_path}
-**Module Name**: {module_name}
-**Source Code**:
-```python
-{file_content}
-```
-"""
-
+    def _build_existing_test_section(self, test_path: str, test_content: str, test_exists: bool) -> str:
+        """Build the existing test section conditionally"""
         if test_exists:
-            prompt += f"""
-# Existing Test Information
-**Test File Path**: {test_path}
-**Current Test Code**:
+            return f"""
+## Existing Test Analysis
+**Test File**: {test_path}
 ```python
 {test_content}
 ```
-"""
+**Task**: Improve coverage and fix identified gaps"""
         else:
-            prompt += f"""
-# Test File Creation
-**Target Test Path**: {test_path}
-**Requirements**: Create a new comprehensive test file with proper imports and test structure
-"""
+            return f"""
+## Test Creation
+**Target**: {test_path}
+**Task**: Create comprehensive test suite from scratch"""
 
-        # Get analysis context using the static function
+    def _build_analysis_context(self, agent, file_path: str) -> str:
+        """Build analysis context if available"""
         analysis_prompt = create_analysis_prompt(agent, file_path)
         if analysis_prompt:
-            prompt += f"\n{analysis_prompt}\n"
-            prompt += "\n**Address execution issues**: Focus on creating tests that prevent the reported errors.\n"
+            return f"""
+## Execution Analysis
+{analysis_prompt}
+**Priority**: Address execution failures and edge cases identified above"""
+        return ""
 
-        prompt += """
-## Requirements
-Write comprehensive tests covering:
-- **Functionality**: All public methods with normal inputs
-- **Edge Cases**: Boundaries, empty inputs, extreme values
-- **Errors**: Invalid inputs and exception handling
-- **Integration**: Component interactions where applicable
+    def _get_prompt_template(self) -> str:
+        """Return the optimized prompt template"""
+        return """# Test Generation Analysis
 
-Respond with JSON:
-{
-    "improved_test_code": "Complete test file with comprehensive coverage",
-    "explanation": "Key testing decisions and coverage strategy",
+## Code Analysis
+**File**: {file_path} | **Module**: {module_name}
+
+```python
+{file_content}
+```
+
+{existing_test_section}
+
+{analysis_context}
+
+## Test Strategy
+Generate comprehensive tests using systematic coverage:
+
+**Core Testing**:
+- All public methods with varied inputs
+- Return value validation and type checking
+- State changes and side effects
+
+**Robustness Testing**:
+- Boundary conditions (empty, None, extremes)
+- Invalid inputs and exception paths
+- Resource constraints and error recovery
+
+**Integration Testing**:
+- Component interactions and dependencies
+- Mock external calls where needed
+
+## Technical Specifications
+- **Framework**: pytest with fixtures and parametrization
+- **Imports**: `import pytest` + `from {module_name} import *`
+- **Structure**: Logical grouping with descriptive test names
+- **Coverage**: Focus on preventing execution failures from analysis
+
+## Response Format
+```json
+{{
+    "improved_test_code": "Complete test file content (no markdown blocks)",
+    "explanation": "Testing strategy and key decisions",
     "changes": [
-        {
-            "type": "test_category",
-            "description": "What this test verifies",
-            "reasoning": "Why this test matters"
-        }
+        {{
+            "type": "coverage_area",
+            "description": "What tests were added/improved",
+            "reasoning": "Why this testing approach was chosen"
+        }}
     ]
-}
+}}
+```
 
-## Critical Technical Requirements
-1. **Complete Test File**: Return the ENTIRE test file content with all tests included
-2. **Pytest Compatibility**: Use pytest conventions and include `import pytest` at the top
-3. **Proper Imports**: Import the module under test correctly using `from {module_name} import *`
-4. **Valid Python**: Ensure all syntax is correct and tests will execute without errors
-5. **No Markdown**: Do not include ```python``` code block formatting in the improved_test_code field
-6. **Clear Organization**: Group related tests together with logical structure and helpful comments
-7. **File Locations**: Assume the code and test files are in the root of the current working directory
-8. **Accountability**: If improved test code is unchanged, mention it in "explanation" and "changes"
-"""
-        return prompt
+**Critical Requirements**:
+1. Return ENTIRE test file with all imports and structure
+2. Ensure pytest compatibility and executable Python syntax
+3. Files located in current working directory root
+4. Address specific execution issues if analysis provided
+5. Mention if no changes made to existing tests"""

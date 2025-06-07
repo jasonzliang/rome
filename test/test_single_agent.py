@@ -75,7 +75,6 @@ def create_config():
             "patience": 1,
             "action_select_strat": "smart",
             "agent_api": True,
-            "foo": 5
         },
         "Logger": {
             "level": "DEBUG",
