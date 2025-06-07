@@ -48,7 +48,7 @@ DEFAULT_CONFIG = {
         "repository": None,  # Repository base directory, can be overwritten by constructor
 
         "fsm_type": "simple",  # Which FSM to load (see fsm_factory.py)
-        "action_select_strat": "smart",  # Which action selector to use (original or smart)
+        "action_select_strat": "original",  # Which action selector to use (original or smart)
         "agent_api": True,  # Launch an REST API server for agent's internal state
         "history_context_len": 20,  # Length of history to use when selecting action
         "patience": 4,  # If same state/action chosen repeatedly, prompt to choose different action
@@ -131,7 +131,7 @@ DEFAULT_CONFIG = {
         "selection_criteria": "Select the file that you have the most confidence in improving or fixing.",
     },
     "TournamentSearchAction": {
-        "batch_size": 15,  # Number of files to randomly choose
+        "batch_size": 10,  # Number of files to randomly choose
         "selection_criteria": "Select the file that you have the most confidence in improving or fixing."
     },
 
