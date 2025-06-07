@@ -55,7 +55,7 @@ class EditCodeAction2(Action):
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']
         filename = os.path.basename(file_path)
-        return f"analyze and improve code in {filename}, addressing execution issues, bugs, performance, and readability using a different prompt modified by LLM"
+        return f"analyze and improve code in {filename}, addressing execution issues, bugs, performance, and readability using a more complex LLM prompt"
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute code editing action to improve the current selected file"""
@@ -190,7 +190,7 @@ Apply systematic code enhancement across these dimensions:
         {{
             "type": "correctness|performance|maintainability|feature",
             "description": "Short description of what code was added/improved",
-            "reasoning": "Short reason of why this coding approach was chosen"
+            "reasoning": "Short reason of   why this coding approach was chosen"
         }}
     ]
 }}
