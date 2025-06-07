@@ -119,58 +119,86 @@ class EditCodeAction2(Action):
     def _create_improvement_prompt(self, agent, file_path: str, content: str) -> str:
         """Create a structured prompt for the LLM to improve code using evidence-based strategies"""
 
-        # Use custom prompt if provided in config
+        # Build dynamic sections
+        analysis_context = self._build_analysis_context(agent, file_path)
+
+        # Use custom prompt if provided, otherwise use optimized default
         if self.custom_prompt is not None:
-            return self.custom_prompt
+            base_prompt = self.custom_prompt
+        else:
+            base_prompt = self._get_optimized_prompt_template()
 
-        # Enhanced compact prompt using structured analysis
-        prompt = f"""Systematically analyze and improve this code:
+        # Format the complete prompt
+        return base_prompt.format(
+            file_path=file_path,
+            content=content,
+            analysis_context=analysis_context
+        )
 
-## Analysis Framework
-1. **Code Understanding**: Identify purpose, logic flow, and dependencies
-2. **Issue Detection**: Find syntax errors, logic bugs, performance bottlenecks, incomplete implementations
-3. **Requirement Extraction**: Parse docstrings/comments for constraints and expected behavior
-4. **Improvement Planning**: Prioritize fixes by impact - correctness > completeness > performance > readability
+    def _build_analysis_context(self, agent, file_path: str) -> str:
+        """Build analysis context if available"""
+        analysis_prompt = create_analysis_prompt(agent, file_path)
+        if analysis_prompt:
+            return f"""
+## Execution Analysis
+{analysis_prompt}
+**Priority**: Fix execution failures and address identified issues"""
+        return ""
 
-## Code to Analyze
+    def _get_optimized_prompt_template(self) -> str:
+        """Return the optimized prompt template"""
+        return """# Code Improvement Analysis
+
+## Code Assessment
 **File**: {file_path}
 ```python
 {content}
 ```
-"""
 
-        # Add analysis context if available
-        analysis_context = create_analysis_prompt(agent, file_path)
-        if analysis_context:
-            prompt += f"\n{analysis_context}\n"
-            prompt += "**Address execution issues**: Fix errors identified in test results above.\n"
+{analysis_context}
 
-        prompt += """
-## Improvement Targets
-- **Correctness**: Fix syntax/logic errors, handle edge cases
-- **Completeness**: Implement missing functionality, add error handling
-- **Performance**: Optimize algorithms, reduce complexity, eliminate redundancy
-- **Maintainability**: Improve readability, add documentation, modularize
+## Improvement Strategy
+Apply systematic code enhancement across these dimensions:
 
-## Response Format (JSON)
-{
-    "improved_code": "Complete file content with all improvements",
-    "explanation": "Concise summary of key changes and rationale",
+**Correctness & Stability**:
+- Fix syntax errors, logic bugs, and runtime exceptions
+- Handle edge cases and invalid inputs properly
+- Ensure proper error handling and recovery
+
+**Performance & Efficiency**:
+- Optimize algorithms and data structures
+- Eliminate redundant operations and memory leaks
+- Improve computational complexity where possible
+
+**Code Quality & Maintainability**:
+- Enhance readability with clear naming and structure
+- Add comprehensive documentation and type hints
+- Modularize code for better organization
+
+## Technical Specifications
+- **Standards**: Follow PEP 8 and Python best practices
+- **Compatibility**: Maintain existing interface contracts
+- **Dependencies**: Preserve import structure and requirements
+- **Focus**: Address execution issues identified in analysis above
+
+## Response Format
+```json
+{{
+    "improved_code": "Complete enhanced file content (no markdown blocks)",
+    "explanation": "Summary of improvements and technical decisions",
     "changes": [
-        {
-            "type": "error_fix|performance|readability|feature",
-            "description": "Specific change made",
-            "reasoning": "Technical justification"
-        }
+        {{
+            "type": "correctness|performance|maintainability|feature",
+            "description": "Short description of what code was added/improved",
+            "reasoning": "Short reason of why this coding approach was chosen"
+        }}
     ]
-}
+}}
+```
 
-## Critical Requirements
-1. **Complete File**: Return ENTIRE file content, not snippets
-2. **Valid Python**: Ensure syntactic correctness and proper imports
-3. **No Markdown**: Raw code only in improved_code field (no ```python blocks)
-4. **Preserve Structure**: Maintain organization unless refactoring needed
-5. **Style Consistency**: Follow existing conventions
-6. **Change Tracking**: Document all modifications in changes array"""
-
-        return prompt
+**Critical Requirements**:
+1. Return ENTIRE file content with all improvements integrated
+2. Ensure syntactic correctness and proper Python execution
+3. Preserve original functionality while enhancing implementation
+4. Address specific execution failures if analysis provided
+5. Document all changes with clear technical reasoning"""

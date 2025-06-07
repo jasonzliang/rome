@@ -211,8 +211,8 @@ Generate comprehensive tests using systematic coverage:
     "changes": [
         {{
             "type": "coverage_area",
-            "description": "What tests were added/improved",
-            "reasoning": "Why this testing approach was chosen"
+            "description": "Short description of what test was added/improved",
+            "reasoning": "Short reason of why this testing approach was chosen"
         }}
     ]
 }}
