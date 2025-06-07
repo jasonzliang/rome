@@ -441,4 +441,5 @@ See LICENSE file for details.
 - Support for shared library or knowledge database
 - Agent communication via requests
 - Dynamic creation of new states/actions
+- Dynamic mutation of action LLM prompts
 - Reinforcement learning for action selection
