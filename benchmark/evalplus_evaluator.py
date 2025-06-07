@@ -182,7 +182,7 @@ class EvalplusEvaluator:
         content = f"""#!/bin/bash
 CMD=$(command -v evalplus || echo "python -m evalplus")
 echo "=== EVALPLUS {self.dataset}: $(wc -l < '{solutions_file}') solutions ===" | tee {output_file}
-$CMD.sanitize --samples "{solutions_file}" 2>&1 | tee -a {output_file} || true
+$CMD.sanitize --samples "{solutions_file}" 2>&1 || true
 EVAL_FILE=$([[ -f "{sanitized}" ]] && echo "{sanitized}" || echo "{solutions_file}")
 $CMD.evaluate --dataset {self.dataset} --samples "$EVAL_FILE" | tee -a {output_file}
 echo "EXIT_CODE:$?" | tee -a {output_file}
