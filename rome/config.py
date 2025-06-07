@@ -136,10 +136,10 @@ DEFAULT_CONFIG = {
     },
 
     # Code Manipulation Actions
-    "EditCodeAction": { "custom_prompt": None },
-    "EditTestAction": { "custom_prompt": None },
-    "EditCodeAction2": { "custom_prompt": None },
-    "EditTestAction2": { "custom_prompt": None },
+    "EditCodeAction": {"custom_prompt": None},
+    "EditCodeAction2": {"custom_prompt": None},
+    "EditTestAction": {"custom_prompt": None},
+    "EditTestAction2": {"custom_prompt": None},
     "ExecuteCodeAction": {},
     "RevertCodeAction": {
         "custom_prompt": None,  # Override prompt for reverting code

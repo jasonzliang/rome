@@ -103,8 +103,8 @@ class SimpleFSMBuilder(FSMBuilder):
         # Create actions with their respective configurations
         search_action = PrioritySearchAction(config.get('PrioritySearchAction', {}))
         reset_action = AdvancedResetAction(config.get('AdvancedResetAction', {}))
-        edit_code_action = EditCodeAction(config.get('EditCodeAction', {}))
-        edit_test_action = EditTestAction(config.get('EditTestAction', {}))
+        edit_code_action = EditCodeAction2(config.get('EditCodeAction2', {}))
+        edit_test_action = EditTestAction2(config.get('EditTestAction2', {}))
         execute_code_action = ExecuteCodeAction(config.get('ExecuteCodeAction', {}),
             config.get('Executor', {}))
 
@@ -140,7 +140,7 @@ class SimpleFSMBuilder(FSMBuilder):
         fsm.set_initial_state(idle_state)
         fsm.validate_fsm()
 
-        self.logger.info("Comprehensive FSM created successfully with code editing, test writing, execution, and intelligent failure recovery")
+        self.logger.info("Simple FSM created successfully with code editing, test writing, execution, and intelligent failure recovery")
         return fsm
 
 
@@ -228,7 +228,7 @@ class IntermediateFSMBuilder(FSMBuilder):
         fsm.set_initial_state(idle_state)
         fsm.validate_fsm()
 
-        self.logger.info("Comprehensive FSM created successfully with code editing, test writing, execution, and intelligent failure recovery")
+        self.logger.info("Intermediate FSM created successfully with code editing, test writing, execution, and intelligent failure recovery")
         return fsm
 
 
