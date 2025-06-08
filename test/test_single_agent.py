@@ -44,7 +44,7 @@ HUMAN_EVAL_SAMPLES = {
     \"\"\"
     pass"""
 }
-HUMAN_EVAL_SAMPLES = {}
+# HUMAN_EVAL_SAMPLES = {}
 
 def setup_test_dir():
     """Create test directory with HumanEval samples"""
