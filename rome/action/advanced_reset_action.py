@@ -111,6 +111,7 @@ Consider work complete if:
         work_complete = confidence >= self.completion_confidence
 
         progress = {
+            'work_complete': work_complete,
             'confidence': confidence,
             'reasoning': reasoning,
             'remaining_issues': remaining_issues,
