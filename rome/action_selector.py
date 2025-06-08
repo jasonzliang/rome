@@ -309,201 +309,191 @@ class OriginalActionSelector(ActionSelectorBase):
 
 
 class SmartActionSelector(ActionSelectorBase):
-    """Enhanced action selection with simplified, efficient loop detection"""
+    """Compact, efficient action selection with intelligent loop detection"""
 
     def __init__(self, config: Dict = None):
         super().__init__(config)
-
-        # Cache for pattern analysis
-        self._pattern_cache = {}
-        self._last_analysis_iteration = -1
+        # Single cache for pattern analysis
+        self._cache = {"iteration": -1, "analysis": {}}
 
     def get_action_selection_prompt(self, fsm, agent) -> str:
-        """Enhanced action selection prompt with simplified anti-loop logic"""
+        """Generate enhanced prompt with context-aware intervention"""
         if fsm.current_state not in fsm.states:
-            raise ValueError(f"Current state '{fsm.current_state}' is not a valid state in the FSM")
+            raise ValueError(f"Current state '{fsm.current_state}' not in FSM states")
 
-        prompt_parts = self._build_base_prompt_parts(fsm, agent)
-        pattern_analysis = self._analyze_patterns_cached(agent, fsm.get_available_actions(), fsm.current_state)
-        selection_instruction = self._build_selection_instruction(pattern_analysis, agent)
-        prompt_parts.append(selection_instruction)
+        # Build base prompt efficiently
+        prompt_parts = self._build_prompt_parts(fsm, agent)
+
+        # Add intervention guidance if needed
+        analysis = self._get_pattern_analysis(agent, fsm.get_available_actions())
+        if analysis["needs_intervention"]:
+            prompt_parts.append(self._build_intervention_prompt(analysis))
+        else:
+            prompt_parts.append(self._build_base_selection_prompt())
 
         return "\n\n".join(prompt_parts)
 
-    def _analyze_patterns_cached(self, agent, available_actions: List[str], current_state: str) -> Dict:
-        """Cached pattern analysis to avoid recomputation"""
-        # Use iteration as cache key - only recompute if iteration changed
-        if agent.curr_iteration == self._last_analysis_iteration:
-            return self._pattern_cache
+    def _build_prompt_parts(self, fsm, agent) -> List[str]:
+        """Build core prompt components efficiently"""
+        current_state = fsm.current_state
+        state_obj = fsm.states[current_state]
+        available_actions = fsm.get_available_actions()
 
-        self._last_analysis_iteration = agent.curr_iteration
-        self._pattern_cache = self._analyze_action_patterns(agent, available_actions, current_state)
-        return self._pattern_cache
+        # Build action details with state transitions
+        action_lines = []
+        future_states = set()
 
-    def _analyze_action_patterns(self, agent, available_actions: List[str], current_state: str) -> Dict:
-        """Simplified, focused pattern analysis"""
+        for action in available_actions:
+            target, fallback = fsm.transitions[current_state][action]
+            transition = f"next state: {target}"
+            if fallback:
+                transition += f", fallback: {fallback}"
+                future_states.add(fallback)
+            future_states.add(target)
+
+            summary = fsm.actions[action].summary(agent)
+            action_lines.append(f"- {action} ({transition}): {summary}")
+
+        # Build future state summaries
+        future_lines = [f"- {name}: {fsm.states[name].future_summary(agent)}"
+                       for name in sorted(future_states)]
+
+        # Assemble prompt sections
+        parts = []
+
+        if fsm.overview:
+            parts.append(f"## FSM Overview ##\n{fsm.overview}")
+
+        history = agent.history.get_history_summary(agent.history_context_len)
+        if history:
+            parts.append(f"## Recent agent history ##\n{history}")
+
+        parts.extend([
+            f"## Current state ##\n{current_state}: {state_obj.summary(agent)}",
+            f"## Available actions ##\n" + "\n".join(action_lines),
+            f"## Future states ##\n" + ("\n".join(future_lines) if future_lines else "No future states")
+        ])
+
+        return parts
+
+    def _get_pattern_analysis(self, agent, available_actions: List[str]) -> Dict:
+        """Cached, efficient pattern analysis"""
+        # Return cached result if same iteration
+        if self._cache["iteration"] == agent.curr_iteration:
+            return self._cache["analysis"]
+
+        # Compute new analysis
         window_size = self.loop_detection_window or agent.history_context_len
         recent_actions = agent.history.get_recent_actions(window_size)
 
         if len(recent_actions) < 3:
-            return self._no_intervention_result()
+            analysis = {"needs_intervention": False, "severity": "none", "message": ""}
+        else:
+            analysis = self._analyze_patterns(recent_actions, available_actions,
+                                            agent.fsm.current_state, agent.patience)
 
+        # Cache and return
+        self._cache = {"iteration": agent.curr_iteration, "analysis": analysis}
+        return analysis
+
+    def _analyze_patterns(self, recent_actions: List, available_actions: List[str],
+                         current_state: str, patience: int) -> Dict:
+        """Compact pattern analysis focused on current state"""
         # Count state-action patterns efficiently
-        state_action_counts = self._count_state_action_patterns(recent_actions, current_state)
-
-        # Focus on current state patterns (most important for loop detection)
-        current_state_patterns = {
-            action: state_action_counts.get(f"{current_state}->{action}", 0)
-            for action in available_actions
-        }
-
-        max_repetitions = max(current_state_patterns.values()) if current_state_patterns else 0
-
-        return self._determine_intervention_level(
-            max_repetitions,
-            agent.patience,
-            current_state_patterns,
-            available_actions
-        )
-
-    def _count_state_action_patterns(self, recent_actions: List, current_state: str) -> Dict[str, int]:
-        """Efficiently count state-action patterns"""
         counts = defaultdict(int)
-
-        for action_record in recent_actions:
-            action, state = self._extract_action_state(action_record, current_state)
+        for record in recent_actions:
+            action, state = self._extract_action_state(record, current_state)
             if action and state:
                 counts[f"{state}->{action}"] += 1
 
-        return dict(counts)
+        # Focus on current state patterns
+        current_patterns = {
+            action: counts.get(f"{current_state}->{action}", 0)
+            for action in available_actions
+        }
 
-    def _extract_action_state(self, action_record, fallback_state: str) -> Tuple[Optional[str], Optional[str]]:
-        """Extract action and state from record with proper fallback handling"""
-        if isinstance(action_record, dict):
-            action = action_record.get('action')
-            # Prefer prev_state, then state, then current as last resort
-            state = action_record.get('prev_state') or action_record.get('state')
-            if not state and action:
-                # Only use fallback if we have an action but no state info
-                state = fallback_state
-        else:
-            action = action_record
-            state = fallback_state
-
-        return action, state
-
-    def _determine_intervention_level(self, max_repetitions: int, patience: int,
-                                    current_patterns: Dict[str, int], available_actions: List[str]) -> Dict:
-        """Determine intervention level based on repetition counts"""
+        max_reps = max(current_patterns.values()) if current_patterns else 0
         critical_threshold = patience + self.patience_buffer
 
-        if max_repetitions >= critical_threshold:
-            return self._critical_intervention(max_repetitions, patience, current_patterns, available_actions)
-        elif max_repetitions >= patience:
-            return self._warning_intervention(max_repetitions, patience, current_patterns, available_actions)
-        elif max_repetitions >= patience // 2 and len(available_actions) > 1:
-            return self._mild_intervention(current_patterns, available_actions)
+        # Determine intervention level
+        if max_reps >= critical_threshold:
+            return self._create_intervention("critical", max_reps, patience,
+                                           current_patterns, available_actions)
+        elif max_reps >= patience:
+            return self._create_intervention("warning", max_reps, patience,
+                                           current_patterns, available_actions)
+        elif max_reps >= patience // 2 and len(available_actions) > 1:
+            return self._create_intervention("mild", max_reps, patience,
+                                           current_patterns, available_actions)
         else:
-            return self._no_intervention_result()
+            return {"needs_intervention": False, "severity": "none", "message": ""}
 
-    def _critical_intervention(self, max_reps: int, patience: int, patterns: Dict, actions: List) -> Dict:
-        """Critical intervention when patience severely exceeded"""
-        overused = [action for action, count in patterns.items() if count >= patience + self.patience_buffer]
-        alternatives = [action for action in actions if patterns.get(action, 0) <= 1]
+    def _extract_action_state(self, record, fallback_state: str) -> Tuple[Optional[str], Optional[str]]:
+        """Extract action and state from history record"""
+        if isinstance(record, dict):
+            action = record.get('action')
+            state = record.get('prev_state') or record.get('state') or (fallback_state if action else None)
+        else:
+            action, state = record, fallback_state
+        return action, state
 
-        message = f"🚨 CRITICAL: Breaking repetitive loop!\n"
-        message += f"- Actions used {max_reps}+ times: {', '.join(overused)}\n"
-        message += f"- MUST try alternatives: {', '.join(alternatives) if alternatives else 'any other available action'}\n"
-        message += f"- Patience ({patience}) exceeded by {max_reps - patience}"
+    def _create_intervention(self, severity: str, max_reps: int, patience: int,
+                           patterns: Dict[str, int], available_actions: List[str]) -> Dict:
+        """Create intervention message based on severity"""
+        if severity == "critical":
+            overused = [a for a, c in patterns.items() if c >= patience + self.patience_buffer]
+            alternatives = [a for a in available_actions if patterns.get(a, 0) <= 1]
+            message = (f"🚨 CRITICAL: Breaking repetitive loop!\n"
+                      f"Overused ({max_reps}+ times): {', '.join(overused)}\n"
+                      f"Try alternatives: {', '.join(alternatives) if alternatives else 'other actions'}")
 
-        return {
-            "needs_intervention": True,
-            "severity": "critical",
-            "message": message,
-            "max_repetitions": max_reps,
-            "patience_threshold": patience,
-            "recommended_actions": alternatives
-        }
+        elif severity == "warning":
+            at_limit = [a for a, c in patterns.items() if c >= patience]
+            alternatives = [a for a in available_actions if patterns.get(a, 0) < patience]
+            message = (f"⚠️ WARNING: Patience threshold reached\n"
+                      f"At limit ({patience}): {', '.join(at_limit)}\n"
+                      f"Consider: {', '.join(alternatives) if alternatives else 'other approaches'}")
 
-    def _warning_intervention(self, max_reps: int, patience: int, patterns: Dict, actions: List) -> Dict:
-        """Warning intervention at patience threshold"""
-        at_limit = [action for action, count in patterns.items() if count >= patience]
-        alternatives = [action for action in actions if patterns.get(action, 0) < patience]
-
-        message = f"⚠️ WARNING: Patience threshold reached\n"
-        message += f"- Actions at limit ({patience}): {', '.join(at_limit)}\n"
-        message += f"- Consider alternatives: {', '.join(alternatives) if alternatives else 'other approaches'}"
-
-        return {
-            "needs_intervention": True,
-            "severity": "warning",
-            "message": message,
-            "max_repetitions": max_reps,
-            "patience_threshold": patience,
-            "recommended_actions": alternatives
-        }
-
-    def _mild_intervention(self, patterns: Dict, actions: List) -> Dict:
-        """Mild intervention for diversity encouragement"""
-        most_used = max(patterns.items(), key=lambda x: x[1]) if patterns else (None, 0)
-        less_used = [action for action in actions if patterns.get(action, 0) <= most_used[1] // 2]
-
-        message = f"💡 SUGGESTION: Consider exploring alternatives\n"
-        message += f"- Most used: {most_used[0]} ({most_used[1]} times)\n"
-        message += f"- Less explored: {', '.join(less_used) if less_used else 'other options'}"
+        else:  # mild
+            most_used = max(patterns.items(), key=lambda x: x[1]) if patterns else ("none", 0)
+            less_used = [a for a in available_actions if patterns.get(a, 0) <= most_used[1] // 2]
+            message = (f"💡 SUGGESTION: Consider exploring alternatives\n"
+                      f"Most used: {most_used[0]} ({most_used[1]} times)\n"
+                      f"Less explored: {', '.join(less_used) if less_used else 'other options'}")
 
         return {
             "needs_intervention": True,
-            "severity": "mild",
+            "severity": severity,
             "message": message,
-            "max_repetitions": most_used[1],
-            "recommended_actions": less_used
+            "max_repetitions": max_reps
         }
 
-    def _no_intervention_result(self) -> Dict:
-        """Return no intervention needed result"""
-        return {
-            "needs_intervention": False,
-            "severity": "none",
-            "message": "",
-            "max_repetitions": 0,
-            "recommended_actions": []
-        }
+    def _build_intervention_prompt(self, analysis: Dict) -> str:
+        """Build prompt with intervention guidance"""
+        base = ('Please select one action. Respond with JSON:\n'
+               '{"selected_action": "action_name", "reasoning": "brief_reason"}')
 
-    def _build_base_prompt_parts(self, fsm, agent) -> List[str]:
-        """Build standard prompt components (unchanged from original)"""
-        # ... existing implementation
-        pass
-
-    def _build_selection_instruction(self, pattern_analysis: Dict, agent) -> str:
-        """Build selection instruction with appropriate guidance"""
-        base_instruction = """Please select one of the available actions to execute. Respond with a JSON object:
-{
-    "selected_action": "selected action name",
-    "reasoning": "Short reason for this choice"
-}"""
-
-        if not pattern_analysis["needs_intervention"]:
-            guidance = f"\n\nChoose the most appropriate action for your role."
-            if self.exploration_rate > 0.1:
-                guidance += f" Occasional exploration can improve outcomes."
-            return base_instruction + guidance
-
-        # Add pattern-specific guidance
-        severity = pattern_analysis["severity"]
-        message = pattern_analysis["message"]
+        severity = analysis["severity"]
+        message = analysis["message"]
 
         if severity == "critical":
-            guidance = f"\n\nCRITICAL INTERVENTION:\n{message}\n"
-            guidance += "STRONGLY recommended to select a different action to break the cycle."
+            guidance = f"\n\nCRITICAL INTERVENTION:\n{message}\nSTRONGLY recommended to select a different action."
         elif severity == "warning":
-            guidance = f"\n\nPATIENCE THRESHOLD:\n{message}\n"
-            guidance += "Consider if current approach is effective. Try alternatives if stuck."
+            guidance = f"\n\nPATIENCE THRESHOLD:\n{message}\nConsider alternatives if current approach isn't working."
         else:  # mild
-            guidance = f"\n\nDIVERSITY SUGGESTION:\n{message}\n"
-            guidance += "Current approach may work, but variety often improves results."
+            guidance = f"\n\nDIVERSITY SUGGESTION:\n{message}\nVariety often improves outcomes."
 
-        return base_instruction + guidance
+        return base + guidance
+
+    def _build_base_selection_prompt(self) -> str:
+        """Build standard selection prompt without intervention"""
+        base = ('Please select one action. Respond with JSON:\n'
+               '{"selected_action": "action_name", "reasoning": "brief_reason"}')
+
+        if self.exploration_rate > 0.1:
+            return base + "\n\nChoose the most appropriate action. Occasional exploration can improve outcomes."
+        else:
+            return base + "\n\nChoose the most appropriate action for your role."
 
 
 class ActionSelector:
