@@ -137,13 +137,12 @@ DEFAULT_CONFIG = {
 
     # Code Manipulation Actions
     # Can override prompt for generating, modifying code
-    "EditCodeAction": {"custom_prompt": None},
-    "EditCodeAction2": {"custom_prompt": None},
-    "EditTestAction": {"custom_prompt": None},
-    "EditTestAction2": {"custom_prompt": None},
+    "EditCodeAction": {},
+    "EditCodeAction2": {},
+    "EditTestAction": {},
+    "EditTestAction2": {},
     "ExecuteCodeAction": {},
     "RevertCodeAction": {
-        "custom_prompt": None,
         "num_versions": 8, # Number of versions to look back to revert
     },
 

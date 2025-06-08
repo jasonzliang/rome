@@ -48,7 +48,6 @@ class EditCodeAction(Action):
     def __init__(self, config: Dict = None):
         super().__init__(config)
         self.logger = get_logger()
-        check_attrs(self, ['custom_prompt'])
 
     def summary(self, agent) -> str:
         """Return a short summary of the code editing action"""
@@ -66,7 +65,7 @@ class EditCodeAction(Action):
         original_content = selected_file['content']
 
         # Prepare prompt for code improvement
-        prompt = self._create_improvement_prompt(agent, file_path, original_content)
+        prompt = self._create_code_prompt(agent, file_path, original_content)
 
         # Get improved code from LLM
         self.logger.info(f"Requesting code improvements for {file_path}")
@@ -116,15 +115,11 @@ class EditCodeAction(Action):
         self.logger.info(f"Successfully edited and wrote improved code to {file_path}")
         return True
 
-    def _create_improvement_prompt(self, agent, file_path: str, content: str) -> str:
+    def _create_code_prompt(self, agent, file_path: str, content: str) -> str:
         """Create a prompt for the LLM to improve the code"""
 
-        # Use custom prompt if provided in config
-        if self.custom_prompt is not None:
-            prompt = self.custom_prompt
-        else:
-            # Base prompt without relying on a configured improvement_prompt
-            prompt = """Analyze the code file and suggest improvements. Focus on:
+        # Base prompt without relying on a configured improvement_prompt
+        prompt = """Analyze the code file and suggest improvements. Focus on:
 1. Implementing missing code and filling in empty functions
 2. Code quality and readability
 3. Bug fixes and edge cases

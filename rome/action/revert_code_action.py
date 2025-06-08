@@ -14,7 +14,7 @@ class RevertCodeAction(Action):
     def __init__(self, config: Dict = None):
         super().__init__(config)
         self.logger = get_logger()
-        check_attrs(self, ['custom_prompt', 'num_versions'])
+        check_attrs(self, ['num_versions'])
 
     def summary(self, agent) -> str:
         """Return a short summary of the revert action"""
@@ -28,7 +28,7 @@ class RevertCodeAction(Action):
         code_summary = self._create_version_summary(code_versions, "Code")
         test_summary = self._create_version_summary(test_versions, "Test")
 
-        base_prompt = self.custom_prompt or """Analyze the version history of code and test files to determine if reverting to a previous version would be beneficial.
+        base_prompt = """Analyze the version history of code and test files to determine if reverting to a previous version would be beneficial.
 
 Focus on:
 1. Execution success/failure trends over versions

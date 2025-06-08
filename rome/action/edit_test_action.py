@@ -14,7 +14,6 @@ class EditTestAction(Action):
     def __init__(self, config: Dict = None):
         super().__init__(config)
         self.logger = get_logger()
-        check_attrs(self, ['custom_prompt'])
 
     def summary(self, agent) -> str:
         """Return a short summary of the test editing action"""
@@ -120,12 +119,8 @@ class EditTestAction(Action):
         file_name = os.path.basename(file_path)
         module_name, _ = os.path.splitext(file_name)
 
-        # Use custom prompt if provided in config
-        if self.custom_prompt is not None:
-            base_prompt = self.custom_prompt
-        else:
-            # Base prompt
-            base_prompt = """Create comprehensive unit tests for the provided code file. Focus on:
+        # Base prompt
+        base_prompt = """Create comprehensive unit tests for the provided code file. Focus on:
 1. Testing all public methods and functions
 2. Edge cases and error conditions
 3. Integration between components
