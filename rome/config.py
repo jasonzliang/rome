@@ -105,7 +105,6 @@ DEFAULT_CONFIG = {
         "smart": {  # Config for smart selector
             "loop_detection_window": None,  # Override window based on agent.history_context_len
             "exploration_rate": 0.15,  # Base probability for encouraging non-optimal actions
-            "overuse_threshold": 0.3  # Fraction of recent actions that triggers "overuse" warning
         }
     },
 

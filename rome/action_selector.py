@@ -398,35 +398,72 @@ class SmartActionSelector(ActionSelectorBase):
 
     def _analyze_patterns(self, recent_actions: List, available_actions: List[str],
                          current_state: str, patience: int) -> Dict:
-        """Compact pattern analysis focused on current state"""
+        """Compact pattern analysis with both loop and cycle detection"""
         # Count state-action patterns efficiently
         counts = defaultdict(int)
+        states = []
+
         for record in recent_actions:
             action, state = self._extract_action_state(record, current_state)
             if action and state:
                 counts[f"{state}->{action}"] += 1
+                states.append(state)
 
-        # Focus on current state patterns
+        # 1. Check for simple loops (existing logic)
         current_patterns = {
             action: counts.get(f"{current_state}->{action}", 0)
             for action in available_actions
         }
-
         max_reps = max(current_patterns.values()) if current_patterns else 0
-        critical_threshold = patience + self.patience_buffer
 
-        # Determine intervention level
-        if max_reps >= critical_threshold:
+        # 2. Check for cycles (new logic) - only if no simple loop detected
+        if max_reps < patience and len(states) >= 6:
+            cycle_info = self._detect_cycle(states)
+            if cycle_info["detected"]:
+                return {
+                    "needs_intervention": True,
+                    "severity": "critical" if cycle_info["repetitions"] >= 3 else "warning",
+                    "message": f"🔄 CYCLE: {' → '.join(cycle_info['pattern'])} repeated {cycle_info['repetitions']} times. Try a different approach.",
+                    "max_repetitions": cycle_info["repetitions"]
+                }
+
+        # 3. Fall back to simple loop logic
+        if max_reps >= patience:
             return self._create_intervention("critical", max_reps, patience,
-                                           current_patterns, available_actions)
-        elif max_reps >= patience:
-            return self._create_intervention("warning", max_reps, patience,
                                            current_patterns, available_actions)
         elif max_reps >= patience // 2 and len(available_actions) > 1:
             return self._create_intervention("mild", max_reps, patience,
                                            current_patterns, available_actions)
         else:
             return {"needs_intervention": False, "severity": "none", "message": ""}
+
+    def _detect_cycle(self, states: List[str]) -> Dict:
+        """Compact cycle detection using pattern matching"""
+        if len(states) < 6:  # Need at least 2 cycles of length 3
+            return {"detected": False}
+
+        # Check cycle lengths 3-8 (covers typical FSM cycles)
+        for cycle_len in range(3, min(9, len(states) // 2 + 1)):
+            recent = states[-cycle_len:]
+            prev = states[-cycle_len*2:-cycle_len] if len(states) >= cycle_len*2 else []
+
+            if recent == prev:  # Found a repeating pattern
+                # Count total repetitions by looking backwards
+                reps = 2  # We already found 2
+                pos = len(states) - cycle_len * 3
+                while pos >= 0 and states[pos:pos + cycle_len] == recent:
+                    reps += 1
+                    pos -= cycle_len
+
+                if reps >= 2:  # At least 2 complete cycles
+                    return {
+                        "detected": True,
+                        "pattern": recent,
+                        "repetitions": reps,
+                        "length": cycle_len
+                    }
+
+        return {"detected": False}
 
     def _extract_action_state(self, record, fallback_state: str) -> Tuple[Optional[str], Optional[str]]:
         """Extract action and state from history record"""
@@ -441,7 +478,7 @@ class SmartActionSelector(ActionSelectorBase):
                            patterns: Dict[str, int], available_actions: List[str]) -> Dict:
         """Create intervention message based on severity"""
         if severity == "critical":
-            overused = [a for a, c in patterns.items() if c >= patience + self.patience_buffer]
+            overused = [a for a, c in patterns.items() if c >= patience]
             alternatives = [a for a in available_actions if patterns.get(a, 0) <= 1]
             message = (f"🚨 CRITICAL: Breaking repetitive loop!\n"
                       f"Overused ({max_reps}+ times): {', '.join(overused)}\n"
