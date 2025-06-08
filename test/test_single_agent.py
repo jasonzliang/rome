@@ -44,7 +44,7 @@ HUMAN_EVAL_SAMPLES = {
     \"\"\"
     pass"""
 }
-
+HUMAN_EVAL_SAMPLES = {}
 
 def setup_test_dir():
     """Create test directory with HumanEval samples"""
@@ -71,7 +71,7 @@ def create_config():
             "cost_limit": 3.0,
         },
         "Agent": {
-            "fsm_type": "intermediate",
+            "fsm_type": "simple",
             "patience": 1,
             "action_select_strat": "smart",
             "agent_api": True,

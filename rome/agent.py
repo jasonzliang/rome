@@ -411,6 +411,7 @@ class Agent:
                 prev_state = self.fsm.current_state
 
                 # Execute the action through FSM
+                self.logger.info(f"Executing {chosen_action} action")
                 success = self.fsm.execute_action(chosen_action, self)
                 self.logger.info(f"Action executed (success: {success}), new state: {self.fsm.current_state}")
 

@@ -71,7 +71,7 @@ def action_frequency_backoff(func=None):
                     raise ActionTooFrequentError(action_name, attempts, self.max_tries)
 
                 # Calculate exponentially increasing wait time: min_interval * 2^attempts
-                wait_time = self.min_interval * (2 ** attempts)
+                wait_time = self.min_interval * (2 ** (attempts - 1))
 
                 self.logger.debug(f"Action {action_name} backing off {wait_time:.1f}s "
                                 f"(attempt {attempts}/{self.max_tries})")
