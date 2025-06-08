@@ -6,6 +6,7 @@ from typing import Dict, List, Any, Optional
 
 from .action import Action
 from ..logger import get_logger
+from ..config import check_attrs
 
 class AdvancedResetAction(Action):
     """Advanced reset action that analyzes execution results and manages file flags appropriately"""
@@ -13,6 +14,7 @@ class AdvancedResetAction(Action):
     def __init__(self, config: Dict):
         super().__init__(config)
         self.logger = get_logger()
+        check_attrs(self, ['completion_confidence', 'max_versions'])
 
     def summary(self, agent) -> str:
         """Return a short summary of the advanced reset action"""
@@ -31,17 +33,16 @@ class AdvancedResetAction(Action):
         Returns:
             True if LLM determines work is complete and correct, False otherwise
         """
-        try:
-            execution_data = agent.version_manager.get_data(selected_file['path'], 'exec_result')
-            exit_code = execution_data['exec_exit_code']
-            output = execution_data['exec_output']
-            analysis = execution_data['exec_analysis']
-        except:
-            self.logger.error("Cannot load latest execution data, looking in selected_file instead")
-            self.logger.error(traceback.format_exc())
-            exit_code = selected_file['exec_exit_code']
-            output = selected_file['exec_output']
-            analysis = selected_file['exec_analysis']
+        execution_data = agent.version_manager.get_data(selected_file['path'], 'exec_result')
+
+        if execution_data:
+            exit_code = execution_data.get('exec_exit_code', 'unknown')
+            output = execution_data.get('exec_output', 'No output available')
+            analysis = execution_data.get('exec_analysis', 'No analysis available')
+        else:
+            exit_code = selected_file.get('exec_exit_code', 'unknown')
+            output = selected_file.get('exec_output', 'No output available')
+            analysis = selected_file.get('exec_analysis', 'No analysis available')
 
         prompt = f"""Examine the test execution results and analysis, use them to determine if the code and tests are now correct and complete.
 
@@ -54,10 +55,10 @@ class AdvancedResetAction(Action):
 
 # Test analysis:
 {analysis}
-"""
 
-        prompt += """
-Based on the execution results and analysis, please determine:
+Based on the execution results and analysis, please determine how confident you are that the work is complete.
+
+Consider:
 1. Are all tests passing successfully?
 2. Is the code functioning correctly?
 3. Are there any remaining issues that need to be addressed?
@@ -65,18 +66,23 @@ Based on the execution results and analysis, please determine:
 
 Respond with a JSON object:
 {{
-    "work_complete": true/false,
-    "confidence": 1-10,
+    "confidence": 0-100,
     "reasoning": "Explanation of your assessment",
     "remaining_issues": "Short summary of remaining issues",
 }}
 
-Set work_complete to true ONLY if:
+For confidence (0-100):
+- Represents how confident you are that the work is COMPLETE
+- 100 = absolutely certain work is complete
+- {self.completion_confidence}+ = high confidence work is complete, should be flagged as finished
+- 50-79 = moderate confidence, some uncertainty remains
+- 0-49 = low confidence, significant issues likely remain
+
+Consider work complete if:
 - Exit code is 0 (success)
 - All tests are passing (unless the failing test(s) are clearly incorrect or unnecessary)
 - No critical errors or failures
 - Code appears to be functioning correctly
-- You are confident (confidence >= 8) that no further work is needed
 """
 
         response = agent.chat_completion(
@@ -91,29 +97,59 @@ Set work_complete to true ONLY if:
             self.logger.error(f"Error parsing LLM analysis response: {result}")
             return False
 
-        work_complete = result.get('work_complete', False)
-        confidence = result.get('confidence', 1)
+        confidence = result.get('confidence', 0)
         reasoning = result.get('reasoning', 'No reasoning provided')
-        remaining_issues = result.get('remaining_issues', "No issues provided")
+        remaining_issues = result.get('remaining_issues', 'No issues provided')
+
+        # Validate and convert confidence to number
+        if isinstance(confidence, str):
+            confidence = float(confidence) if confidence.replace('.', '').isdigit() else 0
+        elif not isinstance(confidence, (int, float)):
+            confidence = 0
+
+        confidence = max(0, min(100, float(confidence)))
+        work_complete = confidence >= self.completion_confidence
 
         progress = {
-            'work_complete': work_complete,
             'confidence': confidence,
             'reasoning': reasoning,
             'remaining_issues': remaining_issues,
             'agent_id': agent.get_id()
         }
+
         agent.version_manager.store_data(selected_file['path'], 'progress', progress)
 
-        self.logger.info(f"LLM analysis - Work complete: {work_complete}, "
-                       f"Confidence: {confidence}/10, Reasoning: {reasoning}")
-        if remaining_issues:
-            self.logger.info(f"Remaining issues identified: {remaining_issues}")
+        self.logger.info(f"Confidence: {confidence}/100, Complete: \
+            {work_complete}, Reasoning: {reasoning}")
 
-        # Only consider work complete if LLM is confident
-        work_complete = work_complete and confidence >= 8
         return work_complete
 
+    def _check_max_versions_reached(self, agent, file_path: str) -> bool:
+        """
+        Check if file has reached maximum number of versions
+
+        Args:
+            agent: Agent instance
+            file_path: Path to the file to check
+
+        Returns:
+            True if max versions reached, False otherwise
+        """
+        versions = agent.version_manager.load_version(file_path,
+            k=self.max_versions + 1, include_content=False)
+
+        if versions is None:
+            version_count = 0
+        elif isinstance(versions, list):
+            version_count = len(versions)
+        else:
+            version_count = 1
+
+        if version_count >= self.max_versions:
+            self.logger.info(f"Max versions ({self.max_versions}) reached for {file_path}")
+            return True
+
+        return False
 
     def execute(self, agent, **kwargs) -> bool:
         """
@@ -128,29 +164,20 @@ Set work_complete to true ONLY if:
         """
         self.logger.info("Starting AdvancedResetAction execution")
 
-        # Get selected file from context before clearing
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']
 
-        self.logger.info("Analyzing execution results to determine if work is complete")
         work_complete = self._analyze_execution_results(agent, selected_file)
+        if not work_complete:
+            work_complete = self._check_max_versions_reached(agent, file_path)
 
-
-        # Handle file flagging if we have a file path
-        # Always unflag active since we're resetting
-        unflag_result = agent.version_manager.unflag_active(agent, file_path)
-        if unflag_result:
-            self.logger.info(f"Successfully unflagged active status for {file_path}")
-
-        # Clear context first (parent class behavior)
+        agent.version_manager.unflag_active(agent, file_path)
         agent.context.clear()
-        self.logger.info("Agent context has been cleared")
 
-        # Flag as finished only if LLM determined work is complete
         if work_complete:
             agent.version_manager.flag_finished(agent, file_path)
-            self.logger.info(f"Flagged {file_path} as finished based on LLM analysis")
+            self.logger.info(f"Flagged {file_path} as finished")
             return True
         else:
-            self.logger.error(f"{file_path} is incomplete based on LLM analysis")
+            self.logger.error(f"Flagged {file_path} as not finished")
             return False

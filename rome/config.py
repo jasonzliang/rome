@@ -122,7 +122,10 @@ DEFAULT_CONFIG = {
 
     # Basic Actions
     "ResetAction": {},
-    "AdvancedResetAction": {},
+    "AdvancedResetAction": {
+        "completion_confidence": 80,
+        "max_versions": 30,
+    },
     "TransitionAction": {},
 
     # Search Actions
