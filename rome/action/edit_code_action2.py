@@ -3,7 +3,7 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 from .action import Action
-from .edit_code_action import EditCodeAction
+from .edit_code_action import EditCodeAction, create_analysis_prompt
 from ..config import check_attrs
 from ..logger import get_logger
 from ..parsing import hash_string
