@@ -23,16 +23,8 @@ class AdvancedResetAction(Action):
                 "to start a new coding task")
 
     def _analyze_execution_results(self, agent, selected_file: Dict) -> bool:
-        """
-        Use LLM to analyze execution results and determine if work is complete
+        """Use LLM to analyze execution results and determine if work is complete"""
 
-        Args:
-            agent: Agent instance with LLM capabilities
-            selected_file: Selected file context with execution results
-
-        Returns:
-            True if LLM determines work is complete and correct, False otherwise
-        """
         execution_data = agent.version_manager.get_data(selected_file['path'], 'exec_result')
 
         if execution_data:
@@ -126,16 +118,8 @@ Consider work complete if:
         return work_complete
 
     def _check_max_versions_reached(self, agent, file_path: str) -> bool:
-        """
-        Check if file has reached maximum number of versions
+        """Check if file has reached maximum number of versions"""
 
-        Args:
-            agent: Agent instance
-            file_path: Path to the file to check
-
-        Returns:
-            True if max versions reached, False otherwise
-        """
         versions = agent.version_manager.load_version(file_path,
             k=self.max_versions + 1, include_content=False)
 
@@ -153,17 +137,7 @@ Consider work complete if:
         return False
 
     def execute(self, agent, **kwargs) -> bool:
-        """
-        Execute advanced reset with analysis and appropriate flagging
-
-        Args:
-            agent: Agent instance
-            **kwargs: Additional arguments
-
-        Returns:
-            True if reset completed successfully
-        """
-        self.logger.info("Starting AdvancedResetAction execution")
+        """Execute advanced reset with analysis and appropriate flagging"""
 
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']

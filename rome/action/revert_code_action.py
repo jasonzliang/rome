@@ -163,7 +163,6 @@ Only recommend reversion if there is clear evidence that a previous version was 
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute the revert analysis and potential reversion"""
-        self.logger.info("Starting RevertCodeAction execution")
 
         # Step 1: Validate inputs
         selected_file = agent.context['selected_file']

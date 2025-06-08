@@ -58,7 +58,6 @@ class EditCodeAction(Action):
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute code editing action to improve the current selected file"""
-        self.logger.info("Starting EditCodeAction execution")
 
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']

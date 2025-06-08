@@ -27,7 +27,6 @@ class EditTestAction(Action):
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute test editing action to create or improve tests for the current selected file"""
-        self.logger.info("Starting EditTestAction execution")
 
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']

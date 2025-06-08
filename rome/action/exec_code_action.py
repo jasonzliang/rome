@@ -69,7 +69,6 @@ Please provide an analysis covering:
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute tests for the current selected file"""
-        self.logger.info("Starting ExecuteCodeAction execution")
 
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']

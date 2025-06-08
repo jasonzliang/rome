@@ -191,7 +191,6 @@ Respond with a JSON object:
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute the tournament search action"""
-        self.logger.info("Starting TournamentSearchAction execution")
 
         # Use the agent's repository manager to collect and filter files
         filtered_files = agent.repository_manager.collect_and_filter_files(agent=agent)
