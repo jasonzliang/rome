@@ -103,8 +103,8 @@ class SimpleFSMBuilder(FSMBuilder):
         # Create actions with their respective configurations
         search_action = PrioritySearchAction(config.get('PrioritySearchAction', {}))
         reset_action = AdvancedResetAction(config.get('AdvancedResetAction', {}))
-        edit_code_action = EditCodeAction2(config.get('EditCodeAction2', {}))
-        edit_test_action = EditTestAction2(config.get('EditTestAction2', {}))
+        edit_code_action = EditCodeAction(config.get('EditCodeAction', {}))
+        edit_test_action = EditTestAction(config.get('EditTestAction', {}))
         execute_code_action = ExecuteCodeAction(config.get('ExecuteCodeAction', {}),
             config.get('Executor', {}))
 

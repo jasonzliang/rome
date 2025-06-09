@@ -117,5 +117,4 @@ class EditCodeAction2(EditCodeAction):
     2. Ensure syntactic correctness and proper Python execution
     3. Preserve original functionality while enhancing implementation
     4. Address specific execution failures if analysis provided
-    5. Document all changes with clear technical reasoning
-    6. Do not change any existing function docstrings or definitions"""
+    5. Document all changes with clear technical reasoning"""
