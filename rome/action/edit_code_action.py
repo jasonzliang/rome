@@ -13,19 +13,14 @@ def create_analysis_prompt(agent, file_path: str) -> Optional[str]:
 
     # Load the latest execution results
     execution_data = agent.version_manager.get_data(file_path, 'exec_result')
-    if not execution_data:
-        return None
 
     context_parts = []
 
-    # Add execution output
-    context_parts.append(f"# Test Execution Output:\n```\n{execution_data['exec_output']}\n```")
-
-    # Add exit code info
-    context_parts.append(f"# Exit Code: {execution_data['exec_exit_code']}")
-
-    # Add analysis if available
-    context_parts.append(f"# Automated Code Analysis:\n{execution_data['exec_analysis']}")
+    # Add execution output if available
+    if execution_data:
+        context_parts.append(f"# Test Execution Output:\n```\n{execution_data['exec_output']}\n```")
+        context_parts.append(f"# Exit Code: {execution_data['exec_exit_code']}")
+        context_parts.append(f"# Automated Code Analysis:\n{execution_data['exec_analysis']}")
 
     if not context_parts:
         return None
@@ -119,48 +114,64 @@ class EditCodeAction(Action):
 
         # Base prompt without relying on a configured improvement_prompt
         prompt = """Analyze the code file and suggest improvements. Focus on:
-1. Implementing missing code and filling in empty functions
-2. Code quality and readability
-3. Bug fixes and edge cases
-4. Performance optimizations
-5. Documentation improvements
-"""
-        # Add file info and original code
+    1. Implementing missing code and filling in empty functions
+    2. Code quality and readability
+    3. Bug fixes and edge cases
+    4. Performance optimizations
+    5. Documentation improvements
+    """
+
+        # Load original version content
+        original_version = agent.version_manager.load_original_version(file_path, include_content=True)
+
+        # Add original version in its own section if available
+        if original_version and original_version.get('content'):
+            prompt += f"""
+    # Original file content:
+    ```python
+    {original_version['content']}
+    ```
+    """
+
+        # Add current file info and code
         prompt += f"""
-# Code file path: {file_path}
-# Code file content:
-```python
-{content}
-```
-"""
+    # Current code file path: {file_path}
+    # Current code file content:
+    ```python
+    {content}
+    ```
+    """
         # Get analysis context using the static function
         analysis_prompt = create_analysis_prompt(agent, file_path)
         if analysis_prompt:
             prompt += f"\n{analysis_prompt}\n"
 
         prompt += """
-Respond with a JSON object containing:
-{{
-    "improved_code": "The new and improved code with changes or edits made to it",
-    "explanation": "A clear explanation of the changes you made and why",
-    "changes": [
-        {{
-            "type": "improvement type (bug fix, performance, readability, etc.)",
-            "description": "Description of the specific change"
-        }},
-        ...
-    ]
-}}
+    Respond with a JSON object containing:
+    {{
+        "improved_code": "The new and improved code with changes or edits made to it",
+        "explanation": "A clear explanation of the changes you made and why",
+        "changes": [
+            {{
+                "type": "improvement type (bug fix, performance, readability, etc.)",
+                "description": "Description of the specific change"
+            }},
+            ...
+        ]
+    }}
 
-IMPORTANT:
-- Return the ENTIRE file content with your improvements, not just the changed parts
-- Make sure the improved code is valid Python syntax and contains no markdown formatting like ```python...```
-- Be conservative with changes - prioritize correctness over style
-- List improvements you made in "changes" and summarize the changes in "explanation"
-- If improved code is unchanged, be sure give an empty list for "changes" and mention it in "explanation"
-"""
+    IMPORTANT:
+    - Return the ENTIRE file content with your improvements, not just the changed parts
+    - Make sure the improved code is valid Python syntax and contains no markdown formatting like ```python...```
+    - Be conservative with changes - prioritize correctness over style
+    - List improvements you made in "changes" and summarize the changes in "explanation"
+    - If improved code is unchanged, be sure give an empty list for "changes" and mention it in "explanation"
+    """
 
         if analysis_prompt:
             prompt += "- Pay special attention to addressing any issues identified in the code analysis"
+
+        if original_version and original_version.get('content'):
+            prompt += "\n- Compare current code with the original version to understand the evolution and make informed improvements"
 
         return prompt

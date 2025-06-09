@@ -90,6 +90,10 @@ def create_config():
         "RepositoryManager": {
             "file_types": [".py"]
         },
+        "AdvancedResetAction": {
+            "completion_confidence": 80,
+            "max_versions": 2,
+        },
     }
 
 

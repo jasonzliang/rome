@@ -553,8 +553,13 @@ class Agent:
 
         self.logger.info("="*80)
 
-    def _save_summary(self, summary, recent_hist_len=None):
-        """Save last N summaries to JSON file in log directory."""
+    def _save_summary(self, summary, save_hist_interval: int = 50):
+        """Save full summary history and most recent summary to separate JSON files.
+
+        Args:
+            summary: Current summary data to save
+            save_hist_interval: Only save full history every N iterations (default: 1, always save)
+        """
         self.summary_history.append({
             'iteration': self.curr_iteration,
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -562,26 +567,38 @@ class Agent:
             'summary': summary
         })
 
-        if not recent_hist_len:
-            recent_hist_len = self.history_context_len
-
         log_dir = self.get_log_dir()
-        summary_file = os.path.join(log_dir, f"{self.get_id()}.summary.json")
 
-        # Keep only last N summaries
-        recent_summaries = self.summary_history[-recent_hist_len:]
-
-        # Prepare summary data structure
-        summary_data = {
+        # Always save the most recent summary
+        recent_summary_file = os.path.join(log_dir, f"{self.get_id()}.summary.json")
+        recent_summary_data = {
             "agent_id": self.get_id(),
-            "summary_count": len(recent_summaries),
-            "summary_history": recent_summaries
+            "latest_summary": self.summary_history[-1]
         }
 
-        # Write all recent summaries to JSON file (overwrite mode)
+        # Only save full history every save_hist_interval iterations
+        save_full_history = (self.curr_iteration % save_hist_interval == 0)
+
         try:
-            with open(summary_file, 'w', encoding='utf-8') as f:
-                json.dump(summary_data, f, indent=4, default=str)
-            self.logger.debug(f"Summary history ({len(recent_summaries)} entries) saved to: {summary_file}")
+            # Always save most recent summary
+            with open(recent_summary_file, 'w', encoding='utf-8') as f:
+                json.dump(recent_summary_data, f, indent=4, default=str)
+            self.logger.debug(f"Latest summary saved to: {recent_summary_file}")
+
+            # Conditionally save full history
+            if save_full_history:
+                full_history_file = os.path.join(log_dir, f"{self.get_id()}.summary_history.json")
+                full_summary_data = {
+                    "agent_id": self.get_id(),
+                    "summary_count": len(self.summary_history),
+                    "summary_history": self.summary_history
+                }
+
+                with open(full_history_file, 'w', encoding='utf-8') as f:
+                    json.dump(full_summary_data, f, indent=4, default=str)
+                self.logger.debug(f"Full summary history ({len(self.summary_history)} entries) saved to: {full_history_file}")
+            else:
+                self.logger.debug(f"Skipping full history save (iteration {self.curr_iteration}, interval {save_hist_interval})")
+
         except Exception as e:
-            self.logger.error(f"Failed to save summary: {e}")
+            self.logger.error(f"Failed to save summary files: {e}")
