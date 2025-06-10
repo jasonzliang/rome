@@ -54,7 +54,7 @@ DEFAULT_CONFIG = {
 
         "agent_api": True,  # Launch an REST API server for agent's internal state
         "log_pid": False,  # Whether to include PID in agent log file names
-        "save_hist_interval": 50, # Interval to save summary history
+        "save_hist_interval": 10, # Interval to save summary history
     },
 
     "AgentApi": {

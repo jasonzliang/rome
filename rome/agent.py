@@ -92,6 +92,10 @@ class Agent:
         agent_config = self.config.get('Agent', {})
         set_attributes_from_config(self, agent_config,
             ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience', 'action_select_strat', 'log_pid', 'save_hist_interval'])
+        self.logger.assert_true(self.history_context_len > 0,
+            f"history_context_len must be greater than 0")
+        self.logger.assert_true(self.save_hist_interval > 0,
+            f"save_hist_interval must be greater than 0")
 
     def _validate_name_role(self, name: str, role: str) -> None:
         """Validates and formats the agent's role string"""
