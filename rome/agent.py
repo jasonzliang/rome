@@ -157,7 +157,7 @@ class Agent:
 
             iteration = summary_data.get('iteration')
             if iteration is None:
-                self.logger.warning("Summary file exists but no iteration found, defaulting to 1")
+                self.logger.error("Summary file exists but no iteration found, defaulting to 1")
                 return 1
 
             next_iteration = iteration
