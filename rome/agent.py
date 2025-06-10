@@ -594,24 +594,26 @@ class Agent:
 
     def _save_summary(self, summary):
         """Save full summary history and most recent summary to separate JSON files."""
-        self.summary_history.append({
+        log_dir = self.get_log_dir()
+
+        # Check if we should save full history this iteration
+        save_full_history = (self.curr_iteration == 1 or
+            self.curr_iteration % self.save_hist_interval == 0)
+
+        # Create recent summary data
+        recent_summary_data = {
             'iteration': self.curr_iteration,
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'epoch_time': time.time(),
             'summary': summary
-        })
+        }
 
-        log_dir = self.get_log_dir()
-
-        # Use the last dict from summary_history directly as recent_summary_data
-        recent_summary_data = self.summary_history[-1]
-
-        # Only save full history every save_hist_interval iterations
-        save_full_history = (self.curr_iteration == 1 or \
-            self.curr_iteration % self.save_hist_interval == 0)
+        # Only append to summary_history when we're saving full history
+        if save_full_history:
+            self.summary_history.append(recent_summary_data)
 
         try:
-            # Always save most recent summary (just the last dict)
+            # Always save most recent summary
             recent_summary_file = os.path.join(log_dir, f"{self.get_id()}.summary.json")
             with open(recent_summary_file, 'w', encoding='utf-8') as f:
                 json.dump(recent_summary_data, f, indent=4, default=str)
