@@ -143,45 +143,51 @@ class Agent:
         self.logger.info(f"Initialized {self.fsm_type} FSM using FSMSelector: {self.fsm.get_current_state()}")
         self.logger.info(f"FSM Description: {fsm_selector.get_description()}")
 
-    def _load_iteration_from_summary(self) -> int:
-        """Always returns a valid iteration number"""
+    def _load_summary_history(self) -> int:
+        """Load iteration number and summary history from saved files"""
         try:
             summary_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.summary.json")
+            history_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.summary_history.json")
 
-            if not os.path.exists(summary_file):
+            # Load current iteration from summary file
+            iteration = 1
+            if os.path.exists(summary_file):
+                with open(summary_file, 'r') as f:
+                    summary_data = json.load(f)
+                iteration = summary_data.get('iteration', 1)
+                self.logger.info(f"Loaded current iteration: {iteration}")
+            else:
                 self.logger.info("No summary file found, starting fresh at iteration 1")
-                return 1
 
-            with open(summary_file, 'r') as f:
-                summary_data = json.load(f)
+            # Load summary history if available
+            if os.path.exists(history_file):
+                with open(history_file, 'r') as f:
+                    history_data = json.load(f)
+                self.summary_history = history_data.get('summary_history', [])
+                self.logger.info(f"Loaded {len(self.summary_history)} summary history entries")
+            else:
+                self.summary_history = []
+                self.logger.info("No summary history file found, starting with empty history")
 
-            iteration = summary_data.get('iteration')
-            if iteration is None:
-                self.logger.error("Summary file exists but no iteration found, defaulting to 1")
-                return 1
-
-            next_iteration = iteration
-            self.logger.info(f"Found saved iteration {iteration}, resuming at {next_iteration}")
-            return next_iteration
+            return iteration
 
         except Exception as e:
-            self.logger.error(f"Error loading iteration from summary: {e}, defaulting to 1")
+            self.logger.error(f"Error loading summary data: {e}, defaulting to iteration 1")
+            self.summary_history = []
             return 1
 
     def _setup_context_history(self) -> None:
-        """Simplified setup - always gets valid iteration"""
+        """Simplified setup - loads iteration and summary history"""
         self.context = {}
         self.history = AgentHistory()
-        self.summary_history = []
 
-        # Always gets a valid iteration number
-        self.curr_iteration = self._load_iteration_from_summary()
+        # Load iteration and summary history together
+        self.curr_iteration = self._load_summary_history()
         self.history.set_iteration(self.curr_iteration)
 
         # Add initial FSM state to history if FSM is initialized
         if self.fsm and self.fsm.current_state:
             self.history.add_initial_state(self.fsm.current_state)
-
 
     def _setup_repository_manager(self) -> None:
         """Initialize repository manager with configuration"""
