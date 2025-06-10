@@ -171,8 +171,8 @@ class EvalplusEvaluator:
             completion_fractions = []
             for score_entry in self.scores:
                 target_time = score_entry[0]
-                total = 0
-                total_completion = 0
+                total_iter = 0.0
+                total_completion = 0.0
                 agent_count = 0
 
                 for entries in agent_data.values():
@@ -181,7 +181,7 @@ class EvalplusEvaluator:
                     total_completion += latest_entry[1]
                     agent_count += 1
 
-                total_iters.append(total)
+                total_iters.append(total_iter/max(agent_count, 1))
                 completion_fractions.append(total_completion / max(agent_count * 100, 1))
 
             # Create compact plot with dual y-axis
@@ -199,9 +199,9 @@ class EvalplusEvaluator:
                     linewidth=2, markersize=4, alpha=0.7)
 
             # Format axes
-            ax1.set_xlabel('Total Agent Iterations')
+            ax1.set_xlabel('Average Agent Iterations')
             ax1.set_ylabel('Pass@1 Score', color='black')
-            ax2.set_ylabel('Completion Fraction', color='green')
+            ax2.set_ylabel('Average Completion', color='green')
             ax1.set_title(f'{self.dataset.upper()} Scores vs Iterations ({len(agent_data)} agents)')
 
             ax1.set_ylim(0, 1)
