@@ -101,7 +101,7 @@ class SimpleFSMBuilder(FSMBuilder):
             CodeExecutedFailState(config.get('CodeExecutedFailState', {})))
 
         # Create actions with their respective configurations
-        search_action = PrioritySearchAction(config.get('PrioritySearchAction', {}))
+        search_action = TournamentSearchAction(config.get('TournamentSearchAction', {}))
         reset_action = AdvancedResetAction(config.get('AdvancedResetAction', {}))
         edit_code_action = EditCodeAction(config.get('EditCodeAction', {}))
         edit_test_action = EditTestAction(config.get('EditTestAction', {}))
