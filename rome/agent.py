@@ -407,8 +407,9 @@ class Agent:
         self.logger.info(f"Starting agent loop for {max_iterations} iterations")
         start_iteration = self.curr_iteration
         end_iteration = max_iterations
+        summary = process_summary()
 
-        for iteration in range(start_iteration, end_iteration+1):
+        for iteration in range(start_iteration, end_iteration + 1):
             try:
                 # Increment iteration counter in history, show iteration
                 self.curr_iteration = iteration
@@ -417,9 +418,6 @@ class Agent:
                 self.logger.info(f"Current state: {self.fsm.current_state}")
                 # Validate active file state for consistency
                 self.version_manager.validate_active_files(self)
-
-                # Print summary and write to file
-                summary = process_summary()
 
                 # Check agent context on first iteration to make sure state is valid
                 if iteration == start_iteration:
@@ -457,6 +455,9 @@ class Agent:
                     curr_state=self.fsm.current_state
                 )
 
+                # Print summary and write to file
+                summary = process_summary()
+
                 # Handle callbacks at end of iteration
                 if self.callback:
                     try:
@@ -487,10 +488,10 @@ class Agent:
             self.logger.info(f"Loop completed with {len(self.history.errors)} errors")
 
         # Set current iteration for next run_loop call
-        self.curr_iteration = end_iteration
+        self.curr_iteration = end_iteration + 1
 
         # Return agent summary
-        return process_summary()
+        return summary
 
     def get_summary(self, recent_hist_len=None) -> Dict:
         """Get a comprehensive summary of the agent's current state as a dictionary."""
