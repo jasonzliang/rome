@@ -112,9 +112,9 @@ class EvalplusEvaluator:
 
     def _create_scores_plot(self):
         """Create and save scores plot"""
-        if len(self._scores_history) < 2:
-            self.logger.info("Insufficient data for plotting (need at least 2 points)")
-            return
+        # if len(self._scores_history) < 2:
+        #     self.logger.info("Insufficient data for plotting (need at least 2 points)")
+        #     return
 
         try:
             # Extract data for plotting
