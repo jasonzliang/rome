@@ -11,7 +11,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from rome.config import LOG_DIR_NAME, merge_with_default_config
+from rome.config import merge_with_default_config
 from rome.logger import get_logger
 from rome.multi_agent import MultiAgent
 from benchmark.evalplus_evaluator import EvalplusEvaluator, PeriodicEvaluator
@@ -71,13 +71,9 @@ class MultiAgentEvalPlusBenchmark:
         self._validate_file(config_path, "Agents config from config file")
         return config_path
 
-    def _get_eval_dir(self) -> Path:
-        """Get evaluation directory"""
-        return self.benchmark_dir / LOG_DIR_NAME / "evaluation"
-
     def _setup_evaluator(self) -> EvalplusEvaluator:
         """Create evaluator with proper directory structure"""
-        self.evaluator = EvalplusEvaluator(self.benchmark_dir, self._get_eval_dir(), self.dataset)
+        self.evaluator = EvalplusEvaluator(self.benchmark_dir, self.dataset)
         self.periodic_evaluator = PeriodicEvaluator(self.evaluator, self.eval_interval) if self.eval_interval else None
 
     def _validate_file(self, path: Path | str, description: str):
@@ -141,7 +137,7 @@ class MultiAgentEvalPlusBenchmark:
         self.logger.info(f"Benchmark results:\n{pprint.pformat(results)}")
 
         # Try primary location, fallback to backup
-        path = self.benchmark_dir / LOG_DIR_NAME / "multi_agent_results.json"
+        path = self.evaluator.log_dir / "multi_agent_results.json"
         try:
             path.parent.mkdir(parents=True, exist_ok=True)
             with open(path, 'w') as f:

@@ -1,4 +1,4 @@
-# evalplus_evaluator_enhanced.py - Bug fixes for score tracking and plotting
+# Enhanced evalplus_evaluator.py with update_plot2 function
 import asyncio
 import json
 import re
@@ -13,6 +13,7 @@ import tempfile
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Callable
 from datetime import datetime
+import glob
 
 # Configure matplotlib backend before any imports
 import matplotlib
@@ -22,6 +23,7 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rome.logger import get_logger
+from rome.config import LOG_DIR_NAME
 
 try:
     from evalplus.data import get_human_eval_plus, get_mbpp_plus, write_jsonl
@@ -36,7 +38,6 @@ class EvalplusEvaluator:
 
     def __init__(self,
         benchmark_dir: Union[str, Path],
-        eval_dir: Union[str, Path],
         dataset: str = "humaneval"):
 
         if dataset not in self.DATASETS:
@@ -44,8 +45,10 @@ class EvalplusEvaluator:
 
         self.dataset = dataset
         self.benchmark_dir = Path(benchmark_dir)
-        self.eval_dir = Path(eval_dir)
+        self.log_dir = self.benchmark_dir / LOG_DIR_NAME
+        self.eval_dir = self.log_dir / "evaluation"
         self.benchmark_dir.mkdir(parents=True, exist_ok=True)
+        self.log_dir.mkdir(parents=True, exist_ok=True)
         self.eval_dir.mkdir(parents=True, exist_ok=True)
 
         self.logger = get_logger()
@@ -55,8 +58,9 @@ class EvalplusEvaluator:
         # Score tracking - using list for simpler handling
         self.start_time = None
         self.scores = []  # List of [timestamp, elapsed_min, base_score, extra_score]
-        self.scores_file = self.eval_dir / "scores_history.json"
-        self.plot_file = self.eval_dir / "scores_plot.png"
+        self.scores_file = self.eval_dir / "score_history.json"
+        self.plot_file = self.eval_dir / "score_time_plot.png"
+        self.plot2_file = self.eval_dir / "score_iteration_plot.png"
         self._load_scores()
 
     def _load_scores(self):
@@ -97,8 +101,9 @@ class EvalplusEvaluator:
                 'dataset': self.dataset
             }))
 
-        # Create plot
+        # Create plots
         self._update_plot()
+        self._update_plot2()
         self.logger.info(f"Scores at t={elapsed_min:.1f}m: base={base:.3f}, extra={extra:.3f}")
 
     def _update_plot(self):
@@ -136,7 +141,85 @@ class EvalplusEvaluator:
             plt.close(fig)
 
         except Exception as e:
-            self.logger.error(f"Plot failed: {e}")
+            self.logger.error(f"Scores vs time elapsed plot failed: {e}")
+
+    def _update_plot2(self):
+        """Compact plot: total iterations vs scores with completion percentage"""
+        if not self.scores:
+            return
+
+        try:
+            # Load agent data from __rome__ directory only
+            agent_data = {}
+            completion_data = {}
+            for file_path in self.log_dir.glob("agent_*.summary_history.json"):
+                try:
+                    data = json.loads(file_path.read_text())
+                    entries = [(e['iteration'], e['epoch_time'],
+                               e.get('summary', {}).get('repository_progress', {}).get('completion_percentage', 0))
+                              for e in data.get('summary_history', [])
+                              if 'iteration' in e and 'epoch_time' in e]
+                    if entries:
+                        agent_data[file_path.stem] = entries
+                except:
+                    continue
+
+            if not agent_data:
+                return
+
+            # Calculate total iterations and completion for each score
+            total_iters = []
+            completion_fractions = []
+            for score_entry in self.scores:
+                target_time = score_entry[0]
+                total = 0
+                total_completion = 0
+                agent_count = 0
+
+                for entries in agent_data.values():
+                    latest_entry = max(((iter_num, completion) for iter_num, epoch_time, completion in entries if epoch_time <= target_time), default=(0, 0))
+                    total += latest_entry[0]
+                    total_completion += latest_entry[1]
+                    agent_count += 1
+
+                total_iters.append(total)
+                completion_fractions.append(total_completion / max(agent_count * 100, 1))
+
+            # Create compact plot with dual y-axis
+            fig, ax1 = plt.subplots(figsize=(12, 6))
+            ax2 = ax1.twinx()
+
+            # Plot scores on left axis
+            base_scores = [s[2] for s in self.scores]
+            extra_scores = [s[3] for s in self.scores]
+            ax1.plot(total_iters, base_scores, 'b-o', label='Base', linewidth=2, markersize=4)
+            ax1.plot(total_iters, extra_scores, 'r-s', label='Base+Extra', linewidth=2, markersize=4)
+
+            # Plot completion fraction on right axis
+            ax2.plot(total_iters, completion_fractions, 'g--^', label='Completion',
+                    linewidth=2, markersize=4, alpha=0.7)
+
+            # Format axes
+            ax1.set_xlabel('Total Agent Iterations')
+            ax1.set_ylabel('Pass@1 Score', color='black')
+            ax2.set_ylabel('Completion Fraction', color='green')
+            ax1.set_title(f'{self.dataset.upper()} Scores vs Iterations ({len(agent_data)} agents)')
+
+            ax1.set_ylim(0, 1)
+            ax2.set_ylim(0, 1)
+            ax1.grid(True, alpha=0.3)
+
+            # Combine legends
+            lines1, labels1 = ax1.get_legend_handles_labels()
+            lines2, labels2 = ax2.get_legend_handles_labels()
+            ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+
+            plt.tight_layout()
+            plt.savefig(self.plot2_file, dpi=200, bbox_inches='tight')
+            plt.close(fig)
+
+        except Exception as e:
+            self.logger.error(f"Scores vs iterations plot failed: {e}")
 
     def setup_problems(self,
         num_samples: int = None,
@@ -349,7 +432,8 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
             "elapsed_minutes": latest_entry[1],
             "latest": {"base": latest_entry[2], "extra": latest_entry[3]},
             "improvement": {"base": latest_entry[2] - first_entry[2], "extra": latest_entry[3] - first_entry[3]},
-            "plot_exists": self.plot_file.exists()
+            "plot_exists": self.plot_file.exists(),
+            "plot2_exists": self.plot2_file.exists()
         }
 
 

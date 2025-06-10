@@ -12,7 +12,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rome.agent import Agent
 from rome.logger import get_logger
-from rome.config import LOG_DIR_NAME, load_config, merge_with_default_config
+from rome.config import load_config, merge_with_default_config
 from benchmark.evalplus_evaluator import EvalplusEvaluator, PeriodicEvaluator
 
 class EvalPlusBenchmark:
@@ -36,7 +36,6 @@ class EvalPlusBenchmark:
         # FIXED: Removed logger parameter
         self.evaluator = EvalplusEvaluator(
             benchmark_dir=self.benchmark_dir,
-            eval_dir=self._get_eval_dir(),
             dataset=self.dataset,
         )
         self.periodic_evaluator = None
@@ -61,10 +60,6 @@ class EvalPlusBenchmark:
             interval=eval_interval
         )
 
-    def _get_eval_dir(self) -> Path:
-        """Get evaluation directory"""
-        return self.benchmark_dir / LOG_DIR_NAME / "evaluation"
-
     def _run_agent(self, max_iterations: int, stop_on_error: bool) -> Dict:
         """Run agent with periodic evaluation using callback system"""
         agent_config = self.config.get('Agent', {})
@@ -85,8 +80,6 @@ class EvalPlusBenchmark:
 
     def _save_results(self, agent_results: Dict, evaluation_results: Dict) -> Optional[Path]:
         """Save benchmark results"""
-        eval_dir = self._get_eval_dir()
-
         results = {
             "agent_name": self.agent.name if self.agent else "unknown",
             "dataset": self.dataset,
@@ -102,7 +95,7 @@ class EvalPlusBenchmark:
             }
         }
 
-        results_file = eval_dir / "benchmark.results.json"
+        results_file = self.evaluator.log_dir / "benchmark.results.json"
         try:
             results_file.write_text(json.dumps(results, indent=4, default=str))
             return results_file
