@@ -18,16 +18,24 @@ def create_analysis_prompt(agent, file_path: str) -> Optional[str]:
 
     # Add execution output if available
     if execution_data:
-        context_parts.append(f"# Test Execution Output:\n```\n{execution_data['exec_output']}\n```")
-        context_parts.append(f"# Exit Code: {execution_data['exec_exit_code']}")
-        context_parts.append(f"# Automated Code Analysis:\n{execution_data['exec_analysis']}")
+        # Get the agent ID from execution data, fallback to current agent ID
+        exec_agent_id = execution_data['agent_id']
+        current_agent_id = agent.get_id()
+
+        context_parts.append(f"# Execution output:\n```\n{execution_data['exec_output']}\n```")
+        context_parts.append(f"# Exit code: {execution_data['exec_exit_code']}")
+        context_parts.append(f"# Execution analysis:\n{execution_data['exec_analysis']}")
+
+        # Add note if analysis was done by a different agent
+        if exec_agent_id != current_agent_id:
+            context_parts.append(f"# Note: The above analysis was performed by a different agent ({exec_agent_id}). Please double-check and verify the analysis results.")
 
     if not context_parts:
         return None
 
     # Create a clearly separated analysis section
     analysis_context = "\n---\n"
-    analysis_context += "Previous execution results and analysis:\n"
+    analysis_context += "Previous code/test execution results and analysis:\n"
     analysis_context += "---\n\n"
     analysis_context += "\n\n".join(context_parts)
     analysis_context += "\n---\n"
