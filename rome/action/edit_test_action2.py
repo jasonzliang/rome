@@ -20,7 +20,7 @@ class EditTestAction2(EditTestAction):
         test_exists = 'test_path' in selected_file and \
             os.path.exists(selected_file.get('test_path', ''))
         action_type = "update existing tests" if test_exists else "create comprehensive unit tests"
-        return f"{action_type} for {filename}, covering edge cases, error conditions, and test failures using a more complex LLM prompt"
+        return f"{action_type} for {filename}, covering edge cases, error conditions, and test failures using a more complex, detailed LLM prompt template"
 
     def _create_test_prompt(self, agent, file_path: str, file_content: str, test_path: str,
                            test_content: str, test_exists: bool) -> str:

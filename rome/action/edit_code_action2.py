@@ -16,7 +16,7 @@ class EditCodeAction2(EditCodeAction):
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']
         filename = os.path.basename(file_path)
-        return f"analyze and improve code in {filename}, addressing execution issues, bugs, performance, and readability using a more complex LLM prompt"
+        return f"analyze and improve code in {filename}, addressing execution issues, bugs, performance, and readability using a more complex, detailed LLM prompt template"
 
     def _create_code_prompt(self, agent, file_path: str, content: str) -> str:
         """Create a structured prompt for the LLM to improve code using evidence-based strategies"""
