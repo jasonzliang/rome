@@ -275,63 +275,63 @@ class VersionManager:
             execution_output, exit_code, execution_analysis
         )
 
-def _load_version_internal(self, file_path: str, versions_dir: str, include_content: bool,
-                          reverse: bool = True, start_idx: int = None, end_idx: int = None,
-                          return_single: bool = False):
-    """
-    Internal method to load versions from any versions directory with slice-based selection.
+    def _load_version_internal(self, file_path: str, versions_dir: str, include_content: bool,
+                              reverse: bool = True, start_idx: int = None, end_idx: int = None,
+                              return_single: bool = False):
+        """
+        Internal method to load versions from any versions directory with slice-based selection.
 
-    Args:
-        file_path: Path to the file
-        versions_dir: Directory containing version metadata
-        include_content: Whether to load file content
-        reverse: Whether to sort versions in descending order (newest first)
-        start_idx: Start index for slice (after sorting)
-        end_idx: End index for slice (after sorting)
-        return_single: If True and result has one item, return Dict instead of List
+        Args:
+            file_path: Path to the file
+            versions_dir: Directory containing version metadata
+            include_content: Whether to load file content
+            reverse: Whether to sort versions in descending order (newest first)
+            start_idx: Start index for slice (after sorting)
+            end_idx: End index for slice (after sorting)
+            return_single: If True and result has one item, return Dict instead of List
 
-    Returns:
-        Single Dict if return_single=True and one result, List otherwise, or None/[] on error
-    """
-    index_file_path = self._get_file_path(versions_dir, FileType.INDEX)
+        Returns:
+            Single Dict if return_single=True and one result, List otherwise, or None/[] on error
+        """
+        index_file_path = self._get_file_path(versions_dir, FileType.INDEX)
 
-    if not os.path.exists(index_file_path):
-        return None if return_single else []
+        if not os.path.exists(index_file_path):
+            return None if return_single else []
 
-    try:
-        with locked_json_operation(index_file_path, {'versions': []}, logger=self.logger) as index:
-            versions = index.get('versions', [])
-            if not versions:
-                return None if return_single else []
+        try:
+            with locked_json_operation(index_file_path, {'versions': []}, logger=self.logger) as index:
+                versions = index.get('versions', [])
+                if not versions:
+                    return None if return_single else []
 
-            # Sort versions by version number
-            versions = sorted(versions, key=lambda x: x.get('version', 0), reverse=reverse)
+                # Sort versions by version number
+                versions = sorted(versions, key=lambda x: x.get('version', 0), reverse=reverse)
 
-            # Apply slicing
-            versions = versions[start_idx:end_idx]
+                # Apply slicing
+                versions = versions[start_idx:end_idx]
 
-            if include_content:
-                for version_data in versions:
-                    if version_num := version_data.get('version'):
-                        version_file_path = self._create_version_file_path(file_path, version_num, versions_dir)
-                        try:
-                            with open(version_file_path, 'r', encoding='utf-8') as f:
-                                version_data['content'] = f.read()
-                        except (FileNotFoundError, IOError) as e:
-                            self.logger.warning(f"Could not load content for version {version_num}: {e}")
-                            version_data['content'] = None
+                if include_content:
+                    for version_data in versions:
+                        if version_num := version_data.get('version'):
+                            version_file_path = self._create_version_file_path(file_path, version_num, versions_dir)
+                            try:
+                                with open(version_file_path, 'r', encoding='utf-8') as f:
+                                    version_data['content'] = f.read()
+                            except (FileNotFoundError, IOError) as e:
+                                self.logger.warning(f"Could not load content for version {version_num}: {e}")
+                                version_data['content'] = None
 
-            # Return single item if requested and exactly one result
-            if return_single and len(versions) == 1:
-                return versions[0]
-            elif return_single and len(versions) == 0:
-                return None
-            else:
-                return versions
+                # Return single item if requested and exactly one result
+                if return_single and len(versions) == 1:
+                    return versions[0]
+                elif return_single and len(versions) == 0:
+                    return None
+                else:
+                    return versions
 
-    except (json.JSONDecodeError, FileNotFoundError) as e:
-        self.logger.error(f"Error loading versions from {index_file_path}: {e}")
-        return None if return_single else []
+        except (json.JSONDecodeError, FileNotFoundError) as e:
+            self.logger.error(f"Error loading versions from {index_file_path}: {e}")
+            return None if return_single else []
 
     def load_version(self, file_path: str, k: int = 1, include_content: bool = False):
         """Load the last K versions for a file. Returns Dict if k=1, List if k>1."""

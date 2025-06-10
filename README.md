@@ -432,11 +432,11 @@ See LICENSE file for details.
 
 ## TODO
 
+- Checkpointing for agents (save number of iterations) X
+- Limit maximum times problem is worked on before marking finished X
 - Visualization of iterations vs evalplus performance
 - Output evalplus results as json or jsonl
 - Venn diagram of finished problems vs problems that passed evalplus
-- Checkpointing for agents (save number of iterations)
-- Limited on maximum times problem is worked on before marking finished
 - New search actions, such as round robin or prioritizing lowest completion
 - Support for shared library or knowledge database
 - Agent communication via requests

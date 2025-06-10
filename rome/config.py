@@ -52,7 +52,8 @@ DEFAULT_CONFIG = {
         "agent_api": True,  # Launch an REST API server for agent's internal state
         "history_context_len": 25,  # Length of history to use when selecting action
         "patience": 5,  # If same state/action chosen repeatedly, prompt to choose different action
-        'log_pid': False  # Whether to include PID in agent log file names
+        'log_pid': False,  # Whether to include PID in agent log file names
+        'save_hist_interval': 50, # Interval to save summary history
     },
 
     "AgentApi": {

@@ -1,4 +1,4 @@
-# evalplus_evaluator.py - Compact, modular EvalPlus evaluator
+# evalplus_evaluator_enhanced.py - Enhanced with score tracking and plotting
 import asyncio
 import json
 import re
@@ -11,6 +11,8 @@ import threading
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Union, Callable
+import matplotlib.pyplot as plt
+from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -23,7 +25,7 @@ except ImportError:
 
 
 class EvalplusEvaluator:
-    """Compact evaluator for EvalPlus datasets with sync/async support"""
+    """Enhanced evaluator with score tracking and visualization"""
 
     DATASETS = {'humaneval': get_human_eval_plus, 'mbpp': get_mbpp_plus}
 
@@ -44,6 +46,125 @@ class EvalplusEvaluator:
         self.logger = get_logger()
         self.problems = {}
         self._process = None
+
+        # Score tracking
+        self._start_time = None
+        self._scores_history = []
+        self._scores_file = self.eval_dir / "scores_history.json"
+        self._plot_file = self.eval_dir / "scores_plot.png"
+
+        # Load existing history if available
+        self._load_scores_history()
+
+    def _load_scores_history(self):
+        """Load existing scores history from file"""
+        if self._scores_file.exists():
+            try:
+                with open(self._scores_file, 'r') as f:
+                    data = json.load(f)
+                    self._scores_history = data.get('scores_history', [])
+                    self._start_time = data.get('start_time')
+                self.logger.info(f"Loaded {len(self._scores_history)} historical score entries")
+            except Exception as e:
+                self.logger.error(f"Failed to load scores history: {e}")
+                self._scores_history = []
+
+    def _save_scores_history(self):
+        """Save scores history to file"""
+        try:
+            data = {
+                'start_time': self._start_time,
+                'scores_history': self._scores_history,
+                'dataset': self.dataset
+            }
+            with open(self._scores_file, 'w') as f:
+                json.dump(data, f, indent=2, default=str)
+        except Exception as e:
+            self.logger.error(f"Failed to save scores history: {e}")
+
+    def _record_scores(self, scores: Optional[Dict], timestamp: float = None):
+        """Record scores with timestamp"""
+        if not scores:
+            return
+
+        if self._start_time is None:
+            self._start_time = timestamp or time.time()
+
+        current_time = timestamp or time.time()
+        elapsed_time = current_time - self._start_time
+
+        # Extract pass@1 scores
+        base_score = scores.get('base', {}).get('pass@1', 0.0)
+        extra_score = scores.get('base_plus_extra', {}).get('pass@1', 0.0)
+
+        entry = {
+            'timestamp': current_time,
+            'elapsed_time': elapsed_time,
+            'base_score': base_score,
+            'extra_score': extra_score,
+            'datetime': datetime.fromtimestamp(current_time).isoformat()
+        }
+
+        self._scores_history.append(entry)
+        self._save_scores_history()
+
+        self.logger.info(f"Recorded scores at t={elapsed_time:.1f}s: base={base_score:.3f}, extra={extra_score:.3f}")
+
+    def _create_scores_plot(self):
+        """Create and save scores plot"""
+        if len(self._scores_history) < 2:
+            self.logger.info("Insufficient data for plotting (need at least 2 points)")
+            return
+
+        try:
+            # Extract data for plotting
+            times = [entry['elapsed_time'] / 60 for entry in self._scores_history]  # Convert to minutes
+            base_scores = [entry['base_score'] for entry in self._scores_history]
+            extra_scores = [entry['extra_score'] for entry in self._scores_history]
+
+            # Create plot
+            plt.figure(figsize=(12, 8))
+
+            # Plot lines
+            plt.plot(times, base_scores, 'b-o', label='Base Tests', linewidth=2, markersize=6)
+            plt.plot(times, extra_scores, 'r-s', label='Base + Extra Tests', linewidth=2, markersize=6)
+
+            # Formatting
+            plt.xlabel('Time Elapsed (minutes)', fontsize=12)
+            plt.ylabel('Pass@1 Score', fontsize=12)
+            plt.title(f'{self.dataset.upper()} Evaluation Scores Over Time', fontsize=14, fontweight='bold')
+            plt.legend(fontsize=11)
+            plt.grid(True, alpha=0.3)
+
+            # Set y-axis to [0, 1] for pass rates
+            plt.ylim(0, 1)
+
+            # Add annotations for latest scores
+            if times:
+                latest_base = base_scores[-1]
+                latest_extra = extra_scores[-1]
+                latest_time = times[-1]
+
+                plt.annotate(f'{latest_base:.3f}',
+                           xy=(latest_time, latest_base),
+                           xytext=(10, 10), textcoords='offset points',
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor='blue', alpha=0.1),
+                           fontsize=10)
+                plt.annotate(f'{latest_extra:.3f}',
+                           xy=(latest_time, latest_extra),
+                           xytext=(10, -15), textcoords='offset points',
+                           bbox=dict(boxstyle='round,pad=0.3', facecolor='red', alpha=0.1),
+                           fontsize=10)
+
+            plt.tight_layout()
+            plt.savefig(self._plot_file, dpi=150, bbox_inches='tight')
+            plt.close()
+
+            self.logger.info(f"Updated scores plot: {self._plot_file}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to create plot: {e}")
+            self.logger.error(traceback.format_exc())
 
     def setup_problems(self,
         num_samples: int = None,
@@ -96,38 +217,6 @@ class EvalplusEvaluator:
             self.logger.error(traceback.format_exc())
             return {"error": str(e), "success": False}
 
-    # async def evaluate_async(self, timeout: int = 1800) -> Dict:
-    #     """Run async evaluation"""
-
-    #     try:
-    #         self.logger.info("Running evalplus.evaluate (async version)")
-    #         solutions = self._extract_solutions()
-    #         solutions_file = self._prepare_eval(solutions)
-    #         eval_script = self._create_script(solutions_file)
-
-    #         process = await asyncio.create_subprocess_shell(
-    #             f"bash {eval_script}",
-    #             stdout=asyncio.subprocess.PIPE,
-    #             stderr=asyncio.subprocess.PIPE,
-    #             cwd=self.eval_dir  # FIXED: added self.
-    #         )
-
-    #         stdout, stderr = await asyncio.wait_for(process.communicate(), timeout)
-    #         output = f"{stdout.decode()}\n{stderr.decode()}\nEXIT_CODE:{process.returncode}"
-    #         # self.logger.info(output)
-    #         return self._parse_result(output, process.returncode)
-
-    #     except asyncio.TimeoutError:
-    #         if 'process' in locals():
-    #             process.kill()
-    #         self.logger.error("Async evaluate timed out")
-    #         self.logger.error(traceback.format_exc())
-    #         return {"error": "timeout", "success": False}
-    #     except Exception as e:
-    #         self.logger.error(f"Async evaluate failed: {e}")
-    #         self.logger.error(traceback.format_exc())
-    #         return {"error": str(e), "success": False}
-
     def shutdown(self):
         """Terminate running evaluation"""
         if self._is_running():
@@ -177,7 +266,7 @@ class EvalplusEvaluator:
         solutions_file = solutions_file.resolve()
         script = (self.eval_dir / "eval.sh").resolve()
         sanitized = Path(str(solutions_file).replace('.jsonl', '-sanitized.jsonl')).resolve()
-        output_file = (self.eval_dir / f"eval.{int(time.time())}.out.txt").resolve()
+        output_file = (self.eval_dir / f"eval.out.txt").resolve()
 
         content = f"""#!/bin/bash
 CMD=$(command -v evalplus || echo "python -m evalplus")
@@ -192,23 +281,59 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
         return script
 
     def _run_blocking(self, script: Path, timeout: int) -> Dict:
-        """Run evaluation in blocking mode"""
+        """Run evaluation in blocking mode with score tracking"""
+        timestamp = time.time()
+
         result = subprocess.run(
             ["bash", str(script)], capture_output=True, text=True,
             timeout=timeout, cwd=script.parent
         )
         output = f"{result.stdout}\n{result.stderr}\nEXIT_CODE:{result.returncode}"
         self.logger.info(output)
-        return self._parse_result(output, result.returncode)
+
+        parsed_result = self._parse_result(output, result.returncode)
+
+        # Record and plot scores
+        if parsed_result.get("success") and "scores" in parsed_result:
+            self._record_scores(parsed_result["scores"], timestamp)
+            self._create_scores_plot()
+
+        return parsed_result
 
     def _run_non_blocking(self, script: Path) -> bool:
-        """Start non-blocking evaluation"""
+        """Start non-blocking evaluation with score tracking"""
         if self._is_running():
             return False
+
+        timestamp = time.time()
+
+        # Start process
         self._process = subprocess.Popen(
-            ["bash", str(script)], stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL, cwd=script.parent
+            ["bash", str(script)], stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, cwd=script.parent
         )
+
+        # Start monitoring thread for score tracking
+        def monitor_process():
+            try:
+                stdout, stderr = self._process.communicate()
+                output = f"{stdout.decode()}\n{stderr.decode()}\nEXIT_CODE:{self._process.returncode}"
+
+                parsed_result = self._parse_result(output, self._process.returncode)
+
+                # Record and plot scores
+                if parsed_result.get("success") and "scores" in parsed_result:
+                    self._record_scores(parsed_result["scores"], timestamp)
+                    self._create_scores_plot()
+
+                self.logger.info(f"Non-blocking evaluation completed: {parsed_result.get('success', False)}")
+
+            except Exception as e:
+                self.logger.error(f"Error in non-blocking evaluation monitoring: {e}")
+
+        monitor_thread = threading.Thread(target=monitor_process, daemon=True)
+        monitor_thread.start()
+
         return True
 
     def _parse_result(self, output: str, exit_code: int) -> Dict:
@@ -243,9 +368,31 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
         except Exception:
             return None
 
+    def get_scores_summary(self) -> Dict:
+        """Get summary of score tracking"""
+        if not self._scores_history:
+            return {"total_evaluations": 0}
+
+        latest = self._scores_history[-1]
+        first = self._scores_history[0]
+
+        return {
+            "total_evaluations": len(self._scores_history),
+            "elapsed_time_minutes": latest['elapsed_time'] / 60,
+            "latest_scores": {
+                "base": latest['base_score'],
+                "extra": latest['extra_score']
+            },
+            "improvement": {
+                "base": latest['base_score'] - first['base_score'],
+                "extra": latest['extra_score'] - first['extra_score']
+            },
+            "plot_file": str(self._plot_file) if self._plot_file.exists() else None
+        }
+
 
 class PeriodicEvaluator:
-    """Fixed PeriodicEvaluator with immediate first evaluation"""
+    """Enhanced PeriodicEvaluator with plotting support"""
 
     def __init__(self, evaluator, interval: int):
         self.evaluator = evaluator
@@ -287,7 +434,6 @@ class PeriodicEvaluator:
 
     def _worker(self):
         """Worker that runs first evaluation immediately, then at intervals"""
-        # self.logger.info("Worker started")
         evaluation_count = 0
 
         while not self._stop_event.is_set():
@@ -300,12 +446,10 @@ class PeriodicEvaluator:
                 self.logger.info(f"Running background evaluation #{evaluation_count}")
                 self._run_evaluation()
                 self._last_eval = current_time
-                # self.logger.info(f"Next evaluation in {self.interval}s ({self.interval/60:.1f} minutes)")
 
             # Wait for stop signal with short timeout to check timing frequently
-            if self._stop_event.wait(timeout=min(60, self.interval/10)):  # Check every minute or 1/10 interval
+            if self._stop_event.wait(timeout=min(60, self.interval/10)):
                 break
-        # self.logger.info(f"Worker stopped after {evaluation_count} evaluations")
 
     def _run_evaluation(self):
         """Run single evaluation with error handling"""

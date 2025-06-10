@@ -1,6 +1,7 @@
 import multiprocessing as mp
 import json
 import os
+import pprint
 import sys
 import time
 import traceback
@@ -8,7 +9,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from .agent import Agent
-from .config import set_attributes_from_config, LOG_DIR_NAME
+from .config import DEFAULT_CONFIG, LOG_DIR_NAME, set_attributes_from_config, merge_with_default_config
 from .logger import get_logger
 from .process import process_managed
 
@@ -67,9 +68,7 @@ class MultiAgent:
         self.logger = get_logger()
 
         # Config setup
-        if config:
-            set_attributes_from_config(self, config.get('MultiAgent', {}),
-                ['agent_role_json', 'repository', 'suppress_output'])
+        self._setup_config()
         self.agent_role_json = agent_role_json or getattr(self, 'agent_role_json', None)
         self.repository = repository or getattr(self, 'repository', None)
         os.makedirs(self.repository, exist_ok=True)
@@ -84,6 +83,21 @@ class MultiAgent:
         self.result_queue = None
         self.results = {}
         self.agent_status = {}
+
+    def _setup_config(self, config_dict: Dict = None) -> dict:
+        """Setup and validate configuration"""
+        if config_dict:
+            self.config = merge_with_default_config(config_dict)
+        else:
+            self.logger.info("Using DEFAULT_CONFIG, no config dict provided")
+            self.config = DEFAULT_CONFIG.copy()
+
+        set_attributes_from_config(self, self.config.get('MultiAgent', {}),
+            ['agent_role_json', 'repository', 'suppress_output'])
+        self.logger.info(f"MultiAgent full config:\n{pprint.pformat(self.config)}")
+
+        # Set attributes from Agent config
+        agent_config = self.config.get('Agent', {})
 
     def _validate_paths(self):
         """Validate required paths exist"""

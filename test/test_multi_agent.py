@@ -128,7 +128,6 @@ def main():
 
     # Create multi-agent system
     config = create_config()
-    config["MultiAgent"] = {"agent_role_json": agent_role_json, "repository": str(test_dir.absolute())}
 
     multi_agent = MultiAgent(
         agent_role_json=agent_role_json,

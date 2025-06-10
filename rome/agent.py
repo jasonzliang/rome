@@ -91,7 +91,7 @@ class Agent:
         # Set attributes from Agent config
         agent_config = self.config.get('Agent', {})
         set_attributes_from_config(self, agent_config,
-            ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience', 'action_select_strat', 'log_pid'])
+            ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience', 'action_select_strat', 'log_pid', 'save_hist_interval'])
 
     def _validate_name_role(self, name: str, role: str) -> None:
         """Validates and formats the agent's role string"""
@@ -143,16 +143,45 @@ class Agent:
         self.logger.info(f"Initialized {self.fsm_type} FSM using FSMSelector: {self.fsm.get_current_state()}")
         self.logger.info(f"FSM Description: {fsm_selector.get_description()}")
 
+    def _load_iteration_from_summary(self) -> int:
+        """Always returns a valid iteration number"""
+        try:
+            summary_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.summary.json")
+
+            if not os.path.exists(summary_file):
+                self.logger.info("No summary file found, starting fresh at iteration 1")
+                return 1
+
+            with open(summary_file, 'r') as f:
+                summary_data = json.load(f)
+
+            iteration = summary_data.get('iteration')
+            if iteration is None:
+                self.logger.warning("Summary file exists but no iteration found, defaulting to 1")
+                return 1
+
+            next_iteration = iteration
+            self.logger.info(f"Found saved iteration {iteration}, resuming at {next_iteration}")
+            return next_iteration
+
+        except Exception as e:
+            self.logger.error(f"Error loading iteration from summary: {e}, defaulting to 1")
+            return 1
+
     def _setup_context_history(self) -> None:
-        """Initialize core agent components"""
+        """Simplified setup - always gets valid iteration"""
         self.context = {}
         self.history = AgentHistory()
         self.summary_history = []
-        self.curr_iteration = 1
+
+        # Always gets a valid iteration number
+        self.curr_iteration = self._load_iteration_from_summary()
+        self.history.set_iteration(self.curr_iteration)
 
         # Add initial FSM state to history if FSM is initialized
         if self.fsm and self.fsm.current_state:
             self.history.add_initial_state(self.fsm.current_state)
+
 
     def _setup_repository_manager(self) -> None:
         """Initialize repository manager with configuration"""
@@ -348,7 +377,8 @@ class Agent:
     def run_loop(self,
         max_iterations: int = 10,
         stop_on_error: bool = True,
-        raise_exception: bool = False) -> Dict:
+        raise_exception: bool = False,
+        auto_resume: bool = True) -> Dict:
         """
         Main execution loop that continuously executes actions based on FSM state
         Now uses ActionSelector for cleaner action selection logic
@@ -357,15 +387,17 @@ class Agent:
             max_iterations: Maximum number of iterations to prevent infinite loops
             stop_on_error: Whether to stop the loop on errors or continue
             raise_exception: Whether to reraise exception if error encountered
+            auto_resume: Whether to automatically resume from last iteration in summary file
 
         Returns:
             Dict containing loop execution results
         """
 
-        def _process_summary():
+        def process_summary():
             summary = self.get_summary()
             self._print_summary(summary)
             self._save_summary(summary)
+            return summary
 
         self.logger.assert_true(
             self.fsm is not None,
@@ -374,23 +406,23 @@ class Agent:
 
         self.logger.info(f"Starting agent loop for {max_iterations} iterations")
         start_iteration = self.curr_iteration
-        end_iteration = self.curr_iteration + max_iterations
+        end_iteration = max_iterations
 
-        for iteration in range(start_iteration, end_iteration):
+        for iteration in range(start_iteration, end_iteration+1):
             try:
                 # Increment iteration counter in history, show iteration
                 self.curr_iteration = iteration
                 self.history.set_iteration(iteration)
-                self.logger.info(f"Loop iteration {iteration}/{end_iteration-1}")
+                self.logger.info(f"Loop iteration {iteration}/{end_iteration}")
                 self.logger.info(f"Current state: {self.fsm.current_state}")
                 # Validate active file state for consistency
                 self.version_manager.validate_active_files(self)
 
                 # Print summary and write to file
-                _process_summary()
+                summary = process_summary()
 
                 # Check agent context on first iteration to make sure state is valid
-                if iteration == 1:
+                if iteration == start_iteration:
                     self.fsm.check_context(self)
 
                 # Use ActionSelector for all action selection logic
@@ -458,7 +490,7 @@ class Agent:
         self.curr_iteration = end_iteration
 
         # Return agent summary
-        return self.get_summary()
+        return process_summary()
 
     def get_summary(self, recent_hist_len=None) -> Dict:
         """Get a comprehensive summary of the agent's current state as a dictionary."""
@@ -553,13 +585,8 @@ class Agent:
 
         self.logger.info("="*80)
 
-    def _save_summary(self, summary, save_hist_interval: int = 50):
-        """Save full summary history and most recent summary to separate JSON files.
-
-        Args:
-            summary: Current summary data to save
-            save_hist_interval: Only save full history every N iterations (default: 1, always save)
-        """
+    def _save_summary(self, summary):
+        """Save full summary history and most recent summary to separate JSON files."""
         self.summary_history.append({
             'iteration': self.curr_iteration,
             'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -569,18 +596,15 @@ class Agent:
 
         log_dir = self.get_log_dir()
 
-        # Always save the most recent summary
-        recent_summary_file = os.path.join(log_dir, f"{self.get_id()}.summary.json")
-        recent_summary_data = {
-            "agent_id": self.get_id(),
-            "latest_summary": self.summary_history[-1]
-        }
+        # Use the last dict from summary_history directly as recent_summary_data
+        recent_summary_data = self.summary_history[-1]
 
         # Only save full history every save_hist_interval iterations
-        save_full_history = (self.curr_iteration % save_hist_interval == 0)
+        save_full_history = (self.curr_iteration % self.save_hist_interval == 0)
 
         try:
-            # Always save most recent summary
+            # Always save most recent summary (just the last dict)
+            recent_summary_file = os.path.join(log_dir, f"{self.get_id()}.summary.json")
             with open(recent_summary_file, 'w', encoding='utf-8') as f:
                 json.dump(recent_summary_data, f, indent=4, default=str)
             self.logger.debug(f"Latest summary saved to: {recent_summary_file}")
@@ -598,7 +622,7 @@ class Agent:
                     json.dump(full_summary_data, f, indent=4, default=str)
                 self.logger.debug(f"Full summary history ({len(self.summary_history)} entries) saved to: {full_history_file}")
             else:
-                self.logger.debug(f"Skipping full history save (iteration {self.curr_iteration}, interval {save_hist_interval})")
+                self.logger.debug(f"Skipping full history save (iteration {self.curr_iteration}, interval {self.save_hist_interval})")
 
         except Exception as e:
             self.logger.error(f"Failed to save summary files: {e}")
