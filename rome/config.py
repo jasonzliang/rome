@@ -49,11 +49,12 @@ DEFAULT_CONFIG = {
 
         "fsm_type": "simple",  # Which FSM to load (see fsm_factory.py)
         "action_select_strat": "original",  # Which action selector to use (original or smart)
-        "agent_api": True,  # Launch an REST API server for agent's internal state
         "history_context_len": 25,  # Length of history to use when selecting action
         "patience": 5,  # If same state/action chosen repeatedly, prompt to choose different action
-        'log_pid': False,  # Whether to include PID in agent log file names
-        'save_hist_interval': 50, # Interval to save summary history
+
+        "agent_api": True,  # Launch an REST API server for agent's internal state
+        "log_pid": False,  # Whether to include PID in agent log file names
+        "save_hist_interval": 50, # Interval to save summary history
     },
 
     "AgentApi": {

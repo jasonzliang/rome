@@ -4,11 +4,13 @@ OpenAIHandler:
   cost_limit: 200.0
 
 Agent:
+  fsm: simple
+  action_select_strat: smart
+  patience: 5
   agent_api: false
-  patience: 4
 
 Logger:
-  include_caller_info: "rome"
+  include_caller_info: rome
 
 MultiAgent:
   agent_role_json: config/8_3_evolved_roles.json

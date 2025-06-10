@@ -49,14 +49,14 @@ HUMAN_EVAL_SAMPLES = {
 def setup_test_dir():
     """Create test directory with HumanEval samples"""
     test_dir = Path("result/test_single_agent")
-    # if test_dir.exists():
-    #     shutil.rmtree(test_dir)
-    # test_dir.mkdir(parents=True)
+    if test_dir.exists():
+        shutil.rmtree(test_dir)
+    test_dir.mkdir(parents=True)
 
-    # for problem_name, content in HUMAN_EVAL_SAMPLES.items():
-    #     problem_dir = test_dir / problem_name
-    #     problem_dir.mkdir()
-    #     (problem_dir / f"{problem_name}.py").write_text(content)
+    for problem_name, content in HUMAN_EVAL_SAMPLES.items():
+        problem_dir = test_dir / problem_name
+        problem_dir.mkdir()
+        (problem_dir / f"{problem_name}.py").write_text(content)
 
     return test_dir
 
@@ -72,8 +72,8 @@ def create_config():
         },
         "Agent": {
             "fsm_type": "simple",
-            "patience": 1,
             "action_select_strat": "smart",
+            "patience": 1,
             "agent_api": True,
             "save_hist_interval": 1
         },
