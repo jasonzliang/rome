@@ -601,7 +601,8 @@ class Agent:
         recent_summary_data = self.summary_history[-1]
 
         # Only save full history every save_hist_interval iterations
-        save_full_history = (self.curr_iteration % self.save_hist_interval == 0)
+        save_full_history = (self.curr_iteration == 1 or \
+            self.curr_iteration % self.save_hist_interval == 0)
 
         try:
             # Always save most recent summary (just the last dict)
