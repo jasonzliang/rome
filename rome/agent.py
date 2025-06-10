@@ -407,7 +407,7 @@ class Agent:
         self.logger.info(f"Starting agent loop for {max_iterations} iterations")
         start_iteration = self.curr_iteration
         end_iteration = max_iterations
-        summary = process_summary()
+        summary = None
 
         for iteration in range(start_iteration, end_iteration + 1):
             try:
@@ -491,7 +491,7 @@ class Agent:
         self.curr_iteration = end_iteration + 1
 
         # Return agent summary
-        return summary
+        return summary if summary else process_summary()
 
     def get_summary(self, recent_hist_len=None) -> Dict:
         """Get a comprehensive summary of the agent's current state as a dictionary."""
