@@ -175,8 +175,7 @@ class MultiAgentEvalPlusBenchmark:
             agent_results = self.run_agents(max_iterations, stop_on_error)
 
             if run_evaluation:
-                # Final evaluation (non-blocking)
-                self.evaluator.evaluate(blocking=False)
+                self.evaluator.evaluate()
 
             # Save and return results
             results_file = self.save_results(agent_results, evaluation_results)
