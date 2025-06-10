@@ -439,6 +439,9 @@ class VersionManager:
 
     def try_reserve_file(self, agent, file_path: str, max_attempts: int = None) -> bool:
         """Try to reserve a file with exponential backoff using global locking config."""
+        if not self.lock_active_file:
+            return True
+
         locking_config = get_locking_config()
         if max_attempts is None:
             max_attempts = locking_config.max_retries
