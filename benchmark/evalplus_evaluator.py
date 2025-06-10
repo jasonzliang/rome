@@ -117,7 +117,7 @@ class EvalplusEvaluator:
             base_scores = [entry[2] for entry in self.scores]  # base_score
             extra_scores = [entry[3] for entry in self.scores]  # extra_score
 
-            fig, ax = plt.subplots(figsize=(10, 6))
+            fig, ax = plt.subplots(figsize=(12, 6))
 
             # Plot data
             if len(times) == 1:
@@ -151,7 +151,6 @@ class EvalplusEvaluator:
         try:
             # Load agent data from __rome__ directory only
             agent_data = {}
-            completion_data = {}
             for file_path in self.log_dir.glob("agent_*.summary_history.json"):
                 try:
                     data = json.loads(file_path.read_text())
