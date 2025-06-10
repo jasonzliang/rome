@@ -177,7 +177,7 @@ class EvalplusEvaluator:
 
                 for entries in agent_data.values():
                     latest_entry = max(((iter_num, completion) for iter_num, epoch_time, completion in entries if epoch_time <= target_time), default=(0, 0))
-                    total += latest_entry[0]
+                    total_iter += latest_entry[0]
                     total_completion += latest_entry[1]
                     agent_count += 1
 
