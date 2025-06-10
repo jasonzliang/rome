@@ -107,7 +107,7 @@ class EvalplusEvaluator:
         self.logger.info(f"Scores at t={elapsed_min:.1f}m: base={base:.3f}, extra={extra:.3f}")
 
     def _update_plot(self):
-        """Create/update plot efficiently"""
+        """Create/update plot efficiently with latest scores in legend"""
         if not self.scores:
             return
 
@@ -119,13 +119,11 @@ class EvalplusEvaluator:
 
             fig, ax = plt.subplots(figsize=(12, 6))
 
-            # Plot data
-            if len(times) == 1:
-                ax.scatter(times, base_scores, c='blue', s=80, label='Base', marker='o')
-                ax.scatter(times, extra_scores, c='red', s=80, label='Base+Extra', marker='s')
-            else:
-                ax.plot(times, base_scores, 'b-o', label='Base', linewidth=2, markersize=4)
-                ax.plot(times, extra_scores, 'r-s', label='Base+Extra', linewidth=2, markersize=4)
+            # Plot data with latest scores in labels
+            ax.plot(times, base_scores, 'b-o',
+                   label=f'Base ({base_scores[-1]:.3f})', linewidth=2, markersize=4)
+            ax.plot(times, extra_scores, 'r-s',
+                   label=f'Base+Extra ({extra_scores[-1]:.3f})', linewidth=2, markersize=4)
 
             # Format
             ax.set_xlabel('Time (minutes)')
@@ -144,12 +142,11 @@ class EvalplusEvaluator:
             self.logger.error(f"Scores vs time elapsed plot failed: {e}")
 
     def _update_plot2(self):
-        """Compact plot: total iterations vs scores with completion percentage"""
+        """Compact plot: total iterations vs scores with completion percentage and latest scores in legend"""
         if not self.scores:
             return
 
         try:
-            # Load agent data from __rome__ directory only
             agent_data = {}
             for file_path in self.log_dir.glob("agent_*.summary_history.json"):
                 try:
@@ -184,18 +181,23 @@ class EvalplusEvaluator:
                 total_iters.append(total_iter/max(agent_count, 1))
                 completion_fractions.append(total_completion / max(agent_count * 100, 1))
 
+            # Get latest values for legend
+            base_scores = [s[2] for s in self.scores]
+            extra_scores = [s[3] for s in self.scores]
+
             # Create compact plot with dual y-axis
             fig, ax1 = plt.subplots(figsize=(12, 6))
             ax2 = ax1.twinx()
 
-            # Plot scores on left axis
-            base_scores = [s[2] for s in self.scores]
-            extra_scores = [s[3] for s in self.scores]
-            ax1.plot(total_iters, base_scores, 'b-o', label='Base', linewidth=2, markersize=4)
-            ax1.plot(total_iters, extra_scores, 'r-s', label='Base+Extra', linewidth=2, markersize=4)
+            # Plot scores on left axis with latest scores in labels
+            ax1.plot(total_iters, base_scores, 'b-o',
+                    label=f'Base ({base_scores[-1]:.3f})', linewidth=2, markersize=4)
+            ax1.plot(total_iters, extra_scores, 'r-s',
+                    label=f'Base+Extra ({extra_scores[-1]:.3f})', linewidth=2, markersize=4)
 
-            # Plot completion fraction on right axis
-            ax2.plot(total_iters, completion_fractions, 'g--^', label='Completion',
+            # Plot completion fraction on right axis with latest value in label
+            ax2.plot(total_iters, completion_fractions, 'g--^',
+                    label=f'Completion ({completion_fractions[-1]:.3f})',
                     linewidth=2, markersize=4, alpha=0.7)
 
             # Format axes
