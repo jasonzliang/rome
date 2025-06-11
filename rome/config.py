@@ -49,7 +49,7 @@ DEFAULT_CONFIG = {
         "repository": None,  # Repository base directory, can be overwritten by constructor
 
         "fsm_type": "simple",  # Which FSM to load (see fsm_factory.py)
-        "action_select_strat": "original",  # Which action selector to use (original or smart)
+        "action_select_strat": "smart",  # Which action selector to use (original or smart)
         "history_context_len": 25,  # Length of history to use when selecting action
         "patience": 5,  # If same state/action chosen repeatedly, prompt to choose different action
 
@@ -148,7 +148,7 @@ DEFAULT_CONFIG = {
     "EditTestAction2": {},
     "ExecuteCodeAction": {},
     "RevertCodeAction": {
-        "num_versions": 8, # Number of versions to look back to revert
+        "num_versions": 10, # Number of versions to look back to revert
     },
 
     # REPOSITORY & FILE MANAGEMENT
