@@ -133,105 +133,56 @@ class ActionSelectorBase(ABC):
 
     def select_action(self, agent, iteration: int, stop_on_error: bool = True) -> Tuple[str, str, bool]:
         """Select an action with frequency-based exponential backoff"""
-        # Check if there are available actions
-        available_actions = agent.fsm.get_available_actions()
-        if not available_actions:
-            error_msg = "No available actions in current state"
-            self.logger.error(f"{error_msg}. Stopping loop.")
+
+        def handle_error(msg: str, exception: Exception = None) -> Tuple[str, str, bool]:
+            """Unified error handling with reset logic"""
+            self.logger.error(msg)
+            agent.history.add_error(iteration, msg, agent.fsm.current_state, str(exception) if exception else None)
 
             if stop_on_error:
-                raise ActionSelectorError(error_msg)
-            else:
-                agent.fsm.reset(agent)
-                agent.history.reset()
-                return None, f"{error_msg} - reset and continue", True
-        else:
-            self.logger.info(f"Available actions from {agent.fsm.get_current_state()}: {available_actions}")
+                raise ActionSelectorError(msg) from exception
 
-        # If only one action available, select it directly without LLM call
+            agent.fsm.reset(agent)
+            agent.history.reset()
+            return None, f"{msg} - reset and continue", True
+
+        # Check available actions
+        available_actions = agent.fsm.get_available_actions()
+        if not available_actions:
+            return handle_error("No available actions in current state")
+
+        self.logger.info(f"Available actions from {agent.fsm.get_current_state()}: {available_actions}")
+
+        # Auto-select if only one action
         if len(available_actions) == 1:
             chosen_action = available_actions[0]
-            reasoning = "only one action available - auto-selected"
             self.logger.info(f"Auto-selecting single available action: {chosen_action}")
-            return chosen_action, reasoning, True
+            return chosen_action, "only one action available - auto-selected", True
 
-        # Multiple actions available - use LLM for selection
+        # Multi-action selection via LLM
         try:
-            # Use strategy-specific prompt generation
             prompt = self.get_action_selection_prompt(agent.fsm, agent)
-
-            # Get action choice from LLM
             response = agent.chat_completion(
                 prompt=prompt,
                 system_message=agent.role,
                 response_format={"type": "json_object"}
             )
-
-            # Extract action from response
             chosen_action, reasoning = self._extract_action_from_response(agent, response)
 
         except Exception as e:
-            error_msg = f"LLM call failed during action selection: {str(e)}"
-            self.logger.error(error_msg)
-            agent.history.add_error(iteration, error_msg, agent.fsm.current_state, str(e))
+            return handle_error(f"LLM call failed during action selection: {str(e)}", e)
 
-            if stop_on_error:
-                raise ActionSelectorError(error_msg) from e
-            else:
-                agent.fsm.reset(agent)
-                agent.history.reset()
-                return None, f"{error_msg} - reset and continue", True
-
-        # Validate action was extracted
+        # Validate action selection
         if not chosen_action:
-            error_msg = f"Could not determine action from LLM response: {response}"
-            self.logger.error(error_msg)
-            agent.history.add_error(iteration, error_msg, agent.fsm.current_state)
+            return handle_error(f"Could not determine action from LLM response: {response}")
 
-            if stop_on_error:
-                raise ActionSelectorError(error_msg)
-            else:
-                agent.fsm.reset(agent)
-                agent.history.reset()
-                return None, f"{error_msg} - reset and continue", True
-
-        # Validate action is available
         if chosen_action not in available_actions:
-            error_msg = f"Action '{chosen_action}' not available in state '{agent.fsm.current_state}'. Available: {available_actions}"
-            self.logger.error(error_msg)
-            agent.history.add_error(iteration, error_msg, agent.fsm.current_state)
-
-            if stop_on_error:
-                raise ActionSelectorError(error_msg)
-            else:
-                agent.fsm.reset(agent)
-                agent.history.reset()
-                return None, f"{error_msg} - reset and continue", True
+            return handle_error(
+                f"Action '{chosen_action}' not available in state '{agent.fsm.current_state}'. "
+                f"Available: {available_actions}"
+            )
 
         return chosen_action, reasoning, True
-
-    # def get_backoff_status(self) -> Dict:
-    #     """Get current backoff status"""
-    #     if hasattr(self, 'last_execution'):
-    #         current_time = time.time()
-    #         return {
-    #             action: {
-    #                 'time_since_last': current_time - last_exec,
-    #                 'can_execute': (current_time - last_exec) >= self.min_interval
-    #             }
-    #             for action, last_exec in self.last_execution.items()
-    #         }
-    #     return {}
-
-    # def reset_backoff(self, action_name: str = None):
-    #     """Reset backoff tracking"""
-    #     if hasattr(self, 'last_execution'):
-    #         if action_name:
-    #             self.last_execution.pop(action_name, None)
-    #             self.logger.info(f"Reset backoff for '{action_name}'")
-    #         else:
-    #             self.last_execution.clear()
-    #             self.logger.info("Reset all backoff tracking")
 
 
 class OriginalActionSelector(ActionSelectorBase):
@@ -525,7 +476,8 @@ class SmartActionSelector(ActionSelectorBase):
     def _build_base_selection_prompt(self) -> str:
         """Build standard selection prompt without intervention"""
         base = ('Please select one action. Respond with JSON:\n'
-               '{"selected_action": "action_name", "reasoning": "brief_reason"}')
+               '{"selected_action": "action_name", "reasoning": "brief_reason"}\n'
+               'IMPORTANT: You must select an action from "## Available actions ##", even if all of them are overused.')
 
         if self.exploration_rate > 0.1:
             return base + "\n\nChoose the most appropriate action. Occasional exploration can improve outcomes."

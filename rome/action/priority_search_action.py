@@ -56,7 +56,7 @@ class PrioritySearchAction(Action):
         # Get version count
         versions = agent.version_manager.load_version(file_path, k=sys.maxsize,
             include_content=False)
-        version_count = len(versions) if isinstance(versions, list) else (1 if versions else 0)
+        version_count = max(len(versions), 1) if isinstance(versions, list) else 1
 
         return {
             "path": file_path,
@@ -194,8 +194,7 @@ IMPORTANT:
             if file_metadata:
                 batch_data.append({
                     **file_metadata,
-                    'priority': file_info.get("priority", 1),
-                    'priority_reason': f"Completion confidence: {file_metadata['completion_confidence']}%, Versions: {file_metadata['version_count']}"
+                    'priority': file_info.get("priority", 1)
                 })
         return batch_data
 
