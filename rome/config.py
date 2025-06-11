@@ -1,6 +1,7 @@
 # config.py
 import ast
 import copy
+import numbers
 import os
 import sys
 import yaml
@@ -292,17 +293,20 @@ def load_config(config_path="config.yaml", create_if_missing=False):
 def merge_with_default_config(custom_config):
     """Merge a custom config with the default config and do some basic validation"""
 
-    def _error_msg(key, val):
+    def error_msg(key, val):
         return f"Invalid value {val} ({type(val).__name__}) for config parameter '{key}'"
 
-    def _validate(key, old_v, new_v):
+    def same_type(x, y):
+        return type(x) == type(y) or (isinstance(x, numbers.Number) and isinstance(y, numbers.Number))
+
+    def validate(key, old_v, new_v):
         # Easy to way in include key but still use default
         if new_v == "default":
             new_v = old_v
 
         # Check old and new value type matches
         if old_v is not None:
-            logger.assert_true(type(old_v) == type(new_v), f"Type mismatch for old {type(old_v).__name__} and new value {type(new_v).__name__} for config parameter '{key}'")
+            logger.assert_true(same_type(old_v, new_v), f"Type mismatch for old {type(old_v).__name__} and new value {type(new_v).__name__} for config parameter '{key}'")
         else:
             logger.debug(f"Type checking skipped for config parameter '{key}' ({old_v} -> {new_v})")
 
@@ -310,28 +314,28 @@ def merge_with_default_config(custom_config):
         for v in [old_v, new_v]:
             if isinstance(v, (list, tuple, str)):
                 if not key.startswith("exclude_"):
-                    logger.assert_true(len(v) > 0, f"{_error_msg(key, v)} — non-empty value")
+                    logger.assert_true(len(v) > 0, f"{error_msg(key, v)} — non-empty value")
             elif isinstance(v, (int, float)):
-                logger.assert_true(v >= 0, f"{_error_msg(key, v)} — non-negative value")
+                logger.assert_true(v >= 0, f"{error_msg(key, v)} — non-negative value")
             else:
                 logger.assert_true(isinstance(v, (bool, NoneType)),
-                    f"{_error_msg(key, v)} - invalid type")
+                    f"{error_msg(key, v)} - invalid type")
         return new_v
 
-    def _update_dict(d, u):
+    def update_dict(d, u):
         for k, v in u.items():
             # If dict, recursively update it
             if isinstance(v, dict) and k in d and isinstance(d[k], dict):
-                d[k] = _update_dict(d[k], v)
+                d[k] = update_dict(d[k], v)
             elif k in d: # If key in orig dict, validate it
-                d[k] = _validate(k, d[k], v)
+                d[k] = validate(k, d[k], v)
             else: # If key not in orig dict, just add it
                 d[k] = v
         return d
 
     logger = get_logger()
     merged_config = copy.deepcopy(DEFAULT_CONFIG)
-    result = _update_dict(merged_config, custom_config)
+    result = update_dict(merged_config, custom_config)
     logger.info("Configuration merged with defaults")
     return result
 

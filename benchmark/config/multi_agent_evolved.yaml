@@ -5,7 +5,7 @@ OpenAIHandler:
 
 Agent:
   fsm: simple
-  action_select_strat: smart
+  action_select_strat: original
   patience: 5
   agent_api: false
 
@@ -13,4 +13,4 @@ Logger:
   include_caller_info: rome
 
 MultiAgent:
-  agent_role_json: config/minimal_roles.json
+  agent_role_json: config/minimal_roles2.json
