@@ -23,7 +23,7 @@ DEFAULT_HASH_FUNC = "sha256"
 SUMMARY_LENGTH = 100
 LONG_SUMMARY_LEN = 200
 LONGER_SUMMARY_LEN = 400
-LONGEST_SUMMARY_LEN = 800
+LONGEST_SUMMARY_LEN = 600
 
 # Meta directory for file specific information
 META_DIR_EXT = 'rome'
@@ -49,7 +49,7 @@ DEFAULT_CONFIG = {
         "repository": None,  # Repository base directory, can be overwritten by constructor
 
         "fsm_type": "simple",  # Which FSM to load (see fsm_factory.py)
-        "action_select_strat": "smart",  # Which action selector to use (original or smart)
+        "action_select_strat": "original",  # Which action selector to use (original or smart)
         "history_context_len": 25,  # Length of history to use when selecting action
         "patience": 5,  # If same state/action chosen repeatedly, prompt to choose different action
 

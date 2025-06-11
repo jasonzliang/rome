@@ -3,7 +3,7 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 from .action import Action
-from ..config import check_attrs, LONGEST_SUMMARY_LEN
+from ..config import check_attrs, LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
 from ..logger import get_logger
 from ..state import truncate_text
 
