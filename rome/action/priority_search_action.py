@@ -6,6 +6,7 @@ import random
 import re
 import sys
 import time
+import pprint
 from typing import Dict, Optional, Any, Union, List
 
 from .action import Action
@@ -42,37 +43,33 @@ class PrioritySearchAction(Action):
 
     def _get_file_metadata(self, file_path: str, agent) -> Dict[str, Any]:
         """Get comprehensive file metadata including completion confidence and version count"""
-        try:
-            stats = os.stat(file_path)
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+        stats = os.stat(file_path)
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
 
-            all_definitions = extract_all_definitions(content)
+        all_definitions = extract_all_definitions(content)
 
-            # Get completion confidence from progress data
-            progress_data = agent.version_manager.get_data(file_path, 'progress')
-            completion_confidence = progress_data.get('confidence', 0) if progress_data else 0
+        # Get completion confidence from progress data
+        progress_data = agent.version_manager.get_data(file_path, 'progress')
+        completion_confidence = progress_data.get('confidence', 0) if progress_data else 0
 
-            # Get version count
-            versions = agent.version_manager.load_version(file_path, k=sys.maxint,
-                include_content=False)
-            version_count = len(versions) if isinstance(versions, list) else (1 if versions else 0)
+        # Get version count
+        versions = agent.version_manager.load_version(file_path, k=sys.maxsize,
+            include_content=False)
+        version_count = len(versions) if isinstance(versions, list) else (1 if versions else 0)
 
-            return {
-                "path": file_path,
-                "content": content,
-                "size_kb": round(stats.st_size / 1024, 2),
-                "modified_age": round(time.time() - stats.st_mtime, 1),
-                "all_definitions": all_definitions,
-                "definition_count": len(all_definitions),
-                "function_count": len([d for d in all_definitions if d['type'] == 'function']),
-                "class_count": len([d for d in all_definitions if d['type'] == 'class']),
-                "completion_confidence": completion_confidence,
-                "version_count": version_count,
-            }
-        except Exception as e:
-            self.logger.info(f"Error reading {file_path}: {e}")
-            return None
+        return {
+            "path": file_path,
+            "content": content,
+            "size_kb": round(stats.st_size / 1024, 2),
+            "modified_age": round(time.time() - stats.st_mtime, 1),
+            "all_definitions": all_definitions,
+            "definition_count": len(all_definitions),
+            "function_count": len([d for d in all_definitions if d['type'] == 'function']),
+            "class_count": len([d for d in all_definitions if d['type'] == 'class']),
+            "completion_confidence": completion_confidence,
+            "version_count": version_count,
+        }
 
     def _create_definition_summary(self, definition: Dict) -> str:
         """Create a concise summary of a function/class definition"""
@@ -160,8 +157,6 @@ IMPORTANT:
 
     def _prioritize_files(self, agent, file_overviews: List[Dict]) -> List[Dict]:
         """Use LLM to prioritize files based on completion confidence, versions, and definitions"""
-        self.logger.info(f"Prioritizing {min(len(file_overviews), self.batch_size)} files by completion confidence")
-
         prompt = self._create_prioritization_prompt(file_overviews)
         response = agent.chat_completion(
             prompt=prompt,
@@ -180,7 +175,7 @@ IMPORTANT:
                     })
         else:
             # Fallback: use completion confidence for direct ranking
-            self.logger.error("Invalid LLM response, using direct confidence ranking")
+            self.logger.error("Invalid LLM response, using direct completion confidence ranking")
             sorted_overviews = sorted(file_overviews,
                 key=lambda x: (x['completion_confidence'], x['version_count']))
             prioritized_files = [{
@@ -200,8 +195,7 @@ IMPORTANT:
                 batch_data.append({
                     **file_metadata,
                     'priority': file_info.get("priority", 1),
-                    'priority_reason': f"Confidence: {file_metadata['completion_confidence']}%, "
-                                     f"Versions: {file_metadata['version_count']}"
+                    'priority_reason': f"Completion confidence: {file_metadata['completion_confidence']}%, Versions: {file_metadata['version_count']}"
                 })
         return batch_data
 
@@ -247,9 +241,9 @@ Respond with a JSON object:
 """
         return prompt
 
-    def _process_single_batch(self, agent, batch_file_info: List[Dict], batch_info: str) -> Optional[Dict]:
+    def _process_batch(self, agent, batch_file_info: List[Dict]) -> Optional[Dict]:
         """Process a batch of files and return selected file if found"""
-        self.logger.info(f"Processing {batch_info}: {len(batch_file_info)} files")
+        self.logger.info(f"Processing batch: {len(batch_file_info)} files")
 
         current_batch_data = self._prepare_batch_data(batch_file_info, agent)
         if not current_batch_data:
@@ -283,14 +277,12 @@ Respond with a JSON object:
             'path': file_data['path'],
             'content': file_data['content'],
             'reason': selected_info.get('reason', 'Selected by LLM'),
-            'priority': file_data['priority'],
-            'all_definitions': file_data['all_definitions'],
-            'completion_confidence': file_data['completion_confidence'],
-            'version_count': file_data['version_count']
+            # 'priority': file_data['priority'],
+            # 'all_definitions': file_data['all_definitions'],
+            # 'completion_confidence': file_data['completion_confidence'],
+            # 'version_count': file_data['version_count']
         }
-
-        self.logger.info(f"Selected: {file_data['path']} (Confidence: {file_data['completion_confidence']}%, "
-                        f"Versions: {file_data['version_count']}) - {selected_file['reason']}")
+        self.logger.info(f"Selected: {file_data['path']} (Completion confidence: {file_data['completion_confidence']}%, Versions: {file_data['version_count']}) - {selected_file['reason']}")
         return selected_file
 
     def execute(self, agent, **kwargs) -> bool:
@@ -305,15 +297,13 @@ Respond with a JSON object:
         # Create overview, prioritize by completion confidence, and process
         file_overviews = self._create_global_overview(agent, filtered_files)
         prioritized_files = self._prioritize_files(agent, file_overviews)
-        selected_file = self._process_single_batch(agent, prioritized_files, "completion confidence batch")
+        selected_file = self._process_batch(agent, prioritized_files)
 
         if selected_file:
             # Try to reserve the file with retry logic
             if agent.version_manager.try_reserve_file(agent, selected_file['path']):
                 agent.version_manager.save_original(selected_file['path'], selected_file['content'])
                 agent.context['selected_file'] = selected_file
-                self.logger.info(f"Search completed with selected file: {selected_file['path']} "
-                               f"(Confidence: {selected_file['completion_confidence']}%)")
                 return True
             else:
                 self.logger.error(f"Could not reserve {selected_file['path']} after multiple attempts")
