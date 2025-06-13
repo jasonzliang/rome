@@ -174,8 +174,8 @@ class Logger:
     def configure(self, log_config: dict):
         """Configure logger with provided settings, sets up console and file handlers."""
         with self._lock:
-            if self._configured:
-                return  # Already configured, skip
+            # if self._configured:
+            #     return  # Already configured, skip
 
             # Clear basic handlers before full configuration
             for handler in self._logger.handlers[:]:

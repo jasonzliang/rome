@@ -15,6 +15,7 @@ class AdvancedResetAction(Action):
         super().__init__(config)
         self.logger = get_logger()
         check_attrs(self, ['completion_confidence', 'max_versions'])
+        c = max(min(self.completion_confidence, 100), 1)
 
     def summary(self, agent) -> str:
         """Return a short summary of the advanced reset action"""
@@ -35,6 +36,12 @@ class AdvancedResetAction(Action):
             exit_code = selected_file.get('exec_exit_code', 'unknown')
             output = selected_file.get('exec_output', 'No output available')
             analysis = selected_file.get('exec_analysis', 'No analysis available')
+
+        min_completion_conf = 0
+        low_completion_conf = self.completion_confidence // 2
+        medium_completion_conf = self.completion_confidence - 1
+        high_completion_conf = self.completion_confidence
+        max_completion_conf = 100
 
         prompt = f"""Examine the test execution results and analysis, use them to determine if the code and tests are now correct and complete.
 
@@ -65,12 +72,12 @@ Respond with a JSON object:
 
 For confidence (0-100):
 - Represents how confident you are that the work is COMPLETE
-- 100 = absolutely certain work is complete
-- {self.completion_confidence}+ = high confidence work is complete, should be flagged as finished
-- 50-79 = moderate confidence, some uncertainty remains
-- 0-49 = low confidence, significant issues likely remain
+- {max_completion_conf} = absolutely certain work is complete
+- {high_completion_conf}+ = high confidence work is complete, should be flagged as finished
+- {low_completion_conf} - {medium_completion_conf} = moderate confidence, some uncertainty remains
+- {min_completion_conf} - {low_completion_conf} = low confidence, significant issues likely remain
 
-Consider work complete if:
+Only give a confidence that is {self.completion_confidence} or above if:
 - Exit code is 0 (success)
 - All tests are passing (unless the failing test(s) are clearly incorrect or unnecessary)
 - No critical errors or failures
