@@ -133,11 +133,11 @@ Files to prioritize:
                 prompt += "No function/class definitions found\n"
 
         prompt += f"""
-Return a JSON OBJECT with {min(len(file_overviews), self.batch_size)} files like below. These files should be the ones which you think have the highest priority. For files with same priority, randomly choose one.
+Return a JSON OBJECT with {min(len(file_overviews), self.batch_size)} files like below. These files should be a mixture of high priority files (from 7-10). For files with same priority, randomly choose one.
 {{
-  "path/to/file1.py": 8,
-  "path/to/file2.py": 6,
-  "path/to/file3.py": 3,
+  "path/to/file1.py": 9,
+  "path/to/file2.py": 8,
+  "path/to/file3.py": 7,
   ...
 }}
 
