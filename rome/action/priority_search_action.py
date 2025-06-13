@@ -43,33 +43,37 @@ class PrioritySearchAction(Action):
 
     def _get_file_metadata(self, file_path: str, agent) -> Dict[str, Any]:
         """Get comprehensive file metadata including completion confidence and version count"""
-        stats = os.stat(file_path)
-        with open(file_path, 'r', encoding='utf-8') as f:
-            content = f.read()
+        try:
+            stats = os.stat(file_path)
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
 
-        all_definitions = extract_all_definitions(content)
+            all_definitions = extract_all_definitions(content)
 
-        # Get completion confidence from progress data
-        progress_data = agent.version_manager.get_data(file_path, 'progress')
-        completion_confidence = progress_data.get('confidence', 0) if progress_data else 0
+            # Get completion confidence from progress data
+            progress_data = agent.version_manager.get_data(file_path, 'progress')
+            completion_confidence = progress_data.get('confidence', 0) if progress_data else 0
 
-        # Get version count
-        versions = agent.version_manager.load_version(file_path, k=sys.maxsize,
-            include_content=False)
-        version_count = max(len(versions), 1) if isinstance(versions, list) else 1
+            # Get version count
+            versions = agent.version_manager.load_version(file_path, k=sys.maxsize,
+                include_content=False)
+            version_count = max(len(versions), 1) if isinstance(versions, list) else 1
 
-        return {
-            "path": file_path,
-            "content": content,
-            "size_kb": round(stats.st_size / 1024, 2),
-            "modified_age": round(time.time() - stats.st_mtime, 1),
-            "all_definitions": all_definitions,
-            "definition_count": len(all_definitions),
-            "function_count": len([d for d in all_definitions if d['type'] == 'function']),
-            "class_count": len([d for d in all_definitions if d['type'] == 'class']),
-            "completion_confidence": completion_confidence,
-            "version_count": version_count,
-        }
+            return {
+                "path": file_path,
+                "content": content,
+                "size_kb": round(stats.st_size / 1024, 2),
+                "modified_age": round(time.time() - stats.st_mtime, 1),
+                "all_definitions": all_definitions,
+                "definition_count": len(all_definitions),
+                "function_count": len([d for d in all_definitions if d['type'] == 'function']),
+                "class_count": len([d for d in all_definitions if d['type'] == 'class']),
+                "completion_confidence": completion_confidence,
+                "version_count": version_count,
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to extract file metadata from {file_path} due to error: {e}")
+            return None
 
     def _create_definition_summary(self, definition: Dict) -> str:
         """Create a concise summary of a function/class definition"""
@@ -110,14 +114,19 @@ class PrioritySearchAction(Action):
         if shuffle:
             random.shuffle(file_overviews)
 
-        prompt = f"""Return a JSON OBJECT with ALL {len(file_overviews)} files with priority scores.
+        # FIXED: Extract exact file paths upfront
+        valid_file_paths = [overview['path'] for overview in file_overviews]
 
-Assign a priority score (1-10, 10 being highest) using these criteria in ORDER OF IMPORTANCE:
+        prompt = f"""Return a JSON OBJECT with priority scores for EXACTLY these {len(file_overviews)} files.
+
+Assign priority scores (1-10, 10 being highest) using these criteria:
 1. **Completion confidence** (MOST IMPORTANT): Lower confidence = higher priority
-2. **Version count**: Fewer versions = higher priority (within confidence tier)
-3. **Function definitions**: More relevant functions = higher priority (fine-tuning)
+2. **Version count**: Fewer versions = higher priority
+3. **Function definitions**: More relevant functions = higher priority
 
-Files to prioritize:
+CRITICAL: You MUST use the EXACT file paths listed below. Do NOT modify, generate, or create new paths.
+
+File details:
 """
 
         for j, file_info in enumerate(file_overviews):
@@ -127,8 +136,6 @@ Files to prioritize:
             prompt += f"\n--- File {j+1}: {file_info['path']} ---\n"
             prompt += f"Completion confidence: {confidence}%\n"
             prompt += f"Version count: {version_count}\n"
-            # prompt += f"Size: {file_info['size_kb']} KB\n"
-            # prompt += f"Last modified: {file_info['modified_age']} seconds ago\n"
             prompt += f"Total definitions: {file_info['definition_count']} ({file_info['function_count']} functions, {file_info['class_count']} classes)\n"
 
             if file_info['definition_summaries']:
@@ -139,24 +146,26 @@ Files to prioritize:
                 prompt += "No function/class definitions found\n"
 
         prompt += f"""
-Return a JSON OBJECT with {min(len(file_overviews), self.batch_size)} files like below based on priority. Higher priority files (7-10) should show up more often than lower priority files (1-4). Note: priority is relative in relation to other files and should be treated like a ranking.
+Return a JSON OBJECT with up to {min(len(file_overviews), self.batch_size)} files from the EXACT paths listed above:
+
 {{
-  "path/to/file1.py": 9,
-  "path/to/file2.py": 8,
-  "path/to/file3.py": 7,
-  ...
+  "{valid_file_paths[0] if valid_file_paths else 'example/path.py'}": 9,
+  "{valid_file_paths[1] if len(valid_file_paths) > 1 else 'example/path2.py'}": 8
 }}
 
-IMPORTANT:
-- Your response MUST be a valid JSON OBJECT where keys are file paths and values are priority scores (1-10)
-- Prioritize files with LOW completion confidence first (they need more work)
-- Within same confidence tier, prefer files with fewer versions
-- Use function definitions for final ranking adjustments
+REQUIREMENTS:
+- Use ONLY the exact file paths shown above
+- Do NOT create, modify, or generate new file paths
+- Do NOT use paths not explicitly listed
 """
         return prompt
 
     def _prioritize_files(self, agent, file_overviews: List[Dict]) -> List[Dict]:
-        """Use LLM to prioritize files based on completion confidence, versions, and definitions"""
+        """Use LLM to prioritize files with strict validation of returned paths"""
+
+        # Extract valid file paths for validation
+        valid_file_paths = {overview['path'] for overview in file_overviews}
+
         prompt = self._create_prioritization_prompt(file_overviews)
         response = agent.chat_completion(
             prompt=prompt,
@@ -166,22 +175,31 @@ IMPORTANT:
         result = agent.parse_json_response(response)
 
         prioritized_files = []
+        invalid_paths = []
+
         if isinstance(result, dict):
             for file_path, priority in result.items():
+                # ADDED: Strict validation of file paths
+                if file_path not in valid_file_paths:
+                    invalid_paths.append(file_path)
+                    self.logger.error(f"LLM returned invalid file path: {file_path}")
+                    continue
+
+                # ADDED: Verify file still exists
+                if not os.path.exists(file_path):
+                    self.logger.error(f"LLM returned non-existent file: {file_path}")
+                    continue
+
                 if isinstance(priority, (int, float)):
                     prioritized_files.append({
                         "file_path": file_path,
                         "priority": int(priority)
                     })
-        else:
-            # Fallback: use completion confidence for direct ranking
-            self.logger.error("Invalid LLM response, using direct completion confidence ranking")
-            sorted_overviews = sorted(file_overviews,
-                key=lambda x: (x['completion_confidence'], x['version_count']))
-            prioritized_files = [{
-                "file_path": file_info["path"],
-                "priority": max(1, 10 - (i // (len(sorted_overviews) // 10 + 1)))
-            } for i, file_info in enumerate(sorted_overviews[:self.batch_size])]
+
+            # Log results
+            if invalid_paths:
+                self.logger.error(f"LLM hallucinated {len(invalid_paths)} invalid paths: {invalid_paths}")
+            self.logger.info(f"Valid prioritized files: {len(prioritized_files)}")
 
         return sorted(prioritized_files, key=lambda x: x.get("priority", 0), reverse=True)
 
@@ -246,7 +264,7 @@ Respond with a JSON object:
 
         current_batch_data = self._prepare_batch_data(batch_file_info, agent)
         if not current_batch_data:
-            self.logger.info(f"No readable files in {batch_info}")
+            self.logger.error(f"No readable files in file batch")
             return None
 
         # Get LLM selection
@@ -257,18 +275,15 @@ Respond with a JSON object:
             response_format={"type": "json_object"}
         )
         result = agent.parse_json_response(response)
-
-        if not result or "error" in result:
-            self.logger.error(f"Error parsing response for {batch_info}: {result.get('error', 'Unknown')}")
-            return None
-
         selected_info = result.get('selected_file')
-        if not selected_info:
+
+        if not result or "error" in result or not selected_info:
+            self.logger.error(f"Error parsing response for file batch: {result.get('error', 'Unknown')}")
             return None
 
         file_number = selected_info.get('file_number')
         if not (file_number and 1 <= file_number <= len(current_batch_data)):
-            self.logger.error(f"Invalid file_number {file_number} for {batch_info}")
+            self.logger.error(f"Invalid file_number {file_number} for file batch")
             return None
 
         file_data = current_batch_data[file_number - 1]
