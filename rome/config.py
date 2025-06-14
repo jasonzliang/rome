@@ -132,6 +132,7 @@ DEFAULT_CONFIG = {
 
     # Search Actions
     "PrioritySearchAction": {
+        "randomness": 4,
         "batch_size": 10,  # Candidate batch size for selection
         "selection_criteria": "Select the file that you have the most confidence in improving or fixing.",
     },

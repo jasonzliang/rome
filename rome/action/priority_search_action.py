@@ -23,7 +23,7 @@ class PrioritySearchAction(Action):
     def __init__(self, config: Dict = None):
         super().__init__(config)
         self.logger = get_logger()
-        check_attrs(self, ['selection_criteria', 'batch_size'])
+        check_attrs(self, ['selection_criteria', 'batch_size', 'randomness'])
 
     def summary(self, agent) -> str:
         """Return a detailed summary of the search action"""
