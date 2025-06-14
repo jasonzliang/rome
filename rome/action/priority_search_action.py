@@ -228,7 +228,7 @@ REQUIREMENTS:
             class_count = file_info['class_count']
 
             overview += (f"- File {i+1}: {filename} (Priority: {file_info['priority']}/10, "
-                        f"Confidence: {confidence}%, Versions: {version_count}, "
+                        f"Completion confidence: {confidence}%, Versions: {version_count}, "
                         f"{def_count} total: {func_count} functions, {class_count} classes)\n")
         return overview
 
