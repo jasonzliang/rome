@@ -133,7 +133,7 @@ File details:
             confidence = file_info['completion_confidence']
             version_count = file_info['version_count']
 
-            prompt += f"\n--- File {j+1}: {file_info['path']} ---\n"
+            prompt += f"\n--- Code filepath {j+1}: {file_info['path']} ---\n"
             prompt += f"Completion confidence: {confidence}%\n"
             prompt += f"Version count: {version_count}\n"
             prompt += f"Total definitions: {file_info['definition_count']} ({file_info['function_count']} functions, {file_info['class_count']} classes)\n"
