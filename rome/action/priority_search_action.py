@@ -118,7 +118,7 @@ class PrioritySearchAction(Action):
 
         randomness_note = ""
         if self.randomness > 0:
-            randomness_note = f"\n 4. **Scoring noise**: Add or subtract random score 0-{self.randomness}) for exploration."
+            randomness_note = f"\n 4. **Scoring noise**: Add or subtract random score 0-{self.randomness} for exploration."
 
         prompt = f"""Return a JSON OBJECT with priority scores for EXACTLY these {len(file_overviews)} files.
 
