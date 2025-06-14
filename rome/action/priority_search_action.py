@@ -113,17 +113,19 @@ class PrioritySearchAction(Action):
         """Create prompt for completion confidence-based file prioritization"""
         if shuffle:
             random.shuffle(file_overviews)
-
         # FIXED: Extract exact file paths upfront
         valid_file_paths = [overview['path'] for overview in file_overviews]
+
+        randomness_note = ""
+        if self.randomness > 0:
+            randomness_note = f"\n 4. **Scoring noise**: Add or subtract random score 0-{self.randomness}) for exploration."
 
         prompt = f"""Return a JSON OBJECT with priority scores for EXACTLY these {len(file_overviews)} files.
 
 Assign priority scores (1-10, 10 being highest) using these criteria:
 1. **Completion confidence** (MOST IMPORTANT): Lower confidence = higher priority
 2. **Version count**: Fewer versions = higher priority
-3. **Function definitions**: More relevant functions = higher priority
-
+3. **Function definitions**: More relevant functions = higher priority{randomness_note}
 CRITICAL: You MUST use the EXACT file paths listed below. Do NOT modify, generate, or create new paths.
 
 File details:
@@ -132,27 +134,22 @@ File details:
         for j, file_info in enumerate(file_overviews):
             confidence = file_info['completion_confidence']
             version_count = file_info['version_count']
-
             prompt += f"\n--- Code filepath {j+1}: {file_info['path']} ---\n"
             prompt += f"Completion confidence: {confidence}%\n"
             prompt += f"Version count: {version_count}\n"
             prompt += f"Total definitions: {file_info['definition_count']} ({file_info['function_count']} functions, {file_info['class_count']} classes)\n"
-
             if file_info['definition_summaries']:
                 prompt += "Code definitions:\n"
                 for def_summary in file_info['definition_summaries']:
                     prompt += f"  {def_summary}\n"
             else:
                 prompt += "No function/class definitions found\n"
-
         prompt += f"""
 Return a JSON OBJECT with up to {min(len(file_overviews), self.batch_size)} files from the EXACT paths listed above:
-
 {{
   "{valid_file_paths[0] if valid_file_paths else 'example/path.py'}": 9,
   "{valid_file_paths[1] if len(valid_file_paths) > 1 else 'example/path2.py'}": 8
 }}
-
 REQUIREMENTS:
 - Use ONLY the exact file paths shown above
 - Do NOT create, modify, or generate new file paths
