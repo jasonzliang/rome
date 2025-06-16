@@ -13,4 +13,4 @@ Logger:
   include_caller_info: rome
 
 MultiAgent:
-  agent_role_json: role_config/minimal_roles2.json
+  agent_role_json: role_config/minimal_roles.json
