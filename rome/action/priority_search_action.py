@@ -95,14 +95,15 @@ class PrioritySearchAction(Action):
 
     def _sample_batch_files(self, file_metadatas: List[Dict]) -> List[Dict]:
         """Sample batch_size files weighted by priority score"""
-        if len(file_metadatas) <= self.batch_size:
-            return file_metadatas
-
-        # Calculate scores and weights
+        # Calculate scores for all files first
         scored_files = []
         for metadata in file_metadatas:
             score = self._calculate_priority_score(metadata)
             scored_files.append({**metadata, 'priority_score': score})
+
+        if len(scored_files) <= self.batch_size:
+            self.logger.info(f"Using all {len(scored_files)} files (less than batch size)")
+            return scored_files
 
         # Sort by score and take top candidates for weighted sampling
         scored_files.sort(key=lambda x: x['priority_score'], reverse=True)
