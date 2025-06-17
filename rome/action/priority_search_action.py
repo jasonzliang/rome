@@ -164,17 +164,17 @@ Detailed file contents:"""
         for i, file_info in enumerate(batch_data):
             prompt += f"\n\n--- File {i+1}: {file_info['path']} ---\n"
 
-            # Add definition summaries if available
-            if file_info['all_definitions']:
-                prompt += "Key definitions:\n"
-                for defn in file_info['all_definitions'][:5]:  # Limit to top 5
-                    prompt += f"  {self._create_definition_summary(defn)}\n"
-                prompt += "\n"
+            # # Add definition summaries if available
+            # if file_info['all_definitions']:
+            #     prompt += "Key definitions:\n"
+            #     for defn in file_info['all_definitions'][:5]:  # Limit to top 5
+            #         prompt += f"  {self._create_definition_summary(defn)}\n"
+            #     prompt += "\n"
 
             prompt += file_info['content']
+            prompt += "\n---\n"
 
         prompt += """
-
 Respond with JSON:
 {
     "selected_file": {
