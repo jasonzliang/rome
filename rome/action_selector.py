@@ -459,7 +459,8 @@ class SmartActionSelector(ActionSelectorBase):
     def _build_intervention_prompt(self, analysis: Dict) -> str:
         """Build prompt with intervention guidance"""
         base = ('Please select one action. Respond with JSON:\n'
-               '{"selected_action": "action_name", "reasoning": "brief_reason"}')
+               '{"selected_action": "action_name", "reasoning": "brief_reason"}\n'
+               'IMPORTANT: You must select an action from "## Available actions ##", even if all of them are overused.')
 
         severity = analysis["severity"]
         message = analysis["message"]
@@ -476,8 +477,7 @@ class SmartActionSelector(ActionSelectorBase):
     def _build_base_selection_prompt(self) -> str:
         """Build standard selection prompt without intervention"""
         base = ('Please select one action. Respond with JSON:\n'
-               '{"selected_action": "action_name", "reasoning": "brief_reason"}\n'
-               'IMPORTANT: You must select an action from "## Available actions ##", even if all of them are overused.')
+               '{"selected_action": "action_name", "reasoning": "brief_reason"}')
 
         if self.exploration_rate > 0.1:
             return base + "\n\nChoose the most appropriate action. Occasional exploration can improve outcomes."
