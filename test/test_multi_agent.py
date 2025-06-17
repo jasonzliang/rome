@@ -88,8 +88,9 @@ def create_config():
         },
         "Agent": {
             "fsm_type": "simple",
-            "patience": 1,
-            "agent_api": False
+            "action_select_strat": "smart",
+            "history_context_len": 25,
+            "patience": 5,
         },
         "Logger": {
             "level": "DEBUG",
