@@ -125,7 +125,7 @@ DEFAULT_CONFIG = {
     # Basic Actions
     "ResetAction": {},
     "AdvancedResetAction": {
-        "completion_confidence": 90,
+        "completion_confidence": 80,
         "max_versions": 30,
     },
     "TransitionAction": {},
