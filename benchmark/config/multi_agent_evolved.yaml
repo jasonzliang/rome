@@ -5,7 +5,7 @@ OpenAIHandler:
 
 Agent:
   fsm: simple
-  action_select_strat: original
+  action_select_strat: smart
   patience: 5
   agent_api: false
 
