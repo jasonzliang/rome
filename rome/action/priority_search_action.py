@@ -91,7 +91,7 @@ class PrioritySearchAction(Action):
             noise = random.uniform(-self.randomness, self.randomness)
             total_score += noise
 
-        return max(0, total_score)
+        return max(0, int(total_score))
 
     def _sample_batch_files(self, file_metadatas: List[Dict]) -> List[Dict]:
         """Sample batch_size files weighted by priority score"""
