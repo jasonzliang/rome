@@ -1,11 +1,13 @@
 import random
 import os
 import time
+import sys
 from typing import Dict, List, Optional, Any
 
 from .action import Action
 from ..logger import get_logger
 from ..config import check_attrs
+from ..parsing import extract_all_definitions
 
 
 class TournamentSearchAction(Action):
@@ -14,7 +16,6 @@ class TournamentSearchAction(Action):
     def __init__(self, config: Dict = None):
         super().__init__(config)
         self.logger = get_logger()
-
         check_attrs(self, ['selection_criteria', 'batch_size'])
 
     def summary(self, agent) -> str:
@@ -39,16 +40,22 @@ class TournamentSearchAction(Action):
             f"[max files: {max_files}, excluding: {excluded_dirs_str}]"
         )
 
-    def _get_file_stats(self, file_path: str) -> Dict[str, Any]:
-        """Get file statistics and content analysis"""
+    def _get_file_metadata(self, file_path: str, agent) -> Dict[str, Any]:
+        """Get file metadata including completion confidence and version data"""
         try:
             stats = os.stat(file_path)
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
 
-            # Import extract_all_definitions from the parent SearchAction
-            from ..parsing import extract_all_definitions
             all_definitions = extract_all_definitions(content)
+
+            # Get completion confidence from progress data
+            progress_data = agent.version_manager.get_data(file_path, 'progress')
+            completion_confidence = progress_data.get('confidence', 0) if progress_data else 0
+
+            # Get version count
+            versions = agent.version_manager.load_version(file_path, k=sys.maxsize, include_content=False)
+            version_count = max(len(versions), 1) if isinstance(versions, list) else 1
 
             return {
                 "path": file_path,
@@ -59,14 +66,15 @@ class TournamentSearchAction(Action):
                 "definition_count": len(all_definitions),
                 "function_count": len([d for d in all_definitions if d['type'] == 'function']),
                 "class_count": len([d for d in all_definitions if d['type'] == 'class']),
+                "completion_confidence": completion_confidence,
+                "version_count": version_count,
             }
         except Exception as e:
-            self.logger.info(f"Error reading {file_path}: {e}")
+            self.logger.error(f"Failed to extract file metadata from {file_path}: {e}")
             return None
 
     def _randomly_select_files(self, all_files: List[str]) -> List[str]:
         """Step 1: Randomly choose K files or fraction of files from all available files"""
-
         if not all_files:
             self.logger.warning("No files available for tournament selection")
             return []
@@ -87,14 +95,14 @@ class TournamentSearchAction(Action):
 
         return selected_files
 
-    def _prepare_tournament_data(self, selected_files: List[str]) -> List[Dict]:
-        """Step 2: Load full content for each selected file"""
+    def _prepare_tournament_data(self, selected_files: List[str], agent) -> List[Dict]:
+        """Step 2: Load full content and metadata for each selected file"""
         tournament_data = []
 
         for file_path in selected_files:
-            file_stats = self._get_file_stats(file_path)
-            if file_stats:
-                tournament_data.append(file_stats)
+            file_metadata = self._get_file_metadata(file_path, agent)
+            if file_metadata:
+                tournament_data.append(file_metadata)
             else:
                 self.logger.warning(f"Could not read file: {file_path}")
 
@@ -103,22 +111,24 @@ class TournamentSearchAction(Action):
 
     def _create_tournament_prompt(self, tournament_data: List[Dict]) -> str:
         """Step 3: Create prompt with full file contents for LLM selection"""
-
         prompt = f"""Select the most relevant file based on your role and selection criteria: {self.selection_criteria}
 
 Tournament Files ({len(tournament_data)} candidates):
 """
 
-        # Add file overview
+        # Add file overview with enhanced metadata
         for i, file_info in enumerate(tournament_data, 1):
             filename = os.path.basename(file_info['path'])
+            confidence = file_info['completion_confidence']
+            version_count = file_info['version_count']
             def_count = file_info['definition_count']
             func_count = file_info['function_count']
             class_count = file_info['class_count']
             size_kb = file_info['size_kb']
 
             prompt += (f"- File {i}: {filename} "
-                      f"({size_kb} KB, {def_count} definitions: {func_count} functions, {class_count} classes)\n")
+                      f"({size_kb} KB, {def_count} definitions: {func_count} functions, {class_count} classes, "
+                      f"completion confidence: {confidence}%, versions: {version_count})\n")
 
         prompt += "\nFull file contents:\n"
 
@@ -147,7 +157,6 @@ Respond with a JSON object:
 
     def _select_winner(self, agent, tournament_data: List[Dict]) -> Optional[Dict]:
         """Use LLM to select the best file from tournament participants"""
-
         prompt = self._create_tournament_prompt(tournament_data)
 
         try:
@@ -164,7 +173,7 @@ Respond with a JSON object:
 
             selected_info = result.get('selected_file')
             if not selected_info:
-                self.logger.info("LLM did not select any file")
+                self.logger.error("LLM did not select any file")
                 return None
 
             file_number = selected_info.get('file_number')
@@ -182,7 +191,9 @@ Respond with a JSON object:
                 'tournament_size': len(tournament_data)
             }
 
-            self.logger.info(f"Tournament winner: {winner_data['path']} - {selected_file['reason']}")
+            self.logger.info(f"Tournament winner: {winner_data['path']} "
+                           f"(completion confidence: {winner_data['completion_confidence']}%, "
+                           f"versions: {winner_data['version_count']}) - {selected_file['reason']}")
             return selected_file
 
         except Exception as e:
@@ -191,7 +202,6 @@ Respond with a JSON object:
 
     def execute(self, agent, **kwargs) -> bool:
         """Execute the tournament search action"""
-
         # Use the agent's repository manager to collect and filter files
         filtered_files = agent.repository_manager.collect_and_filter_files(agent=agent)
 
@@ -206,8 +216,8 @@ Respond with a JSON object:
             self.logger.error("Search completed but no file was selected by agent.")
             return False
 
-        # Step 2: Load full content for selected files
-        tournament_data = self._prepare_tournament_data(selected_files)
+        # Step 2: Load full content and metadata for selected files
+        tournament_data = self._prepare_tournament_data(selected_files, agent)
 
         if not tournament_data:
             self.logger.error("No readable files in tournament")
