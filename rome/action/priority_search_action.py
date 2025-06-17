@@ -106,10 +106,11 @@ class PrioritySearchAction(Action):
             return scored_files
 
         # Sort by score and take top candidates for weighted sampling
-        scored_files.sort(key=lambda x: x['priority_score'], reverse=True)
+        # scored_files.sort(key=lambda x: x['priority_score'], reverse=True)
 
         # Use top 2x batch_size files for weighted sampling to balance exploration vs exploitation
-        candidates = scored_files[:min(len(scored_files), self.batch_size * 2)]
+        # candidates = scored_files[:min(len(scored_files), self.batch_size * 2)]
+        candidates = scored_files
         weights = [f['priority_score'] for f in candidates]
 
         # Weighted sampling without replacement
