@@ -61,14 +61,14 @@ class Agent:
         self._setup_repository_and_logging(repository)
 
         # Initialize core components
-        self._setup_fsm()
+        self._setup_openai_handler()
         self._setup_context_history()
         self._setup_repository_manager()
         self._setup_version_manager()
-        self._setup_openai_handler()
         self._setup_action_selection()
-        self._setup_agent_api()
         self._setup_callback()
+        self._setup_fsm()
+        self._setup_agent_api()
 
         # Register cleanup handlers
         self._register_cleanup()
@@ -147,19 +147,29 @@ class Agent:
         self.logger.info(f"Initialized {self.fsm_type} FSM using FSMSelector: {self.fsm.get_current_state()}")
         self.logger.info(f"FSM Description: {fsm_selector.get_description()}")
 
-    def _load_summary_history(self) -> int:
-        """Load iteration number and summary history from saved files"""
+    def _load_summary_history(self) -> None:
+        """Load iteration number, summary history, and OpenAI cost from saved files"""
         try:
             summary_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.summary.json")
             history_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.summary_history.json")
 
             # Load current iteration from summary file
             iteration = 1
+            accumulated_cost = 0.0
+            call_count = 0
+
             if os.path.exists(summary_file):
                 with open(summary_file, 'r') as f:
                     summary_data = json.load(f)
                 iteration = summary_data.get('iteration', 1)
+
+                # Extract OpenAI cost data from the most recent summary
+                openai_cost = summary_data.get('summary', {}).get('openai_cost', {})
+                accumulated_cost = openai_cost.get('accumulated_cost', 0.0)
+                call_count = openai_cost.get('call_count', 0)
+
                 self.logger.info(f"Loaded current iteration: {iteration}")
+                self.logger.info(f"Loaded OpenAI accumulated cost: ${accumulated_cost:.4f} from {call_count} calls")
             else:
                 self.logger.info("No summary file found, starting fresh at iteration 1")
 
@@ -173,20 +183,29 @@ class Agent:
                 self.summary_history = []
                 self.logger.info("No summary history file found, starting with empty history")
 
-            return iteration
+            # Set the accumulated cost and call count in OpenAI handler if it exists
+            self.openai_handler.accumulated_cost = accumulated_cost
+            self.openai_handler.call_count = call_count
+            self.logger.info(f"Restored OpenAI handler cost tracking: ${accumulated_cost:.4f}")
+
+            # Set current iteration
+            self.curr_iteration = iteration
+            self.logger.info(f"Set current iteration to: {iteration}")
 
         except Exception as e:
             self.logger.error(f"Error loading summary data: {e}, defaulting to iteration 1")
             self.summary_history = []
-            return 1
+            self.curr_iteration = 1
 
     def _setup_context_history(self) -> None:
         """Simplified setup - loads iteration and summary history"""
+        # Load summary history from json first
+        self._load_summary_history()
+
         self.context = {}
         self.history = AgentHistory()
 
         # Load iteration and summary history together
-        self.curr_iteration = self._load_summary_history()
         self.history.set_iteration(self.curr_iteration)
 
         # Add initial FSM state to history if FSM is initialized
