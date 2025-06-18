@@ -159,15 +159,12 @@ class Agent:
             if os.path.exists(summary_file):
                 with open(summary_file, 'r') as f:
                     summary_data = json.load(f)
-                iteration = summary_data.get('iteration', 1)
+                iteration = summary_data.get('iteration')
 
                 # Extract OpenAI cost data from the most recent summary
                 openai_cost = summary_data.get('summary', {}).get('openai_cost', {})
                 accumulated_cost = openai_cost.get('accumulated_cost')
                 call_count = openai_cost.get('call_count')
-
-                self.logger.info(f"Loaded current iteration: {iteration}")
-                self.logger.info(f"Loaded OpenAI accumulated cost: ${accumulated_cost:.4f} from {call_count} calls")
             else:
                 self.logger.info("No summary file found, starting fresh at iteration 1")
 
@@ -185,11 +182,12 @@ class Agent:
             if accumulated_cost is not None and call_count is not None:
                 self.openai_handler.accumulated_cost = accumulated_cost
                 self.openai_handler.call_count = call_count
-                self.logger.info(f"Restored OpenAI handler cost tracking: ${accumulated_cost:.4f}")
+                self.logger.info(f"Loaded OpenAI API cost from summary: ${accumulated_cost:.4f}")
 
             # Set current iteration
-            self.curr_iteration = iteration
-            self.logger.info(f"Set current iteration to: {iteration}")
+            if iteration is not None:
+                self.curr_iteration = iteration
+                self.logger.info(f"Loaded current iteration from summary: {iteration}")
 
         except Exception as e:
             self.logger.error(f"Error loading summary data: {e}, defaulting to iteration 1")
