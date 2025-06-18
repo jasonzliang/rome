@@ -154,7 +154,7 @@ class Agent:
             history_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.summary_history.json")
 
             # Load current iteration from summary file
-            iteration = 1; accumulated_cost = None; call_count = None
+            iteration = None; accumulated_cost = None; call_count = None
 
             if os.path.exists(summary_file):
                 with open(summary_file, 'r') as f:
@@ -188,6 +188,8 @@ class Agent:
             if iteration is not None:
                 self.curr_iteration = iteration
                 self.logger.info(f"Loaded current iteration from summary: {iteration}")
+            else:
+                self.curr_iteration = 1
 
         except Exception as e:
             self.logger.error(f"Error loading summary data: {e}, defaulting to iteration 1")
