@@ -154,9 +154,7 @@ class Agent:
             history_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.summary_history.json")
 
             # Load current iteration from summary file
-            iteration = 1
-            accumulated_cost = 0.0
-            call_count = 0
+            iteration = 1; accumulated_cost = None; call_count = None
 
             if os.path.exists(summary_file):
                 with open(summary_file, 'r') as f:
@@ -165,8 +163,8 @@ class Agent:
 
                 # Extract OpenAI cost data from the most recent summary
                 openai_cost = summary_data.get('summary', {}).get('openai_cost', {})
-                accumulated_cost = openai_cost.get('accumulated_cost', 0.0)
-                call_count = openai_cost.get('call_count', 0)
+                accumulated_cost = openai_cost.get('accumulated_cost')
+                call_count = openai_cost.get('call_count')
 
                 self.logger.info(f"Loaded current iteration: {iteration}")
                 self.logger.info(f"Loaded OpenAI accumulated cost: ${accumulated_cost:.4f} from {call_count} calls")
@@ -184,9 +182,10 @@ class Agent:
                 self.logger.info("No summary history file found, starting with empty history")
 
             # Set the accumulated cost and call count in OpenAI handler if it exists
-            self.openai_handler.accumulated_cost = accumulated_cost
-            self.openai_handler.call_count = call_count
-            self.logger.info(f"Restored OpenAI handler cost tracking: ${accumulated_cost:.4f}")
+            if accumulated_cost is not None and call_count is not None:
+                self.openai_handler.accumulated_cost = accumulated_cost
+                self.openai_handler.call_count = call_count
+                self.logger.info(f"Restored OpenAI handler cost tracking: ${accumulated_cost:.4f}")
 
             # Set current iteration
             self.curr_iteration = iteration
