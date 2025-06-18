@@ -199,13 +199,11 @@ class Agent:
 
     def _setup_context_history(self) -> None:
         """Simplified setup - loads iteration and summary history"""
-        # Load summary history from json first
+        # Set current iteration and OpenAI API cost from summary history json
         self._load_summary_history()
 
         self.context = {}
         self.history = AgentHistory()
-
-        # Load iteration and summary history together
         self.history.set_iteration(self.curr_iteration)
 
         # Add initial FSM state to history if FSM is initialized
