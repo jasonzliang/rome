@@ -15,20 +15,20 @@ from typing import Dict, List, Optional, Union, Callable
 from datetime import datetime
 import glob
 
-# Configure matplotlib backend before any imports
-import matplotlib
-matplotlib.use('Agg')  # Use non-interactive backend
+import matplotlib; matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from rome.logger import get_logger
-from rome.config import LOG_DIR_NAME
 
 try:
     from evalplus.data import get_human_eval_plus, get_mbpp_plus, write_jsonl
 except ImportError:
     raise ImportError("EvalPlus not found. Install with: pip install evalplus")
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from rome.logger import get_logger
+from rome.config import LOG_DIR_NAME
+
+# Name evaluation directory for evalplus
+EVAL_DIR_NAME = "evaluation"
 
 
 class EvalplusEvaluator:
@@ -46,7 +46,7 @@ class EvalplusEvaluator:
         self.dataset = dataset
         self.benchmark_dir = Path(benchmark_dir)
         self.log_dir = self.benchmark_dir / LOG_DIR_NAME
-        self.eval_dir = self.log_dir / "evaluation"
+        self.eval_dir = self.log_dir / EVAL_DIR_NAME
         self.benchmark_dir.mkdir(parents=True, exist_ok=True)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.eval_dir.mkdir(parents=True, exist_ok=True)
