@@ -74,7 +74,7 @@ def create_config():
             "fsm_type": "simple",
             "action_select_strat": "smart",
             "patience": 1,
-            "agent_api": False,
+            "agent_api": True,
             "save_hist_interval": 1
         },
         "Logger": {

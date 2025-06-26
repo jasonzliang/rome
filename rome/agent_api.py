@@ -83,6 +83,8 @@ class AgentApi:
 
         @self.app.get("/agent", response_class=JSONResponse)
         async def get_agent_state():
+            # Disable logging for this endpoint
+            self.logger.disable()
             try:
                 agent, fsm, hist = self.agent, self.agent.fsm, self.agent.history
                 summary = agent.get_summary()
@@ -141,12 +143,16 @@ class AgentApi:
                     }
                 }
             except Exception as e:
-                self.logger.error(f"Error in get_agent_state endpoint: {str(e)}")
                 return JSONResponse(content={"error": str(e)}, status_code=500)
+            finally:
+                # Re-enable logging after endpoint execution
+                self.logger.enable()
 
         @self.app.get("/agent/fsm", response_class=JSONResponse)
         async def get_agent_fsm():
             """Get detailed FSM structure and workflow information"""
+            # Disable logging for this endpoint
+            self.logger.disable()
             try:
                 fsm = self.agent.fsm
                 return {
@@ -170,8 +176,10 @@ class AgentApi:
                     }
                 }
             except Exception as e:
-                self.logger.error(f"Error in get_agent_fsm endpoint: {str(e)}")
                 return JSONResponse(content={"error": str(e)}, status_code=500)
+            finally:
+                # Re-enable logging after endpoint execution
+                self.logger.enable()
 
     def run(self):
         """Run FastAPI in a background thread (non-blocking)."""

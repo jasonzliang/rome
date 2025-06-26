@@ -61,13 +61,13 @@ class Agent:
         self._setup_repository_and_logging(repository)
 
         # Initialize core components
+        self._setup_fsm()
         self._setup_openai_handler()
         self._setup_context_history()
         self._setup_repository_manager()
         self._setup_version_manager()
         self._setup_action_selection()
         self._setup_callback()
-        self._setup_fsm()
         self._setup_agent_api()
 
         # Register cleanup handlers

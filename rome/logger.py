@@ -167,6 +167,14 @@ class Logger:
             basic_handler.setLevel(logging.INFO)
             self._logger.addHandler(basic_handler)
 
+    def disable(self):
+        """Temporarily disable all logging output"""
+        self._logger.disabled = True
+
+    def enable(self):
+        """Re-enable logging output"""
+        self._logger.disabled = False
+
     def is_configured(self) -> bool:
         """Check if the logger has been properly configured"""
         return self._configured

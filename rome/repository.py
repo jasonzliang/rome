@@ -244,12 +244,11 @@ class RepositoryManager:
 
         Args:
             agent: Agent instance with version_manager for checking finished status
+            verbose: Whether to print stats to console/log
 
         Returns:
             Dictionary with completion statistics
         """
-        self.logger.info(f"Checking completion status in repository: {self.repository_path}")
-
         # Use collect_all_files to get all Python files
         all_files = self.collect_all_files()
 
@@ -275,6 +274,7 @@ class RepositoryManager:
             'completion_percentage': round(completion_percentage, 2)
         }
 
+        self.logger.info(f"Checked completion status in repository: {self.repository_path}")
         self.logger.info(f"Repository progress: {finished_count}/{total_count} files ({completion_percentage:.2f}%)")
         return result
 
