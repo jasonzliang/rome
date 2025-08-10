@@ -1,0 +1,482 @@
+# chroma_server.py
+import os
+import time
+import subprocess
+import signal
+import threading
+import requests
+import atexit
+from typing import Optional, Dict
+
+import chromadb
+
+from .config import set_attributes_from_config
+from .logger import get_logger
+
+
+class ChromaServerManager:
+    """Independent ChromaDB server lifecycle manager"""
+
+    _instance = None
+    _lock = threading.Lock()
+
+    @classmethod
+    def get_instance(cls, config: Dict = None):
+        """Get singleton instance of ChromaServerManager"""
+        with cls._lock:
+            if cls._instance is None:
+                cls._instance = cls(config)
+            return cls._instance
+
+    @classmethod
+    def reset_instance(cls):
+        """Reset singleton instance (for testing)"""
+        with cls._lock:
+            if cls._instance:
+                cls._instance.force_stop()
+            cls._instance = None
+
+    def __init__(self, config: Dict = None):
+        """Initialize ChromaDB server manager"""
+        if ChromaServerManager._instance is not None:
+            raise RuntimeError("ChromaServerManager is a singleton. Use get_instance() instead.")
+
+        self.config = config or {}
+        self.logger = get_logger()
+
+        # Set attributes from config
+        set_attributes_from_config(self, self.config,
+            ['host', 'port', 'persist_path', 'startup_timeout', 'shutdown_timeout'])
+
+        # Handle persist_path intelligently
+        self.persist_path = self._resolve_persist_path()
+
+        self.server_process = None
+        self.server_url = f"http://{self.host}:{self.port}"
+        self._clients = set()  # Track active clients
+        self._shutdown_registered = False
+
+        # Register cleanup on exit
+        self._register_cleanup()
+
+        self.logger.debug(f"ChromaServerManager initialized for {self.server_url}")
+        self.logger.debug(f"Data will persist to: {self.persist_path}")
+
+    def _resolve_persist_path(self) -> str:
+        """Resolve the best persist path for ChromaDB data"""
+        import tempfile
+        import platform
+
+        # If explicitly set in config, use that
+        if self.persist_path:
+            return os.path.expanduser(self.persist_path)
+
+        # Auto-detect best location based on platform
+        system = platform.system().lower()
+
+        base_dir = os.path.expanduser("~/.rome")
+        # if system == "darwin":  # macOS
+        #     base_dir = os.path.expanduser("~/Library/Application Support")
+        # elif system == "windows":
+        #     base_dir = os.path.expanduser("~/AppData/Local")
+        # else:  # Linux and others
+        #     base_dir = os.path.expanduser("~/.local/share")
+
+        # Create agent-specific directory
+        agent_data_dir = os.path.join(base_dir, "agent-framework", "chroma-db")
+
+        # Fallback to temp if home directory issues
+        try:
+            os.makedirs(agent_data_dir, exist_ok=True)
+            # Test write access
+            test_file = os.path.join(agent_data_dir, ".write_test")
+            with open(test_file, 'w') as f:
+                f.write("test")
+            os.remove(test_file)
+            return agent_data_dir
+        except (OSError, PermissionError):
+            # Fallback to session-specific temp directory
+            session_dir = os.path.join(tempfile.gettempdir(), f"agent-chroma-{os.getpid()}")
+            self.logger.warning(f"Could not use user data directory, falling back to: {session_dir}")
+            return session_dir
+
+    def _register_cleanup(self):
+        """Register cleanup handlers"""
+        if not self._shutdown_registered:
+            atexit.register(self.stop)
+            self._shutdown_registered = True
+
+    def is_running(self) -> bool:
+        """Check if ChromaDB server is running"""
+        try:
+            response = requests.get(f"{self.server_url}/api/v1/heartbeat", timeout=2)
+            return response.status_code == 200
+        except:
+            return False
+
+    def start(self, force_restart: bool = False) -> bool:
+        """
+        Start ChromaDB server
+
+        Args:
+            force_restart: If True, stop existing server before starting
+
+        Returns:
+            True if server started successfully, False otherwise
+        """
+        if force_restart and self.is_running():
+            self.logger.info("Force restart requested, stopping existing server")
+            self.stop()
+            time.sleep(2)  # Give server time to fully stop
+
+        if self.is_running():
+            self.logger.info(f"ChromaDB server already running at {self.server_url}")
+            return True
+
+        self.logger.info(f"Starting ChromaDB server at {self.server_url}...")
+
+        # Ensure persist directory exists
+        os.makedirs(self.persist_path, exist_ok=True)
+
+        # Try different command variations for ChromaDB
+        commands = [
+            ["chroma", "run", "--host", self.host, "--port", str(self.port), "--path", self.persist_path],
+            ["chroma", "run", "--host", self.host, "--port", str(self.port)],
+            ["python", "-m", "chromadb.cli.cli", "run", "--host", self.host, "--port", str(self.port), "--path", self.persist_path],
+            ["python", "-m", "chromadb", "run", "--host", self.host, "--port", str(self.port), "--path", self.persist_path]
+        ]
+
+        for cmd in commands:
+            if self._try_start_command(cmd):
+                return True
+
+        self.logger.error("All ChromaDB server start attempts failed")
+        self.logger.info(f"Try manually: chroma run --host {self.host} --port {self.port} --path {self.persist_path}")
+        return False
+
+    def _try_start_command(self, cmd: list) -> bool:
+        """Try to start server with a specific command"""
+        try:
+            self.logger.debug(f"Trying command: {' '.join(cmd)}")
+
+            # Start process
+            self.server_process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                preexec_fn=os.setsid if hasattr(os, 'setsid') else None
+            )
+
+            # Wait for server to be ready
+            for i in range(self.startup_timeout):
+                time.sleep(1)
+
+                if self.is_running():
+                    self.logger.info(f"ChromaDB server started successfully (took {i+1}s)")
+                    return True
+
+                # Check if process died
+                if self.server_process.poll() is not None:
+                    stdout, stderr = self.server_process.communicate()
+                    self.logger.debug(f"Command failed: {stderr.decode().strip()}")
+                    self.server_process = None
+                    return False
+
+            # Timeout - kill process and try next command
+            self.logger.debug(f"Command timed out after {self.startup_timeout}s")
+            self._kill_process()
+            return False
+
+        except FileNotFoundError:
+            self.logger.debug(f"Command not found: {cmd[0]}")
+            return False
+        except Exception as e:
+            self.logger.debug(f"Error with command {cmd[0]}: {e}")
+            self._kill_process()
+            return False
+
+    def _kill_process(self):
+        """Forcefully kill the server process"""
+        if self.server_process:
+            try:
+                if hasattr(os, 'killpg'):
+                    os.killpg(os.getpgid(self.server_process.pid), signal.SIGTERM)
+                else:
+                    self.server_process.terminate()
+
+                try:
+                    self.server_process.wait(timeout=2)
+                except subprocess.TimeoutExpired:
+                    if hasattr(os, 'killpg'):
+                        os.killpg(os.getpgid(self.server_process.pid), signal.SIGKILL)
+                    else:
+                        self.server_process.kill()
+            except Exception as e:
+                self.logger.debug(f"Error killing process: {e}")
+            finally:
+                self.server_process = None
+
+    def stop(self, force: bool = False):
+        """
+        Stop ChromaDB server gracefully
+
+        Args:
+            force: If True, force kill the server process
+        """
+        if not force and self._clients:
+            self.logger.warning(f"Cannot stop server: {len(self._clients)} active clients remain")
+            return False
+
+        if self.server_process and self.server_process.poll() is None:
+            self.logger.info("Stopping ChromaDB server...")
+
+            try:
+                # Graceful shutdown
+                if hasattr(os, 'killpg'):
+                    os.killpg(os.getpgid(self.server_process.pid), signal.SIGTERM)
+                else:
+                    self.server_process.terminate()
+
+                try:
+                    self.server_process.wait(timeout=self.shutdown_timeout)
+                    self.logger.info("ChromaDB server stopped gracefully")
+                except subprocess.TimeoutExpired:
+                    # Force kill if graceful shutdown fails
+                    self.logger.warning("Graceful shutdown timed out, force killing server")
+                    if hasattr(os, 'killpg'):
+                        os.killpg(os.getpgid(self.server_process.pid), signal.SIGKILL)
+                    else:
+                        self.server_process.kill()
+                    self.logger.info("ChromaDB server force stopped")
+
+            except Exception as e:
+                self.logger.warning(f"ChromaDB server shutdown warning: {e}")
+            finally:
+                self.server_process = None
+
+        return True
+
+    def force_stop(self):
+        """Force stop the server regardless of active clients"""
+        return self.stop(force=True)
+
+    def restart(self) -> bool:
+        """Restart the ChromaDB server"""
+        self.logger.info("Restarting ChromaDB server...")
+        self.stop(force=True)
+        time.sleep(2)  # Give server time to fully stop
+        return self.start()
+
+    def get_client(self) -> chromadb.HttpClient:
+        """
+        Get ChromaDB client and register it as active
+
+        Returns:
+            chromadb.HttpClient instance
+
+        Raises:
+            RuntimeError: If server is not running
+        """
+        if not self.is_running():
+            raise RuntimeError(f"ChromaDB server not running at {self.server_url}")
+
+        client = chromadb.HttpClient(host=self.host, port=self.port)
+        self._clients.add(client)
+        self.logger.debug(f"Created ChromaDB client ({len(self._clients)} active)")
+        return client
+
+    def release_client(self, client: chromadb.HttpClient):
+        """Release a client (remove from active clients tracking)"""
+        self._clients.discard(client)
+        self.logger.debug(f"Released ChromaDB client ({len(self._clients)} active)")
+
+    def get_status(self) -> Dict:
+        """Get detailed server status"""
+        return {
+            "running": self.is_running(),
+            "url": self.server_url,
+            "host": self.host,
+            "port": self.port,
+            "persist_path": self.persist_path,
+            "process_id": self.server_process.pid if self.server_process else None,
+            "active_clients": len(self._clients),
+            "startup_timeout": self.startup_timeout,
+            "shutdown_timeout": self.shutdown_timeout
+        }
+
+    def get_database_info(self) -> Dict:
+        """Get information about database location and collections"""
+        try:
+            if self.is_running():
+                client = chromadb.HttpClient(host=self.host, port=self.port)
+                collections = client.list_collections()
+                collection_info = [{"name": c.name, "count": c.count()} for c in collections]
+            else:
+                collection_info = []
+
+            return {
+                "persist_path": self.persist_path,
+                "server_url": self.server_url,
+                "running": self.is_running(),
+                "collections": collection_info,
+                "total_collections": len(collection_info)
+            }
+        except Exception as e:
+            return {
+                "persist_path": self.persist_path,
+                "server_url": self.server_url,
+                "running": self.is_running(),
+                "error": str(e)
+            }
+        """Perform health check and return detailed status"""
+        status = self.get_status()
+
+        if status["running"]:
+            try:
+                # Try to create a test client
+                test_client = chromadb.HttpClient(host=self.host, port=self.port)
+
+                # Test basic operations
+                collections = test_client.list_collections()
+                status.update({
+                    "health": "healthy",
+                    "collections_count": len(collections),
+                    "error": None
+                })
+            except Exception as e:
+                status.update({
+                    "health": "unhealthy",
+                    "error": str(e)
+                })
+        else:
+            status.update({
+                "health": "not_running",
+                "error": "Server is not running"
+            })
+
+        return status
+
+    def clear_database(self, force: bool = False) -> bool:
+        """
+        Clear all data from the ChromaDB database
+
+        Args:
+            force: If True, stop server first to ensure clean deletion
+
+        Returns:
+            True if database was cleared successfully
+        """
+        import shutil
+
+        was_running = self.is_running()
+
+        try:
+            # Stop server if running (database files are locked while server runs)
+            if was_running:
+                if not force:
+                    self.logger.error("Cannot clear database while server is running. Use force=True to stop server first.")
+                    return False
+
+                self.logger.info("Stopping server to clear database...")
+                if not self.stop(force=True):
+                    self.logger.error("Failed to stop server for database clearing")
+                    return False
+
+                # Give server time to fully shutdown
+                import time
+                time.sleep(2)
+
+            # Clear the database directory
+            if os.path.exists(self.persist_path):
+                self.logger.info(f"Clearing database at: {self.persist_path}")
+                shutil.rmtree(self.persist_path)
+                self.logger.info("Database cleared successfully")
+            else:
+                self.logger.info("Database directory doesn't exist - nothing to clear")
+
+            # Restart server if it was running before
+            if was_running:
+                self.logger.info("Restarting server after database clear...")
+                return self.start()
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to clear database: {e}")
+
+            # Try to restart server if it was running
+            if was_running:
+                try:
+                    self.start()
+                except:
+                    self.logger.error("Failed to restart server after failed database clear")
+
+            return False
+
+    def clear_collection(self, collection_name: str) -> bool:
+        """
+        Clear a specific collection from the database
+
+        Args:
+            collection_name: Name of collection to clear
+
+        Returns:
+            True if collection was cleared successfully
+        """
+        try:
+            if not self.is_running():
+                self.logger.error("Server must be running to clear collections")
+                return False
+
+            client = chromadb.HttpClient(host=self.host, port=self.port)
+
+            # Check if collection exists
+            try:
+                collection = client.get_collection(collection_name)
+                # Delete all documents in the collection
+                collection.delete()  # This deletes all documents
+                self.logger.info(f"Cleared collection '{collection_name}'")
+                return True
+            except Exception:
+                # Collection doesn't exist
+                self.logger.info(f"Collection '{collection_name}' doesn't exist - nothing to clear")
+                return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to clear collection '{collection_name}': {e}")
+            return False
+
+    def delete_collection(self, collection_name: str) -> bool:
+        """
+        Completely delete a collection from the database
+
+        Args:
+            collection_name: Name of collection to delete
+
+        Returns:
+            True if collection was deleted successfully
+        """
+        try:
+            if not self.is_running():
+                self.logger.error("Server must be running to delete collections")
+                return False
+
+            client = chromadb.HttpClient(host=self.host, port=self.port)
+
+            try:
+                client.delete_collection(collection_name)
+                self.logger.info(f"Deleted collection '{collection_name}'")
+                return True
+            except Exception:
+                self.logger.info(f"Collection '{collection_name}' doesn't exist - nothing to delete")
+                return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to delete collection '{collection_name}': {e}")
+            return False
+        """Cleanup on deletion"""
+        try:
+            if hasattr(self, 'server_process') and self.server_process:
+                self.force_stop()
+        except:
+            pass  # Ignore errors during cleanup

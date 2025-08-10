@@ -196,6 +196,36 @@ DEFAULT_CONFIG = {
         "max_size_kb": 10000,  # Max log size in kb, truncates after exceeding
         "timezone": 'US/Pacific',  # Default timezone to display
     },
+
+    # KNOWLEDGE BASE MANAGEMENT
+
+    "ChromaKB": {
+        "collection_name": "agent_kb",  # ChromaDB collection name
+        "enable_reranking": True,  # Enable OpenAI reranking
+        "use_shared_server": True,  # Use shared server instance across KB instances
+
+        # LlamaIndex configuration
+        "chunk_size": 512,  # Chunk size for text splitting
+        "chunk_overlap": 50,  # Overlap between chunks
+        "embedding_model": "text-embedding-3-small",  # OpenAI embedding model
+        # Note: LLM model and temperature are inherited from agent's OpenAIHandler config
+        # Note: Server is automatically started when needed
+    },
+
+    "ChromaServerManager": {
+        "host": "localhost",  # ChromaDB server host
+        "port": 8000,  # ChromaDB server port
+        "persist_path": None,  # Data persistence directory (None = auto-detect user data dir)
+        "startup_timeout": 15,  # Server startup timeout in seconds
+        "shutdown_timeout": 5,  # Server shutdown timeout in seconds
+    },
+
+    "OpenAIReranker": {
+        # Note: Model settings are inherited from agent's OpenAIHandler config
+        "batch_size": 5,  # Batch size for reranking
+        "max_docs": 50,  # Max docs for direct reranking (triggers hierarchical above this)
+        "min_score_threshold": 0.3,  # Minimum relevance score to include in context
+    }
 }
 
 

@@ -33,6 +33,8 @@ from .parsing import parse_python_response, parse_json_response
 from .action_selector import ActionSelector
 # Import the process management decorator
 from .process import process_managed
+# Import knowledge base tools
+from .knowledge_base import ChromaKB
 
 # Make yaml use compact representation for lists
 yaml.add_representer(list, lambda dumper, data: dumper.represent_sequence(
@@ -67,6 +69,7 @@ class Agent:
         self._setup_repository_manager()
         self._setup_version_manager()
         self._setup_action_selection()
+        self._setup_knowledge_base()
         self._setup_callback()
         self._setup_agent_api()
 
@@ -91,7 +94,9 @@ class Agent:
         # Set attributes from Agent config
         agent_config = self.config.get('Agent', {})
         set_attributes_from_config(self, agent_config,
-            ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience', 'action_select_strat', 'log_pid', 'save_hist_interval'])
+            ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience',
+             'action_select_strat', 'log_pid', 'save_hist_interval'])
+
         self.logger.assert_true(self.history_context_len > 0,
             f"history_context_len must be greater than 0")
         self.logger.assert_true(self.save_hist_interval > 0,
@@ -245,6 +250,12 @@ class Agent:
         )
         self.logger.info(f"Action selector: {self.action_select_strat}")
 
+    def _setup_knowledge_base(self) -> None:
+        """Setup knowledge base if enabled"""
+        kb_config = self.config.get('ChromaKB', {})
+        self.knowledge_base = ChromaKB(config=kb_config, agent=self)
+        self.logger.info(f"Knowledge base initialized: {self.knowledge_base.info()}")
+
     def _setup_agent_api(self) -> None:
         """Setup agent API if enabled"""
         if not self.agent_api:
@@ -322,10 +333,7 @@ class Agent:
             if self.agent_api:
                 self.agent_api.shutdown()
             self.version_manager.shutdown(self)
-
-            # for obj in self.shutdown_list:
-            #     if hasattr(obj, 'shutdown') and callable(obj.shutdown):
-            #         obj.shutdown()
+            self.knowledge_base.shutdown()
 
             self.logger.info("Agent shutdown completed successfully")
         except Exception as e:
