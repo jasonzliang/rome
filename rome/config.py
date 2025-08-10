@@ -199,7 +199,7 @@ DEFAULT_CONFIG = {
 
     # KNOWLEDGE BASE MANAGEMENT
 
-    "ChromaKB": {
+    "ChromaClientManager": {
         "collection_name": "agent_kb",  # ChromaDB collection name
         "enable_reranking": True,  # Enable OpenAI reranking
         "use_shared_server": True,  # Use shared server instance across KB instances

@@ -34,7 +34,7 @@ from .action_selector import ActionSelector
 # Import the process management decorator
 from .process import process_managed
 # Import knowledge base tools
-from .knowledge_base import ChromaKB
+from .kb_client import ChromaClientManager
 
 # Make yaml use compact representation for lists
 yaml.add_representer(list, lambda dumper, data: dumper.represent_sequence(
@@ -252,9 +252,9 @@ class Agent:
 
     def _setup_knowledge_base(self) -> None:
         """Setup knowledge base if enabled"""
-        kb_config = self.config.get('ChromaKB', {})
-        self.knowledge_base = ChromaKB(config=kb_config, agent=self)
-        self.logger.info(f"Knowledge base initialized: {self.knowledge_base.info()}")
+        kb_config = self.config.get('ChromaClientManager', {})
+        self.kb_manager = ChromaClientManager(config=kb_config, agent=self)
+        self.logger.info(f"Knowledge base initialized: {self.kb_manager.info()}")
 
     def _setup_agent_api(self) -> None:
         """Setup agent API if enabled"""
@@ -333,7 +333,7 @@ class Agent:
             if self.agent_api:
                 self.agent_api.shutdown()
             self.version_manager.shutdown(self)
-            self.knowledge_base.shutdown()
+            self.kb_manager.shutdown()
 
             self.logger.info("Agent shutdown completed successfully")
         except Exception as e:
