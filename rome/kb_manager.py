@@ -18,7 +18,7 @@ except ImportError as e:
 
 from .config import set_attributes_from_config
 from .logger import get_logger
-from .chroma_server import ChromaServerManager
+from .kb_server import ChromaServerManager
 
 
 class OpenAIReranker:

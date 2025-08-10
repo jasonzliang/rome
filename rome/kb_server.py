@@ -1,5 +1,6 @@
 # chroma_server.py
 import os
+import sys
 import time
 import subprocess
 import signal
@@ -13,6 +14,7 @@ import chromadb
 from .config import set_attributes_from_config
 from .logger import get_logger
 
+TIMEOUT_LEN = 2
 
 class ChromaServerManager:
     """Independent ChromaDB server lifecycle manager"""
@@ -46,7 +48,13 @@ class ChromaServerManager:
 
         # Set attributes from config
         set_attributes_from_config(self, self.config,
-            ['host', 'port', 'persist_path', 'startup_timeout', 'shutdown_timeout'])
+            ['host', 'port', 'persist_path'],
+            ['startup_timeout', 'shutdown_timeout'])
+
+        if not self.startup_timeout:
+            self.startup_timeout = TIMEOUT_LEN * 2
+        if not self.shutdown_timeout:
+            self.shutdown_timeout = TIMEOUT_LEN
 
         # Handle persist_path intelligently
         self.persist_path = self._resolve_persist_path()
@@ -71,7 +79,7 @@ class ChromaServerManager:
         if self.persist_path:
             return os.path.expanduser(self.persist_path)
 
-        # Auto-detect best location based on platform
+        # Auto-set best location based on platform
         system = platform.system().lower()
 
         base_dir = os.path.expanduser("~/.rome")
@@ -107,10 +115,27 @@ class ChromaServerManager:
             self._shutdown_registered = True
 
     def is_running(self) -> bool:
-        """Check if ChromaDB server is running"""
+        """Check if ChromaDB server is running using v2 API"""
         try:
-            response = requests.get(f"{self.server_url}/api/v1/heartbeat", timeout=2)
-            return response.status_code == 200
+            # Try v2 heartbeat first
+            response = requests.get(f"{self.server_url}/api/v2/heartbeat", timeout=TIMEOUT_LEN)
+            if response.status_code == 200:
+                return True
+        except:
+            pass
+
+        try:
+            # Fallback: try getting version info
+            response = requests.get(f"{self.server_url}/api/v2/version", timeout=TIMEOUT_LEN)
+            if response.status_code == 200:
+                return True
+        except:
+            pass
+
+        try:
+            # Last resort: try to list collections
+            response = requests.get(f"{self.server_url}/api/v2/collections", timeout=TIMEOUT_LEN)
+            return response.status_code in [200, 404]  # 404 is ok if no collections exist
         except:
             return False
 
@@ -127,7 +152,7 @@ class ChromaServerManager:
         if force_restart and self.is_running():
             self.logger.info("Force restart requested, stopping existing server")
             self.stop()
-            time.sleep(2)  # Give server time to fully stop
+            time.sleep(self.shutdown_timeout)  # Give server time to fully stop
 
         if self.is_running():
             self.logger.info(f"ChromaDB server already running at {self.server_url}")
@@ -140,10 +165,8 @@ class ChromaServerManager:
 
         # Try different command variations for ChromaDB
         commands = [
-            ["chroma", "run", "--host", self.host, "--port", str(self.port), "--path", self.persist_path],
-            ["chroma", "run", "--host", self.host, "--port", str(self.port)],
-            ["python", "-m", "chromadb.cli.cli", "run", "--host", self.host, "--port", str(self.port), "--path", self.persist_path],
-            ["python", "-m", "chromadb", "run", "--host", self.host, "--port", str(self.port), "--path", self.persist_path]
+            ["chroma", "run", "--host", self.host, "--port", str(self.port),
+                "--path", self.persist_path],
         ]
 
         for cmd in commands:
@@ -205,7 +228,7 @@ class ChromaServerManager:
                     self.server_process.terminate()
 
                 try:
-                    self.server_process.wait(timeout=2)
+                    self.server_process.wait(timeout=self.shutdown_timeout)
                 except subprocess.TimeoutExpired:
                     if hasattr(os, 'killpg'):
                         os.killpg(os.getpgid(self.server_process.pid), signal.SIGKILL)
@@ -264,7 +287,7 @@ class ChromaServerManager:
         """Restart the ChromaDB server"""
         self.logger.info("Restarting ChromaDB server...")
         self.stop(force=True)
-        time.sleep(2)  # Give server time to fully stop
+        time.sleep(self.shutdown_timeout)  # Give server time to fully stop
         return self.start()
 
     def get_client(self) -> chromadb.HttpClient:
@@ -328,6 +351,8 @@ class ChromaServerManager:
                 "running": self.is_running(),
                 "error": str(e)
             }
+
+    def health_check(self) -> Dict:
         """Perform health check and return detailed status"""
         status = self.get_status()
 
@@ -383,8 +408,7 @@ class ChromaServerManager:
                     return False
 
                 # Give server time to fully shutdown
-                import time
-                time.sleep(2)
+                time.sleep(self.shutdown_timeout)
 
             # Clear the database directory
             if os.path.exists(self.persist_path):
@@ -474,6 +498,8 @@ class ChromaServerManager:
         except Exception as e:
             self.logger.error(f"Failed to delete collection '{collection_name}': {e}")
             return False
+
+    def __del__(self):
         """Cleanup on deletion"""
         try:
             if hasattr(self, 'server_process') and self.server_process:

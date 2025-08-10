@@ -215,9 +215,9 @@ DEFAULT_CONFIG = {
     "ChromaServerManager": {
         "host": "localhost",  # ChromaDB server host
         "port": 8000,  # ChromaDB server port
-        "persist_path": None,  # Data persistence directory (None = auto-detect user data dir)
-        "startup_timeout": 15,  # Server startup timeout in seconds
-        "shutdown_timeout": 5,  # Server shutdown timeout in seconds
+        "persist_path": None,  # Data persistence directory (None = auto-set user data dir)
+        "startup_timeout": 5,  # Server startup timeout in seconds
+        "shutdown_timeout": 2,  # Server shutdown timeout in seconds
     },
 
     "OpenAIReranker": {
