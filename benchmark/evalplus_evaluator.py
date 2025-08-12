@@ -59,8 +59,8 @@ class EvalplusEvaluator:
         self.start_time = None
         self.scores = []  # List of [timestamp, elapsed_min, base_score, extra_score]
         self.scores_file = self.eval_dir / "score_history.json"
-        self.plot_file = self.eval_dir / "score_time_plot.png"
-        self.plot2_file = self.eval_dir / "score_iteration_plot.png"
+        self.plot_time = self.eval_dir / "score_time_plot.png"
+        self.plot_iteration = self.eval_dir / "score_iteration_plot.png"
         self._load_scores()
 
     def _load_scores(self):
@@ -102,11 +102,11 @@ class EvalplusEvaluator:
             }))
 
         # Create plots
-        self._update_plot()
-        self._update_plot2()
+        self._plot_time()
+        self._plot_iteration()
         self.logger.info(f"Scores at t={elapsed_min:.1f}m: base={base:.3f}, extra={extra:.3f}")
 
-    def _update_plot(self):
+    def _plot_time(self):
         """Create/update plot efficiently with latest scores in legend"""
         if not self.scores:
             return
@@ -135,13 +135,13 @@ class EvalplusEvaluator:
 
             # Save
             plt.tight_layout()
-            plt.savefig(self.plot_file, dpi=200, bbox_inches='tight')
+            plt.savefig(self.plot_time, dpi=200, bbox_inches='tight')
             plt.close(fig)
 
         except Exception as e:
             self.logger.error(f"Scores vs time elapsed plot failed: {e}")
 
-    def _update_plot2(self):
+    def _plot_iteration(self):
         """Compact plot: total iterations vs scores with completion percentage and latest scores in legend"""
         if not self.scores:
             return
@@ -216,7 +216,7 @@ class EvalplusEvaluator:
             ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
 
             plt.tight_layout()
-            plt.savefig(self.plot2_file, dpi=200, bbox_inches='tight')
+            plt.savefig(self.plot_iteration, dpi=200, bbox_inches='tight')
             plt.close(fig)
 
         except Exception as e:
@@ -292,7 +292,8 @@ class EvalplusEvaluator:
         for task_id, info in self.problems.items():
             solution_file = info["dir"] / f"{info['safe_id']}.py"
             solution = solution_file.read_text() if solution_file.exists() else ""
-            solutions.append({"task_id": task_id, "solution": solution})
+            solutions.append({"task_id": task_id, "solution": solution,
+                "solution_file": solution_file})
 
         return solutions
 
@@ -331,6 +332,8 @@ $CMD.sanitize --samples "{solutions_file}" 2>&1 || true
 EVAL_FILE=$([[ -f "{sanitized}" ]] && echo "{sanitized}" || echo "{solutions_file}")
 $CMD.evaluate --dataset {self.dataset} --samples "$EVAL_FILE" | tee -a {output_file}
 echo "EXIT_CODE:$?" | tee -a {output_file}
+echo "SOLUTIONS_FILE:$EVAL_FILE" | tee -a {output_file}
+echo "RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {output_file}
 """
         script.write_text(content)
         script.chmod(0o755)
@@ -392,11 +395,71 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
         if exit_code != 0:
             return {"error": "evaluation failed", "output": output, "success": False}
 
+        self._create_eval_results(output)
         scores = self._parse_scores(output)
         result = {"output": output, "success": True}
         if scores:
             result["scores"] = scores
         return result
+
+    def _create_eval_results(self, output: str):
+        """Create JSON file mapping solution files to test results for passed problems"""
+        try:
+            # Extract file paths from output
+            solutions_file = None
+            results_file = None
+
+            for line in output.split('\n'):
+                if line.startswith('SOLUTIONS_FILE:'):
+                    solutions_file = Path(line.split(':', 1)[1].strip())
+                elif line.startswith('RESULTS_FILE:'):
+                    results_file = Path(line.split(':', 1)[1].strip())
+
+            if not solutions_file or not results_file or not results_file.exists():
+                self.logger.warning("Could not find solutions or results files")
+                return
+
+            # Load solutions
+            solutions = {}
+            with open(solutions_file, 'r') as f:
+                for line in f:
+                    if line.strip():
+                        sol = json.loads(line)
+                        solutions[sol['task_id']] = sol
+
+            # Load results
+            with open(results_file, 'r') as f:
+                results = json.load(f)
+
+            # Create mapping for passed problems
+            passed_mapping = {}
+            for task_id, solution in solutions.items():
+                if task_id in results['eval']:
+                    test_result = results['eval'][task_id]
+                    # Check if problem passed (both base and plus tests)
+                    base_passed = test_result.get('base_status') == 'pass'
+                    plus_passed = test_result.get('plus_status') == 'pass'
+
+                    if base_passed and plus_passed:
+                        # Find the corresponding solution file path
+                        if task_id in self.problems:
+                            solution_file_path = str(self.problems[task_id]['dir'] / f"{self.problems[task_id]['safe_id']}.py")
+                            passed_mapping[solution_file_path] = {
+                                'task_id': task_id,
+                                'base_status': test_result.get('base_status'),
+                                'plus_status': test_result.get('plus_status'),
+                            }
+
+            # Write passed solutions file
+            passed_file = self.eval_dir / "eval_results.json"
+            with open(passed_file, 'w') as f:
+                json.dump(passed_mapping, f, indent=2)
+
+            self.logger.info(f"Created eval results file with {len(passed_mapping)} entries: {passed_file}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to create eval results file: {e}")
+            self.logger.error(traceback.format_exc())
 
     def _parse_scores(self, output: str) -> Optional[Dict]:
         """Parse pass@k scores from output"""
@@ -433,8 +496,8 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
             "elapsed_minutes": latest_entry[1],
             "latest": {"base": latest_entry[2], "extra": latest_entry[3]},
             "improvement": {"base": latest_entry[2] - first_entry[2], "extra": latest_entry[3] - first_entry[3]},
-            "plot_exists": self.plot_file.exists(),
-            "plot2_exists": self.plot2_file.exists()
+            "plot_time_exists": self.plot_time.exists(),
+            "plot_iteration_exists": self.plot_iteration.exists()
         }
 
 
