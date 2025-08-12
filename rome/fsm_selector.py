@@ -178,13 +178,10 @@ class IntermediateFSMBuilder(FSMBuilder):
             CodeExecutedFailState(config.get('CodeExecutedFailState', {})))
 
         # Create actions with their respective configurations
-        search_action = PrioritySearchAction(config.get('PrioritySearchAction', {}))
-        search_action2 = TournamentSearchAction(config.get('TournamentSearchAction', {}))
+        search_action = TournamentSearchAction(config.get('TournamentSearchAction', {}))
         reset_action = AdvancedResetAction(config.get('AdvancedResetAction', {}))
         edit_code_action = EditCodeAction(config.get('EditCodeAction', {}))
-        edit_code_action2 = EditCodeAction2(config.get('EditCodeAction2', {}))
         edit_test_action = EditTestAction(config.get('EditTestAction', {}))
-        edit_test_action2 = EditTestAction2(config.get('EditTestAction2', {}))
         execute_code_action = ExecuteCodeAction(config.get('ExecuteCodeAction', {}),
             config.get('Executor', {}))
 
@@ -194,25 +191,19 @@ class IntermediateFSMBuilder(FSMBuilder):
         # Add transitions from Idle state
         fsm.add_action(idle_state, code_loaded_state,
             search_action, fallback_state=idle_state)
-        fsm.add_action(idle_state, code_loaded_state,
-            search_action2, fallback_state=idle_state)
 
         # Add transitions from CodeLoaded state
         fsm.add_action(code_loaded_state, code_edited_state, edit_code_action,
             fallback_state=idle_state)
-        fsm.add_action(code_loaded_state, code_edited_state, edit_code_action2,
-            fallback_state=idle_state)
 
         fsm.add_action(code_loaded_state, test_edited_state, edit_test_action,
-            fallback_state=idle_state)
-        fsm.add_action(code_loaded_state, test_edited_state, edit_test_action2,
             fallback_state=idle_state)
 
         # Add transitions from CodeEdited state
         fsm.add_action(code_edited_state, test_edited_state, edit_test_action,
             fallback_state=idle_state)
-        fsm.add_action(code_edited_state, test_edited_state, edit_test_action2,
-            fallback_state=idle_state)
+        # fsm.add_action(code_edited_state, test_edited_state, edit_test_action2,
+        #     fallback_state=idle_state)
 
         # Add transitions from TestEdited state
         fsm.add_action(test_edited_state, code_executed_pass_state, execute_code_action,
@@ -224,6 +215,16 @@ class IntermediateFSMBuilder(FSMBuilder):
         # Add transitions from CodeExecutedFail state - INTELLIGENT RECOVERY
         fsm.add_action(code_executed_fail_state, code_loaded_state, revert_code_action)
         fsm.add_action(code_executed_fail_state, idle_state, reset_action)
+
+        # search_action2 = PrioritySearchAction(config.get('PrioritySearchAction', {}))
+        # edit_code_action2 = EditCodeAction2(config.get('EditCodeAction2', {}))
+        # edit_test_action2 = EditTestAction2(config.get('EditTestAction2', {}))
+        # fsm.add_action(idle_state, code_loaded_state,
+        #     search_action2, fallback_state=idle_state)
+        # fsm.add_action(code_loaded_state, code_edited_state, edit_code_action2,
+        #     fallback_state=idle_state)
+        # fsm.add_action(code_loaded_state, test_edited_state, edit_test_action2,
+        #     fallback_state=idle_state)
 
         # Set initial state and validate
         fsm.set_initial_state(idle_state)

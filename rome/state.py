@@ -119,6 +119,7 @@ class IdleState(State):
     def future_summary(self, agent) -> str:
         return "you are in default initial state and ready to start a new task"
 
+
 class CodeLoadedState(State):
     """State where code has been loaded and is ready for analysis"""
 
@@ -203,6 +204,7 @@ class TestEditedState(State):
     def future_summary(self, agent) -> str:
         return "you have created or updated tests for the code file"
 
+
 class CodeExecutedPassState(State):
     """State where code or test file has been executed successfully"""
 
@@ -238,6 +240,7 @@ class CodeExecutedPassState(State):
 
     def future_summary(self, agent) -> str:
         return "you have executed test file and the output shows the tests have passed"
+
 
 class CodeExecutedFailState(State):
     """State where code or test file execution failed"""
