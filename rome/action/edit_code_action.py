@@ -3,13 +3,13 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 from .action import Action
-from ..config import check_attrs
+from ..config import check_attrs, LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
 from ..logger import get_logger
 from ..parsing import hash_string
 
 
-def create_analysis_prompt(agent, file_path: str) -> Optional[str]:
-    """Create analysis context for code editing prompts by loading execution and analysis data."""
+def create_analysis_prompt(agent, file_path: str, file_content: str) -> Optional[str]:
+    """Create analysis context for code editing prompts by loading execution data and querying knowledge base."""
 
     # Load the latest execution results
     execution_data = agent.version_manager.get_data(file_path, 'exec_result')
@@ -18,22 +18,25 @@ def create_analysis_prompt(agent, file_path: str) -> Optional[str]:
 
     # Add execution output if available
     if execution_data:
-        # Get the agent ID from execution data, fallback to current agent ID
         exec_agent_id = execution_data['agent_id']
         current_agent_id = agent.get_id()
 
-        context_parts.append(f"# Execution output:\n```\n{execution_data['exec_output']}\n```")
         context_parts.append(f"# Exit code: {execution_data['exec_exit_code']}")
+        context_parts.append(f"# Execution output:\n```\n{execution_data['exec_output']}\n```")
         context_parts.append(f"# Execution analysis:\n{execution_data['exec_analysis']}")
 
-        # Add note if analysis was done by a different agent
         if exec_agent_id != current_agent_id:
             context_parts.append(f"# Note: The above analysis was performed by a different agent ({exec_agent_id}). Please double-check and verify the analysis results.")
+
+    # Query knowledge base for relevant insights
+    kb_insights = _query_knowledge_base(agent, file_path, file_content, execution_data)
+    if kb_insights:
+        context_parts.extend(kb_insights)
 
     if not context_parts:
         return None
 
-    # Create a clearly separated analysis section
+    # Create clearly separated analysis section
     analysis_context = "\n---\n"
     analysis_context += "Previous code/test execution results and analysis:\n"
     analysis_context += "---\n\n"
@@ -43,6 +46,98 @@ def create_analysis_prompt(agent, file_path: str) -> Optional[str]:
     analysis_context += "---\n"
 
     return analysis_context
+
+
+def _query_knowledge_base(agent, file_path: str, file_content: str,
+    execution_data: Optional[Dict]) -> List[str]:
+    """Query knowledge base for relevant insights using agent's kb_manager.query method."""
+
+    insights = []
+    filename = os.path.basename(file_path)
+
+    # Build prioritized query terms
+    query_terms = _build_kb_query_terms(filename, file_path, file_content, execution_data)
+
+    # Try each query until we get useful results
+    for query_text, context_desc in query_terms:
+        if not query_text.strip():
+            continue
+
+        # Use the kb_manager.query method which returns a string response
+        kb_response = agent.kb_manager.query(
+            question=query_text,
+            top_k=5,  # Get top K most relevant results
+            show_scores=True  # Don't show scores in logs for cleaner output
+        )
+
+        # Check if we got a meaningful response
+        if kb_response and len(kb_response.strip()) > 50:  # Ensure substantial content
+            # Don't include error responses
+            if not kb_response.startswith("Error:"):
+                insights.append(f"# Knowledge base insights ({context_desc}):")
+                insights.append(kb_response.strip())
+                break  # Use first successful query to avoid redundancy
+
+    return insights
+
+
+def _build_kb_query_terms(filename: str, file_path: str, file_content: str,
+    execution_data: Optional[Dict]) -> List[tuple]:
+    """Build prioritized query terms for knowledge base search."""
+
+    queries = []
+    if file_content:
+        code_query = f"Find insights for the following code:\n{file_content}"
+        queries.append(code_query, "code analysis query")
+
+    # Error-specific queries (highest priority if execution failed)
+    if execution_data and execution_data.get('exec_exit_code') != 0:
+        exec_output = execution_data.get('exec_output', '')
+        exec_analysis = execution_data.get('exec_analysis', '')
+
+        # Use execution analysis if available
+        analysis_query = f"Find insights for this code execution analysis: {exec_analysis}"
+        queries.append((analysis_query, "execution analysis query"))
+
+        # Extract error keywords from output
+        # error_terms = _extract_error_keywords(exec_output)
+        # if error_terms:
+        #     error_query = f"How to fix {' '.join(error_terms)} errors in Python code"
+        #     queries.append((error_query, "error handling patterns"))
+
+    return queries
+
+
+# def _extract_error_keywords(output: str) -> List[str]:
+#     """Extract relevant error keywords from execution output."""
+
+#     if not output:
+#         return []
+
+#     # Common error patterns to look for
+#     error_patterns = [
+#         'AttributeError', 'TypeError', 'ValueError', 'ImportError', 'NameError',
+#         'IndexError', 'KeyError', 'FileNotFoundError', 'ZeroDivisionError',
+#         'SyntaxError', 'IndentationError', 'UnboundLocalError', 'RecursionError'
+#     ]
+
+#     keywords = []
+#     output_lower = output.lower()
+
+#     # Find exact error type matches
+#     for pattern in error_patterns:
+#         if pattern.lower() in output_lower:
+#             keywords.append(pattern)
+
+#     # Extract words that appear after "Error:" or "Exception:"
+#     import re
+#     error_matches = re.findall(r'(?:Error|Exception):\s*([^\n\r]+)', output, re.IGNORECASE)
+#     for match in error_matches[:2]:  # Limit to first 2 matches
+#         # Extract meaningful words (3+ chars, alphanumeric)
+#         words = re.findall(r'\b[a-zA-Z]{3,}\b', match)
+#         keywords.extend(words[:3])  # Max 3 words per error
+
+#     return list(set(keywords))  # Remove duplicates
 
 
 class EditCodeAction(Action):
@@ -64,10 +159,10 @@ class EditCodeAction(Action):
 
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']
-        original_content = selected_file['content']
+        file_content = selected_file['content']
 
         # Prepare prompt for code improvement
-        prompt = self._create_code_prompt(agent, file_path, original_content)
+        prompt = self._create_code_prompt(agent, file_path, file_content)
 
         # Get improved code from LLM
         self.logger.info(f"Requesting code improvements for {file_path}")
@@ -94,7 +189,7 @@ class EditCodeAction(Action):
             self.logger.error("Improved code is missing or invalid")
             return False
 
-        if improved_code == original_content:
+        if improved_code == file_content:
             self.logger.info("No changes made to the code")
             # Even if no changes, we'll continue to the next state
 
@@ -117,17 +212,17 @@ class EditCodeAction(Action):
         self.logger.info(f"Successfully edited and wrote improved code to {file_path}")
         return True
 
-    def _create_code_prompt(self, agent, file_path: str, content: str) -> str:
+    def _create_code_prompt(self, agent, file_path: str, file_code: str) -> str:
         """Create a prompt for the LLM to improve the code"""
 
         # Base prompt without relying on a configured improvement_prompt
         prompt = """Analyze the code file and suggest improvements. Focus on:
-    1. Implementing missing code and filling in empty functions
-    2. Code quality and readability
-    3. Bug fixes and edge cases
-    4. Performance optimizations
-    5. Documentation improvements
-    """
+1. Implementing missing code and filling in empty functions
+2. Code quality and readability
+3. Bug fixes and edge cases
+4. Performance optimizations
+5. Documentation improvements
+"""
 
         # Load original version content
         original_version = agent.version_manager.load_original_version(file_path, include_content=True)
@@ -135,49 +230,49 @@ class EditCodeAction(Action):
         # Add original version in its own section if available
         if original_version and original_version.get('content'):
             prompt += f"""
-    # Original file content:
-    ```python
-    {original_version['content']}
-    ```
-    """
+# Original file content:
+```python
+{original_version['content']}
+```
+"""
 
         # Add current file info and code
         prompt += f"""
-    # Current code file path: {file_path}
-    # Current code file content:
-    ```python
-    {content}
-    ```
-    """
-        # Get analysis context using the static function
-        analysis_prompt = create_analysis_prompt(agent, file_path)
+# Current code file path: {file_path}
+# Current code file content:
+```python
+{file_code}
+```
+"""
+        # Get analysis context using the enhanced function
+        analysis_prompt = create_analysis_prompt(agent, file_path, file_code)
         if analysis_prompt:
             prompt += f"\n{analysis_prompt}\n"
 
         prompt += """
-    Respond with a JSON object containing:
-    {{
-        "improved_code": "The new and improved code with changes or edits made to it",
-        "explanation": "A clear explanation of the changes you made and why",
-        "changes": [
-            {{
-                "type": "improvement type (bug fix, performance, readability, etc.)",
-                "description": "Description of the specific change"
-            }},
-            ...
-        ]
-    }}
+Respond with a JSON object containing:
+{
+    "improved_code": "The new and improved code with changes or edits made to it",
+    "explanation": "A clear explanation of the changes you made and why",
+    "changes": [
+        {
+            "type": "improvement type (bug fix, performance, readability, etc.)",
+            "description": "Description of the specific change"
+        },
+        ...
+    ]
+}
 
-    IMPORTANT:
-    - Return the ENTIRE file content with your improvements, not just the changed parts
-    - Make sure the improved code is valid Python syntax and contains no markdown formatting like ```python...```
-    - Be conservative with changes - prioritize correctness over style
-    - List improvements you made in "changes" and summarize the changes in "explanation"
-    - If improved code is unchanged, be sure give an empty list for "changes" and mention it in "explanation"
-    """
+IMPORTANT:
+- Return the ENTIRE file content with your improvements, not just the changed parts
+- Make sure the improved code is valid Python syntax and contains no markdown formatting like ```python...```
+- Be conservative with changes - prioritize correctness over style
+- List improvements you made in "changes" and summarize the changes in "explanation"
+- If improved code is unchanged, be sure give an empty list for "changes" and mention it in "explanation"
+"""
 
         if analysis_prompt:
-            prompt += "- Pay special attention to addressing any issues identified in the code analysis"
+            prompt += "- Pay special attention to addressing any issues identified in the code analysis and knowledge base insights"
 
         if original_version and original_version.get('content'):
             prompt += "\n- Compare current code with the original version to understand the evolution and make informed improvements"

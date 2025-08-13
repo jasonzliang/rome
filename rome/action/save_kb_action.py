@@ -34,15 +34,15 @@ class SaveKBAction(Action):
         execution_context = ""
         if 'exec_output' in agent.context['selected_file'] and \
             agent.context['selected_file']['exec_exit_code'] == 0:
-            exec_output = agent.context['selected_file'].get('exec_output', '')
             exec_code = agent.context['selected_file'].get('exec_exit_code', 'unknown')
+            exec_output = agent.context['selected_file'].get('exec_output', '')
             exec_analysis = agent.context['selected_file'].get('exec_analysis', '')
 
             execution_context = f"""
 # Execution Results:
 Exit Code: {exec_code}
-Output: {exec_output[:LONGEST_SUMMARY_LEN]}...
-Analysis: {exec_analysis[:LONGEST_SUMMARY_LEN]}...
+Output:\n```\n{exec_output}\n```
+Analysis:\n{exec_analysis}
 """
 
         prompt = f"""Analyze the following code and test files to extract valuable, reusable insights that could help with similar problems in the future.

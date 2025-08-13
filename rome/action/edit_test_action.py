@@ -154,7 +154,7 @@ Include proper test setup, all necessary imports, and comprehensive test cases.
 """
 
         # Get analysis context using the static function
-        analysis_prompt = create_analysis_prompt(agent, file_path)
+        analysis_prompt = create_analysis_prompt(agent, file_path, file_content)
         if analysis_prompt:
             prompt += f"\n{analysis_prompt}\n"
 

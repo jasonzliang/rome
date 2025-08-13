@@ -251,10 +251,10 @@ class ChromaClientManager:
             self.logger.error(f"Failed to add text: {e}")
             return False
 
-    def query(self, question, top_k=5, use_reranking=None, show_scores=False):
+    def query(self, question, top_k=None, use_reranking=None, show_scores=False):
         """Enhanced query with simplified reranking logic"""
         try:
-            top_k = top_k or self.top_k or 10
+            top_k = top_k or self.top_k or 5
             should_rerank = (use_reranking is True) or (use_reranking is None and self.reranker is not None)
 
             if should_rerank and self.reranker:
