@@ -88,7 +88,7 @@ def _build_kb_query_terms(filename: str, file_path: str, file_content: str,
     queries = []
     if file_content:
         code_query = f"Find insights for the following code:\n{file_content}"
-        queries.append(code_query, "code analysis query")
+        queries.append((code_query, "code analysis"))
 
     # Error-specific queries (highest priority if execution failed)
     if execution_data and execution_data.get('exec_exit_code') != 0:
@@ -97,47 +97,9 @@ def _build_kb_query_terms(filename: str, file_path: str, file_content: str,
 
         # Use execution analysis if available
         analysis_query = f"Find insights for this code execution analysis: {exec_analysis}"
-        queries.append((analysis_query, "execution analysis query"))
-
-        # Extract error keywords from output
-        # error_terms = _extract_error_keywords(exec_output)
-        # if error_terms:
-        #     error_query = f"How to fix {' '.join(error_terms)} errors in Python code"
-        #     queries.append((error_query, "error handling patterns"))
+        queries.append((analysis_query, "code execution analysis"))
 
     return queries
-
-
-# def _extract_error_keywords(output: str) -> List[str]:
-#     """Extract relevant error keywords from execution output."""
-
-#     if not output:
-#         return []
-
-#     # Common error patterns to look for
-#     error_patterns = [
-#         'AttributeError', 'TypeError', 'ValueError', 'ImportError', 'NameError',
-#         'IndexError', 'KeyError', 'FileNotFoundError', 'ZeroDivisionError',
-#         'SyntaxError', 'IndentationError', 'UnboundLocalError', 'RecursionError'
-#     ]
-
-#     keywords = []
-#     output_lower = output.lower()
-
-#     # Find exact error type matches
-#     for pattern in error_patterns:
-#         if pattern.lower() in output_lower:
-#             keywords.append(pattern)
-
-#     # Extract words that appear after "Error:" or "Exception:"
-#     import re
-#     error_matches = re.findall(r'(?:Error|Exception):\s*([^\n\r]+)', output, re.IGNORECASE)
-#     for match in error_matches[:2]:  # Limit to first 2 matches
-#         # Extract meaningful words (3+ chars, alphanumeric)
-#         words = re.findall(r'\b[a-zA-Z]{3,}\b', match)
-#         keywords.extend(words[:3])  # Max 3 words per error
-
-#     return list(set(keywords))  # Remove duplicates
 
 
 class EditCodeAction(Action):
@@ -212,7 +174,7 @@ class EditCodeAction(Action):
         self.logger.info(f"Successfully edited and wrote improved code to {file_path}")
         return True
 
-    def _create_code_prompt(self, agent, file_path: str, file_code: str) -> str:
+    def _create_code_prompt(self, agent, file_path: str, file_content: str) -> str:
         """Create a prompt for the LLM to improve the code"""
 
         # Base prompt without relying on a configured improvement_prompt
@@ -245,7 +207,7 @@ class EditCodeAction(Action):
 ```
 """
         # Get analysis context using the enhanced function
-        analysis_prompt = create_analysis_prompt(agent, file_path, file_code)
+        analysis_prompt = create_analysis_prompt(agent, file_path, file_content)
         if analysis_prompt:
             prompt += f"\n{analysis_prompt}\n"
 
