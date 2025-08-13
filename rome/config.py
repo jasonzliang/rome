@@ -31,6 +31,9 @@ META_DIR_EXT = 'rome'
 # Default logging base directory name for agents
 LOG_DIR_NAME = "__rome__"
 
+# Name of evaluation directory with GD test results
+EVAL_DIR_NAME = "evaluation"
+
 # Default extension for test files:
 TEST_FILE_EXT = '_test.py'
 

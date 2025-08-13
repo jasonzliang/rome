@@ -3,9 +3,8 @@ import json
 from typing import Optional, List, Dict
 
 # ChromaDB and LlamaIndex imports
-import chromadb
-
 try:
+    import chromadb
     from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
     from llama_index.vector_stores.chroma import ChromaVectorStore
     from llama_index.embeddings.openai import OpenAIEmbedding
@@ -13,7 +12,7 @@ try:
     from llama_index.core.node_parser import SentenceSplitter
 except ImportError as e:
     print(f"Import error: {e}")
-    print("Install with: pip install llama-index llama-index-vector-stores-chroma llama-index-embeddings-openai llama-index-llms-openai")
+    print("Install with: pip install chromadb llama-index llama-index-vector-stores-chroma llama-index-embeddings-openai llama-index-llms-openai")
     exit(1)
 
 from .config import set_attributes_from_config

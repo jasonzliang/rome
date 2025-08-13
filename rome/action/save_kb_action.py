@@ -2,18 +2,20 @@ import os
 import traceback
 from typing import Dict, List, Any, Optional
 
-from .advanced_reset_action import AdvancedResetAction
+from .advanced_reset_action import analyze_execution_results, check_max_versions_reached, check_ground_truth
 from ..config import LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
 from ..logger import get_logger
 
 
-class SaveKBAction(AdvancedResetAction):
+class SaveKBAction:
     """Action to extract and save reusable insights from code/test pairs to knowledge base, inheriting completion analysis from AdvancedResetAction"""
 
     def __init__(self, config: Dict = None):
         super().__init__(config)
-        check_attrs(self, ['use_ground_truth', 'completion_confidence', 'max_versions'])
         self.logger = get_logger()
+        check_attrs(self, ['use_ground_truth', 'completion_confidence', 'max_versions'])
+        self.completion_confidence = max(min(self.completion_confidence, 100), 1)
+        self.max_versions = max(self.max_versions, 1)
 
     def summary(self, agent) -> str:
         """Return a short summary of the knowledge base save action"""
@@ -126,12 +128,12 @@ Extracted reusable patterns and insights from {filename} and its test file {test
         test_content = selected_file['test_content']
 
         # Use parent class's analysis to check if work is complete
-        if use_ground_truth:
-            work_complete = self._check_ground_truth(agent, file_path)
+        if self.use_ground_truth:
+            work_complete = check_ground_truth(agent, file_path)
         else:
-            work_complete = self._analyze_execution_results(agent, selected_file)
-            if not work_complete:
-                work_complete = self._check_max_versions_reached(agent, file_path)
+            work_complete = analyze_execution_results(agent, selected_file,
+                self.completion_confidence) or \
+            check_max_versions_reached(agent, file_path, self.max_versions)
 
         if not work_complete:
             self.logger.info(f"Coding not finished for {file_path}, skipping knowledge base storage")

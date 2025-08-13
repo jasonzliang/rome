@@ -17,8 +17,7 @@ from pathlib import Path
 from typing import Set, Dict, Tuple
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from rome.config import LOG_DIR_NAME
-from benchmark.evalplus_evaluator import EVAL_DIR_NAME
+from rome.config import LOG_DIR_NAME, EVAL_DIR_NAME
 
 def extract_test_results(directory_path: str) -> Tuple[Set[str], Set[str]]:
     """Extract test IDs that passed and failed from eval_results.json"""

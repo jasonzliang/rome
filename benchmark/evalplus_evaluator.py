@@ -25,10 +25,7 @@ except ImportError:
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.logger import get_logger
-from rome.config import LOG_DIR_NAME
-
-# Name evaluation directory for evalplus
-EVAL_DIR_NAME = "evaluation"
+from rome.config import LOG_DIR_NAME, EVAL_DIR_NAME
 
 
 class EvalplusEvaluator:
