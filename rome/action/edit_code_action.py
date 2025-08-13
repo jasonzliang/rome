@@ -3,7 +3,7 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 from .action import Action
-from ..config import check_attrs, SHORT_SUMMARY_LEN, LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
+from ..config import check_attrs, SUMMARY_LENGTH, LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
 from ..logger import get_logger
 from ..parsing import hash_string
 
@@ -71,12 +71,12 @@ def _query_knowledge_base(agent, file_path: str, file_content: str,
         )
 
         # Check if we got a meaningful response
-        if kb_response and len(kb_response.strip()) > SHORT_SUMMARY_LEN:  # Ensure substantial content
+        if kb_response and len(kb_response.strip()) > SUMMARY_LENGTH:  # Ensure substantial content
             # Don't include error responses
             if not kb_response.startswith("Error:"):
                 insights.append(f"# Knowledge base insights ({context_desc}):")
                 insights.append(kb_response.strip())
-                break  # Use first successful query to avoid redundancy
+                # break  # Use first successful query to avoid redundancy
 
     return insights
 
@@ -96,7 +96,7 @@ def _build_kb_query_terms(filename: str, file_path: str, file_content: str,
         exec_analysis = execution_data.get('exec_analysis', '')
 
         # Use execution analysis if available
-        analysis_query = f"Find insights for this code execution analysis: {exec_analysis}"
+        analysis_query = f"Find insights for following execution analysis: {exec_analysis}"
         queries.append((analysis_query, "code execution analysis"))
 
     return queries

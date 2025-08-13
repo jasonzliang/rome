@@ -235,6 +235,9 @@ class ChromaClientManager:
             self.reranker = None
             self.logger.debug("Reranking disabled")
 
+    def size(self):
+        return self.collection.count()
+
     def add_text(self, text, metadata=None):
         """Add a single text document"""
         self.index.insert(Document(text=text, metadata=metadata or {}))
@@ -242,8 +245,7 @@ class ChromaClientManager:
     def query(self, question, top_k=None, use_reranking=None, show_scores=False):
         """Enhanced query with simplified reranking logic and empty collection validation"""
         # Check if collection is empty before proceeding
-        collection_count = self.collection.count()
-        if collection_count == 0:
+        if self.size() == 0:
             return None
 
         top_k = top_k or self.top_k or 5
