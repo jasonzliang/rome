@@ -20,6 +20,7 @@ AGENT_NAME_LENGTH = (8, 32)
 DEFAULT_HASH_FUNC = "sha256"
 
 # How long to display long strings for console output
+SHORT_SUMMARY_LEN = 50
 SUMMARY_LENGTH = 100
 LONG_SUMMARY_LEN = 200
 LONGER_SUMMARY_LEN = 400

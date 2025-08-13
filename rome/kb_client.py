@@ -177,7 +177,7 @@ class ChromaClientManager:
         }
 
         # Use agent's OpenAI configuration if available, otherwise use defaults
-        if self.agent and hasattr(self.agent, 'openai_handler'):
+        if self.agent:
             self.llm = OpenAI(
                 model=self.agent.openai_handler.model,
                 temperature=self.agent.openai_handler.temperature
@@ -219,18 +219,11 @@ class ChromaClientManager:
         self.storage_context = StorageContext.from_defaults(vector_store=self.vector_store)
 
         # Create index with explicit embed model to avoid global setting conflicts
-        try:
-            self.index = VectorStoreIndex.from_vector_store(
-                self.vector_store,
-                storage_context=self.storage_context,
-                embed_model=self.embed_model  # Use instance-specific embed model
-            )
-        except TypeError:
-            # Fallback for older LlamaIndex versions that don't support embed_model parameter
-            self.index = VectorStoreIndex.from_vector_store(
-                self.vector_store,
-                storage_context=self.storage_context
-            )
+        self.index = VectorStoreIndex.from_vector_store(
+            self.vector_store,
+            storage_context=self.storage_context,
+            embed_model=self.embed_model  # Use instance-specific embed model
+        )
 
     def _setup_reranker(self):
         """Setup reranker if enabled"""
@@ -244,35 +237,29 @@ class ChromaClientManager:
 
     def add_text(self, text, metadata=None):
         """Add a single text document"""
-        try:
-            self.index.insert(Document(text=text, metadata=metadata or {}))
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to add text: {e}")
-            return False
+        self.index.insert(Document(text=text, metadata=metadata or {}))
 
     def query(self, question, top_k=None, use_reranking=None, show_scores=False):
-        """Enhanced query with simplified reranking logic"""
-        try:
-            top_k = top_k or self.top_k or 5
-            should_rerank = (use_reranking is True) or (use_reranking is None and self.reranker is not None)
+        """Enhanced query with simplified reranking logic and empty collection validation"""
+        # Check if collection is empty before proceeding
+        collection_count = self.collection.count()
+        if collection_count == 0:
+            return None
 
-            if should_rerank and self.reranker:
-                # Calculate how many docs to retrieve for reranking
-                retrieval_k = self._calculate_retrieval_size(top_k)
+        top_k = top_k or self.top_k or 5
+        should_rerank = (use_reranking is True) or \
+            (use_reranking is None and self.reranker is not None)
 
-                # Get documents
-                nodes = self._retrieve_nodes(question, retrieval_k)
-
-                # Rerank and generate response
-                return self._rerank_and_respond(question, nodes, top_k, show_scores)
-            else:
-                # Standard query without reranking
-                return self._standard_query(question, top_k)
-
-        except Exception as e:
-            self.logger.error(f"Query failed: {e}")
-            return f"Error: {e}"
+        if should_rerank and self.reranker:
+            # Calculate how many docs to retrieve for reranking
+            retrieval_k = self._calculate_retrieval_size(top_k)
+            # Get documents
+            nodes = self._retrieve_nodes(question, retrieval_k)
+            # Rerank and generate response
+            return self._rerank_and_respond(question, nodes, top_k, show_scores)
+        else:
+            # Standard query without reranking
+            return self._standard_query(question, top_k)
 
     def _calculate_retrieval_size(self, top_k: int) -> int:
         """Calculate optimal retrieval size for reranking"""
@@ -351,15 +338,12 @@ class ChromaClientManager:
 
     def shutdown(self):
         """Shutdown the knowledge base"""
-        try:
-            # Release client from server tracking
-            if hasattr(self, 'client'):
-                self.server.release_client(self.client)
+        # Release client from server tracking
+        if hasattr(self, 'client'):
+            self.server.release_client(self.client)
 
-            # Only stop server if we own it (not shared)
-            if self._owns_server and hasattr(self, 'server'):
-                self.server.stop()
+        # Only stop server if we own it (not shared)
+        if self._owns_server and hasattr(self, 'server'):
+            self.server.stop()
 
-            self.logger.info("ChromaClientManager shutdown completed")
-        except Exception as e:
-            self.logger.error(f"ChromaClientManager shutdown error: {e}")
+        self.logger.info("ChromaClientManager shutdown completed")

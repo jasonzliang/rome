@@ -3,7 +3,7 @@ import traceback
 from typing import Dict, List, Any, Optional
 
 from .action import Action
-from ..config import check_attrs, LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
+from ..config import check_attrs, SHORT_SUMMARY_LEN, LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
 from ..logger import get_logger
 from ..parsing import hash_string
 
@@ -71,7 +71,7 @@ def _query_knowledge_base(agent, file_path: str, file_content: str,
         )
 
         # Check if we got a meaningful response
-        if kb_response and len(kb_response.strip()) > 50:  # Ensure substantial content
+        if kb_response and len(kb_response.strip()) > SHORT_SUMMARY_LEN:  # Ensure substantial content
             # Don't include error responses
             if not kb_response.startswith("Error:"):
                 insights.append(f"# Knowledge base insights ({context_desc}):")
