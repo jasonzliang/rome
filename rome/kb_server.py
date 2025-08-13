@@ -17,7 +17,7 @@ from .logger import get_logger
 TIMEOUT_LEN = 2
 
 class ChromaServerManager:
-    """Independent ChromaDB server lifecycle manager"""
+    """Independent ChromaDB server lifecycle manager with thread safety"""
 
     _instance = None
     _lock = threading.Lock()
@@ -61,7 +61,10 @@ class ChromaServerManager:
 
         self.server_process = None
         self.server_url = f"http://{self.host}:{self.port}"
-        self._clients = set()  # Track active clients
+
+        self._clients = set()
+        self._clients_lock = threading.Lock()  # New lock for client operations
+
         self._shutdown_registered = False
 
         # Register cleanup on exit
@@ -78,15 +81,6 @@ class ChromaServerManager:
         # If explicitly set in config, use that
         if self.persist_path:
             return os.path.expanduser(self.persist_path)
-
-        # Auto-set best location based on platform
-        # system = platform.system().lower()
-        # if system == "darwin":  # macOS
-        #     base_dir = os.path.expanduser("~/Library/Application Support")
-        # elif system == "windows":
-        #     base_dir = os.path.expanduser("~/AppData/Local")
-        # else:  # Linux and others
-        #     base_dir = os.path.expanduser("~/.local/share")
 
         # Create agent-specific directory
         base_dir = os.path.expanduser("~/.rome")
@@ -239,9 +233,12 @@ class ChromaServerManager:
                 self.server_process = None
 
     def stop(self, force: bool = False) -> bool:
-        """Stop ChromaDB server with improved reliability"""
-        if not force and self._clients:
-            self.logger.warning(f"Cannot stop server: {len(self._clients)} active clients remain")
+        """Stop ChromaDB server with improved reliability and thread safety"""
+        with self._clients_lock:
+            active_clients = len(self._clients)
+
+        if not force and active_clients > 0:
+            self.logger.warning(f"Cannot stop server: {active_clients} active clients remain")
             return False
 
         # Get all possible PIDs to stop
@@ -278,11 +275,11 @@ class ChromaServerManager:
             self.logger.info(f"Stopping ChromaDB process (PID: {pid})")
 
             if force:
-                return self._kill_process(pid, signal.SIGKILL, timeout=2)
+                return self._kill_process_by_pid(pid, signal.SIGKILL, timeout=2)
 
             # Try graceful then force
-            return (self._kill_process(pid, signal.SIGTERM, self.shutdown_timeout) or
-                   self._kill_process(pid, signal.SIGKILL, timeout=2))
+            return (self._kill_process_by_pid(pid, signal.SIGTERM, self.shutdown_timeout) or
+                   self._kill_process_by_pid(pid, signal.SIGKILL, timeout=2))
 
         except (OSError, ProcessLookupError):
             return True  # Already dead
@@ -290,7 +287,7 @@ class ChromaServerManager:
             self.logger.error(f"Error stopping process {pid}: {e}")
             return False
 
-    def _kill_process(self, pid: int, sig: int, timeout: int) -> bool:
+    def _kill_process_by_pid(self, pid: int, sig: int, timeout: int) -> bool:
         """Kill process with signal and wait for termination"""
         try:
             # Try psutil first (most reliable)
@@ -404,7 +401,7 @@ class ChromaServerManager:
 
     def get_client(self) -> chromadb.HttpClient:
         """
-        Get ChromaDB client and register it as active
+        Get ChromaDB client and register it as active (thread-safe)
 
         Returns:
             chromadb.HttpClient instance
@@ -416,20 +413,30 @@ class ChromaServerManager:
             raise RuntimeError(f"ChromaDB server not running at {self.server_url}")
 
         client = chromadb.HttpClient(host=self.host, port=self.port)
-        self._clients.add(client)
-        self.logger.debug(f"Created ChromaDB client ({len(self._clients)} active)")
+
+        with self._clients_lock:
+            self._clients.add(client)
+            client_count = len(self._clients)
+
+        self.logger.debug(f"Created ChromaDB client ({client_count} active)")
         return client
 
     def release_client(self, client: chromadb.HttpClient):
-        """Release a client (remove from active clients tracking)"""
-        self._clients.discard(client)
-        self.logger.debug(f"Released ChromaDB client ({len(self._clients)} active)")
+        """Release a client (remove from active clients tracking) - thread-safe"""
+        with self._clients_lock:
+            self._clients.discard(client)
+            client_count = len(self._clients)
+
+        self.logger.debug(f"Released ChromaDB client ({client_count} active)")
 
     def get_status(self) -> Dict:
-        """Get detailed server status with external PID detection"""
+        """Get detailed server status with external PID detection (thread-safe)"""
         external_pid = None
         if self.is_running() and not self.server_process:
             external_pid = self._find_external_pid()
+
+        with self._clients_lock:
+            active_clients = len(self._clients)
 
         return {
             "running": self.is_running(),
@@ -439,7 +446,7 @@ class ChromaServerManager:
             "persist_path": self.persist_path,
             "process_id": self.server_process.pid if self.server_process else external_pid,
             "managed_externally": self.server_process is not None,
-            "active_clients": len(self._clients),
+            "active_clients": active_clients,
             "startup_timeout": self.startup_timeout,
             "shutdown_timeout": self.shutdown_timeout
         }

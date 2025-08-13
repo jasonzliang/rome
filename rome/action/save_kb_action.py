@@ -7,7 +7,7 @@ from ..config import LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
 from ..logger import get_logger
 
 
-class SaveKBAction:
+class SaveKBAction(Action):
     """Action to extract and save reusable insights from code/test pairs to knowledge base, inheriting completion analysis from AdvancedResetAction"""
 
     def __init__(self, config: Dict = None):
