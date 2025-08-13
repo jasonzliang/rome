@@ -142,7 +142,6 @@ DEFAULT_CONFIG = {
     },
 
     # Code Manipulation Actions
-    # Can override prompt for generating, modifying code
     "EditCodeAction": {},
     "EditCodeAction2": {},
     "EditTestAction": {},
@@ -151,6 +150,13 @@ DEFAULT_CONFIG = {
     "RevertCodeAction": {
         "num_versions": 10, # Number of versions to look back to revert
     },
+
+    # Knowledge Base Actions
+    "SaveKBAction": {
+        "use_ground_truth": True, # If True, ignores completion_confidence/max_versions, only uses evalplus results to determine to save or not
+        "completion_confidence": 85,  # Minimum completion confidence threshold to save insights
+        "max_versions": 30,  # Maximum versions before forcing to save insights
+    }
 
     # REPOSITORY & FILE MANAGEMENT
 

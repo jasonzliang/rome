@@ -10,3 +10,4 @@ from .revert_code_action import RevertCodeAction
 from .priority_search_action import PrioritySearchAction
 from .tournament_search_action import TournamentSearchAction
 from .transition_action import TransitionAction
+from .save_kb_action import SaveKBAction
