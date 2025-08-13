@@ -7,7 +7,7 @@ import signal
 import threading
 import requests
 import atexit
-from typing import Optional, Dict
+from typing import Optional, Callable, List, Dict
 
 import chromadb
 
@@ -80,9 +80,7 @@ class ChromaServerManager:
             return os.path.expanduser(self.persist_path)
 
         # Auto-set best location based on platform
-        system = platform.system().lower()
-
-        base_dir = os.path.expanduser("~/.rome")
+        # system = platform.system().lower()
         # if system == "darwin":  # macOS
         #     base_dir = os.path.expanduser("~/Library/Application Support")
         # elif system == "windows":
@@ -91,7 +89,8 @@ class ChromaServerManager:
         #     base_dir = os.path.expanduser("~/.local/share")
 
         # Create agent-specific directory
-        agent_data_dir = os.path.join(base_dir, "agent-framework", "chroma-db")
+        base_dir = os.path.expanduser("~/.rome")
+        agent_data_dir = os.path.join(base_dir, "agent-chroma-db")
 
         # Fallback to temp if home directory issues
         try:
@@ -104,13 +103,13 @@ class ChromaServerManager:
             return agent_data_dir
         except (OSError, PermissionError):
             # Fallback to session-specific temp directory
-            session_dir = os.path.join(tempfile.gettempdir(), f"agent-chroma-{os.getpid()}")
+            session_dir = os.path.join(tempfile.gettempdir(), f"agent-chroma-db-{os.getpid()}")
             self.logger.warning(f"Could not use user data directory, falling back to: {session_dir}")
             return session_dir
 
     def _register_cleanup(self):
         """Register cleanup handlers"""
-        if not self._shutdown_registered:
+        if not self._shutdown_registered and hasattr(self, '_started_by_me'):
             atexit.register(self.stop)
             self._shutdown_registered = True
 
@@ -239,47 +238,160 @@ class ChromaServerManager:
             finally:
                 self.server_process = None
 
-    def stop(self, force: bool = False):
-        """
-        Stop ChromaDB server gracefully
-
-        Args:
-            force: If True, force kill the server process
-        """
+    def stop(self, force: bool = False) -> bool:
+        """Stop ChromaDB server with improved reliability"""
         if not force and self._clients:
             self.logger.warning(f"Cannot stop server: {len(self._clients)} active clients remain")
             return False
 
+        # Get all possible PIDs to stop
+        pids = self._get_target_pids()
+        if not pids:
+            self.logger.info("No ChromaDB processes found to stop")
+            return True
+
+        # Stop all found processes
+        success = all(self._stop_process(pid, force) for pid in pids)
+        self.server_process = None
+
+        # Verify server stopped
+        return self._verify_stopped() if success else False
+
+    def _get_target_pids(self) -> List[int]:
+        """Get all PIDs that need to be stopped"""
+        pids = []
+
+        # Add managed process PID
         if self.server_process and self.server_process.poll() is None:
-            self.logger.info("Stopping ChromaDB server...")
+            pids.append(self.server_process.pid)
 
+        # Add external process PID
+        external_pid = self._find_external_pid()
+        if external_pid and external_pid not in pids:
+            pids.append(external_pid)
+
+        return pids
+
+    def _stop_process(self, pid: int, force: bool) -> bool:
+        """Stop a single process by PID"""
+        try:
+            self.logger.info(f"Stopping ChromaDB process (PID: {pid})")
+
+            if force:
+                return self._kill_process(pid, signal.SIGKILL, timeout=2)
+
+            # Try graceful then force
+            return (self._kill_process(pid, signal.SIGTERM, self.shutdown_timeout) or
+                   self._kill_process(pid, signal.SIGKILL, timeout=2))
+
+        except (OSError, ProcessLookupError):
+            return True  # Already dead
+        except Exception as e:
+            self.logger.error(f"Error stopping process {pid}: {e}")
+            return False
+
+    def _kill_process(self, pid: int, sig: int, timeout: int) -> bool:
+        """Kill process with signal and wait for termination"""
+        try:
+            # Try psutil first (most reliable)
             try:
-                # Graceful shutdown
-                if hasattr(os, 'killpg'):
-                    os.killpg(os.getpgid(self.server_process.pid), signal.SIGTERM)
+                import psutil
+                proc = psutil.Process(pid)
+                if sig == signal.SIGKILL:
+                    proc.kill()
                 else:
-                    self.server_process.terminate()
+                    proc.terminate()
+                proc.wait(timeout=timeout)
+                return True
+            except ImportError:
+                pass
 
+            # Fallback to os.kill
+            os.kill(pid, sig)
+
+            # Wait for process death
+            for _ in range(timeout * 2):  # Check every 0.5s
                 try:
-                    self.server_process.wait(timeout=self.shutdown_timeout)
-                    self.logger.info("ChromaDB server stopped gracefully")
-                except subprocess.TimeoutExpired:
-                    # Force kill if graceful shutdown fails
-                    self.logger.warning("Graceful shutdown timed out, force killing server")
-                    if hasattr(os, 'killpg'):
-                        os.killpg(os.getpgid(self.server_process.pid), signal.SIGKILL)
-                    else:
-                        self.server_process.kill()
-                    self.logger.info("ChromaDB server force stopped")
+                    os.kill(pid, 0)  # Check if alive
+                    time.sleep(0.5)
+                except OSError:
+                    return True  # Process died
 
-            except Exception as e:
-                self.logger.warning(f"ChromaDB server shutdown warning: {e}")
-            finally:
-                self.server_process = None
+            return False  # Timeout
 
-        return True
+        except (OSError, ProcessLookupError):
+            return True  # Already dead
 
-    def force_stop(self):
+    def _find_external_pid(self) -> Optional[int]:
+        """Find external ChromaDB process PID using multiple methods"""
+        finders: List[Callable[[], Optional[int]]] = [
+            lambda: self._run_cmd(['lsof', '-ti', f':{self.port}']),
+            lambda: self._parse_netstat(),
+            lambda: self._check_psutil_connections()
+        ]
+
+        for finder in finders:
+            try:
+                pid = finder()
+                if pid:
+                    return pid
+            except Exception:
+                continue
+        return None
+
+    def _run_cmd(self, cmd: List[str]) -> Optional[int]:
+        """Run command and extract first PID from output"""
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=5)
+            if result.returncode == 0 and result.stdout.strip():
+                return int(result.stdout.strip().split('\n')[0])
+        except (subprocess.TimeoutExpired, ValueError, FileNotFoundError):
+            pass
+        return None
+
+    def _parse_netstat(self) -> Optional[int]:
+        """Extract PID from netstat output"""
+        try:
+            result = subprocess.run(['netstat', '-tlnp'], capture_output=True, text=True, timeout=5)
+            if result.returncode != 0:
+                return None
+
+            for line in result.stdout.split('\n'):
+                if f':{self.port} ' in line and 'LISTEN' in line:
+                    for part in line.split():
+                        if '/' in part:
+                            try:
+                                return int(part.split('/')[0])
+                            except ValueError:
+                                continue
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+        return None
+
+    def _check_psutil_connections(self) -> Optional[int]:
+        """Find PID using psutil network connections"""
+        try:
+            import psutil
+            for conn in psutil.net_connections(kind='inet'):
+                if (conn.status == psutil.CONN_LISTEN and
+                    conn.laddr.port == self.port):
+                    return conn.pid
+        except ImportError:
+            pass
+        return None
+
+    def _verify_stopped(self) -> bool:
+        """Verify server actually stopped"""
+        for _ in range(10):  # Check for 5 seconds
+            if not self.is_running():
+                self.logger.info("ChromaDB server stopped successfully")
+                return True
+            time.sleep(0.5)
+
+        self.logger.warning("Server appears to still be running after stop attempt")
+        return False
+
+    def force_stop(self) -> bool:
         """Force stop the server regardless of active clients"""
         return self.stop(force=True)
 
@@ -314,14 +426,19 @@ class ChromaServerManager:
         self.logger.debug(f"Released ChromaDB client ({len(self._clients)} active)")
 
     def get_status(self) -> Dict:
-        """Get detailed server status"""
+        """Get detailed server status with external PID detection"""
+        external_pid = None
+        if self.is_running() and not self.server_process:
+            external_pid = self._find_external_pid()
+
         return {
             "running": self.is_running(),
             "url": self.server_url,
             "host": self.host,
             "port": self.port,
             "persist_path": self.persist_path,
-            "process_id": self.server_process.pid if self.server_process else None,
+            "process_id": self.server_process.pid if self.server_process else external_pid,
+            "managed_externally": self.server_process is not None,
             "active_clients": len(self._clients),
             "startup_timeout": self.startup_timeout,
             "shutdown_timeout": self.shutdown_timeout

@@ -159,7 +159,7 @@ DEFAULT_CONFIG = {
         "use_ground_truth": True, # If True, ignores completion_confidence/max_versions, only uses evalplus results to determine to save or not
         "completion_confidence": 85,  # Minimum completion confidence threshold to save insights
         "max_versions": 30,  # Maximum versions before forcing to save insights
-    }
+    },
 
     # REPOSITORY & FILE MANAGEMENT
 
@@ -209,7 +209,7 @@ DEFAULT_CONFIG = {
     # KNOWLEDGE BASE MANAGEMENT
 
     "ChromaClientManager": {
-        "collection_name": "agent_kb",  # ChromaDB collection name
+        "collection_name": "humaneval",  # ChromaDB collection name
         "enable_reranking": True,  # Enable OpenAI reranking
         "use_shared_server": True,  # Use shared server instance across KB instances
 

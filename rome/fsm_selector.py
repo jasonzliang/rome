@@ -149,12 +149,12 @@ class IntermediateFSMBuilder(FSMBuilder):
     """Builder for intermediate FSM with code editing, testing, and execution"""
 
     def get_description(self) -> str:
-        return ("This is an intermediate code development workflow with 6-states and multiple action variants: "
-            "1) IDLE → Search/load code (PrioritySearch OR TournamentSearch) → CODE_LOADED "
+        return ("This is an intermediate code development workflow with 7-states and multiple action variants: "
+            "1) IDLE → Search/load code (TournamentSearch OR PrioritySearch) → CODE_LOADED "
             "2) CODE_LOADED → Edit code (EditCode OR EditCode2) OR write tests (EditTest OR EditTest2) → CODE_EDITED or TEST_EDITED "
             "3) CODE_EDITED → Write/edit tests (EditTest OR EditTest2) → TEST_EDITED "
             "4) TEST_EDITED → Execute code with tests → CODE_EXECUTED_PASS (success) or CODE_EXECUTED_FAIL (failure) "
-            "5) CODE_EXECUTED_PASS → Reset → IDLE (complete successful cycle) "
+            "5) CODE_EXECUTED_PASS → Reset/cleanup → CODE_EXECUTED_PASS2 → Save knowledge base → IDLE (complete successful cycle) "
             "6) CODE_EXECUTED_FAIL → Analyze version history and potentially revert → CODE_LOADED (retry with better version) OR Reset → IDLE (start over). "
             "This intermediate-level agent provides multiple strategies for each development phase, allowing for more sophisticated code discovery, editing approaches, and test creation methods compared to the simple workflow.")
 
@@ -174,19 +174,20 @@ class IntermediateFSMBuilder(FSMBuilder):
         test_edited_state = fsm.add_state(TestEditedState(config.get('TestEditedState', {})))
         code_executed_pass_state = fsm.add_state(
             CodeExecutedPassState(config.get('CodeExecutedPassState', {})))
+        code_executed_pass_state2 = fsm.add_state(
+            CodeExecutedPassState(config.get('CodeExecutedPassState', {})))
         code_executed_fail_state = fsm.add_state(
             CodeExecutedFailState(config.get('CodeExecutedFailState', {})))
 
         # Create actions with their respective configurations
         search_action = TournamentSearchAction(config.get('TournamentSearchAction', {}))
-        reset_action = AdvancedResetAction(config.get('AdvancedResetAction', {}))
         edit_code_action = EditCodeAction(config.get('EditCodeAction', {}))
         edit_test_action = EditTestAction(config.get('EditTestAction', {}))
         execute_code_action = ExecuteCodeAction(config.get('ExecuteCodeAction', {}),
             config.get('Executor', {}))
-
-        # Replace TransitionAction with RevertCodeAction for intelligent failure recovery
+        reset_action = AdvancedResetAction(config.get('AdvancedResetAction', {}))
         revert_code_action = RevertCodeAction(config.get('RevertCodeAction', {}))
+        save_kb_action = SaveKBAction(config.get('SaveKBAction', {}))
 
         # Add transitions from Idle state
         fsm.add_action(idle_state, code_loaded_state,
@@ -210,7 +211,8 @@ class IntermediateFSMBuilder(FSMBuilder):
             fallback_state=code_executed_fail_state)
 
         # Add transitions from CodeExecutedPass state
-        fsm.add_action(code_executed_pass_state, idle_state, reset_action)
+        fsm.add_action(code_executed_pass_state, code_executed_pass_state2, reset_action)
+        fsm.add_action(code_executed_pass_state2, idle_state, save_kb_action)
 
         # Add transitions from CodeExecutedFail state - INTELLIGENT RECOVERY
         fsm.add_action(code_executed_fail_state, code_loaded_state, revert_code_action)
