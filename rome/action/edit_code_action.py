@@ -74,9 +74,7 @@ def _query_knowledge_base(agent, file_path: str, file_content: str,
         if kb_response and len(kb_response.strip()) > SUMMARY_LENGTH:  # Ensure substantial content
             # Don't include error responses
             if not kb_response.startswith("Error:"):
-                insights.append(f"# Knowledge base insights ({context_desc}):")
-                insights.append(kb_response.strip())
-                # break  # Use first successful query to avoid redundancy
+                insights.append(f"# Knowledge base insights ({context_desc}):\n{kb_response}")
 
     return insights
 
@@ -87,17 +85,20 @@ def _build_kb_query_terms(filename: str, file_path: str, file_content: str,
 
     queries = []
     if file_content:
-        code_query = f"Find insights for the following code:\n{file_content}"
+        if execution_data:
+            exec_analysis = execution_data.get('exec_analysis', '')
+        else:
+            exec_analysis = ''
+        code_query = f"Find relevant insights for the following code and execution analysis:\n```python\n{file_content}\n```\n{exec_analysis}"
         queries.append((code_query, "code analysis"))
 
     # Error-specific queries (highest priority if execution failed)
-    if execution_data and execution_data.get('exec_exit_code') != 0:
-        exec_output = execution_data.get('exec_output', '')
-        exec_analysis = execution_data.get('exec_analysis', '')
+    # if execution_data and execution_data.get('exec_exit_code') != 0:
+    #     exec_analysis = execution_data.get('exec_analysis', '')
 
-        # Use execution analysis if available
-        analysis_query = f"Find insights for following execution analysis: {exec_analysis}"
-        queries.append((analysis_query, "code execution analysis"))
+    #     # Use execution analysis if available
+    #     analysis_query = f"Find insights for following execution analysis: {exec_analysis}"
+    #     queries.append((analysis_query, "code execution analysis"))
 
     return queries
 
@@ -122,9 +123,11 @@ class EditCodeAction(Action):
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']
         file_content = selected_file['content']
+        test_path = selected_file.get('test_path')
+        test_content = selected_file.get('test_content')
 
         # Prepare prompt for code improvement
-        prompt = self._create_code_prompt(agent, file_path, file_content)
+        prompt = self._create_code_prompt(agent, file_path, file_content, test_path, test_content)
 
         # Get improved code from LLM
         self.logger.info(f"Requesting code improvements for {file_path}")
@@ -174,13 +177,14 @@ class EditCodeAction(Action):
         self.logger.info(f"Successfully edited and wrote improved code to {file_path}")
         return True
 
-    def _create_code_prompt(self, agent, file_path: str, file_content: str) -> str:
+    def _create_code_prompt(self, agent, file_path: str, file_content: str,
+        test_path: str, test_content: str) -> str:
         """Create a prompt for the LLM to improve the code"""
 
         # Base prompt without relying on a configured improvement_prompt
         prompt = """Analyze the code file and suggest improvements. Focus on:
 1. Implementing missing code and filling in empty functions
-2. Code quality and readability
+2. Code correctness, quality, and readability
 3. Bug fixes and edge cases
 4. Performance optimizations
 5. Documentation improvements
@@ -198,12 +202,21 @@ class EditCodeAction(Action):
 ```
 """
 
-        # Add current file info and code
+        # Add current file code + tests if they exist
         prompt += f"""
 # Current code file path: {file_path}
 # Current code file content:
 ```python
 {file_code}
+```
+"""
+        if test_path and os.path.exists(test_path):
+            prompt += f"""
+# Test file path:
+{test_path}
+# Test file content:
+```python
+{test_content}
 ```
 """
         # Get analysis context using the enhanced function
@@ -228,7 +241,7 @@ Respond with a JSON object containing:
 IMPORTANT:
 - Return the ENTIRE file content with your improvements, not just the changed parts
 - Make sure the improved code is valid Python syntax and contains no markdown formatting like ```python...```
-- Be conservative with changes - prioritize correctness over style
+- Be careful with changes - prioritize correctness over style
 - List improvements you made in "changes" and summarize the changes in "explanation"
 - If improved code is unchanged, be sure give an empty list for "changes" and mention it in "explanation"
 """

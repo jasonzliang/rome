@@ -30,20 +30,14 @@ class SaveKBAction(Action):
         filename = os.path.basename(file_path)
         test_filename = os.path.basename(test_path)
 
-        # Get execution results if available
+        # Get execution context if available
         execution_context = ""
-        if 'exec_output' in agent.context['selected_file'] and \
-            agent.context['selected_file']['exec_exit_code'] == 0:
+        if ('exec_output' in agent.context['selected_file'] and
+            agent.context['selected_file']['exec_exit_code'] == 0):
             exec_code = agent.context['selected_file'].get('exec_exit_code', 'unknown')
-            exec_output = agent.context['selected_file'].get('exec_output', '')
-            exec_analysis = agent.context['selected_file'].get('exec_analysis', '')
-
-            execution_context = f"""
-# Execution Results:
-Exit Code: {exec_code}
-Output:\n```\n{exec_output}\n```
-Analysis:\n{exec_analysis}
-"""
+            exec_output = agent.context['selected_file'].get('exec_output', '')[:200]  # Limit context
+            exec_analysis = agent.context['selected_file'].get('exec_analysis', '')[:200]
+            execution_context = f"Exit: {exec_code}\nOutput: {exec_output}\nAnalysis: {exec_analysis}"
 
         prompt = f"""Analyze the following code and test files to extract valuable, reusable insights that could help with similar problems in the future.
 
@@ -65,15 +59,17 @@ Please extract and provide insights in the following categories:
 
 2. **Testing Approaches**: What testing strategies, patterns, or best practices are shown?
 
-3. **Problem Solutions**: What common problems are solved and how? Include error handling approaches.
+3. **Reusable Code**: Extract 1-3 most reusable functions or code snippets that could be used as library code.
 
 4. **Applicable Context**: What types of problems or domains would benefit from these patterns?
+
+IMPORTANT: Limit your total response to maximum 600 tokens. Be concise but comprehensive.
 
 Respond with a JSON object containing these insights:
 {{
     "code_patterns": "Design patterns, algorithms, and reusable code structures",
     "testing_approaches": "Testing strategies and best practices demonstrated",
-    "problem_solutions": "Common problems solved and solution approaches including error handling",
+    "reusable_code": "1-3 most reusable functions or code snippets for library use",
     "applicable_context": "Types of problems or domains where these patterns apply"
 }}
 """
@@ -83,7 +79,6 @@ Respond with a JSON object containing these insights:
             system_message=agent.role,
             response_format={"type": "json_object"}
         )
-
         return agent.parse_json_response(response)
 
     def _create_knowledge_entry(self, insights: Dict, file_path: str, test_path: str) -> str:
