@@ -244,7 +244,7 @@ class ChromaClientManager:
         if self.log_db:
             with open(os.path.join(self.agent.get_log_dir(),
                 self.agent.get_id() + ".db-doc.log"), "a") as f:
-                f.write(f"Text: {text}\n\nMetadata: {metadata}\n\n")
+                f.write(f"Document: {text}\n\nMetadata: {metadata}\n\n")
 
     def query(self, question, top_k=None, use_reranking=None, show_scores=False):
         """Enhanced query with simplified reranking logic and empty collection validation"""
