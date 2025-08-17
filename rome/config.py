@@ -129,6 +129,7 @@ DEFAULT_CONFIG = {
     # Basic Actions
     "ResetAction": {},
     "AdvancedResetAction": {
+        "use_ground_truth": True,
         "completion_confidence": 85,
         "max_versions": 30,
     },
@@ -215,10 +216,11 @@ DEFAULT_CONFIG = {
         "use_shared_server": True,  # Use shared server instance across KB instances
 
         # LlamaIndex configuration
-        "chunk_size": 512,  # Chunk size for text splitting
-        "chunk_overlap": 50,  # Overlap between chunks
+        "chunk_size": 400,  # Chunk size for text splitting
+        "chunk_overlap": 80,  # Overlap between chunks
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model
-        "top_k": 10,
+        "top_k": 5,
+        "log_db": True
         # Note: LLM model and temperature are inherited from agent's OpenAIHandler config
     },
 

@@ -131,7 +131,7 @@ class ChromaClientManager:
         # Set attributes from config
         set_attributes_from_config(self, self.config,
             ['collection_name', 'enable_reranking', 'chunk_size', 'chunk_overlap',
-             'embedding_model', 'use_shared_server'], ['top_k'])
+             'embedding_model', 'use_shared_server'], ['top_k', 'log_db'])
 
         # Get or create server manager instance
         if self.use_shared_server:
@@ -241,6 +241,10 @@ class ChromaClientManager:
     def add_text(self, text, metadata=None):
         """Add a single text document"""
         self.index.insert(Document(text=text, metadata=metadata or {}))
+        if self.log_db:
+            with open(os.path.join(self.agent.get_log_dir(),
+                self.agent.get_id() + ".db-doc.log"), "a") as f:
+                f.write(f"Text: {text}\n\nMetadata: {metadata}\n\n")
 
     def query(self, question, top_k=None, use_reranking=None, show_scores=False):
         """Enhanced query with simplified reranking logic and empty collection validation"""
@@ -258,10 +262,16 @@ class ChromaClientManager:
             # Get documents
             nodes = self._retrieve_nodes(question, retrieval_k)
             # Rerank and generate response
-            return self._rerank_and_respond(question, nodes, top_k, show_scores)
+            response = self._rerank_and_respond(question, nodes, top_k, show_scores)
         else:
             # Standard query without reranking
-            return self._standard_query(question, top_k)
+            response = self._standard_query(question, top_k)
+
+        if self.log_db:
+            with open(os.path.join(self.agent.get_log_dir(),
+                self.agent.get_id() + ".db-query.log"), "a") as f:
+                f.write(f"Query: {question}\n\nResponse: {response}\n\n")
+        return response
 
     def _calculate_retrieval_size(self, top_k: int) -> int:
         """Calculate optimal retrieval size for reranking"""

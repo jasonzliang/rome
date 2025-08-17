@@ -6,9 +6,10 @@ from .action import Action
 from ..config import check_attrs, SUMMARY_LENGTH, LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
 from ..logger import get_logger
 from ..parsing import hash_string
+from ..state import truncate_text
 
 
-def create_analysis_prompt(agent, file_path: str, file_content: str) -> Optional[str]:
+def create_analysis_prompt(agent, file_path: str, file_content: str, query_kb: bool = True) -> Optional[str]:
     """Create analysis context for code editing prompts by loading execution data and querying knowledge base."""
 
     # Load the latest execution results
@@ -29,9 +30,10 @@ def create_analysis_prompt(agent, file_path: str, file_content: str) -> Optional
             context_parts.append(f"# Note: The above analysis was performed by a different agent ({exec_agent_id}). Please double-check and verify the analysis results.")
 
     # Query knowledge base for relevant insights
-    kb_insights = _query_knowledge_base(agent, file_path, file_content, execution_data)
-    if kb_insights:
-        context_parts.extend(kb_insights)
+    if query_kb:
+        kb_insights = _query_knowledge_base(agent, file_path, file_content, execution_data)
+        if kb_insights:
+            context_parts.extend(kb_insights)
 
     if not context_parts:
         return None
@@ -89,7 +91,7 @@ def _build_kb_query_terms(filename: str, file_path: str, file_content: str,
             exec_analysis = execution_data.get('exec_analysis', '')
         else:
             exec_analysis = ''
-        code_query = f"Find relevant insights for the following code and execution analysis:\n```python\n{file_content}\n```\n{exec_analysis}"
+        code_query = f"Find relevant insights for the following code and execution analysis:\n```python\n{truncate_text(file_content, LONGEST_SUMMARY_LEN)}\n```\n{truncate_text(exec_analysis, LONGEST_SUMMARY_LEN)}"
         queries.append((code_query, "code analysis"))
 
     # Error-specific queries (highest priority if execution failed)

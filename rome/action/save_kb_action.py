@@ -63,7 +63,7 @@ Please extract and provide insights in the following categories:
 
 4. **Applicable Context**: What types of problems or domains would benefit from these patterns?
 
-IMPORTANT: Limit your total response to maximum 600 tokens. Be concise but comprehensive.
+IMPORTANT: Limit your total response to maximum 800 tokens. Be concise but comprehensive.
 
 Respond with a JSON object containing these insights:
 {{
