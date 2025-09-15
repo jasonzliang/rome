@@ -63,7 +63,7 @@ class ChromaServerManager:
         self.server_url = f"http://{self.host}:{self.port}"
 
         self._clients = set()
-        self._clients_lock = threading.Lock()  # New lock for client operations
+        self._clients_lock = threading.Lock()
 
         self._shutdown_registered = False
 
@@ -73,9 +73,13 @@ class ChromaServerManager:
         self.logger.debug(f"ChromaServerManager initialized for {self.server_url}")
         self.logger.debug(f"Data will persist to: {self.persist_path}")
 
-        while not self.is_running():
-            self.logger.debug("Waiting for server to start up...")
-            time.sleep(1)
+        # FIX: Actually start the server before waiting for it
+        if not self.is_running():
+            self.logger.info("ChromaDB server not running, starting it...")
+            if not self.start():
+                raise RuntimeError(f"Failed to start ChromaDB server at {self.server_url}")
+        else:
+            self.logger.info(f"ChromaDB server already running at {self.server_url}")
 
     def _resolve_persist_path(self) -> str:
         """Resolve the best persist path for ChromaDB data"""

@@ -209,7 +209,7 @@ class EditCodeAction(Action):
 # Current code file path: {file_path}
 # Current code file content:
 ```python
-{file_code}
+{file_content}
 ```
 """
         if test_path and os.path.exists(test_path):
