@@ -1,6 +1,7 @@
 # knowledge_base.py
 import json
 from typing import Optional, List, Dict
+import time
 
 # ChromaDB and LlamaIndex imports
 try:
@@ -123,8 +124,9 @@ Respond with ONLY a JSON array of scores: [0.8, 0.2, 0.9]"""
 class ChromaClientManager:
     """Enhanced ChromaDB + LlamaIndex knowledge base with reranking"""
 
-    def __init__(self, config: Dict = None, agent=None):
+    def __init__(self, config=None, server_config=None, agent=None):
         self.config = config or {}
+        self.server_config = server_config or {}
         self.agent = agent
         self.logger = get_logger()
 
@@ -136,12 +138,10 @@ class ChromaClientManager:
         # Get or create server manager instance
         if self.use_shared_server:
             # Use shared singleton server
-            server_config = self.config.get('ChromaServerManager', {})
             self.server = ChromaServerManager.get_instance(server_config)
             self._owns_server = False
         else:
             # Create dedicated server instance
-            server_config = self.config.get('ChromaServerManager', {})
             self.server = ChromaServerManager(server_config)
             self._owns_server = True
 

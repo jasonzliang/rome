@@ -252,8 +252,10 @@ class Agent:
 
     def _setup_knowledge_base(self) -> None:
         """Setup knowledge base if enabled"""
-        kb_config = self.config.get('ChromaClientManager', {})
-        self.kb_manager = ChromaClientManager(config=kb_config, agent=self)
+        kb_config_client = self.config.get('ChromaClientManager', {})
+        kb_config_server = self.config.get('ChromaServerManager', {})
+        self.kb_manager = ChromaClientManager(config=kb_config_client,
+            server_config=kb_config_server, agent=self)
         self.logger.info(f"Knowledge base initialized: {self.kb_manager.info()}")
 
     def _setup_agent_api(self) -> None:

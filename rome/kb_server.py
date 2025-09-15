@@ -73,6 +73,10 @@ class ChromaServerManager:
         self.logger.debug(f"ChromaServerManager initialized for {self.server_url}")
         self.logger.debug(f"Data will persist to: {self.persist_path}")
 
+        while not self.is_running():
+            self.logger.debug("Waiting for server to start up...")
+            time.sleep(1)
+
     def _resolve_persist_path(self) -> str:
         """Resolve the best persist path for ChromaDB data"""
         import tempfile
