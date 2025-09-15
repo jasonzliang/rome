@@ -8,7 +8,7 @@ Usage:
     python kb_server_cli.py restart [--host HOST] [--port PORT] [--path PATH]
     python kb_server_cli.py status
     python kb_server_cli.py clear [--collection NAME] [--force]
-    python kb_server_cli.py info
+    python kb_server_cli.py list [--collection NAME] [--limit LIMIT]
 """
 
 import argparse
@@ -21,6 +21,7 @@ from typing import Dict, Optional
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.kb_server import ChromaServerManager
 from rome.logger import get_logger
+from rome.config import LONG_SUMMARY_LEN
 
 logger = get_logger()
 logger.configure({
@@ -62,7 +63,7 @@ Examples:
     # Restart server
     python kb_server_cli.py restart
 
-    # Check server status
+    # Check server status and database info
     python kb_server_cli.py status
 
     # Clear all data (requires confirmation)
@@ -71,8 +72,14 @@ Examples:
     # Clear specific collection
     python kb_server_cli.py clear --collection my_collection
 
-    # Show database info
-    python kb_server_cli.py info
+    # List all documents in all collections
+    python kb_server_cli.py list
+
+    # List documents in specific collection
+    python kb_server_cli.py list --collection my_collection
+
+    # List first 10 documents only
+    python kb_server_cli.py list --limit 10
         """
     )
 
@@ -96,16 +103,18 @@ Examples:
     restart_parser.add_argument('--port', type=int, default=DEFAULT_PORT, help='Server port (default: 8000)')
     restart_parser.add_argument('--path', type=str, default=DEFAULT_PATH, help='Data persistence path (default: auto-detect)')
 
-    # Status command
-    subparsers.add_parser('status', help='Show server status')
+    # Status command (now includes database info)
+    subparsers.add_parser('status', help='Show server status and database information')
 
     # Clear command
     clear_parser = subparsers.add_parser('clear', help='Clear database or collection')
     clear_parser.add_argument('--collection', help='Clear specific collection (default: clear all)')
     clear_parser.add_argument('--force', action='store_true', help='Skip confirmation prompt')
 
-    # Info command
-    subparsers.add_parser('info', help='Show database information')
+    # List command (new)
+    list_parser = subparsers.add_parser('list', help='List documents in collections')
+    list_parser.add_argument('--collection', help='List documents in specific collection (default: all collections)')
+    list_parser.add_argument('--limit', type=int, default=None, help='Limit number of documents to display')
 
     return parser
 
@@ -115,32 +124,25 @@ def get_server_manager() -> 'ChromaServerManager':
     return ChromaServerManager.get_instance(SERVER_CONFIG)
 
 
-def print_status(status: Dict, detailed: bool = False):
-    """Print formatted status information"""
+def print_status_and_info(status: Dict, db_info: Dict):
+    """Print combined status and database information"""
+    # Server status section
     if status['running']:
         print(f"✅ ChromaDB server is RUNNING")
         print(f"   URL: {status['url']}")
         print(f"   PID: {status['process_id']}")
         print(f"   Active clients: {status['active_clients']}")
-
-        if detailed:
-            print(f"   Host: {status['host']}")
-            print(f"   Port: {status['port']}")
-            print(f"   Data path: {status['persist_path']}")
-            print(f"   Startup timeout: {status['startup_timeout']}s")
-            print(f"   Shutdown timeout: {status['shutdown_timeout']}s")
+        print(f"   Host: {status['host']}")
+        print(f"   Port: {status['port']}")
+        print(f"   Startup timeout: {status['startup_timeout']}s")
+        print(f"   Shutdown timeout: {status['shutdown_timeout']}s")
     else:
         print(f"❌ ChromaDB server is NOT RUNNING")
-        if detailed:
-            print(f"   Would run at: {status['url']}")
-            print(f"   Data path: {status['persist_path']}")
+        print(f"   Would run at: {status['url']}")
 
-
-def print_database_info(db_info: Dict):
-    """Print formatted database information"""
-    print(f"📊 Database Information")
+    # Database info section
+    print(f"\n📊 Database Information")
     print(f"   Data path: {db_info['persist_path']}")
-    print(f"   Server URL: {db_info['server_url']}")
     print(f"   Running: {'Yes' if db_info['running'] else 'No'}")
 
     if 'error' in db_info:
@@ -154,6 +156,57 @@ def print_database_info(db_info: Dict):
                 print(f"     - {col['name']} ({col['count']} documents)")
         else:
             print(f"   Collections: None")
+
+
+def print_documents(documents: Dict, collection_name: str = None, limit: int = None):
+    """Print formatted document information"""
+    if collection_name:
+        print(f"📄 Documents in collection '{collection_name}':")
+    else:
+        print(f"📄 All documents:")
+
+    total_docs = 0
+    displayed_docs = 0
+
+    for col_name, docs in documents.items():
+        if collection_name and col_name != collection_name:
+            continue
+
+        doc_count = len(docs)
+        total_docs += doc_count
+
+        if not collection_name:
+            print(f"\n   Collection: {col_name} ({doc_count} documents)")
+
+        for i, doc in enumerate(docs):
+            if limit and displayed_docs >= limit:
+                print(f"   ... (showing {limit} of {total_docs} total documents)")
+                return
+
+            # Extract document info
+            doc_id = doc.get('id', 'Unknown')
+            content = doc.get('document', '')
+            metadata = doc.get('metadata', {})
+
+            # Truncate content for display
+            maxlen = LONG_SUMMARY_LEN
+            content_preview = content[:maxlen] + "..." if len(content) > maxlen else content
+
+            print(f"   [{displayed_docs + 1}] ID: {doc_id}")
+            print(f"       Content: {content_preview}")
+            if metadata:
+                print(f"       Metadata: {metadata}")
+            print()
+
+            displayed_docs += 1
+
+    if displayed_docs == 0:
+        if collection_name:
+            print(f"   No documents found in collection '{collection_name}'")
+        else:
+            print(f"   No documents found in any collection")
+    elif not limit or displayed_docs < limit:
+        print(f"   Total: {displayed_docs} documents")
 
 
 def confirm_action(message: str) -> bool:
@@ -206,7 +259,9 @@ def handle_start(args):
 
         if manager.is_running() and not args.force:
             print("✅ ChromaDB server is already running")
-            print_status(manager.get_status())
+            status = manager.get_status()
+            db_info = manager.get_database_info()
+            print_status_and_info(status, db_info)
             return 0
 
         print("🚀 Starting ChromaDB server...")
@@ -217,7 +272,9 @@ def handle_start(args):
 
         if success:
             print("✅ ChromaDB server started successfully")
-            print_status(manager.get_status())
+            status = manager.get_status()
+            db_info = manager.get_database_info()
+            print_status_and_info(status, db_info)
 
             if args.detach:
                 print("🔗 Server running in background. Use 'python kb_server_cli.py stop' to stop.")
@@ -272,7 +329,9 @@ def handle_restart(args):
 
         if success:
             print("✅ ChromaDB server restarted successfully")
-            print_status(manager.get_status())
+            status = manager.get_status()
+            db_info = manager.get_database_info()
+            print_status_and_info(status, db_info)
             return 0
         else:
             print("❌ Failed to restart ChromaDB server")
@@ -285,12 +344,13 @@ def handle_restart(args):
 
 
 def handle_status(args):
-    """Handle status command"""
+    """Handle status command (now includes database info)"""
     try:
         manager = get_server_manager()
         status = manager.get_status()
+        db_info = manager.get_database_info()
 
-        print_status(status, detailed=True)
+        print_status_and_info(status, db_info)
         return 0
 
     except Exception as e:
@@ -343,17 +403,70 @@ def handle_clear(args):
         return 1
 
 
-def handle_info(args):
-    """Handle info command"""
+def handle_list(args):
+    """Handle list command - list documents in collections"""
     try:
         manager = get_server_manager()
-        db_info = manager.get_database_info()
 
-        print_database_info(db_info)
+        if not manager.is_running():
+            print("❌ ChromaDB server is not running")
+            print("   Use 'python kb_server_cli.py start' to start the server first")
+            return 1
+
+        # Get ChromaDB client
+        import chromadb
+        client = chromadb.HttpClient(host=manager.host, port=manager.port)
+
+        # Get collections
+        collections = client.list_collections()
+
+        if not collections:
+            print("📄 No collections found in database")
+            return 0
+
+        # Collect documents from collections
+        documents = {}
+
+        for collection in collections:
+            col_name = collection.name
+
+            # Skip if specific collection requested and this isn't it
+            if args.collection and col_name != args.collection:
+                continue
+
+            try:
+                # Get all documents from collection
+                result = collection.get(include=['documents', 'metadatas'])
+
+                # Format documents
+                col_documents = []
+                for i in range(len(result['ids'])):
+                    doc = {
+                        'id': result['ids'][i],
+                        'document': result['documents'][i] if result['documents'] else '',
+                        'metadata': result['metadatas'][i] if result['metadatas'] else {}
+                    }
+                    col_documents.append(doc)
+
+                documents[col_name] = col_documents
+
+            except Exception as e:
+                print(f"⚠️  Error reading collection '{col_name}': {e}")
+                continue
+
+        if not documents:
+            if args.collection:
+                print(f"📄 Collection '{args.collection}' not found or empty")
+            else:
+                print("📄 No documents found in any collection")
+            return 0
+
+        # Print documents
+        print_documents(documents, args.collection, args.limit)
         return 0
 
     except Exception as e:
-        print(f"❌ Error getting database info: {e}")
+        print(f"❌ Error listing documents: {e}")
         traceback.print_exc()
         return 1
 
@@ -383,7 +496,7 @@ def main():
         'restart': handle_restart,
         'status': handle_status,
         'clear': handle_clear,
-        'info': handle_info,
+        'list': handle_list,  # New command
     }
 
     handler = commands.get(args.command)

@@ -73,7 +73,7 @@ def create_config():
         "Agent": {
             "fsm_type": "knowledge_base",
             "action_select_strat": "original",
-            "patience": 5,
+            "patience": 1,
             "agent_api": True,
             "save_hist_interval": 1
         },
@@ -92,7 +92,13 @@ def create_config():
             "file_types": [".py"]
         },
         "AdvancedResetAction": {
+            "use_ground_truth": False,
             "completion_confidence": 80,
+            "max_versions": 30,
+        },
+        "SaveKBAction": {
+            "use_ground_truth": False,
+            "completion_confidence": 85,
             "max_versions": 30,
         },
     }

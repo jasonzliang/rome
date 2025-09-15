@@ -1,6 +1,8 @@
 # knowledge_base.py
 import json
+import hashlib
 from typing import Optional, List, Dict
+import os
 import time
 
 # ChromaDB and LlamaIndex imports
@@ -239,12 +241,39 @@ class ChromaClientManager:
         return self.collection.count()
 
     def add_text(self, text, metadata=None):
-        """Add a single text document"""
-        self.index.insert(Document(text=text, metadata=metadata or {}))
-        if self.log_db:
-            with open(os.path.join(self.agent.get_log_dir(),
-                self.agent.get_id() + ".db-doc.log"), "a") as f:
-                f.write(f"Document: {text}\n\nMetadata: {metadata}\n\n")
+        """Add a single text document with automatic deduplication"""
+        try:
+            # Generate deterministic ID from content for deduplication
+            content_hash = hashlib.sha256(text.encode()).hexdigest()
+
+            # Get count before operation
+            count_before = self.collection.count()
+
+            # Use upsert for automatic deduplication
+            self.collection.upsert(
+                ids=[content_hash],
+                documents=[text],
+                metadatas=[metadata or {}]
+            )
+
+            # Get count after operation
+            count_after = self.collection.count()
+
+            # Log if it was a new document
+            if count_after > count_before:
+                self.logger.info(f"Added new document with hash {content_hash[:8]}...")
+                if self.log_db:
+                    with open(os.path.join(self.agent.get_log_dir(),
+                        self.agent.get_id() + ".db-doc.log"), "a") as f:
+                        f.write(f"Document: {text}\n\nMetadata: {metadata}\n\n")
+            else:
+                self.logger.info(f"Updated existing document with hash {content_hash[:8]}...")
+
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to add document to knowledge base: {e}")
+            raise
 
     def query(self, question, top_k=None, use_reranking=None, show_scores=False):
         """Enhanced query with simplified reranking logic and empty collection validation"""
