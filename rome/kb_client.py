@@ -18,7 +18,7 @@ except ImportError as e:
 from .config import set_attributes_from_config
 from .logger import get_logger
 from .kb_server import ChromaServerManager
-from ..parsing import parse_json_response
+from .parsing import parse_json_response
 
 
 class OpenAIReranker:

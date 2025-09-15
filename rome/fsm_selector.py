@@ -145,7 +145,7 @@ class SimpleFSMBuilder(FSMBuilder):
         return fsm
 
 
-class IntermediateFSMBuilder(FSMBuilder):
+class KnowledgeBaseFSMBuilder(FSMBuilder):
     """Builder for intermediate FSM with code editing, testing, and execution"""
 
     def get_description(self) -> str:
@@ -242,7 +242,7 @@ class FSMSelector:
     BUILDERS = {
         'minimal': MinimalFSMBuilder,
         'simple': SimpleFSMBuilder,
-        'intermediate': IntermediateFSMBuilder,
+        'knowledge_base': KnowledgeBaseFSMBuilder,
     }
 
     def __init__(self, fsm_type: str = "simple", config: Dict = None):

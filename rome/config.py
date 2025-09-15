@@ -229,7 +229,7 @@ DEFAULT_CONFIG = {
         "direct_rerank_limit": 40,  # Max docs for direct reranking (triggers hierarchical above this)
         "batch_size": 6,  # Batch size for reranking
         "min_score_threshold": 0.4,  # Minimum relevance score to include in context
-    }
+    },
 
     "ChromaServerManager": {
         "host": "localhost",  # ChromaDB server host

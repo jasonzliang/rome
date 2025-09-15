@@ -2,8 +2,9 @@ import os
 import traceback
 from typing import Dict, List, Any, Optional
 
+from .action import Action
 from .advanced_reset_action import analyze_execution_results, check_max_versions_reached, check_ground_truth
-from ..config import LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
+from ..config import check_attrs, LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
 from ..logger import get_logger
 
 

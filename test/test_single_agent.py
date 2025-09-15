@@ -68,12 +68,12 @@ def create_config():
             "model": "gpt-4o",
             "temperature": 0.1,
             "max_tokens": 8192,
-            "cost_limit": 3.0,
+            "cost_limit": 10.0,
         },
         "Agent": {
-            "fsm_type": "simple",
-            "action_select_strat": "smart",
-            "patience": 1,
+            "fsm_type": "knowledge_base",
+            "action_select_strat": "original",
+            "patience": 5,
             "agent_api": True,
             "save_hist_interval": 1
         },
