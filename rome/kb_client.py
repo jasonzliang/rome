@@ -126,10 +126,13 @@ Respond with ONLY a JSON array of scores: [0.8, 0.2, 0.9]"""
 class ChromaClientManager:
     """Enhanced ChromaDB + LlamaIndex knowledge base with reranking"""
 
-    def __init__(self, config=None, server_config=None, agent=None):
-        self.config = config or {}
-        self.server_config = server_config or {}
+    def __init__(self, agent=None):
         self.agent = agent
+
+        client_config = self.agent.config.get('ChromaClientManager', {})
+        server_config = self.agent.config.get('ChromaServerManager', {})
+        self.config = client_config or {}
+        self.server_config = server_config or {}
         self.logger = get_logger()
 
         # Set attributes from config
@@ -230,7 +233,7 @@ class ChromaClientManager:
     def _setup_reranker(self):
         """Setup reranker if enabled"""
         if self.enable_reranking:
-            reranker_config = self.config.get('OpenAIReranker', {})
+            reranker_config = self.agent.config.get('OpenAIReranker', {})
             self.reranker = OpenAIReranker(reranker_config, self.agent)
             self.logger.debug("OpenAI reranker enabled")
         else:

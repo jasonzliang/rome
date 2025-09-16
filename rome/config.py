@@ -227,7 +227,7 @@ DEFAULT_CONFIG = {
     "OpenAIReranker": {
         # Note: Model settings are inherited from agent's OpenAIHandler config
         "direct_rerank_limit": 40,  # Max docs for direct reranking (triggers hierarchical above this)
-        "batch_size": 6,  # Batch size for reranking
+        "batch_size": 10,  # Batch size for reranking
         "min_score_threshold": 0.4,  # Minimum relevance score to include in context
     },
 
