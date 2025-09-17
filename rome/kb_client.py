@@ -265,7 +265,8 @@ class ChromaClientManager:
                 if self.log_db:
                     with open(os.path.join(self.agent.get_log_dir(),
                         self.agent.get_id() + ".db-doc.log"), "a") as f:
-                        f.write(f"Document: {text}\n\nMetadata: {metadata}\n\n")
+                        f.write("="*80)
+                        f.write(f"\n\nDOCUMENT: {text}\n\nMETADATA: {metadata}\n\n")
             else:
                 self.logger.info(f"Updated existing document with hash {content_hash[:8]}...")
 
@@ -299,7 +300,8 @@ class ChromaClientManager:
         if self.log_db:
             with open(os.path.join(self.agent.get_log_dir(),
                 self.agent.get_id() + ".db-query.log"), "a") as f:
-                f.write(f"Query: {question}\n\nResponse: {response}\n\n")
+                f.write("="*80)
+                f.write(f"\n\nQUERY: {question}\n\nRESPONSE: {response}\n\n")
         return response
 
     def _calculate_retrieval_size(self, top_k: int) -> int:

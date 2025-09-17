@@ -161,7 +161,7 @@ class AdvancedResetAction(Action):
     def __init__(self, config: Dict):
         super().__init__(config)
         self.logger = get_logger()
-        check_attrs(self, ['use_ground_truth', 'completion_confidence', 'max_versions'])
+        check_attrs(self, ['completion_confidence', 'max_versions'])
         self.completion_confidence = max(min(self.completion_confidence, 100), 1)
         self.max_versions = max(self.max_versions, 1)
 
@@ -178,7 +178,7 @@ class AdvancedResetAction(Action):
         selected_file = agent.context['selected_file']
         file_path = selected_file['path']
 
-        if self.use_ground_truth:
+        if agent.use_ground_truth:
             work_complete = check_ground_truth(agent, file_path)
         else:
             work_complete = analyze_execution_results(agent, selected_file,

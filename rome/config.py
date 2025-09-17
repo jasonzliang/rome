@@ -60,6 +60,9 @@ DEFAULT_CONFIG = {
         "agent_api": True,  # Launch an REST API server for agent's internal state
         "log_pid": False,  # Whether to include PID in agent log file names
         "save_hist_interval": 10, # Interval to save summary history
+
+        "use_ground_truth": True, # If True, only uses evalplus results to determine if work is complete or not
+
     },
 
     "AgentApi": {
@@ -129,7 +132,6 @@ DEFAULT_CONFIG = {
     # Basic Actions
     "ResetAction": {},
     "AdvancedResetAction": {
-        "use_ground_truth": True,
         "completion_confidence": 85,
         "max_versions": 30,
     },
@@ -158,7 +160,6 @@ DEFAULT_CONFIG = {
 
     # Knowledge Base Actions
     "SaveKBAction": {
-        "use_ground_truth": True, # If True, ignores completion_confidence/max_versions, only uses evalplus results to determine to save or not
         "completion_confidence": 85,  # Minimum completion confidence threshold to save insights
         "max_versions": 30,  # Maximum versions before forcing to save insights
     },

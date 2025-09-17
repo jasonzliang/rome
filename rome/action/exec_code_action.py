@@ -53,7 +53,7 @@ class ExecuteCodeAction(Action):
 
 Exit code: {exit_code}
 
-Please provide an analysis covering:
+Please create an analysis covering:
 1. Overall test execution status (passed/failed)
 2. Specific test failures and their root causes
 3. Any errors, exceptions, or warnings found
@@ -61,8 +61,10 @@ Please provide an analysis covering:
 5. Suggestions for fixing identified problems
 6. Recommendations for improving test coverage
 
+IMPORTANT: Provide analysis as a numbered list with no other text before or after the list
+
 # Your analysis:
-    """
+"""
         return agent.chat_completion(prompt=prompt, system_message=agent.role)
 
 

@@ -175,7 +175,7 @@ class KnowledgeBaseFSMBuilder(FSMBuilder):
         code_executed_pass_state = fsm.add_state(
             CodeExecutedPassState(config.get('CodeExecutedPassState', {})))
         code_executed_pass_state2 = fsm.add_state(
-            CodeExecutedPassState(config.get('CodeExecutedPassState', {})))
+            CodeExecutedPassState2(config.get('CodeExecutedPassState', {})))
         code_executed_fail_state = fsm.add_state(
             CodeExecutedFailState(config.get('CodeExecutedFailState', {})))
 

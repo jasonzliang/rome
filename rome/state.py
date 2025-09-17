@@ -242,6 +242,10 @@ class CodeExecutedPassState(State):
         return "you have executed test file and the output shows the tests have passed"
 
 
+class CodeExecutedPassState2(CodeExecutedPassState):
+    pass
+
+
 class CodeExecutedFailState(State):
     """State where code or test file execution failed"""
 

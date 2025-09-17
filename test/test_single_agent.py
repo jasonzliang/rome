@@ -76,6 +76,7 @@ def create_config():
             "patience": 1,
             "agent_api": True,
             "save_hist_interval": 1
+            "use_ground_truth": True,
         },
         "Logger": {
             "level": "DEBUG",
@@ -92,13 +93,11 @@ def create_config():
             "file_types": [".py"]
         },
         "AdvancedResetAction": {
-            "use_ground_truth": False,
             "completion_confidence": 80,
             "max_versions": 30,
         },
         "SaveKBAction": {
-            "use_ground_truth": False,
-            "completion_confidence": 85,
+            "completion_confidence": 80,
             "max_versions": 30,
         },
     }
