@@ -10,6 +10,7 @@ Agent:
   patience: 5
   action_select_strat: original
   fsm_type: knowledge_base
+  use_ground_truth: True
 
 Logger:
   include_caller_info: "rome"
