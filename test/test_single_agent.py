@@ -93,12 +93,12 @@ def create_config():
             "file_types": [".py"]
         },
         "AdvancedResetAction": {
-            "completion_confidence": 80,
-            "max_versions": 30,
+            "completion_confidence": 50,
+            "max_versions": 3,
         },
         "SaveKBAction": {
-            "completion_confidence": 80,
-            "max_versions": 30,
+            "completion_confidence": 50,
+            "max_versions": 3,
         },
     }
 

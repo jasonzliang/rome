@@ -283,3 +283,7 @@ class CodeExecutedFailState(State):
 
     def future_summary(self, agent) -> str:
         return "you have executed test file and the output shows the tests have failed"
+
+class CodeExecutedFailState2(CodeExecutedFailState):
+    """Intermediate transition state after code/tests have failed"""
+    pass

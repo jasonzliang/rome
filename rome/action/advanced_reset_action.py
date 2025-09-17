@@ -150,7 +150,7 @@ def check_max_versions_reached(agent, file_path: str, max_versions: int) -> bool
         version_count = 1
 
     if version_count >= max_versions:
-        agent.logger.info(f"Max versions ({smax_versions}) reached for {file_path}")
+        agent.logger.info(f"Max versions ({max_versions}) reached for {file_path}")
         return True
 
     return False

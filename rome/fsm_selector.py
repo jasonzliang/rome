@@ -178,6 +178,8 @@ class KnowledgeBaseFSMBuilder(FSMBuilder):
             CodeExecutedPassState2(config.get('CodeExecutedPassState', {})))
         code_executed_fail_state = fsm.add_state(
             CodeExecutedFailState(config.get('CodeExecutedFailState', {})))
+        code_executed_fail_state2 = fsm.add_state(
+            CodeExecutedFailState2(config.get('CodeExecutedFailState', {})))
 
         # Create actions with their respective configurations
         search_action = TournamentSearchAction(config.get('TournamentSearchAction', {}))
@@ -216,7 +218,8 @@ class KnowledgeBaseFSMBuilder(FSMBuilder):
 
         # Add transitions from CodeExecutedFail state - INTELLIGENT RECOVERY
         fsm.add_action(code_executed_fail_state, code_loaded_state, revert_code_action)
-        fsm.add_action(code_executed_fail_state, idle_state, reset_action)
+        fsm.add_action(code_executed_fail_state, code_executed_fail_state2, reset_action)
+        fsm.add_action(code_executed_fail_state2, idle_state, save_kb_action)
 
         # search_action2 = PrioritySearchAction(config.get('PrioritySearchAction', {}))
         # edit_code_action2 = EditCodeAction2(config.get('EditCodeAction2', {}))
