@@ -212,7 +212,7 @@ DEFAULT_CONFIG = {
     # KNOWLEDGE BASE MANAGEMENT
 
     "ChromaClientManager": {
-        "collection_name": "humaneval",  # ChromaDB collection name
+        "collection_name": None,  # ChromaDB collection name, set to None to use agent repo
         "enable_reranking": False,  # Enable OpenAI reranking
         "use_shared_server": True,  # Use shared server instance across KB instances
 

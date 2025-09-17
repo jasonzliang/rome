@@ -3,6 +3,8 @@ import json
 import hashlib
 from typing import Optional, List, Dict
 import os
+from pathlib import Path
+import re
 import time
 
 # ChromaDB and LlamaIndex imports
@@ -138,8 +140,8 @@ class ChromaClientManager:
 
         # Set attributes from config
         set_attributes_from_config(self, self.config,
-            ['collection_name', 'enable_reranking', 'chunk_size', 'chunk_overlap',
-             'embedding_model', 'use_shared_server'], ['top_k', 'log_db'])
+            ['enable_reranking', 'chunk_size', 'chunk_overlap', 'embedding_model', 'use_shared_server'],
+            ['top_k', 'log_db', 'collection_name'])
 
         # Get or create server manager instance
         if self.use_shared_server:
@@ -162,11 +164,19 @@ class ChromaClientManager:
 
         self.logger.info(f"ChromaClientManager initialized: collection={self.collection_name}, reranking={self.enable_reranking}")
 
+    def _path_to_collection_name(self, file_path: str, max_len: int = 128) -> str:
+        """Convert file path to valid Chroma collection name."""
+        name = re.sub(r'[^a-z0-9._-]', '_', Path(file_path).stem.lower())
+        name = re.sub(r'(^[^a-z0-9]+|[^a-z0-9]+$|_{2,}|\.{2,})', '_', name).strip('_')
+        return (name if len(name) >= 3 else f"doc_{name}".ljust(3, '0'))[:max_len]
+
     def _setup_chroma_client(self):
         """Setup ChromaDB client and collection"""
-        self.client = self.server.get_client()
+        if not self.collection_name:
+            self.collection_name = self._path_to_collection_name(self.agent.repository)
 
         # Get or create collection
+        self.client = self.server.get_client()
         try:
             self.collection = self.client.get_collection(self.collection_name)
             self.logger.debug(f"Connected to existing collection: {self.collection_name}")
