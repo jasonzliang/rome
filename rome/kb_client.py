@@ -8,6 +8,7 @@ import time
 # ChromaDB and LlamaIndex imports
 try:
     import chromadb
+    import chromadb.utils.embedding_functions as embedding_functions
     from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
     from llama_index.vector_stores.chroma import ChromaVectorStore
     from llama_index.embeddings.openai import OpenAIEmbedding
@@ -170,7 +171,17 @@ class ChromaClientManager:
             self.collection = self.client.get_collection(self.collection_name)
             self.logger.debug(f"Connected to existing collection: {self.collection_name}")
         except:
-            self.collection = self.client.create_collection(self.collection_name)
+            # Create collection with explicit OpenAI embedding function
+            api_key = os.getenv('OPENAI_API_KEY')
+            openai_ef = embedding_functions.OpenAIEmbeddingFunction(
+                model_name=self.embedding_model,
+                api_key=api_key
+            )
+
+            self.collection = self.client.create_collection(
+                name=self.collection_name,
+                embedding_function=openai_ef
+            )
             self.logger.info(f"Created new collection: {self.collection_name}")
 
     def _setup_llamaindex(self):
@@ -189,22 +200,11 @@ class ChromaClientManager:
             )
             self.embed_model = OpenAIEmbedding(model=self.embedding_model)
 
-            # Only set global settings if not already set by another instance
-            if Settings.llm is None:
-                Settings.llm = self.llm
-            if Settings.embed_model is None:
-                Settings.embed_model = self.embed_model
-
             self.logger.debug(f"Using agent's OpenAI config: model={self.agent.openai_handler.model}")
         else:
             # Fallback to default LlamaIndex settings
             self.llm = OpenAI()  # Instance-specific LLM
             self.embed_model = OpenAIEmbedding(model=self.embedding_model)
-
-            if Settings.llm is None:
-                Settings.llm = self.llm
-            if Settings.embed_model is None:
-                Settings.embed_model = self.embed_model
 
             self.logger.debug("Using LlamaIndex default OpenAI config")
 
@@ -214,9 +214,6 @@ class ChromaClientManager:
                 chunk_size=self.chunk_size,
                 chunk_overlap=self.chunk_overlap
             )
-
-            if Settings.node_parser is None:
-                Settings.node_parser = self.node_parser
 
             self.logger.debug(f"Configured chunking: size={self.chunk_size}, overlap={self.chunk_overlap}")
 

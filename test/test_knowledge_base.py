@@ -230,6 +230,10 @@ def factorial(n):
 
         # Test knowledge base querying first
         print("\n=== Testing KB Query Functionality ===")
+        test_embedding = agent.kb_manager.embed_model.get_text_embedding("test")
+        print(f"Embedding model: {agent.kb_manager.embedding_model}")
+        print(f"Embedding dimensions before add_text: {len(test_embedding)}")
+
         kb_query_result = agent.kb_manager.query(
             question="How to handle division by zero in Python?",
             top_k=3,
@@ -278,7 +282,7 @@ def factorial(n):
 
 if __name__ == "__main__":
     print("Running SaveKBAction test...")
-    # test_save_kb_action_execute()
+    test_save_kb_action_execute()
     print("\nRunning EditCodeAction with KB query test...")
     test_edit_code_action_with_kb_query()
     print("\nAll tests passed!")
