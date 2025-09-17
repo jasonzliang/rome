@@ -17,7 +17,7 @@ def check_ground_truth(agent, file_path: str) -> bool:
 
     if not eval_results_file.exists():
         agent.logger.error(f"Eval results file not found: {eval_results_file}")
-        return False
+        raise
 
     # Load the eval results
     with open(eval_results_file, 'r') as f:
@@ -28,9 +28,10 @@ def check_ground_truth(agent, file_path: str) -> bool:
         result = eval_results[file_path]
         base_status = result.get('base_status')
         return base_status == 'pass'
-
-    # File not found in results means it didn't pass
-    return False
+    else:
+        # File not found in results means it didn't pass
+        agent.logger.error(f"Eval results not in file: {eval_results_file}")
+        raise
 
 
 def analyze_execution_results(agent, selected_file: Dict, completion_conf: int) -> bool:

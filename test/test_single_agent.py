@@ -76,7 +76,7 @@ def create_config():
             "patience": 1,
             "agent_api": True,
             "save_hist_interval": 1,
-            "use_ground_truth": True,
+            "use_ground_truth": False,
         },
         "Logger": {
             "level": "DEBUG",
