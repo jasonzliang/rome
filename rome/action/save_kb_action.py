@@ -100,8 +100,8 @@ Extracted reusable patterns and insights from {filename} and its test file {test
 ## Testing Approaches
 {insights.get('testing_approaches', 'None identified')}
 
-## Problem Solutions
-{insights.get('problem_solutions', 'None identified')}
+## Reusable Code
+{insights.get('reusable_code', 'None identified')}
 
 ## Applicable Context
 {insights.get('applicable_context', 'General programming')}
