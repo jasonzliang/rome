@@ -243,6 +243,7 @@ class CodeExecutedPassState(State):
 
 
 class CodeExecutedPassState2(CodeExecutedPassState):
+    """Intermediate transition state after code/tests have executed successfully"""
     pass
 
 

@@ -75,7 +75,7 @@ def create_config():
             "action_select_strat": "original",
             "patience": 1,
             "agent_api": True,
-            "save_hist_interval": 1
+            "save_hist_interval": 1,
             "use_ground_truth": True,
         },
         "Logger": {
