@@ -76,7 +76,7 @@ def _query_knowledge_base(agent, file_path: str, file_content: str,
         if kb_response and len(kb_response.strip()) > SUMMARY_LENGTH:  # Ensure substantial content
             # Don't include error responses
             if not kb_response.startswith("Error:"):
-                insights.append(f"# Knowledge base insights ({context_desc}):\n{kb_response}")
+                insights.append(f"# Insights from agent's knowledge base ({context_desc}):\n{kb_response}")
 
     return insights
 
@@ -260,7 +260,7 @@ IMPORTANT:
 """
 
         if analysis_prompt:
-            prompt += "- Pay special attention to addressing any issues identified in the code analysis and knowledge base insights"
+            prompt += "- Pay special attention to addressing any issues identified in the code analysis and insights from agent's knowledge base"
 
         if original_version and original_version.get('content'):
             prompt += "\n- Compare current code with the original version to understand the evolution and make informed improvements"
