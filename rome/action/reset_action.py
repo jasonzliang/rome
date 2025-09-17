@@ -20,6 +20,6 @@ class ResetAction(Action):
         return "clear current context and return to initial state to start a new task"
 
     def execute(self, agent, **kwargs) -> bool:
-        agent.context.clear()
+        # No need to clear agent context manually since idle state does that
         self.logger.info("Agent context has been cleared")
         return True

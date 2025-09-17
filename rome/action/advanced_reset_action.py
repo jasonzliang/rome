@@ -186,12 +186,12 @@ class AdvancedResetAction(Action):
             check_max_versions_reached(agent, file_path, self.max_versions)
 
         agent.version_manager.unflag_active(agent, file_path)
-        agent.context.clear()
 
         if work_complete:
             agent.version_manager.flag_finished(agent, file_path)
             self.logger.info(f"Flagged {file_path} as finished")
-            return True
         else:
             self.logger.error(f"Flagged {file_path} as not finished")
-            return False
+
+        # No need to clear agent context manually since idle state does that
+        return work_complete
