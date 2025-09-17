@@ -212,8 +212,8 @@ def print_documents(documents: Dict, collection_name: str = None, limit: int = N
 def confirm_action(message: str) -> bool:
     """Ask for user confirmation"""
     try:
-        response = input(f"{message} (y/N): ").strip().lower()
-        return response in ['y', 'yes']
+        response = input(f"{message} (Y/n): ").strip().lower()
+        return response not in ['n', 'no']
     except KeyboardInterrupt:
         print("\nCancelled.")
         return False
