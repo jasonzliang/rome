@@ -61,7 +61,7 @@ DEFAULT_CONFIG = {
         "log_pid": False,  # Whether to include PID in agent log file names
         "save_hist_interval": 10, # Interval to save summary history
 
-        "use_ground_truth": True, # If True, only uses evalplus results to determine if work is complete or not
+        "use_ground_truth": False, # If True, only uses evalplus results to determine if work is complete or not
 
     },
 
