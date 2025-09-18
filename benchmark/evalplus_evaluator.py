@@ -226,8 +226,8 @@ class EvalplusEvaluator:
         problems = self.DATASETS[self.dataset]()
         if task_ids:
             problems = {tid: problems[tid] for tid in task_ids if tid in problems}
-        if num_problems:
-            problems = dict(list(problems.items()))
+        if not num_problems: num_problems = 1e12
+            # problems = dict(list(problems.items()))
 
         # Create problem directories
         self.problems = {}; self.skipped_problems = {}
