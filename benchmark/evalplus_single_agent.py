@@ -33,7 +33,6 @@ class EvalPlusBenchmark:
         self.agent = None
 
         # Initialize evaluator with benchmark directory
-        # FIXED: Removed logger parameter
         self.evaluator = EvalplusEvaluator(
             benchmark_dir=self.benchmark_dir,
             dataset=self.dataset,
@@ -59,9 +58,10 @@ class EvalPlusBenchmark:
             evaluator=self.evaluator,
             interval=eval_interval
         )
+        self.periodic_evaluator.start_background()
 
     def _run_agent(self, max_iterations: int, stop_on_error: bool) -> Dict:
-        """Run agent with periodic evaluation using callback system"""
+        """Run agent with periodic evaluation"""
         agent_config = self.config.get('Agent', {})
 
         self.agent = Agent(
@@ -71,11 +71,7 @@ class EvalPlusBenchmark:
             config=self.config
         )
 
-        # Set up periodic evaluation callback if enabled
-        if self.periodic_evaluator:
-            self.periodic_evaluator.set_callback(self.agent.set_callback)
-
-        # Run agent normally - callback will handle periodic evaluation
+        # Run agent normally
         return self.agent.run_loop(max_iterations=max_iterations, stop_on_error=stop_on_error)
 
     def _save_results(self, agent_results: Dict, evaluation_results: Dict) -> Optional[Path]:
@@ -104,8 +100,8 @@ class EvalPlusBenchmark:
             return None
 
     def run_benchmark(self, max_iterations: int = 10, stop_on_error: bool = False,
-                              num_problems: Optional[int] = None, task_ids: Optional[List[str]] = None,
-                              run_evaluation: bool = True, eval_interval: Optional[int] = None) -> Tuple[Dict, Path]:
+                      num_problems: Optional[int] = None, task_ids: Optional[List[str]] = None,
+                      run_evaluation: bool = True, eval_interval: Optional[int] = None) -> Tuple[Dict, Path]:
         """Run complete benchmark pipeline with modular evaluation"""
         try:
             # Setup problems
@@ -114,10 +110,10 @@ class EvalPlusBenchmark:
                 raise ValueError("No problems were set up")
 
             # Setup periodic evaluation if requested
-            if eval_interval and run_evaluation:
+            if run_evaluation and eval_interval:
                 self._setup_periodic_evaluation(eval_interval)
 
-            # Run agent with evaluation
+            # Run agent synchronously
             agent_results = self._run_agent(max_iterations, stop_on_error)
 
             # Run final evaluation
@@ -144,6 +140,9 @@ class EvalPlusBenchmark:
             self.logger.error(f"Benchmark execution failed: {e}")
             raise
         finally:
+            # Cleanup
+            if self.periodic_evaluator:
+                self.periodic_evaluator.stop_background()
             if self.agent:
                 self.agent.shutdown()
 

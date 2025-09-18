@@ -22,20 +22,46 @@ def check_ground_truth(agent, file_path, use_plus=False) -> bool:
     with open(eval_results_file, 'r') as f:
         eval_results = json.load(f)
 
-    # Try direct lookup first
-    if file_path in eval_results:
-        matching_key = file_path
+    file_path_str = str(file_path)
+
+    # 1. Direct string match (fastest)
+    if file_path_str in eval_results:
+        matching_key = file_path_str
     else:
-        # Find match by resolving paths
+        # 2. Path resolution approach
+        matching_key = None
+        benchmark_dir = Path(agent.config.get('benchmark_dir', '.'))
+
         try:
-            target_resolved = Path(file_path).resolve()
-            matching_key = next(
-                (key for key in eval_results
-                 if Path(key).resolve() == target_resolved),
-                None
-            )
+            # Resolve the input path
+            input_path = Path(file_path_str)
+            if input_path.is_absolute():
+                target_resolved = input_path.resolve()
+            else:
+                # For relative paths, resolve against benchmark_dir
+                target_resolved = (benchmark_dir / input_path).resolve()
+
+            # Compare against all keys in eval_results
+            for key in eval_results:
+                try:
+                    key_path = Path(key)
+                    if key_path.is_absolute():
+                        key_resolved = key_path.resolve()
+                    else:
+                        # Relative paths in eval_results are relative to benchmark_dir
+                        key_resolved = (benchmark_dir / key_path).resolve()
+
+                    if target_resolved == key_resolved:
+                        matching_key = key
+                        break
+
+                except (OSError, ValueError):
+                    # Skip keys that can't be resolved
+                    continue
+
         except (OSError, ValueError):
-            matching_key = None
+            # If input path can't be resolved, no match possible
+            pass
 
     if not matching_key:
         raise KeyError(f"File {file_path} not found in eval results")

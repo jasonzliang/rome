@@ -351,8 +351,7 @@ echo "EVAL_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {outpu
             timeout=timeout, cwd=script.parent
         )
         output = f"{result.stdout}\n{result.stderr}\nEXIT_CODE:{result.returncode}"
-        return_code = result.returncode
-        self.logger.info(output)
+        return_code = result.returncode; self.logger.info(output)
 
         # output = Path("/Users/jason/Desktop/rome/benchmark/result/test_knowledge_base/__rome__/evaluation/eval.out.txt").read_text()
         # return_code = 0
