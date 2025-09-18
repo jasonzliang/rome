@@ -65,6 +65,8 @@ DEFAULT_CONFIG = {
         "save_hist_interval": 10, # Interval to save summary history
 
         "use_ground_truth": False, # If True, only uses evalplus results to determine if work is complete or not
+        "save_insights": True, # Whether to save insights to knowledge base or not
+        "query_insights": True, # Whether to query knowledge base for insights or not
 
     },
 

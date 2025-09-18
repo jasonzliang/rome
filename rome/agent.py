@@ -95,7 +95,8 @@ class Agent:
         agent_config = self.config.get('Agent', {})
         set_attributes_from_config(self, agent_config,
             ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience',
-             'action_select_strat', 'log_pid', 'save_hist_interval', "use_ground_truth"])
+             'action_select_strat', 'log_pid', 'save_hist_interval', 'use_ground_truth',
+             'save_insights', 'query_insights'])
 
         self.logger.assert_true(self.history_context_len > 0,
             f"history_context_len must be greater than 0")

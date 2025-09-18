@@ -233,7 +233,8 @@ class EditCodeAction(Action):
 ```
 """
         # Get analysis context using the enhanced function
-        analysis_prompt = create_analysis_prompt(agent, file_path, file_content)
+        analysis_prompt = create_analysis_prompt(agent, file_path, file_content,
+            query_kb=agent.query_insights)
         if analysis_prompt:
             prompt += f"\n{analysis_prompt}\n"
 

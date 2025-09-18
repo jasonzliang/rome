@@ -115,6 +115,9 @@ Extracted reusable patterns and insights from {filename} and its test file {test
 
     def execute(self, agent, **kwargs) -> bool:
         """Extract insights and save them to the knowledge base only if work is complete"""
+        if not agent.save_insights:
+            self.logger.error(f"Saving insights to knowledge base disabled")
+            return False
 
         # Get file information from context
         selected_file = agent.context['selected_file']
