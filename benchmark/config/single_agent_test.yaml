@@ -7,18 +7,18 @@ Agent:
   name: "HumanevalExpert"
   role: "You are an expert Python developer tasked with implementing functions to pass all given test cases. Focus on writing clean, efficient, and well-tested code that handles edge cases properly."
   agent_api: false
-  patience: 1
+  patience: 3
   action_select_strat: original
   fsm_type: knowledge_base
   use_ground_truth: True
 
-AdvancedResetAction:
-  completion_confidence: 50
-  max_versions: 3
+# AdvancedResetAction:
+#   completion_confidence: 25
+#   max_versions: 2
 
-SaveKBAction:
-  completion_confidence: 50
-  max_versions: 3
+# SaveKBAction:
+#   completion_confidence: 25
+#   max_versions: 2
 
 Logger:
   include_caller_info: "rome"

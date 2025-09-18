@@ -25,7 +25,7 @@ except ImportError:
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.logger import get_logger
-from rome.config import LOG_DIR_NAME, EVAL_DIR_NAME
+from rome.config import LOG_DIR_NAME, EVAL_DIR_NAME, EVAL_RESULTS_NAME
 
 
 class EvalplusEvaluator:
@@ -290,7 +290,7 @@ class EvalplusEvaluator:
             solution_file = info["dir"] / f"{info['safe_id']}.py"
             solution = solution_file.read_text() if solution_file.exists() else ""
             solutions.append({"task_id": task_id, "solution": solution,
-                "solution_file": solution_file})
+                "solution_file": str(solution_file)})
 
         return solutions
 
@@ -309,9 +309,9 @@ class EvalplusEvaluator:
         solutions_file = self.eval_dir / "solutions.jsonl"
         write_jsonl(str(solutions_file), solutions)
 
-        # Clean old results
-        for old_file in self.eval_dir.glob("*.eval_results.json"):
-            old_file.unlink(missing_ok=True)
+        # # Clean old results
+        # for old_file in self.eval_dir.glob(f"*{EVAL_RESULTS_NANE}"):
+        #     old_file.unlink(missing_ok=True)
 
         return solutions_file
 
@@ -330,7 +330,7 @@ EVAL_FILE=$([[ -f "{sanitized}" ]] && echo "{sanitized}" || echo "{solutions_fil
 $CMD.evaluate --dataset {self.dataset} --samples "$EVAL_FILE" | tee -a {output_file}
 echo "EXIT_CODE:$?" | tee -a {output_file}
 echo "SOLUTIONS_FILE:$EVAL_FILE" | tee -a {output_file}
-echo "RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {output_file}
+echo "EVAL_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {output_file}
 """
         script.write_text(content)
         script.chmod(0o755)
@@ -409,7 +409,7 @@ echo "RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {output_fil
             for line in output.split('\n'):
                 if line.startswith('SOLUTIONS_FILE:'):
                     solutions_file = Path(line.split(':', 1)[1].strip())
-                elif line.startswith('RESULTS_FILE:'):
+                elif line.startswith('EVAL_RESULTS_FILE:'):
                     results_file = Path(line.split(':', 1)[1].strip())
 
             if not solutions_file or not results_file or not results_file.exists():
@@ -432,15 +432,23 @@ echo "RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {output_fil
             passed_mapping = {}
             for task_id, solution in solutions.items():
                 if task_id in results['eval']:
-                    test_result = results['eval'][task_id]
+                    test_results = results['eval'][task_id]
+
+                    # Handle case where test_results is a list (take first entry)
+                    if isinstance(test_results, list):
+                        if not test_results: continue
+                        test_result = test_results[0]  # Take first result
+                    else:
+                        test_result = test_results
+
                     # Check if problem passed (both base and plus tests)
                     base_passed = test_result.get('base_status') == 'pass'
                     plus_passed = test_result.get('plus_status') == 'pass'
 
-                    if base_passed and plus_passed:
+                    if base_passed or plus_passed:
                         # Find the corresponding solution file path
                         if task_id in self.problems:
-                            solution_file_path = str(self.problems[task_id]['dir'] / f"{self.problems[task_id]['safe_id']}.py")
+                            solution_file_path = solution.get('solution_file')
                             passed_mapping[solution_file_path] = {
                                 'task_id': task_id,
                                 'base_status': test_result.get('base_status'),
@@ -448,7 +456,7 @@ echo "RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {output_fil
                             }
 
             # Write passed solutions file
-            passed_file = self.eval_dir / "eval_results.json"
+            passed_file = self.eval_dir / EVAL_RESULTS_NAME
             with open(passed_file, 'w') as f:
                 json.dump(passed_mapping, f, indent=2)
 

@@ -35,6 +35,9 @@ LOG_DIR_NAME = "__rome__"
 # Name of evaluation directory with GD test results
 EVAL_DIR_NAME = "evaluation"
 
+# Name of JSON with evaluation results in it
+EVAL_RESULTS_NAME = "eval_results.json"
+
 # Default extension for test files:
 TEST_FILE_EXT = '_test.py'
 

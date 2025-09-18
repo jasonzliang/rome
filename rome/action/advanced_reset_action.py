@@ -7,17 +7,17 @@ from typing import Dict, List, Any, Optional
 
 from .action import Action
 from ..logger import get_logger
-from ..config import check_attrs, LOG_DIR_NAME, EVAL_DIR_NAME
+from ..config import check_attrs, LOG_DIR_NAME, EVAL_DIR_NAME, EVAL_RESULTS_NAME
 
 
-def check_ground_truth(agent, file_path: str) -> bool:
+def check_ground_truth(agent, file_path, use_plus=False) -> bool:
     """Check if the evalplus result passes base tests"""
     # Get the eval results file path from the agent's configuration
-    eval_results_file = Path(agent.config.get('benchmark_dir', '.')) / LOG_DIR_NAME / EVAL_DIR_NAME / "eval_results.json"
+    eval_results_file = Path(agent.config.get('benchmark_dir', '.')) / LOG_DIR_NAME / EVAL_DIR_NAME / EVAL_RESULTS_NAME
 
     if not eval_results_file.exists():
         agent.logger.error(f"Eval results file not found: {eval_results_file}")
-        raise
+        raise FileNotFoundError(f"Eval results file not found: {eval_results_file}")
 
     # Load the eval results
     with open(eval_results_file, 'r') as f:
@@ -26,12 +26,19 @@ def check_ground_truth(agent, file_path: str) -> bool:
     # Check if file_path exists in results and passes base tests
     if file_path in eval_results:
         result = eval_results[file_path]
-        base_status = result.get('base_status')
-        return base_status == 'pass'
+        status = result.get('base_status') if not use_plus else result.get("plus_status")
+        is_passed = status == 'pass'
+
+        if is_passed:
+            agent.logger.info(f"Ground truth check passed for {file_path}")
+        else:
+            agent.logger.info(f"Ground truth check failed for {file_path}")
+
+        return is_passed
     else:
         # File not found in results means it didn't pass
-        agent.logger.error(f"Eval results not in file: {eval_results_file}")
-        raise
+        agent.logger.error(f"File {file_path} not found in eval results")
+        raise KeyError(f"File {file_path} not found in eval results")
 
 
 def analyze_execution_results(agent, selected_file: Dict, completion_conf: int) -> bool:
