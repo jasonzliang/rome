@@ -213,7 +213,6 @@ class ChromaClientManager:
         name = re.sub(r'(^[^a-z0-9]+|[^a-z0-9]+$|_{2,}|\.{2,})', '_', name).strip('_')
         return (name if len(name) >= 3 else f"doc_{name}".ljust(3, '0'))[:max_len]
 
-    # Replace the existing _setup_chroma_client method
     def _setup_chroma_client(self):
         """Setup ChromaDB client and collection with validation"""
         # Validate model and get expected dimensions
