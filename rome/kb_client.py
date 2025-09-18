@@ -26,6 +26,13 @@ from .logger import get_logger
 from .kb_server import ChromaServerManager
 from .parsing import parse_json_response
 
+# Embedding model configurations
+EMBEDDING_MODELS = {
+    "text-embedding-3-small": 1536, "text-embedding-3-large": 3072,
+    "text-embedding-ada-002": 1536, "text-embedding-ada-001": 1024,
+    "all-MiniLM-L6-v2": 384, "all-MiniLM-L12-v2": 384, "paraphrase-MiniLM-L6-v2": 384
+}
+
 
 class OpenAIReranker:
     """Simplified OpenAI reranker with hierarchical scaling for large document sets"""
@@ -169,35 +176,66 @@ class ChromaClientManager:
 
         self.logger.info(f"ChromaClientManager initialized: collection={self.collection_name}, reranking={self.enable_reranking}")
 
+    def _validate_dimensions(self, expected_dim):
+        """Validate collection embedding dimensions"""
+        if self.collection.count() == 0:
+            return
+
+        result = self.collection.get(limit=1, include=["embeddings"])
+        if result["embeddings"]:
+            actual_dim = len(result["embeddings"][0])
+            if actual_dim != expected_dim:
+                compatible = [m for m, d in EMBEDDING_MODELS.items() if d == actual_dim]
+                raise ValueError(
+                    f"Dimension mismatch: collection={actual_dim}d, model={expected_dim}d. "
+                    f"Compatible models: {compatible} or clear collection."
+                )
+
+    def _create_collection(self, is_sentence_transformer):
+        """Create collection with appropriate embedding function"""
+        if is_sentence_transformer:
+            from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+            embedding_fn = SentenceTransformerEmbeddingFunction(model_name=self.embedding_model)
+        else:
+            if not os.getenv('OPENAI_API_KEY'):
+                raise ValueError(f"OPENAI_API_KEY required for {self.embedding_model}")
+            embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
+                model_name=self.embedding_model, api_key=os.getenv('OPENAI_API_KEY')
+            )
+
+        self.collection = self.client.create_collection(
+            name=self.collection_name, embedding_function=embedding_fn
+        )
+
     def _path_to_collection_name(self, file_path: str, max_len: int = 128) -> str:
         """Convert file path to valid Chroma collection name."""
         name = re.sub(r'[^a-z0-9._-]', '_', Path(file_path).stem.lower())
         name = re.sub(r'(^[^a-z0-9]+|[^a-z0-9]+$|_{2,}|\.{2,})', '_', name).strip('_')
         return (name if len(name) >= 3 else f"doc_{name}".ljust(3, '0'))[:max_len]
 
+    # Replace the existing _setup_chroma_client method
     def _setup_chroma_client(self):
-        """Setup ChromaDB client and collection"""
+        """Setup ChromaDB client and collection with validation"""
+        # Validate model and get expected dimensions
+        if not self.embedding_model or self.embedding_model not in EMBEDDING_MODELS:
+            models = list(EMBEDDING_MODELS.keys())
+            raise ValueError(f"Invalid embedding_model '{self.embedding_model}'. Supported: {models}")
+
+        expected_dim = EMBEDDING_MODELS[self.embedding_model]
+        is_sentence_transformer = expected_dim == 384
+
         if not self.collection_name:
             self.collection_name = self._path_to_collection_name(self.agent.repository)
 
-        # Get or create collection
         self.client = self.server.get_client()
+
         try:
             self.collection = self.client.get_collection(self.collection_name)
-            self.logger.debug(f"Connected to existing collection: {self.collection_name}")
+            self._validate_dimensions(expected_dim)
+            self.logger.debug(f"Connected to collection: {self.collection_name}")
         except:
-            # Create collection with explicit OpenAI embedding function
-            api_key = os.getenv('OPENAI_API_KEY')
-            openai_ef = embedding_functions.OpenAIEmbeddingFunction(
-                model_name=self.embedding_model,
-                api_key=api_key
-            )
-
-            self.collection = self.client.create_collection(
-                name=self.collection_name,
-                embedding_function=openai_ef
-            )
-            self.logger.info(f"Created new collection: {self.collection_name}")
+            self._create_collection(is_sentence_transformer)
+            self.logger.info(f"Created collection: {self.collection_name} ({expected_dim}d)")
 
     def _setup_llamaindex(self):
         """Setup LlamaIndex components with instance isolation"""
