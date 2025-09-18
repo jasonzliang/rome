@@ -17,7 +17,7 @@ def check_ground_truth(agent, file_path, use_plus=False) -> bool:
 
     if not eval_results_file.exists():
         agent.logger.error(f"Eval results file not found: {eval_results_file}")
-        raise FileNotFoundError(f"Eval results file not found: {eval_results_file}")
+        return False
 
     with open(eval_results_file, 'r') as f:
         eval_results = json.load(f)
@@ -64,7 +64,8 @@ def check_ground_truth(agent, file_path, use_plus=False) -> bool:
             pass
 
     if not matching_key:
-        raise KeyError(f"File {file_path} not found in eval results")
+        agent.logger.error(f"File {matching_key} not found in eval results")
+        return False
 
     result = eval_results[matching_key]
     status_key = 'plus_status' if use_plus else 'base_status'
