@@ -220,15 +220,15 @@ class EvalplusEvaluator:
             self.logger.error(f"Scores vs iterations plot failed: {e}")
 
     def setup_problems(self,
-        num_samples: int = None,
+        num_problems: int = None,
         task_ids: List[str] = None) -> Dict:
         """Setup problems in benchmark directory"""
         # Get and filter problems
         problems = self.DATASETS[self.dataset]()
         if task_ids:
             problems = {tid: problems[tid] for tid in task_ids if tid in problems}
-        if num_samples:
-            problems = dict(list(problems.items())[:num_samples])
+        if num_problems:
+            problems = dict(list(problems.items())[:num_problems])
 
         # Create problem directories
         self.problems = {}
@@ -289,8 +289,9 @@ class EvalplusEvaluator:
         for task_id, info in self.problems.items():
             solution_file = info["dir"] / f"{info['safe_id']}.py"
             solution = solution_file.read_text() if solution_file.exists() else ""
+            solution_file = str(solution_file) if solution_file.exists() else ""
             solutions.append({"task_id": task_id, "solution": solution,
-                "solution_file": str(solution_file)})
+                "solution_file": solution_file})
 
         return solutions
 

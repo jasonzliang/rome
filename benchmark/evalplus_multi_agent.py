@@ -151,7 +151,7 @@ class MultiAgentEvalPlusBenchmark:
 
 
     def run_benchmark(self, max_iterations: int = 10, stop_on_error: bool = False,
-                 num_samples: Optional[int] = None, task_ids: Optional[List[str]] = None,
+                 num_problems: Optional[int] = None, task_ids: Optional[List[str]] = None,
                  run_evaluation: bool = True) -> Tuple[List[Dict], Path]:
         """Complete synchronous benchmark pipeline with non-blocking evaluation"""
         agent_results = []
@@ -159,7 +159,7 @@ class MultiAgentEvalPlusBenchmark:
 
         try:
             # Setup and run
-            problems_dict = self.evaluator.setup_problems(num_samples, task_ids)
+            problems_dict = self.evaluator.setup_problems(num_problems, task_ids)
             if not problems_dict:
                 raise ValueError("No problems were set up")
 
@@ -204,7 +204,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--eval-interval", type=int, default=1800, help="Evaluation interval (seconds)")
     parser.add_argument("--max-iterations", type=int, default=0, help="Max iterations per agent")
     parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
-    parser.add_argument("--num-samples", type=int, help="Number of samples")
+    parser.add_argument("--num-problems", type=int, help="Number of problems")
     parser.add_argument("--stop-on-error", action="store_true", help="Stop on errors")
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs")
     return parser
@@ -222,7 +222,7 @@ def main():
 
     results_file = benchmark.run_benchmark(
         max_iterations=args.max_iterations, stop_on_error=args.stop_on_error,
-        num_samples=args.num_samples, task_ids=args.task_ids,
+        num_problemsf=args.num_problems, task_ids=args.task_ids,
         run_evaluation=not args.no_evaluation
     )
     # benchmark.logger.info(f"Results: {results_file}")

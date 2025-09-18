@@ -104,12 +104,12 @@ class EvalPlusBenchmark:
             return None
 
     def run_benchmark(self, max_iterations: int = 10, stop_on_error: bool = False,
-                              num_samples: Optional[int] = None, task_ids: Optional[List[str]] = None,
+                              num_problems: Optional[int] = None, task_ids: Optional[List[str]] = None,
                               run_evaluation: bool = True, eval_interval: Optional[int] = None) -> Tuple[Dict, Path]:
         """Run complete benchmark pipeline with modular evaluation"""
         try:
             # Setup problems
-            problems_dict = self.evaluator.setup_problems(num_samples, task_ids)
+            problems_dict = self.evaluator.setup_problems(num_problems, task_ids)
             if not problems_dict:
                 raise ValueError("No problems were set up")
 
@@ -179,7 +179,7 @@ def main():
     parser.add_argument("--eval-interval", type=int, default=1800, help="Periodic evaluation interval in seconds")
     parser.add_argument("--max-iterations", type=int, default=0, help="Iterations for agent to run")
     parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
-    parser.add_argument("--num-samples", type=int, help="Number of samples to include")
+    parser.add_argument("--num-problems", type=int, help="Number of problems to include")
     parser.add_argument("--stop-on-error", action="store_true", help="Stop agent if exception thrown")
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs to include")
 
@@ -190,7 +190,7 @@ def main():
     results, results_file = benchmark.run_benchmark(
         max_iterations=args.max_iterations,
         stop_on_error=args.stop_on_error,
-        num_samples=args.num_samples,
+        num_problems=args.num_problems,
         task_ids=args.task_ids,
         run_evaluation=not args.no_evaluation,
         eval_interval=args.eval_interval
