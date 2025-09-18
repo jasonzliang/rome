@@ -315,9 +315,9 @@ class EvalplusEvaluator:
         solutions_file = self.eval_dir / "solutions.jsonl"
         write_jsonl(str(solutions_file), solutions)
 
-        # # Clean old results
-        # for old_file in self.eval_dir.glob(f"*{EVAL_RESULTS_NANE}"):
-        #     old_file.unlink(missing_ok=True)
+        # Clean old results
+        for old_file in self.eval_dir.glob(f"*.evalplus_results.json"):
+            old_file.unlink(missing_ok=True)
 
         return solutions_file
 
@@ -336,7 +336,7 @@ EVAL_FILE=$([[ -f "{sanitized}" ]] && echo "{sanitized}" || echo "{solutions_fil
 $CMD.evaluate --dataset {self.dataset} --samples "$EVAL_FILE" | tee -a {output_file}
 echo "EXIT_CODE:$?" | tee -a {output_file}
 echo "SOLUTIONS_FILE:{solutions_file}" | tee -a {output_file}
-echo "EVAL_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {output_file}
+echo "EVALPLUS_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.evalplus_results.json" | tee -a {output_file}
 """
         script.write_text(content)
         script.chmod(0o755)
@@ -420,7 +420,7 @@ echo "EVAL_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {outpu
             for line in output.split('\n'):
                 if line.startswith('SOLUTIONS_FILE:'):
                     solutions_file = Path(line.split(':', 1)[1].strip())
-                elif line.startswith('EVAL_RESULTS_FILE:'):
+                elif line.startswith('EVALPLUS_RESULTS_FILE:'):
                     results_file = Path(line.split(':', 1)[1].strip())
 
             # Load solutions
