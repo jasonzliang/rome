@@ -60,7 +60,7 @@ Please extract and provide insights in the following categories:
 
 2. **Testing Approaches**: What testing strategies, patterns, or best practices are shown?
 
-3. **Reusable Code**: Find 1-3 most reusable functions or code snippets that could be used as library code for other similar problems. Use the following format: ```python [code_snippet]```
+3. **Reusable Code**: Find 1-3 useful/reusable functions or code snippets that could be used as library code for other similar problems. Use the following format for long code snippets or functions: ```python [code_snippet]```.
 
 4. **Applicable Context**: What types of problems or domains would benefit from these patterns?
 
