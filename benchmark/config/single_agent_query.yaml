@@ -11,8 +11,8 @@ Agent:
   action_select_strat: original
   fsm_type: knowledge_base
   use_ground_truth: True
-  save_insights: True
-  query_insights: False
+  save_insights: False
+  query_insights: True
 
 Logger:
   include_caller_info: "rome"
