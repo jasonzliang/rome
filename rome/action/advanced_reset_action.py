@@ -11,10 +11,16 @@ from ..logger import get_logger
 from ..config import check_attrs, LOG_DIR_NAME, EVAL_DIR_NAME, EVAL_RESULTS_NAME
 
 
+def same_path(path1, path2):
+    """Check if two path strings resolve to the same location."""
+    return Path(path1).resolve() == Path(path2).resolve()
+
+
 def check_ground_truth(agent, file_path, use_plus=False) -> bool:
     """Check if the evalplus result passes base tests"""
-    eval_results_file = Path(agent.config.get('benchmark_dir', '.')) / LOG_DIR_NAME / EVAL_DIR_NAME / EVAL_RESULTS_NAME
+    agent.logger.info(f"Checking evaluation ground truth status for {file_path}")
 
+    eval_results_file = Path(agent.repository) / LOG_DIR_NAME / EVAL_DIR_NAME / EVAL_RESULTS_NAME
     if not eval_results_file.exists():
         agent.logger.error(f"Eval results file not found: {eval_results_file}")
         return False
@@ -22,56 +28,21 @@ def check_ground_truth(agent, file_path, use_plus=False) -> bool:
     with open(eval_results_file, 'r') as f:
         eval_results = json.load(f)
 
-    file_path_str = str(file_path)
+    found_file = None
+    for eval_file_path in eval_results:
+        if same_path(file_path, eval_file_path):
+            found_file = eval_file_path
+            break
 
-    # 1. Direct string match (fastest)
-    if file_path_str in eval_results:
-        matching_key = file_path_str
-    else:
-        # 2. Path resolution approach
-        matching_key = None
-        benchmark_dir = Path(agent.config.get('benchmark_dir', '.'))
-
-        try:
-            # Resolve the input path
-            input_path = Path(file_path_str)
-            if input_path.is_absolute():
-                target_resolved = input_path.resolve()
-            else:
-                # For relative paths, resolve against benchmark_dir
-                target_resolved = (benchmark_dir / input_path).resolve()
-
-            # Compare against all keys in eval_results
-            for key in eval_results:
-                try:
-                    key_path = Path(key)
-                    if key_path.is_absolute():
-                        key_resolved = key_path.resolve()
-                    else:
-                        # Relative paths in eval_results are relative to benchmark_dir
-                        key_resolved = (benchmark_dir / key_path).resolve()
-
-                    if target_resolved == key_resolved:
-                        matching_key = key
-                        break
-
-                except (OSError, ValueError):
-                    # Skip keys that can't be resolved
-                    continue
-
-        except (OSError, ValueError):
-            # If input path can't be resolved, no match possible
-            pass
-
-    if not matching_key:
-        agent.logger.error(f"File {matching_key} not found in eval results")
+    if not found_file:
+        agent.logger.error(f"File {file_path} not found in eval results")
         return False
 
-    result = eval_results[matching_key]
+    result = eval_results[found_file]
     status_key = 'plus_status' if use_plus else 'base_status'
     is_passed = result.get(status_key) == 'pass'
 
-    agent.logger.info(f"Ground truth status is {result.get(status_key)} for {matching_key}")
+    agent.logger.info(f"Ground truth status is {result.get(status_key)} for {found_file}")
     return is_passed
 
 
