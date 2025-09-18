@@ -222,7 +222,7 @@ def main():
 
     results_file = benchmark.run_benchmark(
         max_iterations=args.max_iterations, stop_on_error=args.stop_on_error,
-        num_problemsf=args.num_problems, task_ids=args.task_ids,
+        num_problems=args.num_problems, task_ids=args.task_ids,
         run_evaluation=not args.no_evaluation
     )
     # benchmark.logger.info(f"Results: {results_file}")
