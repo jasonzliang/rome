@@ -27,7 +27,6 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.logger import get_logger
 from rome.config import LOG_DIR_NAME, EVAL_DIR_NAME, EVAL_RESULTS_NAME
 
-
 class EvalplusEvaluator:
     """Enhanced evaluator with score tracking and visualization"""
 
@@ -228,22 +227,24 @@ class EvalplusEvaluator:
         if task_ids:
             problems = {tid: problems[tid] for tid in task_ids if tid in problems}
         if num_problems:
-            problems = dict(list(problems.items())[:num_problems])
+            problems = dict(list(problems.items()))
 
         # Create problem directories
-        self.problems = {}
-        for task_id, problem in problems.items():
-            safe_id = self._safe_task_id(task_id)
-            problem_dir = self.benchmark_dir / safe_id
-            problem_dir.mkdir(exist_ok=True)
+        self.problems = {}; self.skipped_problems = {}
+        for i, (task_id, problem) in enumerate(problems.items()):
+            if i < num_problems:
+                safe_id = self._safe_task_id(task_id)
+                problem_dir = self.benchmark_dir / safe_id
+                problem_dir.mkdir(exist_ok=True)
+                problem_file = problem_dir / f"{safe_id}.py"
+                if not problem_file.exists():
+                    problem_file.write_text(problem["prompt"])
 
-            problem_file = problem_dir / f"{safe_id}.py"
-            if not problem_file.exists():
-                problem_file.write_text(problem["prompt"])
+                self.problems[task_id] = {"dir": problem_dir, "safe_id": safe_id}
+            else:
+                self.skipped_problems[task_id] = {}
 
-            self.problems[task_id] = {"dir": problem_dir, "safe_id": safe_id}
-
-        self.logger.info(f"Setup {len(problems)} {self.dataset} problems")
+        self.logger.info(f"Setup {len(self.problems)} {self.dataset} problems")
         return self.problems
 
     def evaluate(self,
@@ -293,6 +294,10 @@ class EvalplusEvaluator:
             solutions.append({"task_id": task_id, "solution": solution,
                 "solution_file": solution_file})
 
+        # Needed to avoid evalplus crashing from not enough problems
+        for task_id, info in self.skipped_problems.items():
+            solutions.append({"task_id": task_id, "solution": "", "solution_file": ""})
+
         return solutions
 
     def _is_running(self) -> bool:
@@ -330,7 +335,7 @@ $CMD.sanitize --samples "{solutions_file}" 2>&1 || true
 EVAL_FILE=$([[ -f "{sanitized}" ]] && echo "{sanitized}" || echo "{solutions_file}")
 $CMD.evaluate --dataset {self.dataset} --samples "$EVAL_FILE" | tee -a {output_file}
 echo "EXIT_CODE:$?" | tee -a {output_file}
-echo "SOLUTIONS_FILE:$EVAL_FILE" | tee -a {output_file}
+echo "SOLUTIONS_FILE:{solutions_file}" | tee -a {output_file}
 echo "EVAL_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {output_file}
 """
         script.write_text(content)
@@ -346,9 +351,13 @@ echo "EVAL_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {outpu
             timeout=timeout, cwd=script.parent
         )
         output = f"{result.stdout}\n{result.stderr}\nEXIT_CODE:{result.returncode}"
+        return_code = result.returncode
         self.logger.info(output)
 
-        parsed_result = self._parse_result(output, result.returncode)
+        # output = Path("/Users/jason/Desktop/rome/benchmark/result/test_knowledge_base/__rome__/evaluation/eval.out.txt").read_text()
+        # return_code = 0
+
+        parsed_result = self._parse_result(output, return_code)
 
         # Record and plot scores with correct timestamp
         if parsed_result.get("success") and "scores" in parsed_result:
@@ -402,6 +411,8 @@ echo "EVAL_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {outpu
 
     def _create_eval_results(self, output: str):
         """Create JSON file mapping solution files to test results for passed problems"""
+        passed_file = self.eval_dir / EVAL_RESULTS_NAME
+
         try:
             # Extract file paths from output
             solutions_file = None
@@ -412,10 +423,6 @@ echo "EVAL_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {outpu
                     solutions_file = Path(line.split(':', 1)[1].strip())
                 elif line.startswith('EVAL_RESULTS_FILE:'):
                     results_file = Path(line.split(':', 1)[1].strip())
-
-            if not solutions_file or not results_file or not results_file.exists():
-                self.logger.warning("Could not find solutions or results files")
-                return
 
             # Load solutions
             solutions = {}
@@ -442,29 +449,22 @@ echo "EVAL_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {outpu
                     else:
                         test_result = test_results
 
-                    # Check if problem passed (both base and plus tests)
-                    base_passed = test_result.get('base_status') == 'pass'
-                    plus_passed = test_result.get('plus_status') == 'pass'
-
-                    if base_passed or plus_passed:
-                        # Find the corresponding solution file path
-                        if task_id in self.problems:
-                            solution_file_path = solution.get('solution_file')
-                            passed_mapping[solution_file_path] = {
-                                'task_id': task_id,
-                                'base_status': test_result.get('base_status'),
-                                'plus_status': test_result.get('plus_status'),
-                            }
+                    solution_file_path = solution.get('solution_file')
+                    if solution_file_path:
+                        passed_mapping[solution_file_path] = {
+                            'task_id': task_id,
+                            'base_status': test_result.get('base_status'),
+                            'plus_status': test_result.get('plus_status'),
+                        }
 
             # Write passed solutions file
-            passed_file = self.eval_dir / EVAL_RESULTS_NAME
             with open(passed_file, 'w') as f:
-                json.dump(passed_mapping, f, indent=2)
+                json.dump(passed_mapping, f, indent=4)
 
             self.logger.info(f"Created eval results file with {len(passed_mapping)} entries: {passed_file}")
 
         except Exception as e:
-            self.logger.error(f"Failed to create eval results file: {e}")
+            self.logger.error(f"Failed to create eval results file: {passed_file}")
             self.logger.error(traceback.format_exc())
 
     def _parse_scores(self, output: str) -> Optional[Dict]:
@@ -582,3 +582,4 @@ class PeriodicEvaluator:
                 self._last_eval = time.time()
 
         set_callback_fn(callback)
+        # callback(None, 0) # Run immediately

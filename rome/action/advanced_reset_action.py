@@ -26,7 +26,7 @@ def check_ground_truth(agent, file_path, use_plus=False) -> bool:
     # Check if file_path exists in results and passes base tests
     if file_path in eval_results:
         result = eval_results[file_path]
-        status = result.get('base_status') if not use_plus else result.get("plus_status")
+        status = result.get('plus_status') if use_plus else result.get("base_status")
         is_passed = status == 'pass'
 
         if is_passed:
