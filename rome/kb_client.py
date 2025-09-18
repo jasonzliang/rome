@@ -153,6 +153,11 @@ class ChromaClientManager:
             self.server = ChromaServerManager(server_config)
             self._owns_server = True
 
+        if not self.server.is_running():
+            self.logger.info("ChromaDB server not running, starting it...")
+            if not self.server.start():
+                raise RuntimeError(f"Failed to start ChromaDB server at {self.server.server_url}")
+
         # Initialize ChromaDB client and collection
         self._setup_chroma_client()
 
