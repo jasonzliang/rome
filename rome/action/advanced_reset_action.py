@@ -1,4 +1,5 @@
 import glob
+import json
 import os
 from pathlib import Path
 import sys
@@ -12,33 +13,39 @@ from ..config import check_attrs, LOG_DIR_NAME, EVAL_DIR_NAME, EVAL_RESULTS_NAME
 
 def check_ground_truth(agent, file_path, use_plus=False) -> bool:
     """Check if the evalplus result passes base tests"""
-    # Get the eval results file path from the agent's configuration
     eval_results_file = Path(agent.config.get('benchmark_dir', '.')) / LOG_DIR_NAME / EVAL_DIR_NAME / EVAL_RESULTS_NAME
 
     if not eval_results_file.exists():
         agent.logger.error(f"Eval results file not found: {eval_results_file}")
         raise FileNotFoundError(f"Eval results file not found: {eval_results_file}")
 
-    # Load the eval results
     with open(eval_results_file, 'r') as f:
         eval_results = json.load(f)
 
-    # Check if file_path exists in results and passes base tests
+    # Try direct lookup first
     if file_path in eval_results:
-        result = eval_results[file_path]
-        status = result.get('plus_status') if use_plus else result.get("base_status")
-        is_passed = status == 'pass'
-
-        if is_passed:
-            agent.logger.info(f"Ground truth check passed for {file_path}")
-        else:
-            agent.logger.info(f"Ground truth check failed for {file_path}")
-
-        return is_passed
+        matching_key = file_path
     else:
-        # File not found in results means it didn't pass
-        agent.logger.error(f"File {file_path} not found in eval results")
+        # Find match by resolving paths
+        try:
+            target_resolved = Path(file_path).resolve()
+            matching_key = next(
+                (key for key in eval_results
+                 if Path(key).resolve() == target_resolved),
+                None
+            )
+        except (OSError, ValueError):
+            matching_key = None
+
+    if not matching_key:
         raise KeyError(f"File {file_path} not found in eval results")
+
+    result = eval_results[matching_key]
+    status_key = 'plus_status' if use_plus else 'base_status'
+    is_passed = result.get(status_key) == 'pass'
+
+    agent.logger.info(f"Ground truth status is {result.get(status_key)} for {matching_key}")
+    return is_passed
 
 
 def analyze_execution_results(agent, selected_file: Dict, completion_conf: int) -> bool:
