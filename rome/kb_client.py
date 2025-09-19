@@ -224,10 +224,6 @@ class ChromaClientManager:
         expected_dim = EMBEDDING_MODELS[self.embedding_model]
         is_sentence_transformer = expected_dim == 384
 
-        self.logger.debug(f"PID {os.getpid()}: Creating embedding function")
-        self.logger.debug(f"OPENAI_API_KEY present: {'OPENAI_API_KEY' in os.environ}")
-        self.logger.debug(f"OPENAI_API_KEY value: {os.environ.get('OPENAI_API_KEY', 'MISSING')[:20]}...")
-
         if is_sentence_transformer:
             embedding_fn = SentenceTransformerEmbeddingFunction(model_name=self.embedding_model)
         else:
@@ -241,13 +237,14 @@ class ChromaClientManager:
             self.collection = self.client.create_collection(
                 name=self.collection_name, embedding_function=embedding_fn
             )
-            self.logger.debug(f"Created new collection: {self.collection_name} ({expected_dim}d)")
+            self.logger.debug(f"Created new collection: {self.collection_name} ({self.embedding_model} - {expected_dim}d)")
         except Exception as e:
             # Handle existing collection more gracefully
             if "already exists" in str(e).lower():
-                self.collection = self.client.get_collection(self.collection_name)
+                self.collection = self.client.get_collection(
+                    name=self.collection_name, embedding_function=embedding_fn)
                 self._validate_dimensions(expected_dim)
-                self.logger.debug(f"Using existing collection: {self.collection_name} ({expected_dim}d)")
+                self.logger.debug(f"Using existing collection: {self.collection_name} ({self.embedding_model} - {expected_dim}d)")
             else:
                 raise
 
