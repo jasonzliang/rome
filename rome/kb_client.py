@@ -216,11 +216,12 @@ class ChromaClientManager:
             self.collection = self.client.create_collection(
                 name=self.collection_name, embedding_function=embedding_fn
             )
+            self.logger.debug(f"Created new collection: {self.collection_name} ({expected_dim}d)")
         except:
             self.collection = self.client.get_collection(self.collection_name)
             self._validate_dimensions(expected_dim)
+            self.logger.debug(f"Connected to existing collection: {self.collection_name}")
 
-        self.logger.debug(f"Connected to collection: {self.collection_name}")
 
     def _setup_chroma_client(self):
         """Setup ChromaDB client and collection with validation"""
@@ -234,7 +235,6 @@ class ChromaClientManager:
 
         self.client = self.server.get_client()
         self._create_collection()
-        self.logger.info(f"Created collection: {self.collection_name} ({expected_dim}d)")
 
     def _setup_llamaindex(self):
         """Setup LlamaIndex components with instance isolation"""
