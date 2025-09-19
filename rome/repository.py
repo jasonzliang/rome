@@ -190,8 +190,8 @@ class RepositoryManager:
         filtered_files = []
         for file_path in files:
             is_available = agent.version_manager.check_avaliable(file_path)
-            is_finished = agent.version_manager.check_finished(agent, file_path,
-                allow_any_agent=agent.use_ground_truth)
+            is_finished = agent.version_manager.check_finished(agent, file_path)
+                # allow_any_agent=agent.use_ground_truth)
 
             if not is_available:
                 self.logger.debug(f"Filtering out active file: {file_path}")
