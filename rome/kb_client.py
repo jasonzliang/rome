@@ -210,7 +210,7 @@ class ChromaClientManager:
                     f"Compatible models: {compatible} or clear collection."
                 )
 
-def _create_collection(self):
+    def _create_collection(self):
         """Create collection with appropriate embedding function"""
         expected_dim = EMBEDDING_MODELS[self.embedding_model]
         is_sentence_transformer = expected_dim == 384
