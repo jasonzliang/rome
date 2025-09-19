@@ -511,7 +511,7 @@ def handle_clear(args):
         if not args.force and not confirm_action(f"Clear collection '{args.collection}'?"):
             return 0
         print(f"🗑️  Clearing collection '{args.collection}'...")
-        success = manager.clear_collection(args.collection)
+        success = manager.delete_collection(args.collection)
         message = f"Collection '{args.collection}'"
     else:
         if not args.force and not confirm_action("Clear ALL database data? This cannot be undone!"):
