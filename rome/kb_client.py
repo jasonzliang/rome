@@ -220,8 +220,7 @@ class ChromaClientManager:
         except:
             self.collection = self.client.get_collection(self.collection_name)
             self._validate_dimensions(expected_dim)
-            self.logger.debug(f"Connected to existing collection: {self.collection_name}")
-
+            self.logger.debug(f"Using existing collection: {self.collection_name} ({expected_dim}d)")
 
     def _setup_chroma_client(self):
         """Setup ChromaDB client and collection with validation"""
