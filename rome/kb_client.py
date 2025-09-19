@@ -189,9 +189,19 @@ class ChromaClientManager:
             return
 
         result = self.collection.get(limit=1, include=["embeddings"])
-        # Fix: Avoid boolean evaluation of array-like objects
+
+        # More defensive approach - handle various array types
         embeddings = result.get("embeddings")
-        if embeddings is not None and len(embeddings) > 0 and embeddings[0] is not None:
+        # Check for None first
+        if embeddings is None:
+            return
+
+        # Convert to list if it's a numpy array or similar
+        if hasattr(embeddings, 'tolist'):
+            embeddings = embeddings.tolist()
+
+        # Now safely check length and content
+        if len(embeddings) > 0 and embeddings[0] is not None:
             actual_dim = len(embeddings[0])
             if actual_dim != expected_dim:
                 compatible = [m for m, d in EMBEDDING_MODELS.items() if d == actual_dim]
@@ -200,7 +210,7 @@ class ChromaClientManager:
                     f"Compatible models: {compatible} or clear collection."
                 )
 
-    def _create_collection(self):
+def _create_collection(self):
         """Create collection with appropriate embedding function"""
         expected_dim = EMBEDDING_MODELS[self.embedding_model]
         is_sentence_transformer = expected_dim == 384
