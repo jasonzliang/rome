@@ -189,8 +189,10 @@ class ChromaClientManager:
             return
 
         result = self.collection.get(limit=1, include=["embeddings"])
-        if result["embeddings"]:
-            actual_dim = len(result["embeddings"][0])
+        # Fix: Check if embeddings list exists and has content
+        embeddings = result.get("embeddings")
+        if embeddings and len(embeddings) > 0 and embeddings[0] is not None:
+            actual_dim = len(embeddings[0])
             if actual_dim != expected_dim:
                 compatible = [m for m, d in EMBEDDING_MODELS.items() if d == actual_dim]
                 raise ValueError(
@@ -217,10 +219,14 @@ class ChromaClientManager:
                 name=self.collection_name, embedding_function=embedding_fn
             )
             self.logger.debug(f"Created new collection: {self.collection_name} ({expected_dim}d)")
-        except:
-            self.collection = self.client.get_collection(self.collection_name)
-            self._validate_dimensions(expected_dim)
-            self.logger.debug(f"Using existing collection: {self.collection_name} ({expected_dim}d)")
+        except Exception as e:
+            # Handle existing collection more gracefully
+            if "already exists" in str(e).lower():
+                self.collection = self.client.get_collection(self.collection_name)
+                self._validate_dimensions(expected_dim)
+                self.logger.debug(f"Using existing collection: {self.collection_name} ({expected_dim}d)")
+            else:
+                raise
 
     def _setup_chroma_client(self):
         """Setup ChromaDB client and collection with validation"""
