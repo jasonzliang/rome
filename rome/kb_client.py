@@ -216,6 +216,8 @@ class ChromaClientManager:
                     f"Dimension mismatch: collection={actual_dim}d, model={expected_dim}d. "
                     f"Compatible models: {compatible} or clear collection."
                 )
+            else:
+                self.logger.debug(f"Embedding dimensions validated: {actual_dim}")
 
     def _create_collection(self):
         """Create collection with appropriate embedding function"""
