@@ -68,9 +68,9 @@ Only recommend reversion if there is clear evidence that a previous version was 
     def _format_version_section(self, versions: List[Dict], section_title: str, n: int = 60) -> str:
         """Format version history with clear visual separation"""
         if not versions:
-            return f"\n\n{section_title} ### VERSION HISTORY\n\n\nNo versions found\n\n"
+            return f"\n\n### {section_title} VERSION HISTORY IS EMPTY"
 
-        section = f"\n\n{section_title} ### VERSION HISTORY\n\n\n"
+        section = f"\n\n### {section_title} VERSION HISTORY\n\n\n"
 
         for version in versions:
             section += self._format_single_version(version)
@@ -100,7 +100,6 @@ Only recommend reversion if there is clear evidence that a previous version was 
                 truncated_output = truncate_text(execution_output, length=LONGEST_SUMMARY_LEN)
                 content += f"# Output:\n{truncated_output}\n"
 
-        # content += f"## VERSION {version_num} END\n\n\n"
         return content + "\n\n"
 
     def _format_changes(self, changes: List[Dict]) -> str:
