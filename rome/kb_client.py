@@ -224,6 +224,10 @@ class ChromaClientManager:
         expected_dim = EMBEDDING_MODELS[self.embedding_model]
         is_sentence_transformer = expected_dim == 384
 
+        self.logger.debug(f"PID {os.getpid()}: Creating embedding function")
+        self.logger.debug(f"OPENAI_API_KEY present: {'OPENAI_API_KEY' in os.environ}")
+        self.logger.debug(f"OPENAI_API_KEY value: {os.environ.get('OPENAI_API_KEY', 'MISSING')[:20]}...")
+
         if is_sentence_transformer:
             embedding_fn = SentenceTransformerEmbeddingFunction(model_name=self.embedding_model)
         else:
