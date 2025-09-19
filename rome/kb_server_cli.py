@@ -11,12 +11,14 @@ Usage:
     python kb_server_cli.py export [--collection NAME] [--output FILE] [--include-embeddings]
     python kb_server_cli.py import [--file FILE] [--collection NAME] [--overwrite]
 """
+import atexit
 import argparse
 import os
 import sys
 import json
 import traceback
 from typing import Dict, Optional, List, Any
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.kb_server import ChromaServerManager
 from rome.logger import get_logger
@@ -79,6 +81,7 @@ Examples:
 
     # Import from JSON file and overwrite existing collection
     python kb_server_cli.py import --file my_export.json --overwrite
+
 """
     )
 
@@ -372,7 +375,7 @@ def print_documents(documents: Dict, collection_name: str = None, limit: int = N
 
             displayed_docs += 1
 
-    print(f"\n{'─' * 50}")
+    print(f"\n{'─' * 60}")
     if displayed_docs == 0:
         if collection_name:
             print(f"   No documents found in collection '{collection_name}'")
@@ -399,7 +402,6 @@ class DetachedServerManager:
     def __init__(self, config: Dict = None):
         # Temporarily disable atexit registration
         original_register = None
-        import atexit
 
         # Monkey patch atexit.register to prevent registration during server creation
         def no_register(*args, **kwargs):
