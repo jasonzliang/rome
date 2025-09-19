@@ -198,8 +198,11 @@ class ChromaClientManager:
                     f"Compatible models: {compatible} or clear collection."
                 )
 
-    def _create_collection(self, is_sentence_transformer):
+    def _create_collection(self):
         """Create collection with appropriate embedding function"""
+        expected_dim = EMBEDDING_MODELS[self.embedding_model]
+        is_sentence_transformer = expected_dim == 384
+
         if is_sentence_transformer:
             embedding_fn = SentenceTransformerEmbeddingFunction(model_name=self.embedding_model)
         else:
@@ -226,14 +229,11 @@ class ChromaClientManager:
             models = list(EMBEDDING_MODELS.keys())
             raise ValueError(f"Invalid embedding_model '{self.embedding_model}'. Supported: {models}")
 
-        expected_dim = EMBEDDING_MODELS[self.embedding_model]
-        is_sentence_transformer = expected_dim == 384
-
         if not self.collection_name:
             self.collection_name = self._path_to_collection_name(self.agent.repository)
 
         self.client = self.server.get_client()
-        self._create_collection(is_sentence_transformer)
+        self._create_collection()
         self.logger.info(f"Created collection: {self.collection_name} ({expected_dim}d)")
 
     def _setup_llamaindex(self):
