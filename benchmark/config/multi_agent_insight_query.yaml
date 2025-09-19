@@ -4,10 +4,14 @@ OpenAIHandler:
   cost_limit: 200.0
 
 Agent:
-  fsm: simple
-  action_select_strat: smart
   patience: 5
   agent_api: false
+
+  action_select_strat: original
+  fsm_type: knowledge_base
+  use_ground_truth: True
+  save_insights: True
+  query_insights: False
 
 Logger:
   include_caller_info: rome
