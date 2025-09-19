@@ -67,8 +67,10 @@ class MultiAgent:
     def __init__(self, agent_role_json: str, repository: str, config: Dict = None):
         self.logger = get_logger()
 
-        # Config setup
-        self._setup_config()
+        # Config setup - pass the config parameter correctly
+        self._setup_config(config)
+
+        # Use processed config values, with parameter fallbacks
         self.agent_role_json = agent_role_json or getattr(self, 'agent_role_json', None)
         self.repository = repository or getattr(self, 'repository', None)
         os.makedirs(self.repository, exist_ok=True)
@@ -76,7 +78,6 @@ class MultiAgent:
         # Validate and load
         self._validate_paths()
         self.agent_role_config = self._load_role_config()
-        self.agent_config = config or {}
 
         # Runtime state - process_managed will handle cleanup automatically
         self.agent_processes: Dict[str, mp.Process] = {}
@@ -84,7 +85,7 @@ class MultiAgent:
         self.results = {}
         self.agent_status = {}
 
-    def _setup_config(self, config_dict: Dict = None) -> dict:
+    def _setup_config(self, config_dict: Dict = None) -> Dict:
         """Setup and validate configuration"""
         if config_dict:
             self.config = merge_with_default_config(config_dict)
@@ -92,17 +93,18 @@ class MultiAgent:
             self.logger.info("Using DEFAULT_CONFIG, no config dict provided")
             self.config = DEFAULT_CONFIG.copy()
 
-        set_attributes_from_config(self, self.config.get('MultiAgent', {}),
-            ['agent_role_json', 'repository', 'suppress_output'])
-        self.logger.info(f"MultiAgent full config:\n{pprint.pformat(self.config)}")
+        # Apply MultiAgent-specific config
+        multiagent_config = self.config.get('MultiAgent', {})
+        set_attributes_from_config(self, multiagent_config,
+            required_attrs=['agent_role_json', 'repository', 'suppress_output'])
 
-        # Set attributes from Agent config
-        agent_config = self.config.get('Agent', {})
+        self.logger.info(f"MultiAgent full config:\n{pprint.pformat(self.config)}")
+        return self.config
 
     def _validate_paths(self):
         """Validate required paths exist"""
         for path, name in [(self.agent_role_json, "Agent config")]:
-            if not os.path.exists(path):
+            if not path or not os.path.exists(path):
                 raise FileNotFoundError(f"{name} not found: {path}")
 
     def _load_role_config(self) -> Dict[str, str]:
@@ -163,7 +165,7 @@ class MultiAgent:
             try:
                 process = mp.Process(
                     target=_agent_worker,
-                    args=(agent_name, agent_role, self.repository, self.agent_config,
+                    args=(agent_name, agent_role, self.repository, self.config,  # Use processed config
                           max_iterations, self.result_queue, self.suppress_output),
                     daemon=False
                 )
