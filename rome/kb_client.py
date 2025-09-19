@@ -189,9 +189,9 @@ class ChromaClientManager:
             return
 
         result = self.collection.get(limit=1, include=["embeddings"])
-        # Fix: Check if embeddings list exists and has content
+        # Fix: Avoid boolean evaluation of array-like objects
         embeddings = result.get("embeddings")
-        if embeddings and len(embeddings) > 0 and embeddings[0] is not None:
+        if embeddings is not None and len(embeddings) > 0 and embeddings[0] is not None:
             actual_dim = len(embeddings[0])
             if actual_dim != expected_dim:
                 compatible = [m for m, d in EMBEDDING_MODELS.items() if d == actual_dim]
