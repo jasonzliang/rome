@@ -578,17 +578,62 @@ class ChromaServerManager:
 
             client = chromadb.HttpClient(host=self.host, port=self.port)
 
-            # Check if collection exists
+            # Check if collection exists first
             try:
+                collections = client.list_collections()
+                collection_names = [col.name for col in collections]
+
+                if collection_name not in collection_names:
+                    self.logger.info(f"Collection '{collection_name}' doesn't exist - nothing to clear")
+                    return True
+
+                # Get the collection and its current count
                 collection = client.get_collection(collection_name)
-                # Delete all documents in the collection
-                collection.delete()  # This deletes all documents
-                self.logger.info(f"Cleared collection '{collection_name}'")
-                return True
-            except Exception:
-                # Collection doesn't exist
-                self.logger.info(f"Collection '{collection_name}' doesn't exist - nothing to clear")
-                return True
+                initial_count = collection.count()
+
+                if initial_count == 0:
+                    self.logger.info(f"Collection '{collection_name}' is already empty")
+                    return True
+
+                self.logger.info(f"Clearing collection '{collection_name}' with {initial_count} documents")
+
+                # Strategy 1: Use where={} to delete all documents (recommended by ChromaDB docs)
+                try:
+                    collection.delete(where={})
+                    final_count = collection.count()
+                    if final_count == 0:
+                        self.logger.info(f"Successfully cleared collection '{collection_name}' using where={{}}")
+                        return True
+                    else:
+                        self.logger.warning(f"Partial clear: {final_count} documents remain after where={{}} deletion")
+                except Exception as e:
+                    self.logger.debug(f"where={{}} deletion failed: {e}")
+
+                # Strategy 2: Get all IDs and delete them explicitly
+                try:
+                    # Get all document IDs (without embeddings/documents for performance)
+                    result = collection.get(include=[])
+                    all_ids = result.get('ids', [])
+
+                    if all_ids:
+                        collection.delete(ids=all_ids)
+                        final_count = collection.count()
+                        if final_count == 0:
+                            self.logger.info(f"Successfully cleared collection '{collection_name}' by deleting {len(all_ids)} IDs")
+                            return True
+                        else:
+                            self.logger.warning(f"Partial clear: {final_count} documents remain after ID deletion")
+                    else:
+                        self.logger.info(f"Collection '{collection_name}' appears empty (no IDs returned)")
+                        return True
+
+                except Exception as e:
+                    self.logger.error(f"ID-based deletion failed: {e}")
+                    return False
+
+            except Exception as e:
+                self.logger.error(f"Error accessing collection '{collection_name}': {e}")
+                return False
 
         except Exception as e:
             self.logger.error(f"Failed to clear collection '{collection_name}': {e}")
