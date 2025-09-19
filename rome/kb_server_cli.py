@@ -6,7 +6,7 @@ Usage:
     python kb_server_cli.py stop [--force]
     python kb_server_cli.py restart [--host HOST] [--port PORT] [--path PATH]
     python kb_server_cli.py status
-    python kb_server_cli.py clear [--collection NAME] [--force]
+    python kb_server_cli.py delete [--collection NAME] [--force]
     python kb_server_cli.py list [--collection NAME] [--limit LIMIT]
     python kb_server_cli.py export [--collection NAME] [--output FILE] [--include-embeddings]
     python kb_server_cli.py import [--file FILE] [--collection NAME] [--overwrite]
@@ -381,11 +381,11 @@ Examples:
     # Check server status and database info
     python kb_server_cli.py status
 
-    # Clear all data (requires confirmation)
-    python kb_server_cli.py clear --force
+    # Delete all data (requires confirmation)
+    python kb_server_cli.py delete --force
 
-    # Clear specific collection
-    python kb_server_cli.py clear --collection my_collection
+    # Delete specific collection
+    python kb_server_cli.py delete --collection my_collection
 
     # List up to 10 documents in a collection
     python kb_server_cli.py list --collection my_collection --limit 10
@@ -422,7 +422,7 @@ Examples:
         ('stop', 'Stop ChromaDB server', [add_force_arg]),
         ('restart', 'Restart ChromaDB server', [add_server_args]),
         ('status', 'Show server status', []),
-        ('clear', 'Clear database or collection', [add_collection_arg, add_force_arg]),
+        ('delete', 'Delete database or collection', [add_collection_arg, add_force_arg]),
         ('list', 'List documents', [add_collection_arg, lambda p: p.add_argument('--limit', type=int, help='Limit results')]),
         ('export', 'Export to JSON', [add_collection_arg, add_batch_arg,
                                     lambda p: p.add_argument('--output', help='Output file'),
@@ -503,24 +503,24 @@ def handle_status(args):
     return 0
 
 @error_handler
-def handle_clear(args):
-    """Handle clear command"""
+def handle_delete(args):
+    """Handle delete command"""
     manager = get_server_manager()
 
     if args.collection:
-        if not args.force and not confirm_action(f"Clear collection '{args.collection}'?"):
+        if not args.force and not confirm_action(f"Delete collection '{args.collection}'?"):
             return 0
-        print(f"🗑️  Clearing collection '{args.collection}'...")
+        print(f"🗑️  Deleting collection '{args.collection}'...")
         success = manager.delete_collection(args.collection)
         message = f"Collection '{args.collection}'"
     else:
-        if not args.force and not confirm_action("Clear ALL database data? This cannot be undone!"):
+        if not args.force and not confirm_action("Delete ALL database data? This cannot be undone!"):
             return 0
-        print("🗑️  Clearing entire database...")
-        success = manager.clear_database(force=True)
+        print("🗑️  Deleting entire database...")
+        success = manager.delete_database(force=True)
         message = "Database"
 
-    print(f"✅ {message} cleared successfully" if success else f"❌ Failed to clear {message.lower()}")
+    print(f"✅ {message} deleted successfully" if success else f"❌ Failed to delete {message.lower()}")
     return 0 if success else 1
 
 @error_handler
@@ -677,7 +677,7 @@ def main():
     # Command dispatch
     commands = {
         'start': handle_start, 'stop': handle_stop, 'restart': handle_restart,
-        'status': handle_status, 'clear': handle_clear, 'list': handle_list,
+        'status': handle_status, 'delete': handle_delete, 'list': handle_list,
         'export': handle_export, 'import': handle_import
     }
 
