@@ -29,8 +29,12 @@ class RepositoryManager:
         set_attributes_from_config(
             self,
             config,
-            required_attrs=['file_types', 'max_files', 'exclude_dirs', 'exclude_types']
+            required_attrs=['file_types', 'max_files', 'exclude_dirs', 'exclude_types'],
+            optional_attrs=['easy_check_finish']
         )
+
+        # Set to True/False value
+        self.easy_check_finish == bool(self.easy_check_finish)
 
         # Store config for reference
         self.config = config or {}
@@ -190,8 +194,8 @@ class RepositoryManager:
         filtered_files = []
         for file_path in files:
             is_available = agent.version_manager.check_avaliable(file_path)
-            is_finished = agent.version_manager.check_finished(agent, file_path)
-                # allow_any_agent=agent.use_ground_truth)
+            is_finished = agent.version_manager.check_finished(agent, file_path,
+                easy_mode=self.easy_check_finish)
 
             if not is_available:
                 self.logger.debug(f"Filtering out active file: {file_path}")

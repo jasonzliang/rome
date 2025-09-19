@@ -524,7 +524,7 @@ class VersionManager:
         self.logger.debug(f"Unflagged active {file_path} for agent {agent.get_id()} (PID {current_pid})")
         return True
 
-    def check_finished(self, agent, file_path: str, allow_any_agent: bool = False) -> bool:
+    def check_finished(self, agent, file_path: str, easy_mode: bool = False) -> bool:
         """Check if a file has been marked as finished by this agent (by name)."""
         meta_dir = self._get_meta_dir(file_path)
         finished_file_path = self._get_file_path(meta_dir, FileType.FINISHED)
@@ -539,7 +539,8 @@ class VersionManager:
         current_agent_name = agent.name
 
         agents = finished_data.get('agents', [])
-        if allow_any_agent:
+        if easy_mode:
+            self.logger.debug("File finished check is set to easy mode!")
             return len(agents) > 0
         else:
             return any(
