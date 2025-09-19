@@ -65,18 +65,16 @@ Only recommend reversion if there is clear evidence that a previous version was 
         response = agent.chat_completion(prompt=prompt, system_message=agent.role, response_format={"type": "json_object"})
         return agent.parse_json_response(response)
 
-    def _format_version_section(self, versions: List[Dict], section_title: str) -> str:
+    def _format_version_section(self, versions: List[Dict], section_title: str, n: int = 60) -> str:
         """Format version history with clear visual separation"""
         if not versions:
-            return f"\n{'='*60}\n{section_title} VERSION HISTORY\n{'='*60}\nNo versions found\n{'='*60}\n"
+            return f"\n\n{section_title} ### VERSION HISTORY\n\n\nNo versions found\n\n"
 
-        section = f"\n{'='*60}\n{section_title} VERSION HISTORY\n{'='*60}\n"
+        section = f"\n\n{section_title} ### VERSION HISTORY\n\n\n"
 
         for version in versions:
             section += self._format_single_version(version)
-            section += f"{'-'*40}\n"
 
-        section += f"{'='*60}\n"
         return section
 
     def _format_single_version(self, version: Dict) -> str:
@@ -88,20 +86,21 @@ Only recommend reversion if there is clear evidence that a previous version was 
         exit_code = version.get('exit_code')
         execution_output = version.get('execution_output', '')
 
-        content = f"VERSION {version_num} ({timestamp})\n"
-        content += f"Explanation: {explanation}\n\n"
+        content = f"## VERSION {version_num} ({timestamp})\n\n"
+        content += f"# Explanation: {explanation}\n\n"
 
-        content += f"Changes ({len(changes)} modifications):\n"
-        content += self._format_changes(changes)
+        content += f"# Changes ({len(changes)} modifications):\n"
+        content += self._format_changes(changes) + "\n"
 
         if exit_code is not None:
             status = "PASSED" if exit_code == 0 else "FAILED"
-            content += f"\nExecution: {status} (exit code: {exit_code})\n"
+            content += f"# Execution: {status} (exit code: {exit_code})\n"
 
             if execution_output:
                 truncated_output = truncate_text(execution_output, length=LONGEST_SUMMARY_LEN)
-                content += f"Output:\n{truncated_output}\n"
+                content += f"# Output:\n{truncated_output}\n"
 
+        content += f"## VERSION {version_num} END\n\n\n"
         return content
 
     def _format_changes(self, changes: List[Dict]) -> str:
