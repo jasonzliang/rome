@@ -71,27 +71,15 @@ Examples:
     # Clear specific collection
     python kb_server_cli.py clear --collection my_collection
 
-    # List all documents in all collections
-    python kb_server_cli.py list
+    # List up to 10 documents in a collection
+    python kb_server_cli.py list --collection my_collection --limit 10
 
-    # List documents in specific collection
-    python kb_server_cli.py list --collection my_collection
-
-    # List first 10 documents only
-    python kb_server_cli.py list --limit 10
-
-    # Export all collections to JSON
-    python kb_server_cli.py export
-
-    # Export specific collection with embeddings
+    # Export specific collection with embeddings to JSON file
     python kb_server_cli.py export --collection my_collection --include-embeddings --output my_export.json
 
-    # Import from JSON file
-    python kb_server_cli.py import --file my_export.json
-
-    # Import and overwrite existing collection
+    # Import from JSON file and overwrite existing collection
     python kb_server_cli.py import --file my_export.json --overwrite
-        """
+"""
     )
 
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
