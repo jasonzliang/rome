@@ -30,12 +30,12 @@ from .parsing import parse_json_response
 # Embedding model configurations
 EMBEDDING_MODELS = {
     "text-embedding-3-small": 1536,
-    # "text-embedding-3-large": 3072,
-    # "text-embedding-ada-002": 1536,
-    # "text-embedding-ada-001": 1024,
-    # "all-MiniLM-L6-v2": 384,
-    # "all-MiniLM-L12-v2": 384,
-    # "paraphrase-MiniLM-L6-v2": 384
+    "text-embedding-3-large": 3072,
+    "text-embedding-ada-002": 1536,
+    "text-embedding-ada-001": 1024,
+    "all-MiniLM-L6-v2": 384,
+    "all-MiniLM-L12-v2": 384,
+    "paraphrase-MiniLM-L6-v2": 384
 }
 
 
