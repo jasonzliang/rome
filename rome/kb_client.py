@@ -29,9 +29,13 @@ from .parsing import parse_json_response
 
 # Embedding model configurations
 EMBEDDING_MODELS = {
-    "text-embedding-3-small": 1536, "text-embedding-3-large": 3072,
-    "text-embedding-ada-002": 1536, "text-embedding-ada-001": 1024,
-    "all-MiniLM-L6-v2": 384, "all-MiniLM-L12-v2": 384, "paraphrase-MiniLM-L6-v2": 384
+    "text-embedding-3-small": 1536,
+    # "text-embedding-3-large": 3072,
+    # "text-embedding-ada-002": 1536,
+    # "text-embedding-ada-001": 1024,
+    # "all-MiniLM-L6-v2": 384,
+    # "all-MiniLM-L12-v2": 384,
+    # "paraphrase-MiniLM-L6-v2": 384
 }
 
 
@@ -150,6 +154,9 @@ class ChromaClientManager:
         set_attributes_from_config(self, self.config,
             ['enable_reranking', 'chunk_size', 'chunk_overlap', 'embedding_model', 'use_shared_server'],
             ['top_k', 'log_db', 'collection_name'])
+
+        assert self.embedding_model in EMBEDDING_MODELS, \
+            f"Invalid embedding model: {self.embedding_model}"
 
         # Get or create server manager instance
         if self.use_shared_server:
