@@ -237,10 +237,11 @@ class ChromaClientManager:
             self.collection = self.client.create_collection(
                 name=self.collection_name, embedding_function=embedding_fn
             )
+            self._validate_dimensions(expected_dim)
             self.logger.debug(f"Created new collection: {self.collection_name} ({self.embedding_model} - {expected_dim}d)")
         except Exception as e:
-            # Handle existing collection more gracefully
             if "already exists" in str(e).lower():
+
                 self.collection = self.client.get_collection(
                     name=self.collection_name, embedding_function=embedding_fn)
                 self._validate_dimensions(expected_dim)
