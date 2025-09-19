@@ -237,17 +237,15 @@ class ChromaClientManager:
             self.collection = self.client.create_collection(
                 name=self.collection_name, embedding_function=embedding_fn
             )
-            self._validate_dimensions(expected_dim)
-            self.logger.debug(f"Created new collection: {self.collection_name} ({self.embedding_model} - {expected_dim}d)")
+            self.logger.debug(f"Created new collection: {self.collection_name} ({self.embedding_model} | {expected_dim}d)")
         except Exception as e:
             if "already exists" in str(e).lower():
-
                 self.collection = self.client.get_collection(
                     name=self.collection_name, embedding_function=embedding_fn)
-                self._validate_dimensions(expected_dim)
-                self.logger.debug(f"Using existing collection: {self.collection_name} ({self.embedding_model} - {expected_dim}d)")
-            else:
-                raise
+                self.logger.debug(f"Using existing collection: {self.collection_name} ({self.embedding_model} | {expected_dim}d)")
+            else: raise
+
+        self._validate_dimensions(expected_dim)
 
     def _setup_chroma_client(self):
         """Setup ChromaDB client and collection with validation"""
@@ -322,7 +320,7 @@ class ChromaClientManager:
         """Add a single text document with automatic deduplication"""
 
         # Validate one more time before adding text
-        self._validate_dimensions(EMBEDDING_MODELS[self.embedding_model])
+        # self._validate_dimensions(EMBEDDING_MODELS[self.embedding_model])
 
         # Generate deterministic ID from content for deduplication
         content_hash = hashlib.sha256(text.encode()).hexdigest()
