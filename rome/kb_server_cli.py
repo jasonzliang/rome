@@ -242,9 +242,41 @@ class OutputFormatter:
             if db_info['collections']:
                 print(f"   Collections:")
                 for col in db_info['collections']:
-                    print(f"     - {col['name']} ({col['count']} documents)")
+                    # Get dimension info for each collection
+                    dimension_info = OutputFormatter._get_collection_dimensions(col.get('name'))
+                    dim_str = f" | {dimension_info}d" if dimension_info else ""
+                    print(f"     - {col['name']} ({col['count']} documents{dim_str})")
             else:
                 print(f"   Collections: None")
+
+    @staticmethod
+    def _get_collection_dimensions(collection_name: str) -> str:
+        """Get embedding dimensions for a collection"""
+        try:
+            client = get_client()
+            collection = client.get_collection(collection_name)
+
+            if collection.count() == 0:
+                return "empty"
+
+            # Get one document with embeddings to check dimensions
+            result = collection.get(limit=1, include=["embeddings"])
+            embeddings = result.get("embeddings")
+
+            if embeddings is None:
+                return "no embeddings"
+
+            # Handle potential numpy arrays
+            if hasattr(embeddings, 'tolist'):
+                embeddings = embeddings.tolist()
+
+            if len(embeddings) > 0 and embeddings[0] is not None:
+                return str(len(embeddings[0]))
+            else:
+                return "unknown"
+
+        except Exception as e:
+            return "error"
 
     @staticmethod
     def print_documents(documents: Dict, collection_name: str = None, limit: int = None):
@@ -262,7 +294,10 @@ class OutputFormatter:
             total_docs += doc_count
 
             if not collection_name:
-                print(f"\n━━━ Collection: {col_name} ({doc_count} documents) ━━━")
+                # Add dimension info to collection header when listing all
+                dimension_info = OutputFormatter._get_collection_dimensions(col_name)
+                dim_str = f" | {dimension_info}d" if dimension_info and dimension_info not in ["empty", "error"] else ""
+                print(f"\n┏━━ Collection: {col_name} ({doc_count} documents{dim_str}) ━━━")
 
             for doc in docs:
                 if limit and displayed_docs >= limit:
@@ -302,7 +337,7 @@ class OutputFormatter:
         else:
             content_preview = content
 
-        print(f"\n🔸 Document #{doc_num}")
+        print(f"\n📸 Document #{doc_num}")
         print(f"   ID: {doc_id}")
 
         if content_preview:
