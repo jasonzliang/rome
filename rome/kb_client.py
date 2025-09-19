@@ -11,6 +11,7 @@ import time
 try:
     import chromadb
     import chromadb.utils.embedding_functions as embedding_functions
+    from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
     from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
     from llama_index.vector_stores.chroma import ChromaVectorStore
     from llama_index.embeddings.openai import OpenAIEmbedding
@@ -176,6 +177,12 @@ class ChromaClientManager:
 
         self.logger.info(f"ChromaClientManager initialized: collection={self.collection_name}, reranking={self.enable_reranking}")
 
+    def _path_to_collection_name(self, file_path: str, max_len: int = 128) -> str:
+        """Convert file path to valid Chroma collection name."""
+        name = re.sub(r'[^a-z0-9._-]', '_', Path(file_path).stem.lower())
+        name = re.sub(r'(^[^a-z0-9]+|[^a-z0-9]+$|_{2,}|\.{2,})', '_', name).strip('_')
+        return (name if len(name) >= 3 else f"doc_{name}".ljust(3, '0'))[:max_len]
+
     def _validate_dimensions(self, expected_dim):
         """Validate collection embedding dimensions"""
         if self.collection.count() == 0:
@@ -194,7 +201,6 @@ class ChromaClientManager:
     def _create_collection(self, is_sentence_transformer):
         """Create collection with appropriate embedding function"""
         if is_sentence_transformer:
-            from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
             embedding_fn = SentenceTransformerEmbeddingFunction(model_name=self.embedding_model)
         else:
             if not os.getenv('OPENAI_API_KEY'):
@@ -203,15 +209,15 @@ class ChromaClientManager:
                 model_name=self.embedding_model, api_key=os.getenv('OPENAI_API_KEY')
             )
 
-        self.collection = self.client.create_collection(
-            name=self.collection_name, embedding_function=embedding_fn
-        )
+        try:
+            self.collection = self.client.create_collection(
+                name=self.collection_name, embedding_function=embedding_fn
+            )
+        except:
+            self.collection = self.client.get_collection(self.collection_name)
+            self._validate_dimensions(expected_dim)
 
-    def _path_to_collection_name(self, file_path: str, max_len: int = 128) -> str:
-        """Convert file path to valid Chroma collection name."""
-        name = re.sub(r'[^a-z0-9._-]', '_', Path(file_path).stem.lower())
-        name = re.sub(r'(^[^a-z0-9]+|[^a-z0-9]+$|_{2,}|\.{2,})', '_', name).strip('_')
-        return (name if len(name) >= 3 else f"doc_{name}".ljust(3, '0'))[:max_len]
+        self.logger.debug(f"Connected to collection: {self.collection_name}")
 
     def _setup_chroma_client(self):
         """Setup ChromaDB client and collection with validation"""
@@ -227,14 +233,8 @@ class ChromaClientManager:
             self.collection_name = self._path_to_collection_name(self.agent.repository)
 
         self.client = self.server.get_client()
-
-        try:
-            self.collection = self.client.get_collection(self.collection_name)
-            self._validate_dimensions(expected_dim)
-            self.logger.debug(f"Connected to collection: {self.collection_name}")
-        except:
-            self._create_collection(is_sentence_transformer)
-            self.logger.info(f"Created collection: {self.collection_name} ({expected_dim}d)")
+        self._create_collection(is_sentence_transformer)
+        self.logger.info(f"Created collection: {self.collection_name} ({expected_dim}d)")
 
     def _setup_llamaindex(self):
         """Setup LlamaIndex components with instance isolation"""
