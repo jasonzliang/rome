@@ -219,7 +219,7 @@ DEFAULT_CONFIG = {
     "ChromaClientManager": {
         "collection_name": None,  # ChromaDB collection name, set to None to use agent repo
         "enable_reranking": False,  # Enable OpenAI reranking
-        "use_shared_server": True,  # Use shared server instance across KB instances
+        "use_shared_server": False,  # Use shared server instance across KB instances
 
         # LlamaIndex configuration
         "chunk_size": 400,  # Chunk size for text splitting
