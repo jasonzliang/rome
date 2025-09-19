@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 ChromaDB Server Command Line Interface
-
 Usage:
     python kb_server_cli.py start [--host HOST] [--port PORT] [--path PATH] [--force]
     python kb_server_cli.py stop [--force]
@@ -9,15 +8,15 @@ Usage:
     python kb_server_cli.py status
     python kb_server_cli.py clear [--collection NAME] [--force]
     python kb_server_cli.py list [--collection NAME] [--limit LIMIT]
+    python kb_server_cli.py export [--collection NAME] [--output FILE] [--include-embeddings]
+    python kb_server_cli.py import [--file FILE] [--collection NAME] [--overwrite]
 """
-
 import argparse
 import os
 import sys
 import json
 import traceback
-from typing import Dict, Optional
-
+from typing import Dict, Optional, List, Any
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.kb_server import ChromaServerManager
 from rome.logger import get_logger
@@ -34,12 +33,12 @@ logger.configure({
 DEFAULT_HOST = 'localhost'
 DEFAULT_PORT = 8000
 DEFAULT_PATH = None
+
 SERVER_CONFIG = {
     'host': DEFAULT_HOST,
     'port': DEFAULT_PORT,
     'persist_path': DEFAULT_PATH
 }
-
 
 def create_parser() -> argparse.ArgumentParser:
     """Create command line argument parser"""
@@ -80,6 +79,18 @@ Examples:
 
     # List first 10 documents only
     python kb_server_cli.py list --limit 10
+
+    # Export all collections to JSON
+    python kb_server_cli.py export
+
+    # Export specific collection with embeddings
+    python kb_server_cli.py export --collection my_collection --include-embeddings --output my_export.json
+
+    # Import from JSON file
+    python kb_server_cli.py import --file my_export.json
+
+    # Import and overwrite existing collection
+    python kb_server_cli.py import --file my_export.json --overwrite
         """
     )
 
@@ -103,7 +114,7 @@ Examples:
     restart_parser.add_argument('--port', type=int, default=DEFAULT_PORT, help='Server port (default: 8000)')
     restart_parser.add_argument('--path', type=str, default=DEFAULT_PATH, help='Data persistence path (default: auto-detect)')
 
-    # Status command (now includes database info)
+    # Status command
     subparsers.add_parser('status', help='Show server status and database information')
 
     # Clear command
@@ -111,18 +122,168 @@ Examples:
     clear_parser.add_argument('--collection', help='Clear specific collection (default: clear all)')
     clear_parser.add_argument('--force', action='store_true', help='Skip confirmation prompt')
 
-    # List command (new)
+    # List command
     list_parser = subparsers.add_parser('list', help='List documents in collections')
     list_parser.add_argument('--collection', help='List documents in specific collection (default: all collections)')
     list_parser.add_argument('--limit', type=int, default=None, help='Limit number of documents to display')
 
-    return parser
+    # Export command
+    export_parser = subparsers.add_parser('export', help='Export collections to JSON')
+    export_parser.add_argument('--collection', help='Export specific collection (default: all collections)')
+    export_parser.add_argument('--output', help='Output JSON file (default: auto-generated)')
+    export_parser.add_argument('--include-embeddings', action='store_true', help='Include embeddings in export')
+    export_parser.add_argument('--batch-size', type=int, default=1000, help='Batch size for large collections (default: 1000)')
 
+    # Import command
+    import_parser = subparsers.add_parser('import', help='Import collections from JSON')
+    import_parser.add_argument('--file', required=True, help='JSON file to import')
+    import_parser.add_argument('--collection', help='Import to specific collection name (overrides file)')
+    import_parser.add_argument('--overwrite', action='store_true', help='Overwrite existing collections')
+    import_parser.add_argument('--batch-size', type=int, default=1000, help='Batch size for import (default: 1000)')
+
+    return parser
 
 def get_server_manager() -> 'ChromaServerManager':
     """Create ChromaServerManager instance with CLI arguments"""
     return ChromaServerManager.get_instance(SERVER_CONFIG)
 
+def get_client():
+    """Get ChromaDB client"""
+    import chromadb
+    manager = get_server_manager()
+    return chromadb.HttpClient(host=manager.host, port=manager.port)
+
+def export_collection_to_dict(collection, include_embeddings: bool = False, batch_size: int = 1000) -> Dict[str, Any]:
+    """Export a single collection to dictionary format"""
+    total_count = collection.count()
+
+    export_data = {
+        'collection_name': collection.name,
+        'count': total_count,
+        'data': []
+    }
+
+    # Process in batches for memory efficiency
+    for offset in range(0, total_count, batch_size):
+        include_fields = ['documents', 'metadatas']
+        if include_embeddings:
+            include_fields.append('embeddings')
+
+        results = collection.get(
+            limit=batch_size,
+            offset=offset,
+            include=include_fields
+        )
+
+        for i in range(len(results['ids'])):
+            item = {
+                'id': results['ids'][i],
+                'document': results['documents'][i] if results['documents'] else None,
+                'metadata': results['metadatas'][i] if results['metadatas'] else None
+            }
+
+            if include_embeddings and results.get('embeddings'):
+                item['embedding'] = results['embeddings'][i]
+
+            export_data['data'].append(item)
+
+    return export_data
+
+def import_collection_from_dict(client, data: Dict[str, Any], target_name: str = None, overwrite: bool = False, batch_size: int = 1000) -> bool:
+    """Import a collection from dictionary data"""
+    collection_name = target_name or data['collection_name']
+
+    # Check if collection exists
+    try:
+        existing_collections = [col.name for col in client.list_collections()]
+        collection_exists = collection_name in existing_collections
+
+        if collection_exists:
+            if overwrite:
+                print(f"   Deleting existing collection '{collection_name}'")
+                client.delete_collection(collection_name)
+            else:
+                print(f"   Collection '{collection_name}' already exists (use --overwrite to replace)")
+                return False
+    except Exception as e:
+        print(f"   Warning: Could not check existing collections: {e}")
+
+    # Create collection
+    try:
+        collection = client.create_collection(collection_name)
+        print(f"   Created collection '{collection_name}'")
+    except Exception as e:
+        print(f"   Error creating collection '{collection_name}': {e}")
+        return False
+
+    # Import data in batches
+    total_items = len(data['data'])
+    imported_count = 0
+
+    for start_idx in range(0, total_items, batch_size):
+        end_idx = min(start_idx + batch_size, total_items)
+        batch_data = data['data'][start_idx:end_idx]
+
+        # Separate batch data
+        batch_ids = []
+        batch_documents = []
+        batch_metadatas = []
+        batch_embeddings = []
+
+        has_documents = False
+        has_metadatas = False
+        has_embeddings = False
+
+        for item in batch_data:
+            batch_ids.append(item['id'])
+
+            if item.get('document') is not None:
+                batch_documents.append(item['document'])
+                has_documents = True
+            else:
+                batch_documents.append('')
+
+            if item.get('metadata') is not None:
+                batch_metadatas.append(item['metadata'])
+                has_metadatas = True
+            else:
+                batch_metadatas.append({})
+
+            if item.get('embedding') is not None:
+                batch_embeddings.append(item['embedding'])
+                has_embeddings = True
+
+        # Add batch to collection
+        try:
+            add_kwargs = {'ids': batch_ids}
+            if has_documents:
+                add_kwargs['documents'] = batch_documents
+            if has_metadatas:
+                add_kwargs['metadatas'] = batch_metadatas
+            if has_embeddings:
+                add_kwargs['embeddings'] = batch_embeddings
+
+            collection.add(**add_kwargs)
+            imported_count += len(batch_data)
+
+            if total_items > batch_size:
+                print(f"   Imported {imported_count}/{total_items} documents...")
+
+        except Exception as e:
+            print(f"   Error importing batch {start_idx}-{end_idx}: {e}")
+            return False
+
+    print(f"   Successfully imported {imported_count} documents to '{collection_name}'")
+    return True
+
+def generate_output_filename(collection_name: str = None) -> str:
+    """Generate output filename for export"""
+    from datetime import datetime
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    if collection_name:
+        return f"chroma_export_{collection_name}_{timestamp}.json"
+    else:
+        return f"chroma_export_all_{timestamp}.json"
 
 def print_status_and_info(status: Dict, db_info: Dict):
     """Print combined status and database information"""
@@ -149,7 +310,6 @@ def print_status_and_info(status: Dict, db_info: Dict):
         print(f"   Error: {db_info['error']}")
     elif 'collections' in db_info:
         print(f"   Total collections: {db_info['total_collections']}")
-
         if db_info['collections']:
             print(f"   Collections:")
             for col in db_info['collections']:
@@ -157,9 +317,8 @@ def print_status_and_info(status: Dict, db_info: Dict):
         else:
             print(f"   Collections: None")
 
-
 def print_documents(documents: Dict, collection_name: str = None, limit: int = None):
-    """Print formatted document information"""
+    """Print human-readable formatted document information"""
     if collection_name:
         print(f"📄 Documents in collection '{collection_name}':")
     else:
@@ -174,13 +333,14 @@ def print_documents(documents: Dict, collection_name: str = None, limit: int = N
 
         doc_count = len(docs)
         total_docs += doc_count
+        maxlen = LONG_SUMMARY_LEN
 
         if not collection_name:
-            print(f"\n   Collection: {col_name} ({doc_count} documents)")
+            print(f"\n━━━ Collection: {col_name} ({doc_count} documents) ━━━")
 
         for i, doc in enumerate(docs):
             if limit and displayed_docs >= limit:
-                print(f"   ... (showing {limit} of {total_docs} total documents)")
+                print(f"\n💡 Showing first {limit} of {total_docs} total documents")
                 return
 
             # Extract document info
@@ -188,26 +348,54 @@ def print_documents(documents: Dict, collection_name: str = None, limit: int = N
             content = doc.get('document', '')
             metadata = doc.get('metadata', {})
 
-            # Truncate content for display
-            maxlen = LONG_SUMMARY_LEN
-            content_preview = content[:maxlen] + "..." if len(content) > maxlen else content
+            # Format content with smart truncation
+            if len(content) > maxlen:
+                # Try to break at word boundary
+                truncated = content[:maxlen]
+                last_space = truncated.rfind(' ')
+                if last_space > maxlen * 0.8:  # If space is reasonably close to end
+                    content_preview = truncated[:last_space] + "..."
+                else:
+                    content_preview = truncated + "..."
+            else:
+                content_preview = content
 
-            print(f"   [{displayed_docs + 1}] ID: {doc_id}")
-            print(f"       Content: {content_preview}")
+            # Pretty print document
+            print(f"\n🔸 Document #{displayed_docs + 1}")
+            print(f"   ID: {doc_id}")
+
+            if content_preview:
+                print(f"   Content:")
+                # Indent content for better readability
+                for line in content_preview.split('\n'):
+                    print(f"     {line}")
+            else:
+                print(f"   Content: (empty)")
+
             if metadata:
-                print(f"       Metadata: {metadata}")
-            print()
+                print(f"   Metadata:")
+                for key, value in sorted(metadata.items()):
+                    # Format metadata values nicely
+                    if isinstance(value, (dict, list)):
+                        value_str = json.dumps(value, indent=6)
+                        print(f"     {key}: {value_str}")
+                    else:
+                        print(f"     {key}: {value}")
 
             displayed_docs += 1
 
+    print(f"\n{'─' * 50}")
     if displayed_docs == 0:
         if collection_name:
             print(f"   No documents found in collection '{collection_name}'")
         else:
             print(f"   No documents found in any collection")
-    elif not limit or displayed_docs < limit:
-        print(f"   Total: {displayed_docs} documents")
-
+    else:
+        if collection_name:
+            print(f"   Total: {displayed_docs} documents in '{collection_name}'")
+        else:
+            collections_shown = len([name for name in documents.keys() if not collection_name or name == collection_name])
+            print(f"   Total: {displayed_docs} documents across {collections_shown} collections")
 
 def confirm_action(message: str) -> bool:
     """Ask for user confirmation"""
@@ -218,10 +406,8 @@ def confirm_action(message: str) -> bool:
         print("\nCancelled.")
         return False
 
-
 class DetachedServerManager:
     """Wrapper for ChromaServerManager that prevents atexit cleanup"""
-
     def __init__(self, config: Dict = None):
         # Temporarily disable atexit registration
         original_register = None
@@ -245,7 +431,6 @@ class DetachedServerManager:
     def __getattr__(self, name):
         """Delegate all other attributes to the manager"""
         return getattr(self.manager, name)
-
 
 def handle_start(args):
     """Handle start command"""
@@ -275,10 +460,8 @@ def handle_start(args):
             status = manager.get_status()
             db_info = manager.get_database_info()
             print_status_and_info(status, db_info)
-
             if args.detach:
                 print("🔗 Server running in background. Use 'python kb_server_cli.py stop' to stop.")
-
             return 0
         else:
             print("❌ Failed to start ChromaDB server")
@@ -289,7 +472,6 @@ def handle_start(args):
         print(f"❌ Error starting server: {e}")
         traceback.print_exc()
         return 1
-
 
 def handle_stop(args):
     """Handle stop command"""
@@ -318,7 +500,6 @@ def handle_stop(args):
         traceback.print_exc()
         return 1
 
-
 def handle_restart(args):
     """Handle restart command"""
     try:
@@ -342,14 +523,12 @@ def handle_restart(args):
         traceback.print_exc()
         return 1
 
-
 def handle_status(args):
     """Handle status command (now includes database info)"""
     try:
         manager = get_server_manager()
         status = manager.get_status()
         db_info = manager.get_database_info()
-
         print_status_and_info(status, db_info)
         return 0
 
@@ -357,7 +536,6 @@ def handle_status(args):
         print(f"❌ Error getting status: {e}")
         traceback.print_exc()
         return 1
-
 
 def handle_clear(args):
     """Handle clear command"""
@@ -402,7 +580,6 @@ def handle_clear(args):
         traceback.print_exc()
         return 1
 
-
 def handle_list(args):
     """Handle list command - list documents in collections"""
     try:
@@ -414,19 +591,16 @@ def handle_list(args):
             return 1
 
         # Get ChromaDB client
-        import chromadb
-        client = chromadb.HttpClient(host=manager.host, port=manager.port)
+        client = get_client()
 
         # Get collections
         collections = client.list_collections()
-
         if not collections:
             print("📄 No collections found in database")
             return 0
 
         # Collect documents from collections
         documents = {}
-
         for collection in collections:
             col_name = collection.name
 
@@ -470,6 +644,170 @@ def handle_list(args):
         traceback.print_exc()
         return 1
 
+def handle_export(args):
+    """Handle export command - export collections to JSON"""
+    try:
+        manager = get_server_manager()
+
+        if not manager.is_running():
+            print("❌ ChromaDB server is not running")
+            print("   Use 'python kb_server_cli.py start' to start the server first")
+            return 1
+
+        # Get ChromaDB client
+        client = get_client()
+
+        # Get collections
+        collections = client.list_collections()
+        if not collections:
+            print("📄 No collections found in database")
+            return 0
+
+        # Generate output filename if not provided
+        output_file = args.output or generate_output_filename(args.collection)
+
+        print(f"📤 Exporting to '{output_file}'...")
+        if args.include_embeddings:
+            print("   Including embeddings in export")
+
+        export_data = {}
+
+        if args.collection:
+            # Export specific collection
+            target_collection = None
+            for col in collections:
+                if col.name == args.collection:
+                    target_collection = col
+                    break
+
+            if not target_collection:
+                print(f"❌ Collection '{args.collection}' not found")
+                return 1
+
+            print(f"   Exporting collection '{args.collection}'...")
+            collection_data = export_collection_to_dict(
+                target_collection,
+                args.include_embeddings,
+                args.batch_size
+            )
+            export_data = {
+                'export_type': 'single_collection',
+                'collections': [collection_data]
+            }
+        else:
+            # Export all collections
+            export_data = {
+                'export_type': 'all_collections',
+                'collections': []
+            }
+
+            for collection in collections:
+                print(f"   Exporting collection '{collection.name}'...")
+                collection_data = export_collection_to_dict(
+                    collection,
+                    args.include_embeddings,
+                    args.batch_size
+                )
+                export_data['collections'].append(collection_data)
+
+        # Write to JSON file
+        try:
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(export_data, f, indent=2, ensure_ascii=False)
+
+            # Summary
+            total_collections = len(export_data['collections'])
+            total_documents = sum(col['count'] for col in export_data['collections'])
+
+            print(f"✅ Export completed successfully")
+            print(f"   File: {output_file}")
+            print(f"   Collections: {total_collections}")
+            print(f"   Total documents: {total_documents}")
+            print(f"   Embeddings included: {'Yes' if args.include_embeddings else 'No'}")
+
+            return 0
+
+        except Exception as e:
+            print(f"❌ Error writing export file: {e}")
+            return 1
+
+    except Exception as e:
+        print(f"❌ Error during export: {e}")
+        traceback.print_exc()
+        return 1
+
+def handle_import(args):
+    """Handle import command - import collections from JSON"""
+    try:
+        manager = get_server_manager()
+
+        if not manager.is_running():
+            print("❌ ChromaDB server is not running")
+            print("   Use 'python kb_server_cli.py start' to start the server first")
+            return 1
+
+        # Check if input file exists
+        if not os.path.exists(args.file):
+            print(f"❌ Input file '{args.file}' not found")
+            return 1
+
+        print(f"📥 Importing from '{args.file}'...")
+
+        # Load JSON data
+        try:
+            with open(args.file, 'r', encoding='utf-8') as f:
+                import_data = json.load(f)
+        except Exception as e:
+            print(f"❌ Error reading import file: {e}")
+            return 1
+
+        # Validate import data structure
+        if 'collections' not in import_data:
+            print("❌ Invalid import file format: missing 'collections' key")
+            return 1
+
+        # Get ChromaDB client
+        client = get_client()
+
+        # Import collections
+        imported_collections = 0
+        total_documents = 0
+
+        for collection_data in import_data['collections']:
+            if 'collection_name' not in collection_data:
+                print("⚠️  Skipping collection with missing name")
+                continue
+
+            collection_name = args.collection or collection_data['collection_name']
+            print(f"   Importing collection '{collection_name}'...")
+
+            success = import_collection_from_dict(
+                client,
+                collection_data,
+                collection_name,
+                args.overwrite,
+                args.batch_size
+            )
+
+            if success:
+                imported_collections += 1
+                total_documents += collection_data.get('count', 0)
+            else:
+                print(f"⚠️  Failed to import collection '{collection_name}'")
+
+        if imported_collections > 0:
+            print(f"✅ Import completed successfully")
+            print(f"   Collections imported: {imported_collections}")
+            print(f"   Total documents: {total_documents}")
+            return 0
+        else:
+            print("❌ No collections were imported")
+            return 1
+
+    except Exception as e:
+        print(f"❌ Error during import: {e}")
+        traceback.print_exc()
+        return 1
 
 def main():
     """Main CLI entry point"""
@@ -496,7 +834,9 @@ def main():
         'restart': handle_restart,
         'status': handle_status,
         'clear': handle_clear,
-        'list': handle_list,  # New command
+        'list': handle_list,
+        'export': handle_export,
+        'import': handle_import,
     }
 
     handler = commands.get(args.command)
@@ -514,7 +854,6 @@ def main():
         print(f"❌ Unexpected error: {e}")
         traceback.print_exc()
         return 1
-
 
 if __name__ == "__main__":
     sys.exit(main())
