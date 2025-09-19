@@ -318,6 +318,10 @@ class ChromaClientManager:
 
     def add_text(self, text, metadata=None):
         """Add a single text document with automatic deduplication"""
+
+        # Validate one more time before adding text
+        self._validate_dimensions(EMBEDDING_MODELS[self.embedding_model])
+
         # Generate deterministic ID from content for deduplication
         content_hash = hashlib.sha256(text.encode()).hexdigest()
 
