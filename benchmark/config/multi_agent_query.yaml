@@ -12,6 +12,7 @@ Agent:
   use_ground_truth: True
   save_insights: False
   query_insights: True
+  collection_name: 9_19_knowledge_base_single
 
 Logger:
   include_caller_info: rome
