@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 OpenAI Usage Dashboard
 Displays a beautifully formatted summary of OpenAI API usage including models, tokens, and costs.

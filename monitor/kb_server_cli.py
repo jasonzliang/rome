@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 ChromaDB Server Command Line Interface
 Usage:
