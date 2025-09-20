@@ -4,12 +4,13 @@ OpenAIHandler:
   cost_limit: 200.0
 
 Agent:
-  patience: 5
   agent_api: false
 
   action_select_strat: original
   fsm_type: knowledge_base
-  use_ground_truth: True
+  patience: 5
+
+  use_ground_truth: False
   save_insights: False
   query_insights: True
   collection_name: 9_19_knowledge_base_single

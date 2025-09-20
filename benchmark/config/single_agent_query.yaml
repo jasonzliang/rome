@@ -7,10 +7,12 @@ Agent:
   name: "PythonCodeExpert"
   role: "You are an expert Python developer tasked with implementing functions to pass all given test cases. Focus on writing clean, efficient, and well-tested code that handles edge cases properly."
   agent_api: false
-  patience: 5
-  action_select_strat: original
+
   fsm_type: knowledge_base
-  use_ground_truth: True
+  action_select_strat: original
+  patience: 5
+
+  use_ground_truth: False
   save_insights: False
   query_insights: True
   collection_name: 9_19_knowledge_base_single
