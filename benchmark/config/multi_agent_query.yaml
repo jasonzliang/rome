@@ -1,0 +1,20 @@
+# HumanEval Benchmark Configuration - Fancy
+
+OpenAIHandler:
+  cost_limit: 200.0
+
+Agent:
+  patience: 5
+  agent_api: false
+
+  action_select_strat: original
+  fsm_type: knowledge_base
+  use_ground_truth: True
+  save_insights: False
+  query_insights: True
+
+Logger:
+  include_caller_info: rome
+
+MultiAgent:
+  agent_role_json: role_config/minimal_roles.json
