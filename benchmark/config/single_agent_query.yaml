@@ -15,6 +15,9 @@ Agent:
   use_ground_truth: False
   save_insights: False
   query_insights: True
+
+
+ChromaClientManager:
   collection_name: 9_19_knowledge_base_single
 
 Logger:
