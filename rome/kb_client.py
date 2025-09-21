@@ -242,7 +242,7 @@ class ChromaClientManager:
             if "already exists" in str(e).lower():
                 self.collection = self.client.get_collection(
                     name=self.collection_name, embedding_function=embedding_fn)
-                self.logger.debug(f"Using existing collection: {self.collection_name} ({self.embedding_model} | {expected_dim}d)")
+                self.logger.debug(f"Using existing collection: {self.collection_name} ({self.embedding_model} | {expected_dim}d | {self.collection.count()}n)")
             else: raise
 
         self._validate_dimensions(expected_dim)
