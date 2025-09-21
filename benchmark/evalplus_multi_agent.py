@@ -201,7 +201,7 @@ def create_parser() -> argparse.ArgumentParser:
 
     parser.add_argument("--agents-config", help="Agents configuration JSON")
     parser.add_argument("--dataset", choices=["humaneval", "mbpp"], default="humaneval")
-    parser.add_argument("--eval-interval", type=int, default=1800, help="Evaluation interval (seconds)")
+    parser.add_argument("--eval-interval", type=int, default=600, help="Evaluation interval (seconds)")
     parser.add_argument("--max-iterations", type=int, default=0, help="Max iterations per agent")
     parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
     parser.add_argument("--num-problems", type=int, help="Number of problems")

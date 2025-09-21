@@ -175,7 +175,7 @@ def main():
     parser.add_argument("config_file", help="Path to agent configuration YAML file")
 
     parser.add_argument("--dataset", choices=["humaneval", "mbpp"], default="humaneval")
-    parser.add_argument("--eval-interval", type=int, default=1800, help="Periodic evaluation interval in seconds")
+    parser.add_argument("--eval-interval", type=int, default=600, help="Periodic evaluation interval in seconds")
     parser.add_argument("--max-iterations", type=int, default=0, help="Iterations for agent to run")
     parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
     parser.add_argument("--num-problems", type=int, help="Number of problems to include")
