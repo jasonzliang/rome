@@ -179,7 +179,7 @@ def main():
     parser.add_argument("--max-iterations", type=int, default=0, help="Iterations for agent to run")
     parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
     parser.add_argument("--num-problems", type=int, help="Number of problems to include")
-    parser.add_argument("--stop-on-error", action="store_true", help="Stop agent if exception thrown")
+    parser.add_argument("--no-stop-on-error", action="store_true", help="Don't stop on errors")
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs to include")
 
     args = parser.parse_args()
@@ -188,7 +188,7 @@ def main():
 
     results, results_file = benchmark.run_benchmark(
         max_iterations=args.max_iterations,
-        stop_on_error=args.stop_on_error,
+        stop_on_error=not args.no_stop_on_error,
         num_problems=args.num_problems,
         task_ids=args.task_ids,
         run_evaluation=not args.no_evaluation,

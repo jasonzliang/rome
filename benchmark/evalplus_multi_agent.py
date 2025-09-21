@@ -205,7 +205,7 @@ def create_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-iterations", type=int, default=0, help="Max iterations per agent")
     parser.add_argument("--no-evaluation", action="store_true", help="Skip evaluation")
     parser.add_argument("--num-problems", type=int, help="Number of problems")
-    parser.add_argument("--stop-on-error", action="store_true", help="Stop on errors")
+    parser.add_argument("--no-stop-on-error", action="store_true", help="Don't stop on errors")
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs")
     return parser
 
@@ -221,8 +221,10 @@ def main():
     )
 
     results_file = benchmark.run_benchmark(
-        max_iterations=args.max_iterations, stop_on_error=args.stop_on_error,
-        num_problems=args.num_problems, task_ids=args.task_ids,
+        max_iterations=args.max_iterations,
+        stop_on_error=not args.no_stop_on_error,
+        num_problems=args.num_problems,
+        task_ids=args.task_ids,
         run_evaluation=not args.no_evaluation
     )
     # benchmark.logger.info(f"Results: {results_file}")
