@@ -10,7 +10,7 @@ Agent:
 
   action_select_strat: original
   fsm_type: knowledge_base
-  patience: 5
+  patience: 4
 
   use_ground_truth: True
   save_insights: True

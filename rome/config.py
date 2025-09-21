@@ -57,8 +57,8 @@ DEFAULT_CONFIG = {
 
         "fsm_type": "simple",  # Which FSM to load (see fsm_factory.py)
         "action_select_strat": "original",  # Which action selector to use (original or smart)
-        "history_context_len": 25,  # Length of history to use when selecting action
-        "patience": 5,  # If same state/action chosen repeatedly, prompt to choose different action
+        "history_context_len": 24,  # Length of history to use when selecting action
+        "patience": 4,  # If same state/action chosen repeatedly, prompt to choose different action
 
         "agent_api": True,  # Launch an REST API server for agent's internal state
         "log_pid": False,  # Whether to include PID in agent log file names
@@ -137,7 +137,7 @@ DEFAULT_CONFIG = {
     # Basic Actions
     "ResetAction": {},
     "AdvancedResetAction": {
-        "completion_confidence": 85,
+        "completion_confidence": 80,
         "max_versions": 30,
     },
     "TransitionAction": {},
@@ -165,7 +165,7 @@ DEFAULT_CONFIG = {
 
     # Knowledge Base Actions
     "SaveKBAction": {
-        "completion_confidence": 85,  # Minimum completion confidence threshold to save insights
+        "completion_confidence": 80,  # Minimum completion confidence threshold to save insights
         "max_versions": 30,  # Maximum versions before forcing to save insights
     },
 
