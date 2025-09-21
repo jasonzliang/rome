@@ -503,7 +503,7 @@ class Agent:
             except Exception as e:
                 if raise_exception:
                     raise
-                error_msg = f"Error in loop iteration {iteration}: {str(e)}"
+                error_msg = f"Agent run_loop error at iteration {iteration}: {str(e)}"
                 stack_trace = traceback.format_exc()
                 self.logger.error(error_msg)
                 self.logger.error(stack_trace)
