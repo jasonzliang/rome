@@ -453,24 +453,34 @@ def create_parser() -> argparse.ArgumentParser:
 Examples:
     # Start server with defaults
     python kb_server_cli.py start
+
     # Start server on specific host/port with custom data path
     python kb_server_cli.py start --host 0.0.0.0 --port 8001 --path ./my_chroma_data
+
     # Stop server gracefully
     python kb_server_cli.py stop
+
     # Force stop server (kills process)
     python kb_server_cli.py stop --force
+
     # Restart server
     python kb_server_cli.py restart
+
     # Check server status and database info
     python kb_server_cli.py status
+
     # Delete all data (--force skips confirmation)
     python kb_server_cli.py delete --force
+
     # Delete specific collection with metadata filtering
     python kb_server_cli.py delete --collection my_collection --metadata key:value
+
     # List up to 10 documents in a collection
     python kb_server_cli.py list --collection my_collection --limit 10
+
     # Export specific collection with embeddings to JSON file
     python kb_server_cli.py export --collection my_collection --include-embeddings --output my_export.json
+
     # Import from JSON file and overwrite existing collection
     python kb_server_cli.py import --file my_export.json --overwrite
 """
