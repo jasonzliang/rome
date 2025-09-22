@@ -10,8 +10,9 @@ import time
 # ChromaDB and LlamaIndex imports
 try:
     import chromadb
-    import chromadb.utils.embedding_functions as embedding_functions
-    from chromadb.utils.embedding_functions import SentenceTransformerEmbeddingFunction
+    from chromadb.utils.embedding_functions import (
+       SentenceTransformerEmbeddingFunction,
+       OpenAIEmbeddingFunction)
     from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
     from llama_index.vector_stores.chroma import ChromaVectorStore
     from llama_index.embeddings.openai import OpenAIEmbedding
@@ -229,15 +230,14 @@ class ChromaClientManager:
         else:
             if not os.getenv('OPENAI_API_KEY'):
                 raise ValueError(f"OPENAI_API_KEY required for {self.embedding_model}")
-            embedding_fn = embedding_functions.OpenAIEmbeddingFunction(
-                model_name=self.embedding_model, api_key=os.getenv('OPENAI_API_KEY')
-            )
+            embedding_fn = OpenAIEmbeddingFunction(
+                model_name=self.embedding_model, api_key=os.getenv('OPENAI_API_KEY'))
 
         try:
             self.collection = self.client.create_collection(
-                name=self.collection_name, embedding_function=embedding_fn
-            )
+                name=self.collection_name, embedding_function=embedding_fn)
             self.logger.debug(f"Created new collection: {self.collection_name} ({self.embedding_model} | {expected_dim}d)")
+
         except Exception as e:
             if "already exists" in str(e).lower():
                 self.collection = self.client.get_collection(
