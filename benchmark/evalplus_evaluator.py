@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Union, Callable
 from datetime import datetime
 import glob
 
+import numpy as np
 import matplotlib; matplotlib.use('Agg')  # Use non-interactive backend
 import matplotlib.pyplot as plt
 
@@ -117,9 +118,11 @@ class EvalplusEvaluator:
 
             # Plot data with latest scores in labels
             ax.plot(times, base_scores, 'b-o',
-                   label=f'Base ({base_scores[-1]:.3f})', linewidth=2, markersize=4)
+                    label=f'Base ({base_scores[-1]:.3f} | {np.mean(base_scores[-1]):.3f})',
+                    linewidth=2, markersize=4)
             ax.plot(times, extra_scores, 'r-s',
-                   label=f'Base+Extra ({extra_scores[-1]:.3f})', linewidth=2, markersize=4)
+                    label=f'Base+Extra ({extra_scores[-1]:.3f} | {np.mean(extra_scores[-1]):.3f})',
+                    linewidth=2, markersize=4)
 
             # Format
             ax.set_xlabel('Time (minutes)')
@@ -187,9 +190,11 @@ class EvalplusEvaluator:
 
             # Plot scores on left axis with latest scores in labels
             ax1.plot(total_iters, base_scores, 'b-o',
-                    label=f'Base ({base_scores[-1]:.3f})', linewidth=2, markersize=4)
+                    label=f'Base ({base_scores[-1]:.3f} | {np.mean(base_scores[-1]):.3f})',
+                    linewidth=2, markersize=4)
             ax1.plot(total_iters, extra_scores, 'r-s',
-                    label=f'Base+Extra ({extra_scores[-1]:.3f})', linewidth=2, markersize=4)
+                    label=f'Base+Extra ({extra_scores[-1]:.3f} | {np.mean(extra_scores[-1]):.3f})',
+                    linewidth=2, markersize=4)
 
             # Plot completion fraction on right axis with latest value in label
             ax2.plot(total_iters, completion_fractions, 'g--^',
