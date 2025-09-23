@@ -11,8 +11,7 @@ import time
 try:
     import chromadb
     from chromadb.utils.embedding_functions import (
-       SentenceTransformerEmbeddingFunction,
-       OpenAIEmbeddingFunction)
+       SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
     from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
     from llama_index.vector_stores.chroma import ChromaVectorStore
     from llama_index.embeddings.openai import OpenAIEmbedding
