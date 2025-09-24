@@ -389,7 +389,7 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
             self.process.wait()
 
             output = f"{stdout.decode()}\n{stderr.decode()}\nEXIT_CODE:{self.process.returncode}"
-            self.logger.debug(f"Eval script output:\n{output}")
+            # self.logger.debug(f"Eval script output:\n{output}")
             parsed_result = self._parse_result(output, self.process.returncode)
 
             # Record and plot scores with completion timestamp (not start timestamp)
