@@ -56,20 +56,20 @@ class SaveKBAction(Action):
 
 Please extract and provide insights in the following categories:
 
-1. **Code Patterns**: What design patterns, algorithms, or reusable code structures are demonstrated?
+1. **Code Patterns**: What design patterns, algorithms, or reusable code structures are demonstrated? What are some anti-patterns to avoid in order to solve this problem?
 
-2. **Testing Approaches**: What testing strategies, patterns, or best practices are shown?
+2. **Algorithm Strategies**: What algorithm strategies, patterns, or best practices are shown? What is the general problem solving approach that is used to solve the problem?
 
 3. **Reusable Code**: Find 1-3 useful/reusable functions or code snippets that could be used as library code for other similar problems. Use the following format for long code snippets or functions: ```python [code_snippet]```.
 
 4. **Applicable Context**: What types of problems or domains would benefit from these patterns?
 
-IMPORTANT: Limit your total response to maximum 800 tokens. Be concise but comprehensive.
+IMPORTANT: Limit your total response to maximum 1200 tokens. Be concise but comprehensive.
 
 Respond with a JSON object containing these insights:
 {{
     "code_patterns": "Design patterns, algorithms, and reusable code structures",
-    "testing_approaches": "Testing strategies and best practices demonstrated",
+    "algorithm_strategies": "Algorithm strategies and approaches demonstrated",
     "reusable_code": "1-3 most reusable functions or code snippets for library use",
     "applicable_context": "Types of problems or domains where these patterns apply"
 }}
@@ -98,7 +98,7 @@ Extracted reusable patterns and insights from {filename} and its test file {test
 {insights.get('code_patterns', 'None identified')}
 
 ## Testing Approaches
-{insights.get('testing_approaches', 'None identified')}
+{insights.get('algorithm_strategies', 'None identified')}
 
 ## Reusable Code
 {insights.get('reusable_code', 'None identified')}

@@ -118,17 +118,17 @@ class EvalplusEvaluator:
 
             # Plot data with latest scores in labels
             ax.plot(times, base_scores, 'b-o',
-                    label=f'Base ({base_scores[-1]:.3f} | {max(base_scores[-1]):.3f})',
+                    label=f'Base ({base_scores[-1]:.3f} | {max(base_scores):.3f})',
                     linewidth=2, markersize=4)
             ax.plot(times, extra_scores, 'r-s',
-                    label=f'Base+Extra ({extra_scores[-1]:.3f} | {max(extra_scores[-1]):.3f})',
+                    label=f'Base+Extra ({extra_scores[-1]:.3f} | {max(extra_scores):.3f})',
                     linewidth=2, markersize=4)
 
             # Format
             ax.set_xlabel('Time (minutes)')
             ax.set_ylabel('Pass@1 Score')
             ax.set_title(f'{self.dataset.upper()} Scores Over Time')
-            ax.legend()
+            ax.legend(loc="lower right")
             ax.grid(True, alpha=0.3)
             ax.set_ylim(0, 1)
 
@@ -190,10 +190,10 @@ class EvalplusEvaluator:
 
             # Plot scores on left axis with latest scores in labels
             ax1.plot(total_iters, base_scores, 'b-o',
-                    label=f'Base ({base_scores[-1]:.3f} | {max(base_scores[-1]):.3f})',
+                    label=f'Base ({base_scores[-1]:.3f} | {max(base_scores):.3f})',
                     linewidth=2, markersize=4)
             ax1.plot(total_iters, extra_scores, 'r-s',
-                    label=f'Base+Extra ({extra_scores[-1]:.3f} | {max(extra_scores[-1]):.3f})',
+                    label=f'Base+Extra ({extra_scores[-1]:.3f} | {max(extra_scores):.3f})',
                     linewidth=2, markersize=4)
 
             # Plot completion fraction on right axis with latest value in label
@@ -214,7 +214,7 @@ class EvalplusEvaluator:
             # Combine legends
             lines1, labels1 = ax1.get_legend_handles_labels()
             lines2, labels2 = ax2.get_legend_handles_labels()
-            ax1.legend(lines1 + lines2, labels1 + labels2, loc='upper left')
+            ax1.legend(lines1 + lines2, labels1 + labels2, loc='lower right')
 
             plt.tight_layout()
             plt.savefig(self.plot_iteration, dpi=200, bbox_inches='tight')
@@ -327,21 +327,23 @@ class EvalplusEvaluator:
         return solutions_file
 
     def _create_script(self, solutions_file: Path) -> Path:
-        """Create evaluation script"""
+        """Create evaluation script with correct command ordering"""
         solutions_file = solutions_file.resolve()
         script = (self.eval_dir / "eval.sh").resolve()
         sanitized = Path(str(solutions_file).replace('.jsonl', '-sanitized.jsonl')).resolve()
         output_file = (self.eval_dir / f"eval.out.txt").resolve()
 
         content = f"""#!/bin/bash
-CMD=$(command -v evalplus || echo "python -m evalplus")
 echo "=== EVALPLUS {self.dataset}: $(wc -l < '{solutions_file}') solutions ===" | tee {output_file}
+echo "SOLUTIONS_FILE:{solutions_file}" | tee -a {output_file}
+
+CMD=$(command -v evalplus || echo "python -m evalplus")
 $CMD.sanitize --samples "{solutions_file}" 2>&1 || true
 EVAL_FILE=$([[ -f "{sanitized}" ]] && echo "{sanitized}" || echo "{solutions_file}")
+echo "EVALPLUS_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {output_file}
+
 $CMD.evaluate --dataset {self.dataset} --samples "$EVAL_FILE" | tee -a {output_file}
 echo "EXIT_CODE:$?" | tee -a {output_file}
-echo "SOLUTIONS_FILE:{solutions_file}" | tee -a {output_file}
-echo "EVALPLUS_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {output_file}
 """
         script.write_text(content)
         script.chmod(0o755)
@@ -358,9 +360,7 @@ echo "EVALPLUS_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {o
         output = f"{result.stdout}\n{result.stderr}\nEXIT_CODE:{result.returncode}"
         return_code = result.returncode; self.logger.info(output)
 
-        # output = Path("/Users/jason/Desktop/rome/benchmark/result/test_knowledge_base/__rome__/evaluation/eval.out.txt").read_text()
-        # return_code = 0
-
+        # self.logger.debug(f"Eval script output:\n{output}")
         parsed_result = self._parse_result(output, return_code)
 
         # Record and plot scores with correct timestamp
@@ -379,14 +379,16 @@ echo "EVALPLUS_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {o
         # Start process
         self.process = subprocess.Popen(
             ["bash", str(script)], stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, cwd=script.parent
+            stderr=subprocess.PIPE, cwd=script.parent,
+            env=os.environ.copy()
         )
 
         # Start monitoring thread for score tracking
         def monitor_process():
             stdout, stderr = self.process.communicate()
-            output = f"{stdout.decode()}\n{stderr.decode()}\nEXIT_CODE:{self.process.returncode}"
 
+            output = f"{stdout.decode()}\n{stderr.decode()}\nEXIT_CODE:{self.process.returncode}"
+            # self.logger.debug(f"Eval script output:\n{output}")
             parsed_result = self._parse_result(output, self.process.returncode)
 
             # Record and plot scores with completion timestamp (not start timestamp)
@@ -408,7 +410,7 @@ echo "EVALPLUS_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {o
 
         self._create_eval_results(output)
         scores = self._parse_scores(output)
-        result = {"output": output, "success": True}
+        result = {"output": output, "success": bool(scores)}
         if scores:
             result["scores"] = scores
         return result
@@ -465,7 +467,8 @@ echo "EVALPLUS_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {o
             with open(passed_file, 'w') as f:
                 json.dump(passed_mapping, f, indent=4)
 
-            self.logger.info(f"Created eval results file with {len(passed_mapping)} entries: {passed_file}")
+            self.logger.info(
+                f"Created eval results file with {len(passed_mapping)} entries: {passed_file}")
 
         except Exception as e:
             self.logger.error(f"Failed to create eval results file: {passed_file}")
@@ -489,7 +492,9 @@ echo "EVALPLUS_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {o
                         scores["base_plus_extra"] = score
 
             return scores or None
-        except Exception:
+        except Exception as e:
+            self.logger.error(f"Failed to parse scores")
+            self.logger.error(traceback.format_exc())
             return None
 
     def get_scores_summary(self) -> Dict:
