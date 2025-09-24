@@ -334,15 +334,15 @@ class EvalplusEvaluator:
         output_file = (self.eval_dir / f"eval.out.txt").resolve()
 
         content = f"""#!/bin/bash
-CMD=$(command -v evalplus || echo "python -m evalplus")
-EVAL_FILE=$([[ -f "{sanitized}" ]] && echo "{sanitized}" || echo "{solutions_file}")
-
 echo "=== EVALPLUS {self.dataset}: $(wc -l < '{solutions_file}') solutions ===" | tee {output_file}
-$CMD.sanitize --samples "{solutions_file}" 2>&1 || true
-$CMD.evaluate --dataset {self.dataset} --samples "$EVAL_FILE" | tee -a {output_file}
-
 echo "SOLUTIONS_FILE:{solutions_file}" | tee -a {output_file}
+
+CMD=$(command -v evalplus || echo "python -m evalplus")
+$CMD.sanitize --samples "{solutions_file}" 2>&1 || true
+EVAL_FILE=$([[ -f "{sanitized}" ]] && echo "{sanitized}" || echo "{solutions_file}")
 echo "EVALPLUS_RESULTS_FILE:${{EVAL_FILE%.jsonl}}.eval_results.json" | tee -a {output_file}
+
+$CMD.evaluate --dataset {self.dataset} --samples "$EVAL_FILE" | tee -a {output_file}
 echo "EXIT_CODE:$?" | tee -a {output_file}
 """
         script.write_text(content)
@@ -379,14 +379,13 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
         # Start process
         self.process = subprocess.Popen(
             ["bash", str(script)], stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE, cwd=script.parent
+            stderr=subprocess.PIPE, cwd=script.parent,
+            env=os.environ.copy()
         )
 
         # Start monitoring thread for score tracking
         def monitor_process():
             stdout, stderr = self.process.communicate()
-            # Ensure process is fully terminated
-            self.process.wait()
 
             output = f"{stdout.decode()}\n{stderr.decode()}\nEXIT_CODE:{self.process.returncode}"
             # self.logger.debug(f"Eval script output:\n{output}")
