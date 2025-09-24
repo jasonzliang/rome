@@ -97,7 +97,7 @@ Extracted reusable patterns and insights from {filename} and its test file {test
 ## Code Patterns
 {insights.get('code_patterns', 'None identified')}
 
-## Testing Approaches
+## Algorithm Strategies
 {insights.get('algorithm_strategies', 'None identified')}
 
 ## Reusable Code
