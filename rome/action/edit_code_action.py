@@ -89,7 +89,8 @@ def _build_kb_query_terms(filename: str, file_path: str, file_content: str,
     if file_content:
         exec_analysis = execution_data.get('exec_analysis', '') if execution_data else ''
         code_query = f"""
-Find relevant insights to improve/fix the following code:
+Find relevant insights to improve/fix the following code. Insights can be code snippets, algorithm or code patterns, general problem solving strategy, or anything that be helpful.
+
 # Code:
 ```python
 {file_content}
