@@ -410,7 +410,7 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
 
         self._create_eval_results(output)
         scores = self._parse_scores(output)
-        result = {"output": output, "success": True}
+        result = {"output": output, "success": bool(scores)}
         if scores:
             result["scores"] = scores
         return result
@@ -491,7 +491,9 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
                         scores["base_plus_extra"] = score
 
             return scores or None
-        except Exception:
+        except Exception as e:
+            self.logger.error(f"Failed to parse scores")
+            self.logger.error(traceback.format_exc())
             return None
 
     def get_scores_summary(self) -> Dict:
