@@ -467,7 +467,8 @@ echo "EXIT_CODE:$?" | tee -a {output_file}
             with open(passed_file, 'w') as f:
                 json.dump(passed_mapping, f, indent=4)
 
-            self.logger.info(f"Created eval results file with {len(passed_mapping)} entries: {passed_file}")
+            self.logger.info(
+                f"Created eval results file with {len(passed_mapping)} entries: {passed_file}")
 
         except Exception as e:
             self.logger.error(f"Failed to create eval results file: {passed_file}")
