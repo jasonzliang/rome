@@ -137,8 +137,8 @@ DEFAULT_CONFIG = {
     # Basic Actions
     "ResetAction": {},
     "AdvancedResetAction": {
-        "completion_confidence": 80,
-        "max_versions": 30,
+        "completion_confidence": 90,  # Minimum completion confidence threshold to save insights
+        "max_versions": 30,  # Maximum versions before forcing to save insights
     },
     "TransitionAction": {},
 
@@ -165,7 +165,7 @@ DEFAULT_CONFIG = {
 
     # Knowledge Base Actions
     "SaveKBAction": {
-        "completion_confidence": 80,  # Minimum completion confidence threshold to save insights
+        "completion_confidence": 90,  # Minimum completion confidence threshold to save insights
         "max_versions": 30,  # Maximum versions before forcing to save insights
     },
 
