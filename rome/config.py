@@ -176,6 +176,7 @@ DEFAULT_CONFIG = {
         "max_files": sys.maxsize,  # Maximum number of candidates to select from after search
         "exclude_types": [],  # File types to not search for
         "exclude_dirs": [".*", "venv", "__*__"],  # Directories to not search in
+        "easy_check_finish": False,  # Mark file as finished for all agents if any agent marks it
     },
 
     "DatabaseManager": {
