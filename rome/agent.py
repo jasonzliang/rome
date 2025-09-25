@@ -115,7 +115,7 @@ class Agent:
         # Make make role description clear what it is
         if "your role" not in self.role.lower():
             self.logger.info("Role string does not contain 'your role', reformatting")
-            self.role = f"Your role as an agent:\n{self.role}"
+            self.role = f"Your role:\n{self.role}"
 
         # Name must be between 8 and 32 char long and alphanum only
         a, b = AGENT_NAME_LENGTH

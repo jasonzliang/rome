@@ -429,12 +429,18 @@ class ChromaClientManager:
         return "\n\n".join(context_parts)
 
     def _standard_query(self, question: str, top_k: int) -> str:
-        """Standard query without reranking"""
+        """Standard query with optional system prompt prepended"""
+
+        # Simply prepend system prompt to the question
+        if self.agent.role and len(self.agent.role) > 0:
+            question = f"{self.agent.role}\n\n{question}"
+
         engine = self.index.as_query_engine(
             similarity_top_k=top_k,
             response_mode="compact",
             llm=self.llm,
-            embed_model=self.embed_model)
+            embed_model=self.embed_model
+        )
         return str(engine.query(question))
 
     def info(self):
