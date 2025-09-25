@@ -15,8 +15,7 @@ Agent:
   query_insights: True
 
 ChromaClientManager:
-  # collection_name: 9_19_knowledge_base_single
-  collection_name: 9_18_knowledge_base_multi
+  collection_name: 9_24_multi_insight
 
 Logger:
   include_caller_info: rome

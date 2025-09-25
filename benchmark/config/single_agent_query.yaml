@@ -18,7 +18,6 @@ Agent:
 
 
 ChromaClientManager:
-  # collection_name: 9_19_knowledge_base_single
   collection_name: 9_18_knowledge_base_multi
 
 Logger:
