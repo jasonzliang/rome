@@ -217,7 +217,7 @@ class CollectionManager:
                     'document': results['documents'][i] if results['documents'] else None,
                     'metadata': results['metadatas'][i] if results['metadatas'] else None
                 }
-                if include_embeddings and results.get('embeddings'):
+                if include_embeddings and results.get('embeddings') is not None:
                     item['embedding'] = results['embeddings'][i]
                 export_data['data'].append(item)
 
