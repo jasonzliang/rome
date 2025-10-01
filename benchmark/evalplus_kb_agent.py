@@ -290,7 +290,7 @@ Give more weight to solutions with higher confidence scores.
 ## Agent solutions:
 {solutions_context}
 
-## Your task
+## Your task:
 Create a single optimal solution that:
 1. Incorporates the best ideas from high-confidence solutions
 2. Resolves any conflicts or inconsistencies
