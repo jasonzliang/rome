@@ -35,7 +35,7 @@ from rome.kb_client import ChromaClientManager
 from benchmark.evalplus_evaluator import EvalplusEvaluator
 
 
-class KBEnhancedEvaluator:
+class KnowledgeBaseEvaluator:
     """Knowledge-base enhanced evaluator with dynamic agent generation"""
 
     def __init__(self, benchmark_dir: str, config_path: str,
@@ -86,15 +86,11 @@ class KBEnhancedEvaluator:
 
     def _create_coordinator(self) -> Agent:
         """Create coordinator agent for KB operations"""
-        coord_config = self.config.copy()
-        coord_config['Agent']['name'] = 'Coordinator'
-        coord_config['Agent']['role'] = 'Orchestrate problem analysis and solution synthesis'
-
         return Agent(
             name='Coordinator',
             role='Expert coordinator for problem analysis and solution synthesis',
             repository=str(self.benchmark_dir),
-            config=coord_config
+            config=self.config
         )
 
     def analyze_problem_requirements(self, problem: Dict) -> Dict:
@@ -189,23 +185,27 @@ Respond with JSON object containing agents array:
 
     def solve_with_agent(self, persona: Dict, problem: Dict) -> Dict:
         """Have agent generate solution with confidence score"""
-        prompt_text = problem['prompt']
+        temp_agent = Agent(
+            name=persona['name'],
+            role=persona['role'],
+            repository=str(self.benchmark_dir),
+            config=self.config
+        )
 
         # Query KB for relevant insights
         kb_insights = ""
-        if self.coordinator.kb_manager.size() > 0:
-            kb_query = f"How to solve: {prompt_text}"
-            kb_response = self.coordinator.kb_manager.query(kb_query)
+        if temp_agent.kb_manager.size() > 0:
+            kb_query = f"How to solve: {problem['prompt']}"
+            kb_response = temp_agent.kb_manager.query(kb_query)
             if kb_response:
                 kb_insights = f"\n\nRelevant insights:\n{kb_response}\n"
 
         # Generate solution
-        solve_prompt = f"""You are {persona['name']}: {persona['role']}
-Your problem-solving style: {persona['style']}
+        solve_prompt = f"""Your problem-solving style: {persona['style']}
 
 {kb_insights}
 Problem to solve:
-{prompt_text}
+{problem['prompt']}
 
 Generate a complete Python solution and rate your confidence (0-100).
 
@@ -216,12 +216,13 @@ For example, respond with JSON:
     "reasoning": "brief explanation of approach"
 }}"""
 
-        response = self.coordinator.chat_completion(
+        response = temp_agent.coordinator.chat_completion(
             prompt=solve_prompt,
             response_format={"type": "json_object"}
         )
-
-        result = self.coordinator.parse_json_response(response) or {}
+        result = temp_agent.parse_json_response(response) or {}
+        temp_agent.shutdown()
+        del temp_agent
 
         return {
             "agent": persona['name'],
@@ -451,7 +452,7 @@ def main():
     parser.add_argument("config_file", help="Agent configuration YAML")
 
     parser.add_argument("--dataset", choices=["humaneval", "mbpp"], default="humaneval")
-    parser.add_argument("--num-agents", type=int, default=3,
+    parser.add_argument("--num-agents", type=int, default=2,
                        help="Number of agents per problem")
     parser.add_argument("--num-problems", type=int, help="Number of problems")
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs")
@@ -460,7 +461,7 @@ def main():
 
     args = parser.parse_args()
 
-    evaluator = KBEnhancedEvaluator(
+    evaluator = KnowledgeBaseEvaluator(
         args.benchmark_dir,
         args.config_file,
         args.dataset,
