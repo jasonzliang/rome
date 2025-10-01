@@ -233,7 +233,7 @@ IMPORTANT:
 Problem to solve:
 {problem['prompt']}
 
-Generate a complete Python solution and rate your confidence (0-100) that the solution is absolutely correct.
+Generate a complete Python solution and rate your confidence (0-100). Your confidence is your estimate of the probability that the solution is correct and will pass all the tests.
 
 Respond with JSON:
 {{
