@@ -256,9 +256,7 @@ Important:
         confidence = max(0, min(100, result.get('confidence', 50)))
         reasoning = result.get('reasoning', '')
 
-        temp_agent.shutdown()
-        del temp_agent
-
+        temp_agent.shutdown(); del temp_agent
         return {
             "agent": persona['name'],
             "solution": solution,
