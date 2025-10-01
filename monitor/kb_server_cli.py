@@ -25,6 +25,16 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.kb_server import ChromaServerManager
 from rome.logger import get_logger
 from rome.config import LONG_SUMMARY_LEN
+from rome.kb_client import EMBEDDING_MODELS
+
+try:
+    import chromadb
+    from chromadb.utils.embedding_functions import (
+       SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
+except ImportError as e:
+    print(f"Import error: {e}")
+    print("Install with: pip install chromadb")
+    sys.exit(1)
 
 logger = get_logger()
 logger.configure({
@@ -86,34 +96,28 @@ def parse_metadata_filter(metadata_str: str) -> Tuple[str, Any]:
     if not key:
         raise ValueError("Metadata key cannot be empty")
 
-    # Convert string value to appropriate type
     value = _convert_value_type(value_str)
     return key, value
 
 def _convert_value_type(value_str: str) -> Any:
     """Convert string value to ChromaDB-compatible type (str, int, float, bool only)"""
-    # Boolean conversion - handle Python boolean literals
     if value_str in ('True', 'true'):
         return True
     elif value_str in ('False', 'false'):
         return False
 
-    # Try numeric conversion only for clearly numeric strings
     try:
-        # Integer (no decimal point)
         if '.' not in value_str and value_str.lstrip('-').isdigit():
             return int(value_str)
     except ValueError:
         pass
 
     try:
-        # Float (has decimal point)
         if '.' in value_str:
             return float(value_str)
     except ValueError:
         pass
 
-    # Everything else stays as string
     return value_str
 
 class ServerManager:
@@ -143,7 +147,6 @@ class ServerManager:
     def get_client(self):
         """Get ChromaDB client"""
         if not self._client:
-            import chromadb
             manager = self.get_manager()
             self._client = chromadb.HttpClient(host=manager.host, port=manager.port)
         return self._client
@@ -174,9 +177,7 @@ class CollectionManager:
 
         print(f"   Scanning {total_count} documents for metadata {metadata_key}:{metadata_value}")
 
-        # Process in batches to handle large collections
         for offset in range(0, total_count, batch_size):
-            # Get batch with metadata
             result = collection.get(
                 limit=batch_size,
                 offset=offset,
@@ -186,14 +187,12 @@ class CollectionManager:
             batch_ids = result.get('ids', [])
             batch_metadatas = result.get('metadatas', [])
 
-            # Find matching documents in this batch
             matching_ids = []
             for i, metadata in enumerate(batch_metadatas):
                 total_checked += 1
                 if metadata and metadata.get(metadata_key) == metadata_value:
                     matching_ids.append(batch_ids[i])
 
-            # Delete matching documents
             if matching_ids:
                 collection.delete(ids=matching_ids)
                 deleted_count += len(matching_ids)
@@ -226,9 +225,29 @@ class CollectionManager:
 
     @staticmethod
     def import_from_dict(client, data: Dict[str, Any], target_name: str = None,
-                        overwrite: bool = False, batch_size: int = 1000) -> bool:
-        """Import collection from dictionary with batching"""
+                        embedding_model: str = None, overwrite: bool = False,
+                        batch_size: int = 1000) -> bool:
+        """Import collection from dictionary with optional embedding model"""
         collection_name = target_name or data['collection_name']
+
+        # Setup embedding function if model specified
+        embedding_fn = None
+        if embedding_model:
+            expected_dim = EMBEDDING_MODELS.get(embedding_model)
+            if not expected_dim:
+                print(f"   Error: Invalid embedding model '{embedding_model}'")
+                return False
+
+            is_sentence_transformer = expected_dim == 384
+
+            if is_sentence_transformer:
+                embedding_fn = SentenceTransformerEmbeddingFunction(model_name=embedding_model)
+            else:
+                if not os.getenv('OPENAI_API_KEY'):
+                    print(f"   Error: OPENAI_API_KEY required for {embedding_model}")
+                    return False
+                embedding_fn = OpenAIEmbeddingFunction(
+                    model_name=embedding_model, api_key=os.getenv('OPENAI_API_KEY'))
 
         # Handle existing collection
         try:
@@ -243,10 +262,14 @@ class CollectionManager:
         except Exception as e:
             print(f"   Warning: Could not check existing collections: {e}")
 
-        # Create and populate collection
+        # Create collection
         try:
-            collection = client.create_collection(collection_name)
-            print(f"   Created collection '{collection_name}'")
+            if embedding_fn:
+                collection = client.create_collection(collection_name, embedding_function=embedding_fn)
+                print(f"   Created collection '{collection_name}' with {embedding_model}")
+            else:
+                collection = client.create_collection(collection_name)
+                print(f"   Created collection '{collection_name}'")
 
             total_items = len(data['data'])
             imported_count = 0
@@ -306,7 +329,6 @@ class OutputFormatter:
     @staticmethod
     def print_status_and_info(status: Dict, db_info: Dict):
         """Print combined status and database information"""
-        # Server status
         if status['running']:
             print(f"✅ ChromaDB server is RUNNING")
             for key in ['URL', 'PID', 'Active clients', 'Host', 'Port', 'Startup timeout', 'Shutdown timeout']:
@@ -318,7 +340,6 @@ class OutputFormatter:
             print(f"❌ ChromaDB server is NOT RUNNING")
             print(f"   Would run at: {status['url']}")
 
-        # Database info
         print(f"\n📊 Database Information")
         print(f"   Data path: {db_info['persist_path']}")
         print(f"   Running: {'Yes' if db_info['running'] else 'No'}")
@@ -330,7 +351,6 @@ class OutputFormatter:
             if db_info['collections']:
                 print(f"   Collections:")
                 for col in db_info['collections']:
-                    # Get dimension info for each collection
                     dimension_info = OutputFormatter._get_collection_dimensions(col.get('name'))
                     dim_str = f" | {dimension_info}d" if dimension_info else ""
                     print(f"     - {col['name']} ({col['count']} documents{dim_str})")
@@ -347,14 +367,12 @@ class OutputFormatter:
             if collection.count() == 0:
                 return "empty"
 
-            # Get one document with embeddings to check dimensions
             result = collection.get(limit=1, include=["embeddings"])
             embeddings = result.get("embeddings")
 
             if embeddings is None:
                 return "no embeddings"
 
-            # Handle potential numpy arrays
             if hasattr(embeddings, 'tolist'):
                 embeddings = embeddings.tolist()
 
@@ -382,7 +400,6 @@ class OutputFormatter:
             total_docs += doc_count
 
             if not collection_name:
-                # Add dimension info to collection header when listing all
                 dimension_info = OutputFormatter._get_collection_dimensions(col_name)
                 dim_str = f" | {dimension_info}d" if dimension_info and dimension_info not in ["empty", "error"] else ""
                 print(f"\n┌── Collection: {col_name} ({doc_count} documents{dim_str}) ──┐")
@@ -413,7 +430,6 @@ class OutputFormatter:
         content = doc.get('document', '')
         metadata = doc.get('metadata', {})
 
-        # Smart content truncation
         maxlen = LONG_SUMMARY_LEN
         if len(content) > maxlen:
             truncated = content[:maxlen]
@@ -488,7 +504,6 @@ Examples:
 
     subparsers = parser.add_subparsers(dest='command', help='Available commands')
 
-    # Common argument groups
     def add_server_args(parser):
         parser.add_argument('--host', default=DEFAULT_CONFIG['host'], help='Server host')
         parser.add_argument('--port', type=int, default=DEFAULT_CONFIG['port'], help='Server port')
@@ -506,7 +521,6 @@ Examples:
     def add_metadata_arg(parser):
         parser.add_argument('--metadata', help='Filter by metadata key:value (e.g., source:web)')
 
-    # Command definitions
     commands = [
         ('start', 'Start ChromaDB server', [add_server_args, add_force_arg]),
         ('stop', 'Stop ChromaDB server', [add_force_arg]),
@@ -530,7 +544,6 @@ Examples:
 
     return parser
 
-# Command handlers using decorators for consistency
 @error_handler
 def handle_start(args):
     """Handle start command"""
@@ -598,12 +611,10 @@ def handle_delete(args):
     """Enhanced delete command with metadata filtering support"""
     manager = get_server_manager()
 
-    # Validate arguments
     if args.metadata and not args.collection:
         print("❌ --metadata filter requires --collection to be specified")
         return 1
 
-    # Parse metadata filter if provided
     metadata_key = metadata_value = None
     if args.metadata:
         try:
@@ -612,9 +623,7 @@ def handle_delete(args):
             print(f"❌ Invalid metadata filter: {e}")
             return 1
 
-    # Handle different deletion types
     if args.metadata:
-        # Delete documents by metadata filter
         if not manager.is_running():
             print("❌ ChromaDB server is not running")
             return 1
@@ -623,7 +632,6 @@ def handle_delete(args):
             client = get_client()
             collection = client.get_collection(args.collection)
 
-            # Confirm deletion
             if not args.force:
                 message = f"Delete documents in '{args.collection}' where {metadata_key}={metadata_value}?"
                 if not confirm_action(message):
@@ -649,14 +657,12 @@ def handle_delete(args):
             return 1
 
     elif args.collection:
-        # Delete entire collection
         if not args.force and not confirm_action(f"Delete collection '{args.collection}'?"):
             return 0
         print(f"🗑️  Deleting collection '{args.collection}'...")
         success = manager.delete_collection(args.collection)
         message = f"Collection '{args.collection}'"
     else:
-        # Delete entire database
         if not args.force and not confirm_action("Delete ALL database data? This cannot be undone!"):
             return 0
         print("🗑️  Deleting entire database...")
@@ -707,7 +713,7 @@ def handle_list(args):
 @error_handler
 @requires_server
 def handle_export(args):
-    """Handle export command"""
+    """Handle export command with embedding model info"""
     client = get_client()
     collections = client.list_collections()
 
@@ -715,7 +721,6 @@ def handle_export(args):
         print("📄 No collections found in database")
         return 0
 
-    # Generate filename
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     suffix = args.collection or "all"
     output_file = args.output or f"chroma_export_{suffix}_{timestamp}.json"
@@ -740,13 +745,19 @@ def handle_export(args):
         collection_data = CollectionManager.export_to_dict(
             collection, args.include_embeddings, args.batch_size
         )
+
+        dimension = OutputFormatter._get_collection_dimensions(collection.name)
+        embedding_model = None
+        if dimension.isdigit():
+            dim = int(dimension)
+            embedding_model = next((model for model, d in EMBEDDING_MODELS.items() if d == dim), None)
+
+        collection_data['embedding_model'] = embedding_model
         export_data['collections'].append(collection_data)
 
-    # Write export file
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(export_data, f, indent=2, ensure_ascii=False)
 
-    # Summary
     total_collections = len(export_data['collections'])
     total_documents = sum(col['count'] for col in export_data['collections'])
 
@@ -761,7 +772,7 @@ def handle_export(args):
 @error_handler
 @requires_server
 def handle_import(args):
-    """Handle import command"""
+    """Handle import command with embedding model validation"""
     if not os.path.exists(args.file):
         print(f"❌ Input file '{args.file}' not found")
         return 1
@@ -784,11 +795,26 @@ def handle_import(args):
             continue
 
         collection_name = args.collection or collection_data['collection_name']
+        embedding_model = collection_data.get('embedding_model')
+
+        if embedding_model:
+            print(f"   Using embedding model: {embedding_model}")
+            expected_dim = EMBEDDING_MODELS.get(embedding_model)
+            if not expected_dim:
+                print(f"   ⚠️  Unknown embedding model: {embedding_model}")
+
         print(f"   Importing collection '{collection_name}'...")
 
-        success = CollectionManager.import_from_dict(
-            client, collection_data, collection_name, args.overwrite, args.batch_size
-        )
+        if embedding_model and embedding_model in EMBEDDING_MODELS:
+            success = CollectionManager.import_from_dict(
+                client, collection_data, collection_name, embedding_model,
+                args.overwrite, args.batch_size
+            )
+        else:
+            success = CollectionManager.import_from_dict(
+                client, collection_data, collection_name, None,
+                args.overwrite, args.batch_size
+            )
 
         if success:
             imported_collections += 1
@@ -812,13 +838,11 @@ def main():
         parser.print_help()
         return 1
 
-    # Update global config
     global SERVER_CONFIG
     for key in ['host', 'port', 'path']:
         if hasattr(args, key) and getattr(args, key) is not None:
             SERVER_CONFIG[key if key != 'path' else 'persist_path'] = getattr(args, key)
 
-    # Command dispatch
     commands = {
         'start': handle_start, 'stop': handle_stop, 'restart': handle_restart,
         'status': handle_status, 'delete': handle_delete, 'list': handle_list,
