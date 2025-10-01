@@ -96,7 +96,7 @@ class Agent:
         set_attributes_from_config(self, agent_config,
             ['name', 'role', 'repository', 'fsm_type', 'agent_api', 'history_context_len', 'patience',
              'action_select_strat', 'log_pid', 'save_hist_interval', 'use_ground_truth',
-             'save_insights', 'query_insights'])
+             'save_insights', 'query_insights', 'draw_fsm'])
 
         self.logger.assert_true(self.history_context_len > 0,
             f"history_context_len must be greater than 0")
@@ -345,6 +345,7 @@ class Agent:
         Draw the FSM graph to a PNG file
         """
         # If no output path specified, use the .rome directory
+        if not self.draw_fsm: return None
         if output_path is None:
             output_path = os.path.join(self.get_log_dir(),
                 f"{self.get_id()}.fsm.png")

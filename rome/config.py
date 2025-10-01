@@ -63,6 +63,7 @@ DEFAULT_CONFIG = {
         "agent_api": True,  # Launch an REST API server for agent's internal state
         "log_pid": False,  # Whether to include PID in agent log file names
         "save_hist_interval": 10, # Interval to save summary history
+        "draw_fsm": True # Whether to draw FSM graph when initialized
 
         "use_ground_truth": False, # If True, only uses evalplus results to determine if work is complete or not
         "save_insights": False, # Whether to save insights to knowledge base or not

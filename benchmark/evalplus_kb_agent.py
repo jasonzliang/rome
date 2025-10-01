@@ -62,12 +62,12 @@ class KnowledgeBaseEvaluator:
         # Check KB status and warn if empty
         kb_size = self.coordinator.kb_manager.size()
         if kb_size == 0:
-            self.logger.warning("Knowledge base is EMPTY - agents will operate without KB insights")
-            self.logger.warning("To populate KB, run standard benchmarks with save_insights=True")
+            self.logger.errors("Knowledge base is EMPTY - agents will operate without KB insights")
+            self.logger.error("To populate KB, run standard benchmarks with save_insights=True")
         else:
             self.logger.info(f"Knowledge base contains {kb_size} documents")
 
-        self.logger.info(f"KB-Enhanced Evaluator initialized: {dataset}, {num_agents} agents per problem")
+        self.logger.info(f"Knowledge Base Evalplus Evaluator initialized: {dataset}, {num_agents} agents per problem")
 
     def _load_config(self) -> Dict:
         """Load and merge configuration"""
@@ -77,10 +77,12 @@ class KnowledgeBaseEvaluator:
         config = load_config(str(self.config_path))
         config = merge_with_default_config(config)
         config['Agent']['repository'] = str(self.benchmark_dir)
+        config['Agent']['draw_fsm'] = False
 
         # Enable KB features
+        config['Agent']['save_insights'] = False
         config['Agent']['query_insights'] = True
-        config['ChromaClientManager']['enable_reranking'] = True
+        # config['ChromaClientManager']['enable_reranking'] = True
 
         return config
 
@@ -95,33 +97,34 @@ class KnowledgeBaseEvaluator:
 
     def analyze_problem_requirements(self, problem: Dict) -> Dict:
         """Use KB to analyze what skills/knowledge/roles are needed"""
-        prompt = problem['prompt']
 
-        query = f"""Analyze this programming problem and identify:
+        kb_context = ""
+        if self.coordinator.kb_manager.size() > 0:
+            kb_response = self.coordinator.kb_manager.query(
+                f"What skills and knowledge are needed to solve:\n{problem['prompt']}")
+            if kb_response:
+                kb_context = f"Relevant insights from knowledge base:\n{kb_response}"
+
+        prompt = f"""Analyze this programming problem and identify:
 1. Required technical skills (e.g., algorithms, data structures)
 2. Domain knowledge needed (e.g., math, string processing)
 3. Problem-solving approaches that would be effective
 
 Problem:
-{prompt}
+{problem['prompt']}
+
+{kb_context}
 
 Respond with JSON:
 {{
     "skills": ["skill1", "skill2", ...],
     "knowledge": ["domain1", "domain2", ...],
     "approaches": ["approach1", "approach2", ...]
-}}"""
-
-        # Query KB if available
-        kb_context = ""
-        if self.coordinator.kb_manager.size() > 0:
-            kb_response = self.coordinator.kb_manager.query(
-                f"What skills and knowledge are needed to solve: {prompt}")
-            if kb_response:
-                kb_context = f"\n\nRelevant insights from knowledge base:\n{kb_response}"
+}}
+"""
 
         response = self.coordinator.chat_completion(
-            prompt=query + kb_context,
+            prompt=prompt,
             response_format={"type": "json_object"}
         )
 
@@ -137,7 +140,7 @@ Respond with JSON:
         knowledge = ", ".join(requirements.get('knowledge', []))
         approaches = ", ".join(requirements.get('approaches', []))
 
-        prompt = f"""Create {k} distinct agent personas for solving a programming problem.
+        agent_prompt = f"""Create {k} distinct agent personas for solving a programming problem.
 Each agent should have:
 - A unique name
 - A specific role/specialty
@@ -152,15 +155,21 @@ Respond with JSON object containing agents array:
     "agents": [
         {{
             "name": "AgentName",
-            "role": "Brief role description emphasizing unique perspective",
+            "role": "Brief role description emphasizing skills and abilities",
             "style": "Problem-solving approach style"
         }},
         ...
     ]
-}}"""
+}}
+
+IMPORTANT:
+ - Name must be between 8 and 32 characters long and alphanumeric only
+ - Role should be 150-300 tokens long
+ - Style should be 150-300 tokens long
+"""
 
         response = self.coordinator.chat_completion(
-            prompt=prompt,
+            prompt=agent_prompt,
             response_format={"type": "json_object"}
         )
 
@@ -175,7 +184,7 @@ Respond with JSON object containing agents array:
 
         # Fallback if parsing fails or insufficient personas
         if not personas or len(personas) < k:
-            self.logger.warning(f"Generated only {len(personas)} personas, requested {k}, using fallback")
+            self.logger.error(f"Generated only {len(personas)} personas, requested {k}, using fallback")
             personas = [
                 {"name": f"Agent{i+1}", "role": f"Specialist {i+1}", "style": "systematic"}
                 for i in range(k)
@@ -195,40 +204,50 @@ Respond with JSON object containing agents array:
         # Query KB for relevant insights
         kb_insights = ""
         if temp_agent.kb_manager.size() > 0:
-            kb_query = f"How to solve: {problem['prompt']}"
+            kb_query = f"How to solve:\n{problem['prompt']}"
             kb_response = temp_agent.kb_manager.query(kb_query)
             if kb_response:
-                kb_insights = f"\n\nRelevant insights:\n{kb_response}\n"
+                kb_insights = f"Relevant insights:\n{kb_response}"
 
         # Generate solution
         solve_prompt = f"""Your problem-solving style: {persona['style']}
 
 {kb_insights}
+
 Problem to solve:
 {problem['prompt']}
 
 Generate a complete Python solution and rate your confidence (0-100).
 
-For example, respond with JSON:
+Respond with JSON:
 {{
     "solution": "complete Python code",
-    "confidence": 50,
+    "confidence": [0-100],
     "reasoning": "brief explanation of approach"
-}}"""
+}}
 
-        response = temp_agent.coordinator.chat_completion(
+IMPORTANT:
+- Python code must be this format: ```python your_code_here```
+- Python code must contain only the solution and no extraneous code such as print statements or tests
+"""
+
+        response = temp_agent.chat_completion(
             prompt=solve_prompt,
             response_format={"type": "json_object"}
         )
         result = temp_agent.parse_json_response(response) or {}
+        solution = temp_agent.parse_python_response(result.get('solution', ''))
+        confidence = max(0, min(100, result.get('confidence', 50)))
+        reasoning = result.get('reasoning', '')
+
         temp_agent.shutdown()
         del temp_agent
 
         return {
             "agent": persona['name'],
-            "solution": result.get('solution', ''),
-            "confidence": max(0, min(100, result.get('confidence', 50))),
-            "reasoning": result.get('reasoning', '')
+            "solution": solution,
+            "confidence": confidence,
+            "reasoning": reasoning
         }
 
     def merge_solutions(self, solutions: List[Dict], problem: Dict) -> str:
@@ -242,21 +261,22 @@ For example, respond with JSON:
 
         # Build context of all solutions
         solutions_context = "\n\n".join([
-            f"Agent {s['agent']} (confidence: {s['confidence']}/100):\n"
-            f"Reasoning: {s['reasoning']}\n"
-            f"Solution:\n{s['solution']}"
+            f"# Agent {s['agent']} (confidence: {s['confidence']}/100):\n"
+            f"# Reasoning: {s['reasoning']}\n"
+            f"# Solution:\n{s['solution']}"
             for s in solutions
         ])
 
         merge_prompt = f"""Synthesize the best solution from multiple agent proposals.
 Give more weight to solutions with higher confidence scores.
 
-Original problem:
+## Original problem:
 {problem['prompt']}
 
-Agent solutions:
+## Agent solutions:
 {solutions_context}
 
+## Your task
 Create a single optimal solution that:
 1. Incorporates the best ideas from high-confidence solutions
 2. Resolves any conflicts or inconsistencies
@@ -266,7 +286,12 @@ Respond with JSON:
 {{
     "solution": "final merged Python code",
     "rationale": "brief explanation of merge decisions"
-}}"""
+}}
+
+IMPORTANT:
+- Python code must be this format: ```python your_code_here```
+- Python code must contain only the solution and no other extraneous code such as print statements or tests
+"""
 
         response = self.coordinator.chat_completion(
             prompt=merge_prompt,
@@ -274,7 +299,7 @@ Respond with JSON:
         )
 
         result = self.coordinator.parse_json_response(response) or {}
-        merged = result.get('solution', '')
+        merged = self.coordinator.parse_python_response(result.get('solution', ''))
 
         # Fallback: use highest confidence solution
         if not merged:
@@ -358,7 +383,7 @@ Respond with JSON:
                     solution_file.write_text(result['solution'])
                     self.logger.info(f"✓ {task_id}: {result['avg_confidence']:.1f}% avg confidence")
                 else:
-                    self.logger.warning(f"✗ {task_id}: {result.get('error')}")
+                    self.logger.error(f"✗ {task_id}: {result.get('error')}")
 
             # Run evaluation if requested
             eval_results = {}
@@ -424,7 +449,7 @@ Respond with JSON:
         summary = results.get('summary', {})
 
         self.logger.info("="*80)
-        self.logger.info("KB-ENHANCED EVALPLUS BENCHMARK SUMMARY")
+        self.logger.info("KNOWLEDGE BASE EVALPLUS BENCHMARK SUMMARY")
         self.logger.info("="*80)
         self.logger.info(f"Dataset: {self.dataset}")
         self.logger.info(f"Problems: {summary.get('total_problems')}")
@@ -446,13 +471,13 @@ Respond with JSON:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="KB-Enhanced EvalPlus Benchmark with Dynamic Agents"
+        description="Knowledge Base EvalPlus Benchmark with Dynamic Agents"
     )
     parser.add_argument("benchmark_dir", help="Benchmark directory path")
     parser.add_argument("config_file", help="Agent configuration YAML")
 
     parser.add_argument("--dataset", choices=["humaneval", "mbpp"], default="humaneval")
-    parser.add_argument("--num-agents", type=int, default=2,
+    parser.add_argument("--num-agents", type=int, default=1,
                        help="Number of agents per problem")
     parser.add_argument("--num-problems", type=int, help="Number of problems")
     parser.add_argument("--task-ids", nargs="+", help="Specific task IDs")
