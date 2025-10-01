@@ -202,7 +202,8 @@ IMPORTANT:
             personas = result
 
         if not personas or len(personas) < k:
-            self.logger.error(f"Generated only {len(personas)} personas, requested {k}, using fallback")
+            self.logger.error(
+                f"Generated only {len(personas)} personas, requested {k}, using fallback")
             personas = [
                 {"name": f"Agent{i+1}", "role": f"Specialist {i+1}", "style": "systematic"}
                 for i in range(k)
