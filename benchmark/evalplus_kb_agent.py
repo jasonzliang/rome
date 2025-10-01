@@ -362,7 +362,7 @@ Respond with JSON:
             # Run evaluation if requested
             eval_results = {}
             if run_evaluation:
-                self.logger.info("Running final evaluation...")
+                self.logger.info("Running evalplus evaluation...")
                 eval_results = self.evaluator.evaluate()
 
             # Save results
