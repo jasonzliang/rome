@@ -241,7 +241,7 @@ Respond with JSON:
     "reasoning": "brief explanation of approach"
 }}
 
-IMPORTANT:
+Important:
 - Solution must be this format: ```python your_code_here```
 - Make sure to include all necessary import statements
 - Solution must not contain any unnecessary code such as print statements or tests
@@ -296,13 +296,13 @@ Create a single optimal solution that:
 2. Resolves any conflicts or inconsistencies
 3. Produces clean, working Python code
 
-Respond with JSON:
+## Respond with JSON:
 {{
     "solution": "final merged Python code",
     "rationale": "brief explanation of merge decisions"
 }}
 
-IMPORTANT:
+## Important:
 - Solution must be this format: ```python your_code_here```
 - Make sure to include all necessary import statements
 - Solution must not contain any unnecessary code such as print statements or tests
