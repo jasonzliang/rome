@@ -112,14 +112,21 @@ class Agent:
         self.logger.assert_true(self.role and self.name,
             f"Invalid name or role: {name}, {role}")
 
-        # Make make role description clear what it is
+        # Make role description clear what it is
         if "your role" not in self.role.lower():
             self.logger.info("Role string does not contain 'your role', reformatting")
             self.role = f"Your role:\n{self.role}"
 
-        # Name must be between 8 and 32 char long and alphanum only
+        # Name must be between a and b char long and alphanum only
         a, b = AGENT_NAME_LENGTH
         clean_name = ''.join(re.findall(r'[a-zA-Z0-9]+', self.name))
+
+        # Force clean_name to be within bounds
+        if len(clean_name) < a:
+            clean_name = clean_name.ljust(a, '0')  # Pad with zeros
+        elif len(clean_name) > b:
+            clean_name = clean_name[:b]  # Truncate to max length
+
         self.logger.assert_true(clean_name and a <= len(clean_name) <= b,
             f"Agent name must be {a}-{b} alphanumeric characters, got: '{self.name}' -> '{clean_name}'")
         self.name = clean_name
