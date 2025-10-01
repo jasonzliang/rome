@@ -21,6 +21,36 @@ from typing import Dict, Optional, List, Any, Callable, Tuple
 from datetime import datetime
 from functools import wraps
 
+def compact_json_dump(data, file, indent=2):
+    """Custom JSON dump that keeps embedding lists on single lines"""
+    def format_item(obj, level=0):
+        ind = ' ' * (indent * level)
+        next_ind = ' ' * (indent * (level + 1))
+
+        if isinstance(obj, dict):
+            if not obj:
+                return '{}'
+            items = []
+            for k, v in obj.items():
+                # Special handling for 'embedding' key - keep list compact
+                if k == 'embedding' and isinstance(v, list):
+                    items.append(f'{next_ind}"{k}": {json.dumps(v)}')
+                else:
+                    items.append(f'{next_ind}"{k}": {format_item(v, level + 1)}')
+            return '{\n' + ',\n'.join(items) + f'\n{ind}}}'
+        elif isinstance(obj, list):
+            if not obj:
+                return '[]'
+            # Check if this is a list of simple items or complex objects
+            if all(not isinstance(item, (dict, list)) for item in obj):
+                return json.dumps(obj)
+            items = [format_item(item, level + 1) for item in obj]
+            return '[\n' + ',\n'.join(f'{next_ind}{item}' for item in items) + f'\n{ind}]'
+        else:
+            return json.dumps(obj, ensure_ascii=False)
+
+    file.write(format_item(data))
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.kb_server import ChromaServerManager
 from rome.logger import get_logger
@@ -758,7 +788,7 @@ def handle_export(args):
         export_data['collections'].append(collection_data)
 
     with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(export_data, f, indent=2, ensure_ascii=False)
+        compact_json_dump(export_data, f, indent=2)
 
     total_collections = len(export_data['collections'])
     total_documents = sum(col['count'] for col in export_data['collections'])
