@@ -86,14 +86,14 @@ class KnowledgeBaseEvaluator:
     def _load_progress(self) -> Dict:
         """Load progress from JSON file"""
         if not self.progress_file.exists():
-            return {"completed": {}, "skipped": {}, "failed": {}}
+            return {"completed": {}, "failed": {}}
 
         try:
             with open(self.progress_file) as f:
                 return json.load(f)
         except Exception as e:
             self.logger.warning(f"Failed to load progress file: {e}")
-            return {"completed": {}, "skipped": {}, "failed": {}}
+            return {"completed": {}, "failed": {}}
 
     def _save_progress(self, progress: Dict):
         """Save progress to JSON file"""
