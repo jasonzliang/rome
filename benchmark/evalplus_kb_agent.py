@@ -232,7 +232,7 @@ IMPORTANT:
 Problem to solve:
 {problem['prompt']}
 
-Generate a complete Python solution and rate your confidence (0-100).
+Generate a complete Python solution and rate your confidence (0-100) that the solution is correct.
 
 Respond with JSON:
 {{
