@@ -63,9 +63,9 @@ DEFAULT_CONFIG = {
         "agent_api": True,  # Launch an REST API server for agent's internal state
         "log_pid": False,  # Whether to include PID in agent log file names
         "save_hist_interval": 10, # Interval to save summary history
-        "draw_fsm": True # Whether to draw FSM graph when initialized
+        "draw_fsm": True, # Whether to draw FSM graph when initialized
 
-        "use_ground_truth": False, # If True, only uses evalplus results to determine if work is complete or not
+        "use_ground_truth": False, # Whether to use EvalPlus results to determine if work is complete
         "save_insights": False, # Whether to save insights to knowledge base or not
         "query_insights": False, # Whether to query knowledge base for insights or not
 
@@ -306,7 +306,7 @@ def generate_default_config(output_path="config.yaml"):
 
 def load_config(config_path="config.yaml", create_if_missing=False):
     """Load configuration from a YAML file or Python file, creating it if it doesn't exist"""
-    logger = get_logger()
+    logger = get_logger(); config_path = str(config_path)
 
     if os.path.exists(config_path):
         logger.info(f"Loading configuration from {config_path}")

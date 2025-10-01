@@ -124,11 +124,11 @@ class Agent:
             f"Agent name must be {a}-{b} alphanumeric characters, got: '{self.name}' -> '{clean_name}'")
         self.name = clean_name
 
-    def _setup_repository_and_logging(self, repository: str = None) -> None:
+    def _setup_repository_and_logging(self, repository=None) -> None:
         """Validate repository and configure logging"""
         # Validate repository
         if repository:
-            self.repository = repository
+            self.repository = str(repository)
         self.logger.assert_true(
             self.repository and os.path.exists(self.repository),
             f"Repository path does not exist: {self.repository}"

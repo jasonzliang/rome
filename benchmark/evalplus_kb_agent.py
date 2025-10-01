@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Knowledge-Base Enhanced EvalPlus Evaluator
+Knowledge-Base Enhanced EvalPlus Evaluator with Progress Tracking
 
 Dynamically creates specialized agents for each problem by:
 1. Querying KB for required skills/knowledge/roles
@@ -8,14 +8,7 @@ Dynamically creates specialized agents for each problem by:
 3. Each agent queries KB for insights and generates solution with confidence
 4. Merging solutions with confidence-weighted voting
 
-IMPORTANT: This script assumes the knowledge base is pre-populated with insights
-from previous agent runs (using save_insights=True in config). The KB queries will
-return empty results if the KB is unpopulated, in which case agents rely solely on
-their base capabilities without additional context.
-
-To populate the KB, run standard evalplus benchmarks with:
-    Agent.save_insights = True
-    Agent.use_ground_truth = True (optional, for higher quality insights)
+Progress is tracked in a JSON file to enable resumption after interruptions.
 """
 
 import argparse
@@ -36,7 +29,9 @@ from benchmark.evalplus_evaluator import EvalplusEvaluator
 
 
 class KnowledgeBaseEvaluator:
-    """Knowledge-base enhanced evaluator with dynamic agent generation"""
+    """Knowledge-base enhanced evaluator with dynamic agent generation and progress tracking"""
+
+    PROGRESS_FILE = "kb_eval_progress.json"
 
     def __init__(self, benchmark_dir: str, config_path: str,
                  dataset: str = "humaneval", num_agents: int = 3):
@@ -44,6 +39,7 @@ class KnowledgeBaseEvaluator:
         self.config_path = Path(config_path)
         self.dataset = dataset.lower()
         self.num_agents = num_agents
+        self.progress_file = self.benchmark_dir / self.PROGRESS_FILE
 
         self.logger = get_logger()
         self.logger.configure({
@@ -52,37 +48,30 @@ class KnowledgeBaseEvaluator:
             "console": True
         })
 
-        # Load config and setup
         self.config = self._load_config()
         self.evaluator = EvalplusEvaluator(self.benchmark_dir, self.dataset)
-
-        # Create a coordinator agent for KB access and orchestration
         self.coordinator = self._create_coordinator()
 
-        # Check KB status and warn if empty
         kb_size = self.coordinator.kb_manager.size()
         if kb_size == 0:
-            self.logger.errors("Knowledge base is EMPTY - agents will operate without KB insights")
+            self.logger.error("Knowledge base is EMPTY - agents will operate without KB insights")
             self.logger.error("To populate KB, run standard benchmarks with save_insights=True")
         else:
             self.logger.info(f"Knowledge base contains {kb_size} documents")
 
-        self.logger.info(f"Knowledge Base Evalplus Evaluator initialized: {dataset}, {num_agents} agents per problem")
+        self.logger.info(f"KB Evalplus Evaluator initialized: {dataset}, {num_agents} agents per problem")
 
     def _load_config(self) -> Dict:
         """Load and merge configuration"""
         if not self.config_path.exists():
             raise FileNotFoundError(f"Config not found: {self.config_path}")
 
-        config = load_config(str(self.config_path))
+        config = load_config(self.config_path)
         config = merge_with_default_config(config)
         config['Agent']['repository'] = str(self.benchmark_dir)
         config['Agent']['draw_fsm'] = False
-
-        # Enable KB features
         config['Agent']['save_insights'] = False
         config['Agent']['query_insights'] = True
-        # config['ChromaClientManager']['enable_reranking'] = True
 
         return config
 
@@ -91,13 +80,45 @@ class KnowledgeBaseEvaluator:
         return Agent(
             name='Coordinator',
             role='Expert coordinator for problem analysis and solution synthesis',
-            repository=str(self.benchmark_dir),
             config=self.config
         )
 
+    def _load_progress(self) -> Dict:
+        """Load progress from JSON file"""
+        if not self.progress_file.exists():
+            return {"completed": {}, "skipped": {}, "failed": {}}
+
+        try:
+            with open(self.progress_file) as f:
+                return json.load(f)
+        except Exception as e:
+            self.logger.warning(f"Failed to load progress file: {e}")
+            return {"completed": {}, "skipped": {}, "failed": {}}
+
+    def _save_progress(self, progress: Dict):
+        """Save progress to JSON file"""
+        try:
+            with open(self.progress_file, 'w') as f:
+                json.dump(progress, f, indent=4)
+        except Exception as e:
+            self.logger.error(f"Failed to save progress: {e}")
+
+    def _mark_completed(self, progress: Dict, task_id: str, result: Dict):
+        """Mark problem as completed and save progress"""
+        progress["completed"][task_id] = {
+            "success": result.get("success"),
+            "avg_confidence": result.get("avg_confidence"),
+            "num_agents": result.get("num_agents")
+        }
+        self._save_progress(progress)
+
+    def _mark_failed(self, progress: Dict, task_id: str, error: str):
+        """Mark problem as failed and save progress"""
+        progress["failed"][task_id] = {"error": error}
+        self._save_progress(progress)
+
     def analyze_problem_requirements(self, problem: Dict) -> Dict:
         """Use KB to analyze what skills/knowledge/roles are needed"""
-
         kb_context = ""
         if self.coordinator.kb_manager.size() > 0:
             kb_response = self.coordinator.kb_manager.query(
@@ -174,15 +195,12 @@ IMPORTANT:
         )
 
         result = self.coordinator.parse_json_response(response)
-
-        # Extract personas from various possible structures
         personas = []
         if isinstance(result, dict):
             personas = result.get('agents', result.get('personas', []))
         elif isinstance(result, list):
             personas = result
 
-        # Fallback if parsing fails or insufficient personas
         if not personas or len(personas) < k:
             self.logger.error(f"Generated only {len(personas)} personas, requested {k}, using fallback")
             personas = [
@@ -197,11 +215,9 @@ IMPORTANT:
         temp_agent = Agent(
             name=persona['name'],
             role=persona['role'],
-            repository=str(self.benchmark_dir),
             config=self.config
         )
 
-        # Query KB for relevant insights
         kb_insights = ""
         if temp_agent.kb_manager.size() > 0:
             kb_query = f"How to solve:\n{problem['prompt']}"
@@ -209,7 +225,6 @@ IMPORTANT:
             if kb_response:
                 kb_insights = f"Relevant insights:\n{kb_response}"
 
-        # Generate solution
         solve_prompt = f"""Your problem-solving style: {persona['style']}
 
 {kb_insights}
@@ -228,7 +243,8 @@ Respond with JSON:
 
 IMPORTANT:
 - Python code must be this format: ```python your_code_here```
-- Python code must contain only the solution and no extraneous code such as print statements or tests
+- Make sure to include all necessary import statements
+- Python code must not contain any unnecessary code such as print statements or tests
 """
 
         response = temp_agent.chat_completion(
@@ -255,11 +271,9 @@ IMPORTANT:
         if not solutions:
             return ""
 
-        # If only one solution, return it
         if len(solutions) == 1:
             return solutions[0]['solution']
 
-        # Build context of all solutions
         solutions_context = "\n\n".join([
             f"# Agent {s['agent']} (confidence: {s['confidence']}/100):\n"
             f"# Reasoning: {s['reasoning']}\n"
@@ -290,7 +304,8 @@ Respond with JSON:
 
 IMPORTANT:
 - Python code must be this format: ```python your_code_here```
-- Python code must contain only the solution and no other extraneous code such as print statements or tests
+- Make sure to include all necessary import statements
+- Python code must not contain any unnecessary code such as print statements or tests
 """
 
         response = self.coordinator.chat_completion(
@@ -301,7 +316,6 @@ IMPORTANT:
         result = self.coordinator.parse_json_response(response) or {}
         merged = self.coordinator.parse_python_response(result.get('solution', ''))
 
-        # Fallback: use highest confidence solution
         if not merged:
             solutions.sort(key=lambda x: x['confidence'], reverse=True)
             merged = solutions[0]['solution']
@@ -313,30 +327,24 @@ IMPORTANT:
         try:
             self.logger.info(f"Solving {task_id}")
 
-            # Step 1: Analyze requirements
             requirements = self.analyze_problem_requirements(problem)
             self.logger.debug(f"Requirements: {requirements}")
 
-            # Step 2: Generate agent personas
             personas = self.generate_agent_personas(requirements, self.num_agents)
             self.logger.debug(f"Generated {len(personas)} personas")
 
-            # Step 3: Each agent generates solution
             solutions = []
             for persona in personas:
                 try:
                     solution = self.solve_with_agent(persona, problem)
                     solutions.append(solution)
-                    self.logger.debug(
-                        f"{persona['name']}: confidence={solution['confidence']}"
-                    )
+                    self.logger.debug(f"{persona['name']}: confidence={solution['confidence']}")
                 except Exception as e:
                     self.logger.error(f"Agent {persona['name']} failed: {e}")
 
             if not solutions:
                 return {"success": False, "error": "No solutions generated"}
 
-            # Step 4: Merge solutions
             final_solution = self.merge_solutions(solutions, problem)
 
             return {
@@ -357,41 +365,45 @@ IMPORTANT:
                      num_problems: Optional[int] = None,
                      task_ids: Optional[List[str]] = None,
                      run_evaluation: bool = True) -> Tuple[Dict, Path]:
-        """Run complete KB-enhanced benchmark"""
+        """Run complete KB-enhanced benchmark with progress tracking"""
         try:
-            # Setup problems
             problems = self.evaluator.setup_problems(num_problems, task_ids)
             if not problems:
                 raise ValueError("No problems setup")
 
-            self.logger.info(f"Processing {len(problems)} problems")
+            progress = self._load_progress()
+            completed_count = len(progress["completed"])
 
-            # Solve each problem
+            self.logger.info(f"Processing {len(problems)} problems ({completed_count} already completed)")
+
             results = {}
-            for task_id, info in problems.items():
-                # Load problem from evaluator's dataset
-                dataset_problems = self.evaluator.DATASETS[self.dataset]()
-                problem = dataset_problems[task_id]
+            dataset_problems = self.evaluator.DATASETS[self.dataset]()
 
-                # Solve using KB-enhanced approach
+            for task_id, info in problems.items():
+                # Skip if already completed
+                if task_id in progress["completed"]:
+                    self.logger.info(f"⊘ {task_id}: Already completed, skipping")
+                    results[task_id] = progress["completed"][task_id]
+                    continue
+
+                problem = dataset_problems[task_id]
                 result = self.solve_problem(task_id, problem)
                 results[task_id] = result
 
-                # Write solution to file
                 if result.get('success'):
                     solution_file = info['dir'] / f"{info['safe_id']}.py"
                     solution_file.write_text(result['solution'])
+                    self._mark_completed(progress, task_id, result)
                     self.logger.info(f"✓ {task_id}: {result['avg_confidence']:.1f}% avg confidence")
                 else:
+                    self._mark_failed(progress, task_id, result.get('error', 'Unknown error'))
                     self.logger.error(f"✗ {task_id}: {result.get('error')}")
 
-            # Run evaluation if requested
             eval_results = {}
             if run_evaluation:
                 self.logger.info("Running evalplus evaluation...")
                 eval_results = self.evaluator.evaluate()
 
-            # Save results
             results_file = self._save_results(results, eval_results)
 
             return {
@@ -439,7 +451,7 @@ IMPORTANT:
         }
 
         results_file = self.evaluator.log_dir / "kb_enhanced_results.json"
-        results_file.write_text(json.dumps(output, indent=2, default=str))
+        results_file.write_text(json.dumps(output, indent=4, default=str))
         self.logger.info(f"Results saved: {results_file}")
 
         return results_file
@@ -452,10 +464,10 @@ IMPORTANT:
         self.logger.info("KNOWLEDGE BASE EVALPLUS BENCHMARK SUMMARY")
         self.logger.info("="*80)
         self.logger.info(f"Dataset: {self.dataset}")
-        self.logger.info(f"Problems: {summary.get('total_problems')}")
+        self.logger.info(f"Num Problems: {summary.get('total_problems')}")
         self.logger.info(f"Success Rate: {summary.get('success_rate')}")
         self.logger.info(f"Avg Confidence: {summary.get('avg_confidence')}")
-        self.logger.info(f"Agents/Problem: {summary.get('agents_per_problem')}")
+        self.logger.info(f"Agents Per Prob: {summary.get('agents_per_problem')}")
 
         scores = summary.get('scores', {})
         if scores:

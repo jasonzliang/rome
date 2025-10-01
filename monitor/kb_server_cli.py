@@ -47,7 +47,7 @@ logger.configure({
 DEFAULT_CONFIG = {'host': 'localhost', 'port': 8000, 'persist_path': None}
 SERVER_CONFIG = DEFAULT_CONFIG.copy()
 
-def compact_json_dump(data, file, indent=2):
+def compact_json_dump(data, file, indent=4):
     """Custom JSON dump that keeps embedding lists on single lines"""
     def format_item(obj, level=0):
         ind = ' ' * (indent * level)
@@ -487,7 +487,7 @@ class OutputFormatter:
             print(f"   Metadata:")
             for key, value in sorted(metadata.items()):
                 if isinstance(value, (dict, list)):
-                    value_str = json.dumps(value, indent=6)
+                    value_str = json.dumps(value, indent=4)
                     print(f"     {key}: {value_str}")
                 else:
                     print(f"     {key}: {value}")
@@ -788,7 +788,7 @@ def handle_export(args):
         export_data['collections'].append(collection_data)
 
     with open(output_file, 'w', encoding='utf-8') as f:
-        compact_json_dump(export_data, f, indent=2)
+        compact_json_dump(export_data, f, indent=4)
 
     total_collections = len(export_data['collections'])
     total_documents = sum(col['count'] for col in export_data['collections'])
