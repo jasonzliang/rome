@@ -21,6 +21,32 @@ from typing import Dict, Optional, List, Any, Callable, Tuple
 from datetime import datetime
 from functools import wraps
 
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from rome.kb_server import ChromaServerManager
+from rome.logger import get_logger
+from rome.config import LONG_SUMMARY_LEN
+from rome.kb_client import EMBEDDING_MODELS
+
+try:
+    import chromadb
+    from chromadb.utils.embedding_functions import (
+       SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
+except ImportError as e:
+    print(f"Import error: {e}")
+    print("Install with: pip install chromadb")
+    sys.exit(1)
+
+logger = get_logger()
+logger.configure({
+    "level": "DEBUG",
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    "console": True,
+    "include_caller_info": "rome"
+})
+
+DEFAULT_CONFIG = {'host': 'localhost', 'port': 8000, 'persist_path': None}
+SERVER_CONFIG = DEFAULT_CONFIG.copy()
+
 def compact_json_dump(data, file, indent=2):
     """Custom JSON dump that keeps embedding lists on single lines"""
     def format_item(obj, level=0):
@@ -50,32 +76,6 @@ def compact_json_dump(data, file, indent=2):
             return json.dumps(obj, ensure_ascii=False)
 
     file.write(format_item(data))
-
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from rome.kb_server import ChromaServerManager
-from rome.logger import get_logger
-from rome.config import LONG_SUMMARY_LEN
-from rome.kb_client import EMBEDDING_MODELS
-
-try:
-    import chromadb
-    from chromadb.utils.embedding_functions import (
-       SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
-except ImportError as e:
-    print(f"Import error: {e}")
-    print("Install with: pip install chromadb")
-    sys.exit(1)
-
-logger = get_logger()
-logger.configure({
-    "level": "DEBUG",
-    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    "console": True,
-    "include_caller_info": "rome"
-})
-
-DEFAULT_CONFIG = {'host': 'localhost', 'port': 8000, 'persist_path': None}
-SERVER_CONFIG = DEFAULT_CONFIG.copy()
 
 def error_handler(func: Callable) -> Callable:
     """Decorator for consistent error handling across commands"""
