@@ -225,7 +225,7 @@ IMPORTANT:
             if kb_response:
                 kb_insights = f"Relevant insights:\n{kb_response}"
 
-        solve_prompt = f"""Your problem-solving style: {persona['style']}
+        solve_prompt = f"""Your problem-solving style:\n{persona['style']}
 
 {kb_insights}
 
