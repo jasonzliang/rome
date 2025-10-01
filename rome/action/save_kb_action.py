@@ -40,7 +40,7 @@ class SaveKBAction(Action):
             exec_analysis = agent.context['selected_file'].get('exec_analysis', '')[:200]
             execution_context = f"Exit: {exec_code}\nOutput: {exec_output}\nAnalysis: {exec_analysis}"
 
-        prompt = f"""Analyze the following code and test files to extract valuable, reusable insights that could help with similar problems in the future.
+        prompt = f"""Analyze the following code and test files to extract useful, reusable insights that could help with similar problems in the future.
 
 # Code File: {filename}
 ```python

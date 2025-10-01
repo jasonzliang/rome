@@ -88,22 +88,22 @@ def _build_kb_query_terms(filename: str, file_path: str, file_content: str,
     queries = []
     if file_content:
         exec_analysis = execution_data.get('exec_analysis', '') if execution_data else ''
-        code_query = f"""
-Find relevant insights to improve/fix the following code. Insights can be code snippets, algorithm or code patterns, general problem solving strategy, or anything that be helpful.
+        code_query = f"""Find relevant insights to improve/complete the following code. Insights can be code snippets, algorithms, design patterns, problem solving strategies, or anything that be helpful.
 
 # Code:
 ```python
 {file_content}
-```"""
+```
+
+# Code execution analysis:
+{truncate_text(exec_analysis, LONGEST_SUMMARY_LEN)}
+"""
 
 #         code_query = f"""Find relevant insights to improve/fix the following code:
 # # Code:
 # ```python
 # {truncate_text(file_content, LONGEST_SUMMARY_LEN)}
 # ```
-# # Code execution analysis
-# \n{truncate_text(exec_analysis, LONGEST_SUMMARY_LEN)}
-# """
         queries.append((code_query, "code analysis"))
 
     # Error-specific queries (highest priority if execution failed)
