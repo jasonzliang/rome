@@ -12,13 +12,13 @@ Progress is tracked in a JSON file to enable resumption after interruptions.
 """
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 import sys
 from pathlib import Path
 from typing import Dict, List, Tuple, Optional
 import traceback
-
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rome.agent import Agent
@@ -334,13 +334,23 @@ Important:
             self.logger.debug(f"Generated {len(personas)} personas")
 
             solutions = []
-            for persona in personas:
-                try:
-                    solution = self.solve_with_agent(persona, problem)
-                    solutions.append(solution)
-                    self.logger.debug(f"{persona['name']}: confidence={solution['confidence']}")
-                except Exception as e:
-                    self.logger.error(f"Agent {persona['name']} failed: {e}")
+            from concurrent.futures import ThreadPoolExecutor, as_completed
+
+            with ThreadPoolExecutor(max_workers=self.num_agents) as executor:
+                future_to_persona = {
+                    executor.submit(self.solve_with_agent, persona, problem): persona
+                    for persona in personas
+                }
+
+                for future in as_completed(future_to_persona):
+                    persona = future_to_persona[future]
+                    try:
+                        solution = future.result()
+                        solutions.append(solution)
+                        self.logger.debug(f"{persona['name']}: confidence={solution['confidence']}")
+                    except Exception as e:
+                        self.logger.error(f"Agent {persona['name']} failed: {e}")
+                        self.logger.error(traceback.format_exc())
 
             if not solutions:
                 return {"success": False, "error": "No solutions generated"}
