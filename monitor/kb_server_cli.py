@@ -218,7 +218,9 @@ class CollectionManager:
                     'metadata': results['metadatas'][i] if results['metadatas'] else None
                 }
                 if include_embeddings and results.get('embeddings') is not None:
-                    item['embedding'] = results['embeddings'][i]
+                    embedding = results['embeddings'][i]
+                    # Convert numpy array to list for JSON serialization
+                    item['embedding'] = embedding.tolist() if hasattr(embedding, 'tolist') else embedding
                 export_data['data'].append(item)
 
         return export_data
