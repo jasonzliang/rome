@@ -242,9 +242,9 @@ Respond with JSON:
 }}
 
 IMPORTANT:
-- Python code must be this format: ```python your_code_here```
+- Solution must be this format: ```python your_code_here```
 - Make sure to include all necessary import statements
-- Python code must not contain any unnecessary code such as print statements or tests
+- Solution must not contain any unnecessary code such as print statements or tests
 """
 
         response = temp_agent.chat_completion(
