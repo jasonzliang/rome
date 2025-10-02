@@ -56,22 +56,22 @@ class SaveKBAction(Action):
 
 Please extract and provide insights in the following categories:
 
-1. **Code Patterns**: What design patterns, algorithms, or reusable code structures are demonstrated? What are some anti-patterns to avoid in order to solve this problem?
+1. **Code Patterns**: What design patterns, algorithms, or strategies are demonstrated? What is the general problem solving approach to use and what are some anti-patterns to avoid in order to solve the problem?
 
-2. **Algorithm Strategies**: What algorithm strategies, patterns, or best practices are shown? What is the general problem solving approach that is used to solve the problem?
+2. **Data Structures**: What data structures are used to help solve the problem? How do the data structures minimize the time or space complexity required?
 
 3. **Reusable Code**: Find 1-3 useful/reusable functions or code snippets that could be used as library code for other similar problems. Use the following format for long code snippets or functions: ```python [code_snippet]```.
 
-4. **Applicable Context**: What types of problems or domains would benefit from these patterns?
+4. **Applicable Context**: What types of problems or domains would benefit from these insights?
 
 IMPORTANT: Limit your total response to maximum 1200 tokens. Be concise but comprehensive.
 
 Respond with a JSON object containing these insights:
 {{
-    "code_patterns": "Design patterns, algorithms, and reusable code structures",
-    "algorithm_strategies": "Algorithm strategies and approaches demonstrated",
+    "code_patterns": "Useful design patterns, algorithms, or strategies for solving the problem",
+    "data_structures": "Useful data structures for solving the problem",
     "reusable_code": "1-3 most reusable functions or code snippets for library use",
-    "applicable_context": "Types of problems or domains where these patterns apply"
+    "applicable_context": "Types of problems or domains where these insights apply"
 }}
 """
 
@@ -97,8 +97,8 @@ Extracted reusable patterns and insights from {filename} and its test file {test
 ## Code Patterns
 {insights.get('code_patterns', 'None identified')}
 
-## Algorithm Strategies
-{insights.get('algorithm_strategies', 'None identified')}
+## Data Structures
+{insights.get('data_structures', 'None identified')}
 
 ## Reusable Code
 {insights.get('reusable_code', 'None identified')}
