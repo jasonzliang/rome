@@ -139,9 +139,10 @@ class EvalplusEvaluator:
 
         except Exception as e:
             self.logger.error(f"Scores vs time elapsed plot failed: {e}")
+            self.logger.error(traceback.format_exc())
 
     def _plot_iteration(self):
-        """Compact plot: total iterations vs scores with completion percentage and latest scores in legend"""
+        """Plot iterations vs scores with completion percentage and latest scores in legend"""
         if not self.scores:
             return
 
@@ -172,13 +173,22 @@ class EvalplusEvaluator:
                 agent_count = 0
 
                 for entries in agent_data.values():
-                    latest_entry = max(((iter_num, completion) for iter_num, epoch_time, completion in entries if epoch_time <= target_time), default=(0, 0))
-                    total_iter += latest_entry[0]
-                    total_completion += latest_entry[1]
-                    agent_count += 1
+                    # Find latest entry before target_time
+                    valid_entries = [(iter_num, completion) for iter_num, epoch_time, completion in entries
+                                    if epoch_time <= target_time]
+                    if valid_entries:  # Only count if agent has data at this time
+                        latest_entry = max(valid_entries)
+                        total_iter += latest_entry[0]
+                        total_completion += latest_entry[1]
+                        agent_count += 1
 
-                total_iters.append(total_iter/max(agent_count, 1))
-                completion_fractions.append(total_completion / max(agent_count * 100, 1))
+                # Only append if we have at least one agent with data
+                if agent_count > 0:
+                    total_iters.append(total_iter / agent_count)
+                    completion_fractions.append(total_completion / (agent_count * 100))
+                else:
+                    total_iters.append(0)
+                    completion_fractions.append(0)
 
             # Get latest values for legend
             base_scores = [s[2] for s in self.scores]
@@ -222,6 +232,7 @@ class EvalplusEvaluator:
 
         except Exception as e:
             self.logger.error(f"Scores vs iterations plot failed: {e}")
+            self.logger.error(traceback.format_exc())
 
     def setup_problems(self,
         num_problems: int = None,
