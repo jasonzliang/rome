@@ -68,6 +68,8 @@ class KnowledgeBaseEvaluator:
 
         config = load_config(self.config_path)
         config = merge_with_default_config(config)
+        config['Agent']['name'] = None
+        config['Agent']['role'] = None
         config['Agent']['repository'] = str(self.benchmark_dir)
         config['Agent']['draw_fsm'] = False
         config['Agent']['save_insights'] = False
