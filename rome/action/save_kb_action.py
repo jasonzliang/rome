@@ -56,7 +56,7 @@ class SaveKBAction(Action):
 
 Please extract and provide insights in the following categories:
 
-1. **Code Patterns**: What design patterns, algorithms, or strategies are demonstrated? What is the general problem solving approach to use and what are some anti-patterns to avoid in order to solve the problem?
+1. **Code Patterns**: What design patterns, algorithms, or strategies are demonstrated? What is the overall problem solving approach to use and what are some anti-patterns to avoid?
 
 2. **Data Structures**: What data structures are used to help solve the problem? How do the data structures minimize the time or space complexity required?
 
