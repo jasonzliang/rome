@@ -163,7 +163,7 @@ Respond with JSON:
         skills = ", ".join(requirements.get('skills', []))
         knowledge = ", ".join(requirements.get('knowledge', []))
         approaches = ", ".join(requirements.get('approaches', []))
-        problem = requirements['problem']
+        problem = requirements.get('problem', '')
 
         agent_prompt = f"""Create {k} distinct agent personas for solving this programming problem:
 {problem}
