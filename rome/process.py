@@ -31,6 +31,15 @@ class ProcessManager:
             self.callbacks.append(callback)
 
     def setup_signals(self, logger=None) -> None:
+        """Setup signal handlers - only works in main thread"""
+        import threading
+
+        # Skip if not in main thread
+        if threading.current_thread() is not threading.main_thread():
+            if logger:
+                logger.debug(f"{self.name}: Skipping signal setup (worker thread)")
+            return
+
         def handler(signum, frame):
             if logger:
                 logger.info(f"{self.name} received signal {signum}, initiating shutdown")
