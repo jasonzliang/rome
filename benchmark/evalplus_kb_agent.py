@@ -150,20 +150,24 @@ Respond with JSON:
             prompt=prompt,
             response_format={"type": "json_object"}
         )
-
-        return self.coordinator.parse_json_response(response) or {
+        requirements = self.coordinator.parse_json_response(response) or {
             "skills": ["problem-solving"],
             "knowledge": ["programming"],
-            "approaches": ["iterative"]
+            "approaches": ["open-ended"]
         }
+        requirements["problem"] = problem['prompt']
+        return requirements
 
     def generate_agent_personas(self, requirements: Dict, k: int) -> List[Dict]:
         """Generate K distinct agent personas based on requirements"""
         skills = ", ".join(requirements.get('skills', []))
         knowledge = ", ".join(requirements.get('knowledge', []))
         approaches = ", ".join(requirements.get('approaches', []))
+        problem = requirements['problem']
 
-        agent_prompt = f"""Create {k} distinct agent personas for solving a programming problem.
+        agent_prompt = f"""Create {k} distinct agent personas for solving this programming problem:
+{problem}
+
 Each agent should have:
 - A unique name
 - A specific role/specialty
