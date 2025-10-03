@@ -66,7 +66,7 @@ Please extract and provide insights in the following categories:
 
 5. **Testing Approaches**: What testing strategies, patterns, or best practices are shown?
 
-IMPORTANT: Limit your response to maximum of 1200 tokens. Be concise but comprehensive.
+IMPORTANT: Limit your overall response to maximum of 1200 tokens. Be concise but comprehensive.
 
 Respond with a JSON object containing these insights:
 {{
