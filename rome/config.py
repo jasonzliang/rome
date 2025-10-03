@@ -227,7 +227,7 @@ DEFAULT_CONFIG = {
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model
         "chunk_size": 400,  # Chunk size for text splitting
         "chunk_overlap": 80,  # Overlap between chunks
-        "top_k": 5,
+        "top_k": 8,
         "log_db": True
         # Note: LLM model and temperature are inherited from agent's OpenAIHandler config
     },
