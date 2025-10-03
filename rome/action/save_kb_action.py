@@ -64,6 +64,8 @@ Please extract and provide insights in the following categories:
 
 4. **Applicable Context**: What types of problems or domains would benefit from these insights?
 
+5. **Testing Approaches**: What testing strategies, patterns, or best practices are shown?
+
 IMPORTANT: Limit your total response to maximum 1200 tokens. Be concise but comprehensive.
 
 Respond with a JSON object containing these insights:
@@ -71,7 +73,8 @@ Respond with a JSON object containing these insights:
     "code_patterns": "Useful design patterns, algorithms, or strategies for solving the problem",
     "data_structures": "Useful data structures for solving the problem",
     "reusable_code": "1-3 most reusable functions or code snippets for library use",
-    "applicable_context": "Types of problems or domains where these insights apply"
+    "applicable_context": "Types of problems or domains where these insights apply",
+    "testing_approaches": "Testing strategies and best practices demonstrated"
 }}
 """
 
@@ -104,7 +107,10 @@ Extracted reusable patterns and insights from {filename} and its test file {test
 {insights.get('reusable_code', 'None identified')}
 
 ## Applicable Context
-{insights.get('applicable_context', 'General programming')}
+{insights.get('applicable_context', 'None identified')}
+
+## Testing Approaches
+{insights.get('testing_approaches', 'None identified')}
 
 ## Source Files
 - Code: {file_path}
