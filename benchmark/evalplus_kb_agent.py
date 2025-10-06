@@ -286,7 +286,7 @@ Important:
             for s in solutions
         ])
 
-        merge_prompt = f"""Synthesize the best answer using proposed solutions from multiple agents. Rank agent solutions by their confidence scores and give more weight to ones with higher rankings.
+        merge_prompt = f"""Synthesize the best answer using proposed solutions from multiple agents. Give more consideration and weight to solutions from agents with higher confidence scores.
 
 ## Original problem:
 
@@ -298,7 +298,7 @@ Important:
 
 ## Your task:
 Create a single optimal solution that:
-1. Incorporates the best ideas from high-ranking solutions
+1. Incorporates the best ideas from high confidence agents
 2. Resolves any conflicts or inconsistencies
 3. Produces clean, working Python code
 
