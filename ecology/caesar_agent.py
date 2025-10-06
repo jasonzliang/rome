@@ -410,11 +410,11 @@ Your response must be valid JSON only, nothing else."""
         self.logger.info(f"Beginning exploration: {self.max_iterations} iterations")
 
         for iteration in range(1, self.max_iterations + 1):
-            self.logger.info(f"\n{'='*60}")
+            self.logger.info(f"\n{'='*80}")
             self.logger.info(f"Iteration {iteration}/{self.max_iterations}")
             self.logger.info(f"Depth: {self.current_depth}/{self.max_depth}")
             self.logger.info(f"URL: {self.current_url}")
-            self.logger.info(f"{'='*60}")
+            self.logger.info(f"{'='*80}")
 
             # Perceive
             content, links = self.perceive()
@@ -457,7 +457,7 @@ Your response must be valid JSON only, nothing else."""
         self.logger.info(f"\nExploration complete: visited {len(self.visited_urls)} pages")
         return self._synthesize_artifact()
 
-    def _synthesize_artifact(self) -> str:
+    def  (self) -> str:
         """Generate final synthesis artifact"""
         self.logger.info("[SYNTHESIS] Generating artifact")
 
@@ -489,7 +489,7 @@ Your response must be valid JSON only, nothing else."""
         # Generate synthesis
         prompt = f"""You have completed an exploration through {len(self.visited_urls)} interconnected sources, gathering {self.kb_manager.size()} insights.
 
-{chr(10).join(perspectives)}
+{'\n'.join(perspectives)}
 
 Create a structured synthesis that:
 1. Identifies emergent patterns not visible in individual sources
@@ -501,8 +501,7 @@ Make this synthesis intellectually engaging and substantive."""
 
         try:
             artifact = self.chat_completion(
-                prompt,
-                override_config={'max_tokens': 4096, 'temperature': 0.6}
+                prompt
             )
         except Exception as e:
             self.logger.error(f"Synthesis LLM call failed: {e}")
