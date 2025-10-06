@@ -6,9 +6,12 @@ import requests
 import json
 import os
 
-from .agent import Agent
-from .config import DEFAULT_CONFIG, set_attributes_from_config
-from .logger import get_logger
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from rome.agent import Agent
+from rome.config import DEFAULT_CONFIG, set_attributes_from_config
+from rome.config import SHORT_SUMMARY_LEN, SUMMARY_LENGTH, LONG_SUMMARY_LEN, LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
+from rome.logger import get_logger
 
 CAESAR_CONFIG = {
     **DEFAULT_CONFIG,
@@ -33,7 +36,7 @@ CAESAR_CONFIG = {
 
 
 class CaesarAgent(Agent):
-    """Web exploration agent that systematically explores allowed domains."""
+    """Veni, vidi, vici: Web exploration agent that systematically explores allowed domains."""
 
     def __init__(self, name: str = None, role: str = None,
                  repository: str = None, config: Dict = None,
@@ -132,7 +135,7 @@ You navigate through information space systematically yet creatively, always wit
             except Exception:
                 continue
 
-            text = a.get_text(strip=True)[:100] or "[no text]"
+            text = a.get_text(strip=True)[:LONGER_SUMMARY_LEN] or "[no text]"
 
             if (url not in seen and
                 self._is_allowed_url(url) and
@@ -141,7 +144,7 @@ You navigate through information space systematically yet creatively, always wit
                 links.append((url, text))
                 seen.add(url)
 
-        return links[:25]
+        return links
 
     def perceive(self) -> Tuple[str, List[Tuple[str, str]]]:
         """Phase 1: Extract content and links from current page"""
@@ -161,12 +164,12 @@ You navigate through information space systematically yet creatively, always wit
             # Extract text
             text = soup.get_text(separator='\n', strip=True)
             lines = [line for line in text.split('\n') if line.strip()]
-            text = '\n'.join(lines)[:6000]
+            text = '\n'.join(lines)[:LONGEST_SUMMARY_LEN*100]
 
             # Extract links
             links = self._extract_links(html, self.current_url)
 
-            self.logger.info(f"Extracted {len(text)} chars, {len(links)} links")
+            self.logger.debug(f"Extracted {len(text)} chars, {len(links)} links")
             return text, links
 
         except Exception as e:
@@ -190,7 +193,7 @@ You navigate through information space systematically yet creatively, always wit
 Content:
 {content}
 
-Provide 3-5 concise, substantive insights:"""
+Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in length total:"""
 
         try:
             insights = self.chat_completion(
@@ -217,12 +220,12 @@ Provide 3-5 concise, substantive insights:"""
         # Add to graph
         self.graph.add_node(
             self.current_url,
-            insights=insights[:300],
+            insights=insights,
             full_insights=insights,
             depth=self.current_depth
         )
 
-        self.logger.info(f"Insights: {insights[:200]}...")
+        self.logger.debug(f"Insights:\n{insights}")
         return insights
 
     def act(self, links: List[Tuple[str, str]]) -> Optional[str]:
@@ -230,7 +233,7 @@ Provide 3-5 concise, substantive insights:"""
 
         # Check depth limit
         if self.current_depth >= self.max_depth:
-            self.logger.info(f"[ACT] Max depth {self.max_depth} reached - backtracking")
+            self.logger.debug(f"[ACT] Max depth {self.max_depth} reached - backtracking")
             if len(self.url_stack) > 1:
                 self.url_stack.pop()
                 self.current_depth = len(self.url_stack) - 1
@@ -239,7 +242,7 @@ Provide 3-5 concise, substantive insights:"""
 
         # No links available
         if not links:
-            self.logger.info("[ACT] No links - backtracking")
+            self.logger.debug("[ACT] No links - backtracking")
             if len(self.url_stack) > 1:
                 self.url_stack.pop()
                 self.current_depth = len(self.url_stack) - 1
@@ -259,7 +262,7 @@ Provide 3-5 concise, substantive insights:"""
 
         # Format links
         link_options = '\n'.join(
-            f"{i+1}. [{text[:80]}] {url}"
+            f"{i+1}. [{text}] {url}"
             for i, (url, text) in enumerate(links)
         )
 
@@ -271,31 +274,44 @@ Available paths forward:
 
 Based on your role of seeking novel patterns and deeper understanding, which link offers the most promising direction for exploration?
 
-Respond with ONLY the number (1-{len(links)}) and a brief reason:"""
+Respond with a JSON object in this exact format:
+{{
+    "choice": <number from 1 to {len(links)}>,
+    "reason": "<brief explanation of why this path is promising>"
+}}
+
+Your response must be valid JSON only, nothing else."""
 
         try:
             response = self.chat_completion(
                 prompt,
-                override_config={'temperature': self.exploration_temperature}
+                override_config={'temperature': self.exploration_temperature},
+                response_format={"type": "json_object"}
             )
 
-            # Parse response
-            parts = response.strip().split()
-            choice = int(parts[0]) - 1 if parts else 0
-            choice = max(0, min(choice, len(links) - 1))
+            # Parse JSON response
+            decision = self.parse_json_response(response)
+            if decision and 'choice' in decision:
+                choice = int(decision['choice']) - 1
+                choice = max(0, min(choice, len(links) - 1))
+                reason = decision.get('reason', 'No reason provided')
+            else:
+                self.logger.error("Invalid JSON response, using first link")
+                choice = 0
+                reason = "Fallback due to invalid response"
 
         except Exception as e:
             self.logger.error(f"LLM decision failed: {e}, using first link")
-            response = "1 (fallback)"
             choice = 0
+            reason = "Fallback due to error"
 
         next_url = links[choice][0]
 
         # Add edge to graph
-        self.graph.add_edge(self.current_url, next_url, reason=response[:150])
+        self.graph.add_edge(self.current_url, next_url, reason=reason)
 
         self.logger.info(f"[ACT] Selected {choice + 1}: {next_url}")
-        self.logger.info(f"Reason: {response[:100]}")
+        self.logger.info(f"Reason: {reason}")
 
         return next_url
 
@@ -358,9 +374,9 @@ Respond with ONLY the number (1-{len(links)}) and a brief reason:"""
                 parsed = urlparse(node)
                 path_parts = parsed.path.strip('/').split('/')
                 label = path_parts[-1] if path_parts and path_parts[-1] else parsed.netloc
-                label = label[:30] + '...' if len(label) > 30 else label
+                label = label[:SHORT_SUMMARY_LEN] + '...' if len(label) > SHORT_SUMMARY_LEN else label
 
-                insights_preview = self.graph.nodes[node].get('insights', '')[:50]
+                insights_preview = self.graph.nodes[node].get('insights', '')[:LONG_SUMMARY_LEN]
                 if insights_preview:
                     label += f"\n{insights_preview}..."
 
@@ -371,7 +387,7 @@ Respond with ONLY the number (1-{len(links)}) and a brief reason:"""
 
             # Add edges with reasons
             for u, v in self.graph.edges():
-                reason = self.graph.edges[u, v].get('reason', '')[:40]
+                reason = self.graph.edges[u, v].get('reason', '')[:LONG_SUMMARY_LEN]
                 viz.add_edge(u, v, label=reason)
 
             # Save visualization
@@ -419,7 +435,7 @@ Respond with ONLY the number (1-{len(links)}) and a brief reason:"""
 
             # Save graph periodically
             if self._should_save_graph(iteration):
-                self.logger.info(f"Saving graph at iteration {iteration}")
+                self.logger.debug(f"Saving graph at iteration {iteration}")
                 self._save_graph_data(iteration)
                 self._draw_graph_visualization(iteration)
 
@@ -434,7 +450,7 @@ Respond with ONLY the number (1-{len(links)}) and a brief reason:"""
                     break
 
         # Final graph save
-        self.logger.info("Final graph save")
+        self.logger.debug("Final graph save")
         self._save_graph_data(self.max_iterations)
         self._draw_graph_visualization(self.max_iterations)
 
