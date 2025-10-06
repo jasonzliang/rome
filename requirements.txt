@@ -1,4 +1,4 @@
-# Library required pkgs
+# Library core pkgs
 colorama
 numpy
 openai
@@ -18,10 +18,8 @@ llama-index-llms-openai
 evalplus
 graphviz
 llmlingua
-pygraphviz
 ribs
 xxhash
-
 
 # Web app pkgs
 fastapi
@@ -33,3 +31,7 @@ requests
 streamlit
 tiktoken
 uvicorn
+
+# Ecology agent pkgs
+beautifulsoup4
+pygraphviz

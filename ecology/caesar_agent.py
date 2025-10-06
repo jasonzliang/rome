@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import requests
 import json
 import os
+import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -71,12 +72,24 @@ You navigate through information space systematically yet creatively, always wit
              'save_graph_interval', 'draw_graph'],
             ['starting_url', 'allowed_domains'])
 
-        self.starting_url = starting_url
-        self.allowed_domains = allowed_domains
+        # Override from constructor if provided
+        if starting_url:
+            self.starting_url = starting_url
+        if allowed_domains:
+            self.allowed_domains = allowed_domains
+
+        # Auto-extract domain if needed
+        if not self.allowed_domains:
+            if self.starting_url:
+                self.allowed_domains = [urlparse(self.starting_url).netloc]
+                self.logger.info(f"Auto-extracted domain: {self.allowed_domains[0]}")
+            else:
+                self.logger.assert_true(False, "Must provide starting_url and/or allowed_domains")
+
+        # Check for wildcard
         self.allow_all_domains = "*" in self.allowed_domains
         if self.allow_all_domains:
-            self.logger.info(
-                "Wildcard '*' in allowed_domains - ALL domains will be allowed. Use with caution!")
+            self.logger.warning("Wildcard '*' detected - ALL domains allowed!")
 
         # Validation
         self.logger.assert_true(self.starting_url is not None,
@@ -141,7 +154,7 @@ You navigate through information space systematically yet creatively, always wit
             except Exception:
                 continue
 
-            text = a.get_text(strip=True)[:LONGER_SUMMARY_LEN] or "[no text]"
+            text = a.get_text(strip=True)[:LONGEST_SUMMARY_LEN] or "[no text]"
 
             if (url not in seen and
                 self._is_allowed_url(url) and
@@ -150,7 +163,7 @@ You navigate through information space systematically yet creatively, always wit
                 links.append((url, text))
                 seen.add(url)
 
-        return links
+        return links[:LONG_SUMMARY_LEN]
 
     def perceive(self) -> Tuple[str, List[Tuple[str, str]]]:
         """Phase 1: Extract content and links from current page"""
@@ -463,7 +476,7 @@ Your response must be valid JSON only, nothing else."""
         self.logger.info(f"\nExploration complete: visited {len(self.visited_urls)} pages")
         return self._synthesize_artifact()
 
-    def  (self) -> str:
+    def _synthesize_artifact(self) -> str:
         """Generate final synthesis artifact"""
         self.logger.info("[SYNTHESIS] Generating artifact")
 
