@@ -178,6 +178,8 @@ cython_debug/
 # Rome library files
 benchmark/result
 test/result
+ecology/result
+rst.txt
 .DS_Store
 .tags*
 *.log
