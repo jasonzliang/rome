@@ -239,12 +239,12 @@ IMPORTANT:
 Problem to solve:
 {problem['prompt']}
 
-Generate a complete Python solution and rate your confidence (0-100). Your confidence is your estimate of the probability that the solution is correct and will pass all the tests.
+Generate a complete Python solution and rate your confidence (0.0-1.0). Your confidence is your estimate of the probability that the solution is correct and will pass all the tests. Do not be afraid to give a lower confidence score if you have the slightest doubts about correctness.
 
 Respond with JSON:
 {{
     "solution": "complete Python code",
-    "confidence": [0-100],
+    "confidence": [0.0-1.0],
     "reasoning": "brief explanation of approach"
 }}
 
