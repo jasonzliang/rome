@@ -36,7 +36,7 @@ CAESAR_CONFIG = {
 
 
 class CaesarAgent(Agent):
-    """Veni, vidi, vici: Web exploration agent that systematically explores allowed domains."""
+    """Veni, Vidi, Vici - Web exploration agent that systematically explores allowed domains."""
 
     def __init__(self, name: str = None, role: str = None,
                  repository: str = None, config: Dict = None,
@@ -71,10 +71,12 @@ You navigate through information space systematically yet creatively, always wit
              'save_graph_interval', 'draw_graph'],
             ['starting_url', 'allowed_domains'])
 
-        if starting_url:
-            self.starting_url = starting_url
-        if allowed_domains:
-            self.allowed_domains = allowed_domains
+        self.starting_url = starting_url
+        self.allowed_domains = allowed_domains
+        self.allow_all_domains = "*" in self.allowed_domains
+        if self.allow_all_domains:
+            self.logger.info(
+                "Wildcard '*' in allowed_domains - ALL domains will be allowed. Use with caution!")
 
         # Validation
         self.logger.assert_true(self.starting_url is not None,
@@ -100,6 +102,10 @@ You navigate through information space systematically yet creatively, always wit
 
     def _is_allowed_url(self, url: str) -> bool:
         """Check if URL is within allowed domains"""
+        # If wildcard is set, allow all domains
+        if self.allow_all_domains:
+            return True
+
         parsed = urlparse(url)
         return any(domain in parsed.netloc for domain in self.allowed_domains)
 
