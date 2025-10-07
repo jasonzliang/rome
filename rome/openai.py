@@ -26,49 +26,61 @@ class OpenAIHandler:
 
     # OpenAI model pricing (per 1M tokens) - Updated with latest models
     MODEL_PRICING = {
-        # GPT-5 series (August 2025)
+        # GPT-5 series (as of August 2025)
         "gpt-5": {"input": 1.25, "output": 10.0},
         "gpt-5-mini": {"input": 0.25, "output": 2.0},
         "gpt-5-nano": {"input": 0.05, "output": 0.40},
-        # GPT-4.1 series (April 2025)
+        "gpt-5-pro": {"input": 15.0, "output": 120.0},
+
+        # GPT-4.1 series (as of April 2025)
         "gpt-4.1": {"input": 2.0, "output": 8.0},
-        "gpt-4.1-mini": {"input": 0.50, "output": 2.0},
+        "gpt-4.1-mini": {"input": 0.40, "output": 1.60},
         "gpt-4.1-nano": {"input": 0.10, "output": 0.40},
-        # GPT-4o series
+
+        # GPT-4o series (standard text)
         "gpt-4o": {"input": 2.5, "output": 10.0},
         "gpt-4o-mini": {"input": 0.15, "output": 0.6},
-        "gpt-4o-realtime-preview": {"input": 5.0, "output": 20.0},
-        "gpt-4o-audio-preview": {"input": 5.0, "output": 20.0},
-        # o-series reasoning models
+
+        # o-series reasoning models (note: pricing fluctuates)
         "o1": {"input": 15.0, "output": 60.0},
-        "o1-preview": {"input": 15.0, "output": 60.0},
-        "o1-mini": {"input": 3.0, "output": 12.0},
-        "o3": {"input": 10.0, "output": 40.0},
+        "o1-mini": {"input": 1.10, "output": 4.40},
+        "o1-pro": {"input": 150.0, "output": 600.0},
+        "o3": {"input": 2.0, "output": 8.0},
         "o3-mini": {"input": 1.10, "output": 4.40},
         "o4-mini": {"input": 1.10, "output": 4.40},
+
+        # Realtime models (text)
+        "gpt-realtime": {"input": 4.0, "output": 16.0},
+        "gpt-realtime-mini": {"input": 0.60, "output": 2.40},
     }
 
-    MODEL_CONTEXT_SIZE = {
-        # GPT-5 series (272K input, 128K output)
+    MODEL_INPUT_CONTEXT = {
+        # GPT-5 series
         "gpt-5": 272000,
         "gpt-5-mini": 272000,
         "gpt-5-nano": 272000,
-        # GPT-4.1 series (1M+ input, 32K output)
+        "gpt-5-pro": 272000,
+
+        # GPT-4.1 series
         "gpt-4.1": 1047576,
         "gpt-4.1-mini": 1047576,
         "gpt-4.1-nano": 1047576,
+
         # GPT-4o series
         "gpt-4o": 128000,
         "gpt-4o-mini": 128000,
-        "gpt-4o-realtime-preview": 128000,
-        "gpt-4o-audio-preview": 128000,
+
         # o-series reasoning models
         "o1": 200000,
-        "o1-preview": 128000,
         "o1-mini": 128000,
+        "o1-pro": 200000,
         "o3": 200000,
         "o3-mini": 200000,
         "o4-mini": 200000,
+
+        # Realtime models
+        "gpt-realtime": 128000,
+        "gpt-realtime-mini": 128000,
     }
 
     # Newer models with different API
@@ -76,9 +88,11 @@ class OpenAIHandler:
         "gpt-5",
         "gpt-5-mini",
         "gpt-5-nano",
+        "gpt-5-pro",
+
         "o1",
-        "o1-preview",
         "o1-mini",
+        "o1-pro",
         "o3",
         "o3-mini",
         "o4-mini",
