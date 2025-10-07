@@ -18,14 +18,13 @@ import traceback
 # Add the parent directory to sys.path to import from the module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from rome.caesar_agent import CaesarAgent
-from rome.config import load_config, merge_with_default_config, format_yaml_like
+from ecology.caesar_agent import CaesarAgent
+from rome.config import load_config, format_yaml_like
 from rome.logger import get_logger
 
 
-def validate_repository(repo_path: str) -> str:
+def validate_repository(repo_path: str, logger) -> str:
     """Validate and return absolute repository path, creating if needed"""
-    logger = get_logger()
     path = Path(repo_path).resolve()
 
     if not path.exists():
@@ -60,21 +59,7 @@ Examples:
     return parser.parse_args()
 
 
-def load_and_merge_config(config_path: str) -> dict:
-    """Load and merge configuration with defaults"""
-    logger = get_logger()
-
-    try:
-        config = load_config(config_path)
-        config = merge_with_default_config(config)
-        logger.info(f"Configuration loaded: {config_path}")
-        return config
-    except Exception as e:
-        logger.error(f"Failed to load config: {e}")
-        sys.exit(1)
-
-
-def print_config_summary(agent):
+def print_config_summary(agent, logger):
     """Print configuration summary before starting"""
     summary = {
         "Agent Configuration": {
@@ -96,18 +81,16 @@ def print_config_summary(agent):
         }
     }
 
-    print("="*80)
-    print("CAESAR AGENT CONFIGURATION")
-    print("="*80)
+    logger.info("="*80)
+    logger.info("CAESAR AGENT CONFIGURATION")
+    logger.info("="*80)
     for line in format_yaml_like(summary):
-        print(line)
-    print("="*80)
-    print()
+        logger.info(line)
+    logger.info("="*80)
 
 
-def print_final_summary(agent, artifact):
+def print_final_summary(agent, artifact, logger):
     """Print exploration completion summary"""
-    logger = get_logger()
     cost = agent.openai_handler.get_cost_summary()
 
     logger.info("\n" + "="*80)
@@ -120,8 +103,10 @@ def print_final_summary(agent, artifact):
     logger.info(f"  Total Cost:    ${cost['accumulated_cost']:.4f}")
     logger.info(f"  API Calls:     {cost['call_count']}")
     logger.info(f"  Avg per Call:  ${cost['average_cost_per_call']:.4f}")
-    if cost['cost_limit']:
-        logger.info(f"  Budget Used:   {cost['usage_percentage']}")
+    if cost.get('cost_limit'):
+        remaining = cost.get('remaining_budget', 0)
+        usage_pct = (cost['accumulated_cost'] / cost['cost_limit']) * 100
+        logger.info(f"  Budget Used:   {usage_pct:.1f}% (${remaining:.2f} remaining)")
 
     logger.info(f"\nLogs saved to: {agent.get_log_dir()}")
     logger.info("Exploration completed successfully!")
@@ -137,48 +122,53 @@ def main():
         "console": True
     })
 
-    # Parse arguments
-    args = parse_args()
-
-    # Validate repository
-    repository = validate_repository(args.repository)
-
-    # Load configuration
-    config = load_and_merge_config(args.config)
-
-    # Get agent name from config
-    agent_name = config.get('Agent', {}).get('name', 'CaesarAgent')
-
-    # Initialize agent
-    logger.info("Initializing CaesarAgent...")
     try:
+        # Parse arguments
+        args = parse_args()
+
+        # Validate repository
+        repository = validate_repository(args.repository, logger)
+
+        # Load configuration
+        try:
+            config = load_config(args.config)
+            logger.info(f"Configuration loaded: {args.config}")
+        except Exception as e:
+            logger.error(f"Failed to load config: {e}")
+            sys.exit(1)
+
+        # Get agent name from config
+        agent_name = config.get('Agent', {}).get('name', 'CaesarAgent')
+
+        # Initialize agent
+        logger.info("Initializing CaesarAgent...")
         agent = CaesarAgent(name=agent_name, repository=repository, config=config)
-    except Exception as e:
-        logger.error(f"Agent initialization failed: {e}")
-        traceback.print_exc()
-        sys.exit(1)
 
-    # Print configuration
-    print_config_summary(agent)
+        # Print configuration
+        print_config_summary(agent, logger)
 
-    # Run exploration
-    logger.info("Starting exploration...\n")
-
-    try:
+        # Run exploration
+        logger.info("Starting exploration...\n")
         artifact = agent.explore()
-        print_final_summary(agent, artifact)
+
+        # Print final summary
+        print_final_summary(agent, artifact, logger)
+
+        # Shutdown
         agent.shutdown()
         return 0
 
     except KeyboardInterrupt:
         logger.error("\nExploration interrupted by user")
-        agent.shutdown()
+        if 'agent' in locals():
+            agent.shutdown()
         return 130
 
     except Exception as e:
-        logger.error(f"\nExploration failed: {e}")
+        logger.error(f"\nError: {e}")
         traceback.print_exc()
-        agent.shutdown()
+        if 'agent' in locals():
+            agent.shutdown()
         return 1
 
 

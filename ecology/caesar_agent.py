@@ -10,7 +10,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from rome.agent import Agent
-from rome.config import DEFAULT_CONFIG, set_attributes_from_config
+from rome.config import DEFAULT_CONFIG, merge_with_default_config, set_attributes_from_config
 from rome.config import SHORT_SUMMARY_LEN, SUMMARY_LENGTH, LONG_SUMMARY_LEN, LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
 from rome.logger import get_logger
 
@@ -18,17 +18,19 @@ CAESAR_CONFIG = {
     **DEFAULT_CONFIG,
 
     "CaesarAgent": {
-        "max_iterations": 10,
-        "starting_url": "https://en.wikipedia.org/wiki/Main_Page",
-        "allowed_domains": [],
-        "max_depth": 1e12,
-        "exploration_temperature": 0.8,
+        "max_iterations": 10,  # Maximum rounds of exploration
+        "starting_url": "https://en.wikipedia.org/wiki/Main_Page",  # Web page to start exploration
+        "allowed_domains": [],  # Domains allowed, by default always use starting_url
+        "max_depth": 1e12,  # Max depth to traverse in exploration
+        "exploration_temperature": 0.8,  # Exploration LLM temperature
         "save_graph_interval": 5,  # Save graph every N iterations
         "draw_graph": True,  # Whether to visualize graph
+        "same_page_links": False  # Whether to allow links to same page
     },
 
     "OpenAIHandler": {
         **DEFAULT_CONFIG["OpenAIHandler"],
+
         "model": "gpt-4o",
         "temperature": 0.1,
         "max_tokens": 4096,
@@ -43,14 +45,53 @@ class CaesarAgent(Agent):
                  repository: str = None, config: Dict = None,
                  starting_url: str = None, allowed_domains: List[str] = None):
 
-        self.config = {**CAESAR_CONFIG, **(config or {})}
-        self.logger = get_logger()
+        # Setup Caesar-specific config before parent init
+        self._setup_caesar_config_pre_init(config, starting_url, allowed_domains)
 
-        # Core setup
-        self._setup_config(self.config)
-
+        # Set default role if not provided
         if not role:
-            role = """Your role: You are an explorer seeking novel patterns and connections in information.
+            role = self._get_default_role()
+
+        # Call parent init (handles most setup)
+        super().__init__(name=name, role=role, repository=repository, config=self.config)
+
+        # Caesar-specific validation and initialization
+        self._validate_caesar_config()
+        self._setup_exploration_state()
+        self._log_initialization()
+
+    def _setup_caesar_config_pre_init(self, config: Dict = None,
+                                      starting_url: str = None,
+                                      allowed_domains: List[str] = None) -> None:
+        """Setup Caesar config before parent init (merged config needed for parent)"""
+        if config:
+            self.config = merge_with_default_config(config)
+            caesar_defaults = CAESAR_CONFIG.get('CaesarAgent', {})
+            for key, value in caesar_defaults.items():
+                if key not in self.config.get('CaesarAgent', {}):
+                    self.config.setdefault('CaesarAgent', {})[key] = value
+        else:
+            self.config = CAESAR_CONFIG.copy()
+
+        # Extract Caesar config
+        caesar_config = self.config.get('CaesarAgent', {})
+        set_attributes_from_config(self, caesar_config,
+            ['max_iterations', 'max_depth', 'exploration_temperature',
+             'save_graph_interval', 'draw_graph', 'starting_url',
+             'allowed_domains', 'same_page_links'])
+
+        # Override from constructor if provided
+        if starting_url:
+            self.starting_url = starting_url
+        if allowed_domains:
+            self.allowed_domains = allowed_domains
+
+        # Setup allowed domains
+        self._setup_allowed_domains()
+
+    def _get_default_role(self) -> str:
+        """Return default Caesar role"""
+        return """Your role: You are an explorer seeking novel patterns and connections in information.
 
 Your approach:
 - Identify limitations in current understanding as opportunities for deeper exploration
@@ -60,53 +101,47 @@ Your approach:
 
 You navigate through information space systematically yet creatively, always within defined boundaries, building a web of understanding that reveals emergent patterns."""
 
-        self._validate_name_role(name, role)
-        self._setup_repository_and_logging(repository)
-        self._setup_openai_handler()
-        self._setup_knowledge_base()
+    def _setup_allowed_domains(self) -> None:
+        """Configure allowed domains from starting URL or config"""
+        if not hasattr(self, 'logger'):
+            self.logger = get_logger()
 
-        # Caesar-specific config
-        caesar_config = self.config.get('CaesarAgent', {})
-        set_attributes_from_config(self, caesar_config,
-            ['max_iterations', 'max_depth', 'exploration_temperature',
-             'save_graph_interval', 'draw_graph'],
-            ['starting_url', 'allowed_domains'])
-
-        # Override from constructor if provided
-        if starting_url:
-            self.starting_url = starting_url
-        if allowed_domains:
-            self.allowed_domains = allowed_domains
-
-        # Auto-extract domain if needed
         if not self.allowed_domains:
             if self.starting_url:
                 self.allowed_domains = [urlparse(self.starting_url).netloc]
                 self.logger.info(f"Auto-extracted domain: {self.allowed_domains[0]}")
             else:
-                self.logger.assert_true(False, "Must provide starting_url and/or allowed_domains")
+                self.logger.assert_true(False,
+                    "Must provide starting_url and/or allowed_domains")
 
         # Check for wildcard
         self.allow_all_domains = "*" in self.allowed_domains
         if self.allow_all_domains:
             self.logger.warning("Wildcard '*' detected - ALL domains allowed!")
 
-        # Validation
+    def _validate_caesar_config(self) -> None:
+        """Validate Caesar-specific configuration"""
         self.logger.assert_true(self.starting_url is not None,
             "starting_url must be provided")
         self.logger.assert_true(self.allowed_domains and len(self.allowed_domains) > 0,
             "allowed_domains must contain at least one domain")
-        self.logger.assert_true(self.max_iterations > 0, "max_iterations must be positive")
-        self.logger.assert_true(self.max_depth > 0, "max_depth must be positive")
-        self.logger.assert_true(self.save_graph_interval > 0, "save_graph_interval must be positive")
+        self.logger.assert_true(self.max_iterations > 0,
+            "max_iterations must be positive")
+        self.logger.assert_true(self.max_depth > 0,
+            "max_depth must be positive")
+        self.logger.assert_true(self.save_graph_interval > 0,
+            "save_graph_interval must be positive")
 
-        # Exploration state
+    def _setup_exploration_state(self) -> None:
+        """Initialize exploration-specific state"""
         self.graph = nx.DiGraph()
         self.visited_urls = set()
         self.url_stack = [self.starting_url]
         self.current_url = self.starting_url
         self.current_depth = 0
 
+    def _log_initialization(self) -> None:
+        """Log initialization summary"""
         self.logger.info(f"CaesarAgent '{self.name}' initialized")
         self.logger.info(f"Starting: {self.starting_url}")
         self.logger.info(f"Domains: {self.allowed_domains}")
@@ -148,13 +183,25 @@ You navigate through information space systematically yet creatively, always wit
         links = []
         seen = set()
 
+        # Parse base URL for comparison
+        base_parsed = urlparse(base_url)
+        base_path = f"{base_parsed.scheme}://{base_parsed.netloc}{base_parsed.path}"
+
         for a in soup.find_all('a', href=True):
             try:
                 url = urljoin(base_url, a['href'])
             except Exception:
                 continue
 
-            text = a.get_text(strip=True)[:LONGEST_SUMMARY_LEN] or "[no text]"
+            # Filter same-page anchors if enabled
+            if not self.same_page_links:
+                parsed = urlparse(url)
+                url_without_fragment = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+                # Skip if it's the same page (just different anchor)
+                if url_without_fragment == base_path:
+                    continue
+
+            text = a.get_text(strip=True)[:LONGER_SUMMARY_LEN] or "[no text]"
 
             if (url not in seen and
                 self._is_allowed_url(url) and
@@ -163,7 +210,7 @@ You navigate through information space systematically yet creatively, always wit
                 links.append((url, text))
                 seen.add(url)
 
-        return links[:LONG_SUMMARY_LEN]
+        return links
 
     def perceive(self) -> Tuple[str, List[Tuple[str, str]]]:
         """Phase 1: Extract content and links from current page"""
@@ -180,10 +227,11 @@ You navigate through information space systematically yet creatively, always wit
             for tag in soup(["script", "style", "nav", "footer", "header"]):
                 tag.decompose()
 
-            # Extract text
-            text = soup.get_text(separator='\n', strip=True)
-            lines = [line for line in text.split('\n') if line.strip()]
-            text = '\n'.join(lines)[:LONGEST_SUMMARY_LEN*100]
+            # Extract text with space separator to collapse whitespace
+            text = soup.get_text(separator=' ', strip=True)
+            # Collapse multiple spaces into single spaces
+            text = ' '.join(text.split())
+            text = text[:LONGEST_SUMMARY_LEN*100]
 
             # Extract links
             links = self._extract_links(html, self.current_url)
@@ -240,7 +288,6 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
         self.graph.add_node(
             self.current_url,
             insights=insights,
-            full_insights=insights,
             depth=self.current_depth
         )
 
@@ -344,7 +391,6 @@ Your response must be valid JSON only, nothing else."""
                         'url': node,
                         'depth': self.graph.nodes[node].get('depth', 0),
                         'insights': self.graph.nodes[node].get('insights', ''),
-                        'full_insights': self.graph.nodes[node].get('full_insights', '')
                     }
                     for node in self.graph.nodes()
                 ],
@@ -358,10 +404,10 @@ Your response must be valid JSON only, nothing else."""
                 ]
             }
 
-            filepath = os.path.join(self.get_log_dir(),
-                                   f"{self.get_id()}.graph_iter{iteration}.json")
+            filepath = os.path.join(self.get_repo(),
+                f"{self.get_id()}.graph_iter{iteration}.json")
             with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(graph_data, f, indent=2, ensure_ascii=False)
+                json.dump(graph_data, f, indent=4, ensure_ascii=False)
 
             self.logger.info(f"Graph data saved: {filepath}")
 
@@ -395,7 +441,7 @@ Your response must be valid JSON only, nothing else."""
                 label = path_parts[-1] if path_parts and path_parts[-1] else parsed.netloc
                 label = label[:SHORT_SUMMARY_LEN] + '...' if len(label) > SHORT_SUMMARY_LEN else label
 
-                insights_preview = self.graph.nodes[node].get('insights', '')[:LONG_SUMMARY_LEN]
+                insights_preview = self.graph.nodes[node].get('insights', '')[:SUMMARY_LEN]
                 if insights_preview:
                     label += f"\n{insights_preview}..."
 
@@ -406,12 +452,12 @@ Your response must be valid JSON only, nothing else."""
 
             # Add edges with reasons
             for u, v in self.graph.edges():
-                reason = self.graph.edges[u, v].get('reason', '')[:LONG_SUMMARY_LEN]
+                reason = self.graph.edges[u, v].get('reason', '')[:SUMMARY_LEN]
                 viz.add_edge(u, v, label=reason)
 
             # Save visualization
-            filepath = os.path.join(self.get_log_dir(),
-                                   f"{self.get_id()}.graph_iter{iteration}.png")
+            filepath = os.path.join(self.get_repo(),
+                f"{self.get_id()}.graph_iter{iteration}.png")
             viz.draw(filepath, prog='dot')
             self.logger.info(f"Graph visualization saved: {filepath}")
 
@@ -428,6 +474,7 @@ Your response must be valid JSON only, nothing else."""
         """Execute the main exploration loop"""
         self.logger.info(f"Beginning exploration: {self.max_iterations} iterations")
 
+        self.last_iter_saved = -1
         for iteration in range(1, self.max_iterations + 1):
             self.logger.info(f"\n{'='*80}")
             self.logger.info(f"Iteration {iteration}/{self.max_iterations}")
@@ -457,6 +504,7 @@ Your response must be valid JSON only, nothing else."""
                 self.logger.debug(f"Saving graph at iteration {iteration}")
                 self._save_graph_data(iteration)
                 self._draw_graph_visualization(iteration)
+                self.last_iter_saved = iteration
 
             # Act (skip on last iteration)
             if iteration < self.max_iterations:
@@ -469,20 +517,21 @@ Your response must be valid JSON only, nothing else."""
                     break
 
         # Final graph save
-        self.logger.debug("Final graph save")
-        self._save_graph_data(self.max_iterations)
-        self._draw_graph_visualization(self.max_iterations)
+        if self.last_iter_saved < self.max_iterations:
+            self.logger.debug("Final graph save")
+            self._save_graph_data(self.max_iterations)
+            self._draw_graph_visualization(self.max_iterations)
 
         self.logger.info(f"\nExploration complete: visited {len(self.visited_urls)} pages")
         return self._synthesize_artifact()
 
-    def _synthesize_artifact(self) -> str:
-        """Generate final synthesis artifact"""
+    def _synthesize_artifact(self) -> Dict[str, str]:
+        """Generate final synthesis artifact as JSON with abstract and main content, save to repo"""
         self.logger.info("[SYNTHESIS] Generating artifact")
 
         if self.kb_manager.size() == 0:
             self.logger.error("No insights in KB, cannot synthesize")
-            return "No insights collected during exploration."
+            return {"abstract": "", "artifact": "No insights collected during exploration."}
 
         # Query KB from multiple perspectives
         queries = [
@@ -503,28 +552,72 @@ Your response must be valid JSON only, nothing else."""
                 self.logger.error(f"KB query failed for '{q}': {e}")
 
         if not perspectives:
-            return "Unable to query knowledge base for synthesis."
+            return {"abstract": "", "artifact": "Unable to query knowledge base for synthesis."}
 
-        # Generate synthesis
-        prompt = f"""You have completed an exploration through {len(self.visited_urls)} interconnected sources, gathering {self.kb_manager.size()} insights.
+        # Generate synthesis with abstract in single LLM call
+        synthesis_prompt = f"""You have completed an exploration through {len(self.visited_urls)} interconnected sources, gathering {self.kb_manager.size()} insights.
 
 {'\n'.join(perspectives)}
 
-Create a structured synthesis that:
-1. Identifies emergent patterns not visible in individual sources
-2. Highlights novel connections and unexpected relationships
-3. Explores tensions, contradictions, or open questions
-4. Proposes new directions or perspectives
+Create a synthesis with two parts:
 
-Make this synthesis intellectually engaging and substantive."""
+1. **Abstract** (100-150 tokens): A concise summary capturing the core discovery, key patterns, and significance
+
+2. **Artifact** (Up to 3000 tokens): A structured synthesis that:
+   - Identifies emergent patterns not visible in individual sources
+   - Highlights novel connections and unexpected relationships
+   - Explores tensions, contradictions, or open questions
+   - Proposes new directions or perspectives
+
+Make both intellectually engaging and substantive.
+
+Respond with a JSON object in this exact format:
+{{
+    "abstract": "<your abstract text here>",
+    "artifact": "<your full synthesis text here>"
+}}
+
+Your response must be valid JSON only, nothing else."""
 
         try:
-            artifact = self.chat_completion(
-                prompt
+            response = self.chat_completion(
+                synthesis_prompt,
+                response_format={"type": "json_object"}
             )
+            result = self.parse_json_response(response)
+
+            if not result or "abstract" not in result or "artifact" not in result:
+                self.logger.error("Invalid JSON response from LLM"); raise
         except Exception as e:
             self.logger.error(f"Synthesis LLM call failed: {e}")
-            return f"Synthesis generation failed: {e}"
+            result = {
+                "abstract": "Synthesis generation failed.",
+                "artifact": f"Synthesis generation failed: {e}"
+            }
+
+        # Add metadata
+        result["metadata"] = {
+            "pages_visited": len(self.visited_urls),
+            "insights_collected": self.kb_manager.size(),
+            "max_depth": self.current_depth,
+            "starting_url": self.starting_url
+        }
+
+        # Save to repository
+        try:
+            filepath = os.path.join(self.get_repo(), f"{self.get_id()}.synthesis.json")
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(result, f, indent=4, ensure_ascii=False)
+            self.logger.info(f"Artifact saved as JSON: {filepath}")
+
+            filepath = os.path.splitext(filepath)[0] + ".txt"
+            with open(filepath, 'w', encoding='utf-8') as f:
+                f.write(f"ABSTRACT:\n{result['abstract']}\n\n")
+                f.write(f"ARTIFACT:\n{result['artifact']}\n\n")
+                f.write(f"METADATA:\n{str(result['metadata'])}")
+            self.logger.info(f"Artifact saved as txt: {filepath}")
+        except Exception as e:
+            self.logger.error(f"Failed to save artifact: {e}")
 
         self.logger.info("Artifact synthesis complete")
-        return artifact
+        return result

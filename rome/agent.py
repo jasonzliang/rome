@@ -318,6 +318,11 @@ class Agent:
         else:
             return f'agent_{self.name}'
 
+    def get_repo(self):
+        """Get agent repository and create if it doesn't exist"""
+        os.makedirs(self.repository, exist_ok=True)
+        return self.repository
+
     def get_log_dir(self):
         """Get agent log directory and create if it doesn't exist"""
         log_dir = os.path.join(self.repository, LOG_DIR_NAME)
