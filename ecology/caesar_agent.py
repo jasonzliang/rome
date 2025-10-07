@@ -24,7 +24,7 @@ CAESAR_CONFIG = {
         "max_depth": 1e12,  # Max depth to traverse in exploration
         "exploration_temperature": 0.8,  # Exploration LLM temperature
         "save_graph_interval": 5,  # Save graph every N iterations
-        "draw_graph": True,  # Whether to visualize graph
+        "draw_graph": False,  # Whether to visualize graph
         "same_page_links": False  # Whether to allow links to same page
     },
 
