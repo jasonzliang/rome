@@ -7,7 +7,13 @@ from pathlib import Path
 import re
 import time
 
-# ChromaDB and LlamaIndex imports
+try:
+    __import__('pysqlite3')
+    import sys
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except:
+    print(f"pysqlite3 import error: {e}")
+
 try:
     import chromadb
     from chromadb.utils.embedding_functions import (
