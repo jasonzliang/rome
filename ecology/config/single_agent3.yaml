@@ -1,0 +1,39 @@
+# Caesar Agent Configuration File
+# Only includes settings that differ from DEFAULT_CONFIG
+
+# ============================================================================
+# AGENT CONFIGURATION
+# ============================================================================
+Agent:
+  name: CaesarExplorer
+  draw_fsm: false
+
+# ============================================================================
+# CAESAR-SPECIFIC CONFIGURATION
+# ============================================================================
+CaesarAgent:
+  starting_url: "https://en.wikipedia.org/wiki/Evolution"
+  max_iterations: 600
+  exploration_temperature: 0.8
+  save_graph_interval: 10
+  draw_graph: true
+
+# ============================================================================
+# LLM CONFIGURATION
+# ============================================================================
+OpenAIHandler:
+  cost_limit: 300.0
+  model: gpt-5
+  temperature: 0.1
+
+# ============================================================================
+# KNOWLEDGE BASE CONFIGURATION
+# ============================================================================
+# ChromaClientManager:
+#   log_db: true
+
+# ============================================================================
+# LOGGING CONFIGURATION
+# ============================================================================
+Logger:
+  include_caller_info: "rome"
