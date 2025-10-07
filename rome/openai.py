@@ -54,7 +54,7 @@ class OpenAIHandler:
         "gpt-realtime-mini": {"input": 0.60, "output": 2.40},
     }
 
-    MODEL_INPUT_CONTEXT = {
+    MODEL_CONTEXT_SIZE = {
         # GPT-5 series
         "gpt-5": 272000,
         "gpt-5-mini": 272000,
