@@ -17,7 +17,8 @@ import os
 import sys
 import json
 import traceback
-from typing import Dict, Optional, List, Any, Callable, Tuple
+import fnmatch
+from typing import Dict, Optional, List, Any, Callable, Tuple, Set
 from datetime import datetime
 from functools import wraps
 
@@ -46,6 +47,36 @@ logger.configure({
 
 DEFAULT_CONFIG = {'host': 'localhost', 'port': 8000, 'persist_path': None}
 SERVER_CONFIG = DEFAULT_CONFIG.copy()
+
+def parse_collection_patterns(pattern_str: str) -> List[str]:
+    """Parse comma-separated collection patterns"""
+    return [p.strip() for p in pattern_str.split(',') if p.strip()]
+
+def match_collections(patterns: List[str], available_collections: List) -> Set[str]:
+    """
+    Match collection patterns against available collections
+
+    Args:
+        patterns: List of collection names or wildcard patterns
+        available_collections: List of collection objects with .name attribute
+
+    Returns:
+        Set of matched collection names
+    """
+    collection_names = [col.name for col in available_collections]
+    matched = set()
+
+    for pattern in patterns:
+        if '*' in pattern or '?' in pattern or '[' in pattern:
+            # Wildcard pattern matching
+            matches = fnmatch.filter(collection_names, pattern)
+            matched.update(matches)
+        else:
+            # Exact match
+            if pattern in collection_names:
+                matched.add(pattern)
+
+    return matched
 
 def compact_json_dump(data, file, indent=4):
     """Custom JSON dump that keeps embedding lists on single lines"""
@@ -520,14 +551,20 @@ Examples:
     # Delete all data (--force skips confirmation)
     python kb_server_cli.py delete --force
 
+    # Delete specific collection
+    python kb_server_cli.py delete --collection my_collection
+
+    # Delete multiple collections with wildcards
+    python kb_server_cli.py delete --collection "temp_*,test_*"
+
     # Delete specific collection with metadata filtering
     python kb_server_cli.py delete --collection my_collection --metadata key:value
 
-    # List up to 10 documents in a collection
-    python kb_server_cli.py list --collection my_collection --limit 10
+    # List up to 10 documents in matching collections
+    python kb_server_cli.py list --collection "data_*" --limit 10
 
-    # Export specific collection with embeddings to JSON file
-    python kb_server_cli.py export --collection my_collection --include-embeddings --output my_export.json
+    # Export specific collections with embeddings to JSON file
+    python kb_server_cli.py export --collection "prod_*" --include-embeddings --output my_export.json
 
     # Import from JSON file and overwrite existing collection
     python kb_server_cli.py import --file my_export.json --overwrite
@@ -542,7 +579,10 @@ Examples:
         parser.add_argument('--path', default=DEFAULT_CONFIG['persist_path'], help='Data persistence path')
 
     def add_collection_arg(parser):
-        parser.add_argument('--collection', help='Target collection name')
+        parser.add_argument(
+            '--collection',
+            help='Collection name(s) - supports wildcards (* ?) and comma-separated list (e.g., "data_*,test_*")'
+        )
 
     def add_force_arg(parser):
         parser.add_argument('--force', action='store_true', help='Force action without confirmation')
@@ -640,7 +680,7 @@ def handle_status(args):
 
 @error_handler
 def handle_delete(args):
-    """Enhanced delete command with metadata filtering support"""
+    """Enhanced delete with multi-collection and wildcard support"""
     manager = get_server_manager()
 
     if args.metadata and not args.collection:
@@ -662,65 +702,115 @@ def handle_delete(args):
 
         try:
             client = get_client()
-            collection = client.get_collection(args.collection)
+            patterns = parse_collection_patterns(args.collection)
+            all_collections = client.list_collections()
+            matched = match_collections(patterns, all_collections)
+
+            if not matched:
+                print(f"❌ No collections matched pattern(s): {args.collection}")
+                return 1
+
+            if len(matched) > 1:
+                print(f"📋 Matched collections: {', '.join(sorted(matched))}")
 
             if not args.force:
-                message = f"Delete documents in '{args.collection}' where {metadata_key}={metadata_value}?"
+                message = f"Delete documents in {len(matched)} collection(s) where {metadata_key}={metadata_value}?"
                 if not confirm_action(message):
                     return 0
 
-            print(f"🗑️  Deleting documents with metadata {metadata_key}:{metadata_value}...")
-            deleted_count, total_checked = CollectionManager.delete_documents_by_metadata(
-                collection, metadata_key, metadata_value
-            )
+            total_deleted = total_checked = 0
+            for collection_name in sorted(matched):
+                collection = client.get_collection(collection_name)
+                print(f"\n🗑️  Processing collection '{collection_name}'...")
 
-            if deleted_count > 0:
-                print(f"✅ Deleted {deleted_count} documents (checked {total_checked} total)")
-            else:
-                print(f"ℹ️  No documents found matching {metadata_key}:{metadata_value} (checked {total_checked} total)")
+                deleted, checked = CollectionManager.delete_documents_by_metadata(
+                    collection, metadata_key, metadata_value
+                )
+                total_deleted += deleted
+                total_checked += checked
 
+                if deleted > 0:
+                    print(f"   ✅ Deleted {deleted} documents")
+                else:
+                    print(f"   ℹ️  No matching documents found")
+
+            print(f"\n✅ Summary: Deleted {total_deleted} documents across {len(matched)} collection(s) (checked {total_checked} total)")
             return 0
 
         except Exception as e:
-            if "not found" in str(e).lower():
-                print(f"❌ Collection '{args.collection}' not found")
-            else:
-                print(f"❌ Error deleting documents: {e}")
+            print(f"❌ Error deleting documents: {e}")
             return 1
 
     elif args.collection:
-        if not args.force and not confirm_action(f"Delete collection '{args.collection}'?"):
-            return 0
-        print(f"🗑️  Deleting collection '{args.collection}'...")
-        success = manager.delete_collection(args.collection)
-        message = f"Collection '{args.collection}'"
+        if not manager.is_running():
+            print("❌ ChromaDB server is not running")
+            return 1
+
+        try:
+            client = get_client()
+            patterns = parse_collection_patterns(args.collection)
+            all_collections = client.list_collections()
+            matched = match_collections(patterns, all_collections)
+
+            if not matched:
+                print(f"❌ No collections matched pattern(s): {args.collection}")
+                return 1
+
+            print(f"📋 Matched collections: {', '.join(sorted(matched))}")
+
+            if not args.force:
+                message = f"Delete {len(matched)} collection(s)?"
+                if not confirm_action(message):
+                    return 0
+
+            success_count = 0
+            for collection_name in sorted(matched):
+                print(f"🗑️  Deleting collection '{collection_name}'...")
+                if manager.delete_collection(collection_name):
+                    print(f"   ✅ Deleted successfully")
+                    success_count += 1
+                else:
+                    print(f"   ❌ Failed to delete")
+
+            print(f"\n✅ Deleted {success_count}/{len(matched)} collections")
+            return 0 if success_count == len(matched) else 1
+
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            return 1
     else:
         if not args.force and not confirm_action("Delete ALL database data? This cannot be undone!"):
             return 0
         print("🗑️  Deleting entire database...")
         success = manager.clear_database(force=True)
-        message = "Database"
-
-    if 'success' in locals():
-        print(f"✅ {message} deleted successfully" if success else f"❌ Failed to delete {message.lower()}")
+        print(f"✅ Database deleted successfully" if success else f"❌ Failed to delete database")
         return 0 if success else 1
 
 @error_handler
 @requires_server
 def handle_list(args):
-    """Handle list command"""
+    """Handle list with multi-collection and wildcard support"""
     client = get_client()
-    collections = client.list_collections()
+    all_collections = client.list_collections()
 
-    if not collections:
+    if not all_collections:
         print("📄 No collections found in database")
         return 0
 
-    documents = {}
-    for collection in collections:
-        if args.collection and collection.name != args.collection:
-            continue
+    if args.collection:
+        patterns = parse_collection_patterns(args.collection)
+        matched = match_collections(patterns, all_collections)
 
+        if not matched:
+            print(f"❌ No collections matched pattern(s): {args.collection}")
+            return 1
+
+        target_collections = [col for col in all_collections if col.name in matched]
+    else:
+        target_collections = all_collections
+
+    documents = {}
+    for collection in target_collections:
         try:
             result = collection.get(include=['documents', 'metadatas'])
             documents[collection.name] = [
@@ -735,42 +825,51 @@ def handle_list(args):
             print(f"⚠️  Error reading collection '{collection.name}': {e}")
 
     if not documents:
-        target = f"Collection '{args.collection}'" if args.collection else "No documents"
-        print(f"📄 {target} not found or empty")
+        print("📄 No documents found")
         return 0
 
-    OutputFormatter.print_documents(documents, args.collection, args.limit)
+    OutputFormatter.print_documents(documents, None, args.limit)
     return 0
 
 @error_handler
 @requires_server
 def handle_export(args):
-    """Handle export command with embedding model info"""
+    """Handle export with multi-collection and wildcard support"""
     client = get_client()
-    collections = client.list_collections()
+    all_collections = client.list_collections()
 
-    if not collections:
+    if not all_collections:
         print("📄 No collections found in database")
         return 0
 
+    if args.collection:
+        patterns = parse_collection_patterns(args.collection)
+        matched = match_collections(patterns, all_collections)
+
+        if not matched:
+            print(f"❌ No collections matched pattern(s): {args.collection}")
+            return 1
+
+        target_collections = [col for col in all_collections if col.name in matched]
+        suffix = args.collection.replace(',', '_').replace('*', 'wildcard')
+    else:
+        target_collections = all_collections
+        suffix = "all"
+
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    suffix = args.collection or "all"
     output_file = args.output or f"chroma_export_{suffix}_{timestamp}.json"
 
     print(f"📤 Exporting to '{output_file}'...")
     if args.include_embeddings:
         print("   Including embeddings in export")
 
+    if len(target_collections) > 1:
+        print(f"   Exporting {len(target_collections)} collections: {', '.join(col.name for col in target_collections)}")
+
     export_data = {
-        'export_type': 'single_collection' if args.collection else 'all_collections',
+        'export_type': 'filtered' if args.collection else 'all_collections',
         'collections': []
     }
-
-    target_collections = [col for col in collections if not args.collection or col.name == args.collection]
-
-    if args.collection and not target_collections:
-        print(f"❌ Collection '{args.collection}' not found")
-        return 1
 
     for collection in target_collections:
         print(f"   Exporting collection '{collection.name}'...")
