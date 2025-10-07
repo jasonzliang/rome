@@ -572,10 +572,10 @@ Create a synthesis with two parts:
 Make both intellectually engaging and substantive.
 
 Respond with a JSON object in this exact format:
-{{
+{
     "abstract": "<your abstract text here>",
     "artifact": "<your full synthesis text here>"
-}}
+}
 
 Your response must be valid JSON only, nothing else."""
 
