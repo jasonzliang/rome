@@ -26,65 +26,62 @@ class OpenAIHandler:
 
     # OpenAI model pricing (per 1M tokens) - Updated with latest models
     MODEL_PRICING = {
-        "gpt-4.1": {"input": 30.0, "output": 120.0},
-        "gpt-4.1-nano": {"input": 1.0, "output": 4.0},
+        # GPT-5 series (August 2025)
+        "gpt-5": {"input": 1.25, "output": 10.0},
+        "gpt-5-mini": {"input": 0.25, "output": 2.0},
+        "gpt-5-nano": {"input": 0.05, "output": 0.40},
+        # GPT-4.1 series (April 2025)
+        "gpt-4.1": {"input": 2.0, "output": 8.0},
+        "gpt-4.1-mini": {"input": 0.50, "output": 2.0},
+        "gpt-4.1-nano": {"input": 0.10, "output": 0.40},
+        # GPT-4o series
         "gpt-4o": {"input": 2.5, "output": 10.0},
         "gpt-4o-mini": {"input": 0.15, "output": 0.6},
         "gpt-4o-realtime-preview": {"input": 5.0, "output": 20.0},
         "gpt-4o-audio-preview": {"input": 5.0, "output": 20.0},
-        "gpt-4-turbo": {"input": 10.0, "output": 30.0},
-        "gpt-4-turbo-2024-04-09": {"input": 10.0, "output": 30.0},
-        "gpt-4-turbo-preview": {"input": 10.0, "output": 30.0},
-        "gpt-4": {"input": 30.0, "output": 60.0},
-        "gpt-4-0314": {"input": 30.0, "output": 60.0},
-        "gpt-4-0613": {"input": 30.0, "output": 60.0},
-        "gpt-4-32k": {"input": 60.0, "output": 120.0},
-        "gpt-4-32k-0314": {"input": 60.0, "output": 120.0},
-        "gpt-4-32k-0613": {"input": 60.0, "output": 120.0},
-        "gpt-3.5-turbo": {"input": 0.5, "output": 1.5},
-        "gpt-3.5-turbo-0125": {"input": 0.5, "output": 1.5},
-        "gpt-3.5-turbo-1106": {"input": 1.0, "output": 2.0},
-        "gpt-3.5-turbo-0613": {"input": 1.5, "output": 2.0},
-        "gpt-3.5-turbo-16k": {"input": 3.0, "output": 4.0},
-        "gpt-3.5-turbo-16k-0613": {"input": 3.0, "output": 4.0},
-        "gpt-3.5-turbo-instruct": {"input": 1.5, "output": 2.0},
+        # o-series reasoning models
         "o1": {"input": 15.0, "output": 60.0},
         "o1-preview": {"input": 15.0, "output": 60.0},
         "o1-mini": {"input": 3.0, "output": 12.0},
-        "o3-mini": {"input": 1.10, "output": 4.40},
         "o3": {"input": 10.0, "output": 40.0},
+        "o3-mini": {"input": 1.10, "output": 4.40},
         "o4-mini": {"input": 1.10, "output": 4.40},
     }
 
     MODEL_CONTEXT_SIZE = {
-        "gpt-4.1": 1000000,  # 1M tokens
-        "gpt-4.1-nano": 1000000,  # 1M tokens
-        "gpt-4o": 128000,  # 128K tokens
-        "gpt-4o-mini": 128000,  # 128K tokens
-        "gpt-4o-realtime-preview": 128000,  # 128K tokens
-        "gpt-4o-audio-preview": 128000,  # 128K tokens
-        "gpt-4-turbo": 128000,  # 128K tokens
-        "gpt-4-turbo-2024-04-09": 128000,  # 128K tokens
-        "gpt-4-turbo-preview": 128000,  # 128K tokens
-        "gpt-4": 8192,  # 8K tokens
-        "gpt-4-0314": 8192,  # 8K tokens
-        "gpt-4-0613": 8192,  # 8K tokens
-        "gpt-4-32k": 32768,  # 32K tokens
-        "gpt-4-32k-0314": 32768,  # 32K tokens
-        "gpt-4-32k-0613": 32768,  # 32K tokens
-        "gpt-3.5-turbo": 16385,  # 16K tokens
-        "gpt-3.5-turbo-0125": 16385,  # 16K tokens
-        "gpt-3.5-turbo-1106": 16385,  # 16K tokens
-        "gpt-3.5-turbo-0613": 4096,  # 4K tokens
-        "gpt-3.5-turbo-16k": 16384,  # 16K tokens
-        "gpt-3.5-turbo-16k-0613": 16384,  # 16K tokens
-        "gpt-3.5-turbo-instruct": 4096,  # 4K tokens
-        "o1": 200000,  # 200K tokens
-        "o1-preview": 128000,  # 128K tokens
-        "o1-mini": 128000,  # 128K tokens
-        "o3-mini": 200000,  # 200K tokens
-        "o3": 200000,  # 200K tokens
-        "o4-mini": 200000,  # 200K tokens
+        # GPT-5 series (272K input, 128K output)
+        "gpt-5": 272000,
+        "gpt-5-mini": 272000,
+        "gpt-5-nano": 272000,
+        # GPT-4.1 series (1M+ input, 32K output)
+        "gpt-4.1": 1047576,
+        "gpt-4.1-mini": 1047576,
+        "gpt-4.1-nano": 1047576,
+        # GPT-4o series
+        "gpt-4o": 128000,
+        "gpt-4o-mini": 128000,
+        "gpt-4o-realtime-preview": 128000,
+        "gpt-4o-audio-preview": 128000,
+        # o-series reasoning models
+        "o1": 200000,
+        "o1-preview": 128000,
+        "o1-mini": 128000,
+        "o3": 200000,
+        "o3-mini": 200000,
+        "o4-mini": 200000,
+    }
+
+    # Newer models with different API
+    NEW_MODELS = {
+        "gpt-5",
+        "gpt-5-mini",
+        "gpt-5-nano",
+        "o1",
+        "o1-preview",
+        "o1-mini",
+        "o3",
+        "o3-mini",
+        "o4-mini",
     }
 
     def __init__(self, config: Dict = None):
@@ -94,7 +91,7 @@ class OpenAIHandler:
         # Initialize cost tracking
         self.accumulated_cost = 0.0
         self.call_count = 0
-        self.cost_history = []  # List of (timestamp, cost, tokens_used) tuples
+        self.cost_history = []
 
         # Set attributes from config
         set_attributes_from_config(self, self.config, [
@@ -119,11 +116,15 @@ class OpenAIHandler:
         if self.cost_limit:
             self.logger.info(f"Cost limit enabled: ${self.cost_limit:.2f}")
 
+    def _is_new_model(self, model: str = None) -> bool:
+        """Check if model is older one."""
+        model = model or self.model
+        return model in self.NEW_MODELS
+
     def _get_max_input_tokens(self) -> int:
         """Get max input tokens."""
         return max(self.max_input_tokens or (self._get_model_context_length() - self.max_tokens), 0)
 
-    # Private methods (internal use only)
     @lru_cache(maxsize=128)
     def _get_encoding(self, model: str = None):
         """Get tiktoken encoding for the model."""
@@ -153,13 +154,11 @@ class OpenAIHandler:
         encoding = self._get_encoding(self.model)
 
         if not encoding or not precise:
-            # Fast estimation
             total_chars = sum(len(str(msg.get('content', ''))) + len(str(msg.get('role', ''))) + 10 for msg in messages)
             return total_chars // self.chars_per_token
 
-        # Precise counting
         total = sum(4 + sum(len(encoding.encode(str(v))) for v in msg.values()) for msg in messages)
-        return total + 2  # Assistant reply primer
+        return total + 2
 
     def _should_use_precise_counting(self, messages: List[Dict]) -> bool:
         """Decide if precise token counting is needed."""
@@ -307,17 +306,14 @@ class OpenAIHandler:
             role = msg.get('role', 'unknown')
             content = msg.get('content', '')
 
-            # Log the role and message number
             self.logger.debug(f"[{i}] {role}:")
 
-            # Split content by newlines and log each line separately with proper indentation
             if '\n' in content:
                 for line in content.split('\n'):
                     self.logger.debug(f"    {line}")
             else:
                 self.logger.debug(f"    {content}")
 
-            # Add a separator between messages
             if i < len(messages) - 1:
                 self.logger.debug("----------")
 
@@ -326,7 +322,7 @@ class OpenAIHandler:
         pricing = self._get_model_pricing(model)
         return (input_tokens * pricing["input"] + output_tokens * pricing["output"]) / 1_000_000
 
-    # Public methods (external interface)
+    # Public methods
 
     def get_model_pricing(self, model: str = None) -> Dict[str, float]:
         """Get pricing for a model (public interface)."""
@@ -359,9 +355,9 @@ class OpenAIHandler:
         kwargs = {
             "model": self.model,
             "messages": messages,
-            "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
             "top_p": self.top_p,
+            "max_tokens": self.max_tokens,
+            "temperature": self.temperature
         }
 
         if self.seed:
@@ -373,8 +369,15 @@ class OpenAIHandler:
         if extra_body:
             kwargs.update(extra_body)
 
+        if self._is_new_model(kwargs["model"]):
+            if "temperature" in kwargs:
+                del kwargs["temperature"]
+            if "max_tokens" in kwargs:
+                kwargs["max_completion_tokens"] = kwargs["max_tokens"]
+                del kwargs["max_tokens"]
+
         # Check cost limit (including accumulated costs)
-        self._check_and_log_cost(messages, kwargs["max_tokens"], kwargs["model"])
+        self._check_and_log_cost(messages, self.max_tokens, kwargs["model"])
 
         # Log request
         self.logger.debug(f"OpenAI API request parameters: {json.dumps({k: v for k, v in kwargs.items() if k != 'messages'}, indent=4)}")
@@ -398,7 +401,6 @@ class OpenAIHandler:
             usage = response.usage
             actual_cost = self._estimate_cost(usage.prompt_tokens, usage.completion_tokens, kwargs["model"])
 
-            # Add the actual cost to our tracking
             self._add_cost(actual_cost, usage.prompt_tokens, usage.completion_tokens)
 
             pricing = self._get_model_pricing(kwargs["model"])
@@ -422,5 +424,5 @@ class OpenAIHandler:
             "model": self.model,
             "model_pricing": self._get_model_pricing(),
             "pricing_per_1m_tokens": True,
-            "cost_history": self.cost_history[-10:]  # Last 10 calls for brevity
+            "cost_history": self.cost_history[-10:]
         }
