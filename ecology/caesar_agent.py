@@ -337,14 +337,16 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
 
 Available paths forward:
 {link_options}
+"""
 
+        prompt += """
 Based on your role of seeking novel patterns and deeper understanding, which link offers the most promising direction for exploration?
 
 Respond with a JSON object in this exact format:
-{{
+{
     "choice": <number from 1 to {len(links)}>,
     "reason": "<brief explanation of why this path is promising>"
-}}
+}
 
 Your response must be valid JSON only, nothing else."""
 
@@ -570,15 +572,17 @@ Create a synthesis with two parts:
    - Proposes new directions or perspectives
 
 Make both intellectually engaging and substantive.
+"""
 
+        # Add JSON template as regular string (not f-string) to avoid escaping issues
+        synthesis_prompt += """
 Respond with a JSON object in this exact format:
-{{
+{
     "abstract": "<your abstract text here>",
     "artifact": "<your full synthesis text here>"
-}}
+}
 
-Your response must be valid JSON only, nothing else.
-"""
+Your response must be valid JSON only, nothing else."""
 
         try:
             response = self.chat_completion(
@@ -588,7 +592,8 @@ Your response must be valid JSON only, nothing else.
             result = self.parse_json_response(response)
 
             if not result or "abstract" not in result or "artifact" not in result:
-                self.logger.error("Invalid JSON response from LLM"); raise
+                self.logger.error("Invalid JSON response from LLM")
+                raise ValueError("Missing required keys in response")
         except Exception as e:
             self.logger.error(f"Synthesis LLM call failed: {e}")
             result = {
