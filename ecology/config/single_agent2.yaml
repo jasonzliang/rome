@@ -16,7 +16,7 @@ CaesarAgent:
   max_iterations: 600
   exploration_temperature: 0.8
   save_graph_interval: 10
-  draw_graph: true
+  draw_graph: false
 
 # ============================================================================
 # LLM CONFIGURATION
