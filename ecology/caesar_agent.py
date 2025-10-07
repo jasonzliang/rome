@@ -555,11 +555,12 @@ Your response must be valid JSON only, nothing else."""
 
         if not perspectives:
             return {"abstract": "", "artifact": "Unable to query knowledge base for synthesis."}
+        perspectives = '\n'.join(perspectives)
 
         # Generate synthesis with abstract in single LLM call
         synthesis_prompt = f"""You have completed an exploration through {len(self.visited_urls)} interconnected sources, gathering {self.kb_manager.size()} insights.
 
-{'\n'.join(perspectives)}
+{perspectives}
 
 Create a synthesis with two parts:
 
