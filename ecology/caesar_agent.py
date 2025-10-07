@@ -305,10 +305,6 @@ You navigate through information space systematically yet creatively, always wit
             self.logger.error(f"Failed to load checkpoint: {e}")
             return False
 
-    def _should_checkpoint(self, iteration: int) -> bool:
-        """Determine if checkpoint should be saved this iteration"""
-        return iteration % self.checkpoint_interval == 0
-
     def _is_allowed_url(self, url: str) -> bool:
         """Check if URL is within allowed domains"""
         if self.allow_all_domains:
@@ -609,12 +605,17 @@ Your response must be valid JSON only, nothing else."""
                 iteration % self.save_graph_interval == 0 or
                 iteration == self.max_iterations)
 
+    def _should_checkpoint(self, iteration: int) -> bool:
+        """Determine if checkpoint should be saved this iteration"""
+        return (iteration == 1 or
+                iteration % self.checkpoint_interval == 0 or
+                iteration == self.max_iterations)
+
     def explore(self) -> str:
         """Execute the main exploration loop"""
         start_iteration = self.current_iteration + 1
         self.logger.info(f"Beginning exploration: iterations {start_iteration} to {self.max_iterations}")
 
-        self.last_iter_saved = -1
         for iteration in range(start_iteration, self.max_iterations + 1):
             self.current_iteration = iteration
 
@@ -641,17 +642,6 @@ Your response must be valid JSON only, nothing else."""
             # Think
             self.think(content)
 
-            # Save checkpoint periodically
-            if self._should_checkpoint(iteration):
-                self._save_checkpoint(iteration)
-
-            # Save graph periodically
-            if self._should_save_graph(iteration):
-                self.logger.debug(f"Saving graph at iteration {iteration}")
-                self._save_graph_data(iteration)
-                self._draw_graph_visualization(iteration)
-                self.last_iter_saved = iteration
-
             # Act (skip on last iteration)
             if iteration < self.max_iterations:
                 next_url = self.act(links)
@@ -662,12 +652,21 @@ Your response must be valid JSON only, nothing else."""
                 else:
                     break
 
-        # Final saves
-        if self.last_iter_saved < self.max_iterations:
-            self.logger.debug("Final graph save")
-            self._save_graph_data(self.max_iterations)
-            self._draw_graph_visualization(self.max_iterations)
-            self._save_checkpoint(self.max_iterations)
+            # Save graph periodically
+            if self._should_save_graph(iteration):
+                self.logger.debug(f"Saving graph at iteration {iteration}")
+                self._save_graph_data(iteration)
+                self._draw_graph_visualization(iteration)
+
+            # Save checkpoint AFTER act() completes - ensures we don't re-process URLs on resume
+            if self._should_checkpoint(iteration):
+                self._save_checkpoint(iteration)
+
+        # One more save at end of iteration
+        self.logger.debug(f"Loop ended at iteration {self.current_iteration}, saving")
+        self._save_graph_data(self.current_iteration)
+        self._draw_graph_visualization(self.current_iteration)
+        self._save_checkpoint(self.current_iteration)
 
         self.logger.info(f"\nExploration complete: visited {len(self.visited_urls)} pages")
         return self._synthesize_artifact()
