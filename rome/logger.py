@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Optional
 from rich.console import Console
 from rich.logging import RichHandler
+from rich.markup import escape
 
 # Global singleton logger instance
 _logger_instance = None
@@ -130,8 +131,9 @@ class ParentPathRichHandler(RichHandler):
             parent_info = user_frames[1]
 
         if parent_info:
-            parent_path = f"\\[{parent_info['filename']}:{parent_info['lineno']}]"
-            record.msg = f"{parent_path} {record.msg}"
+            parent_path = f"[{parent_info['filename']}:{parent_info['lineno']}]"
+            # Escape both the parent path and the message to prevent markup interpretation
+            record.msg = f"{escape(parent_path)} {escape(str(record.msg))}"
 
         super().emit(record)
 
