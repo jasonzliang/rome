@@ -443,7 +443,7 @@ Your response must be valid JSON only, nothing else."""
                 label = path_parts[-1] if path_parts and path_parts[-1] else parsed.netloc
                 label = label[:SHORT_SUMMARY_LEN] + '...' if len(label) > SHORT_SUMMARY_LEN else label
 
-                insights_preview = self.graph.nodes[node].get('insights', '')[:SUMMARY_LEN]
+                insights_preview = self.graph.nodes[node].get('insights', '')[:SUMMARY_LENGTH]
                 if insights_preview:
                     label += f"\n{insights_preview}..."
 
@@ -454,7 +454,7 @@ Your response must be valid JSON only, nothing else."""
 
             # Add edges with reasons
             for u, v in self.graph.edges():
-                reason = self.graph.edges[u, v].get('reason', '')[:SUMMARY_LEN]
+                reason = self.graph.edges[u, v].get('reason', '')[:SUMMARY_LENGTH]
                 viz.add_edge(u, v, label=reason)
 
             # Save visualization
