@@ -29,6 +29,12 @@ from rome.config import LONG_SUMMARY_LEN
 from rome.kb_client import EMBEDDING_MODELS
 
 try:
+    __import__('pysqlite3')
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except:
+    print(f"pysqlite3 import error: {e}")
+
+try:
     import chromadb
     from chromadb.utils.embedding_functions import (
        SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
