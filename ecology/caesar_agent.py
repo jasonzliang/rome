@@ -27,8 +27,6 @@ CAESAR_CONFIG = {
         "allowed_domains": [],
         # Maximum depth of exploration tree before backtracking
         "max_depth": 1e12,
-        # Temperature for LLM decisions (higher = more exploratory choices)
-        "exploration_temperature": 0.8,
         # Save exploration graph every N iterations
         "save_graph_interval": 5,
         # Generate visual graph representations (requires pygraphviz)
@@ -39,6 +37,15 @@ CAESAR_CONFIG = {
         "checkpoint_interval": 1,
         # Automatically resume from checkpoint if found on initialization
         "auto_resume": True,
+
+        # False for classic mode
+        "iterative_synthesis": True,
+        # Number of q/a iterations
+        "synthesis_iterations": 5,
+        # KB docs per query
+        "top_k": 10,
+        # Temperature for LLM decisions (higher = more exploratory choices)
+        "exploration_temperature": 0.8,
     },
 
     "OpenAIHandler": {
@@ -97,11 +104,7 @@ class CaesarAgent(Agent):
             self.config = CAESAR_CONFIG.copy()
 
         caesar_config = self.config.get('CaesarAgent', {})
-        set_attributes_from_config(self, caesar_config,
-            ['max_iterations', 'max_depth', 'exploration_temperature',
-             'save_graph_interval', 'draw_graph', 'starting_url',
-             'allowed_domains', 'same_page_links', 'checkpoint_interval',
-             'auto_resume'])
+        set_attributes_from_config(self, caesar_config, CAESAR_CONFIG['CaesarAgent'].keys())
 
         if starting_url:
             self.starting_url = starting_url
@@ -477,7 +480,7 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
             try:
                 kb_context = self.kb_manager.query(
                     "What patterns, gaps, or questions have emerged? What should we explore next?",
-                    top_k=5
+                    top_k=self.top_k
                 )
             except Exception as e:
                 self.logger.error(f"KB query failed: {e}")
@@ -686,97 +689,180 @@ Your response must be valid JSON only, nothing else."""
         self.logger.info(f"\nExploration complete: visited {len(self.visited_urls)} pages")
         return self._synthesize_artifact()
 
-    def _synthesize_artifact(self) -> Dict[str, str]:
-        """Generate final synthesis artifact as JSON with abstract and main content"""
-        self.logger.info("[SYNTHESIS] Generating artifact")
+    def _generate_next_query(self, previous_queries: List[str],
+                             previous_responses: List[str]) -> Optional[str]:
+        """Generate next synthesis query based on accumulated context"""
+        context = "\n\n".join([
+            f"Q: {q}\nA: {r}" for q, r in zip(previous_queries, previous_responses)
+        ])
 
-        if self.kb_manager.size() == 0:
-            self.logger.error("No insights in KB, cannot synthesize")
-            return {"abstract": "", "artifact": "No insights collected during exploration."}
+        prompt = f"""Previous exploration queries and responses:
+{context}
 
-        queries = [
-            "What are the central themes and patterns discovered?",
-            "What unexpected connections or insights emerged?",
-            "What contradictions or tensions were revealed?",
-            "What questions remain open or were raised?",
-            "What novel perspective emerged from this exploration?"
-        ]
+Based on the insights gathered so far, what is the next most important question to ask
+to deepen understanding and reveal emergent patterns? The question should:
+- Build on previous insights rather than repeat them
+- Seek connections between different themes
+- Identify gaps or contradictions to explore
+- Move toward synthesis rather than enumeration
 
-        perspectives = []
-        for q in queries:
+Respond with JSON:
+{{
+    "query": "<your next question>",
+    "reason": "<why this question advances synthesis>"
+}}"""
+
+        try:
+            response = self.chat_completion(prompt, response_format={"type": "json_object"})
+            result = self.parse_json_response(response)
+            if result and "query" in result:
+                self.logger.debug(f"Next query: {result['query']} ({result.get('reason', '')})")
+                return result["query"]
+        except Exception as e:
+            self.logger.error(f"Query generation failed: {e}")
+        return None
+
+
+    def _get_synthesis_queries(self, mode: str = "iterative") -> List[str]:
+        """Get queries for synthesis - either fixed or iteratively generated"""
+        if mode == "classic":
+            return [
+                "What are the central themes and patterns discovered?",
+                "What unexpected connections or insights emerged?",
+                "What contradictions or tensions were revealed?",
+                "What questions remain open or were raised?",
+                "What novel perspective emerged from this exploration?"
+            ]
+
+        # Iterative mode
+        k = self.synthesis_iterations
+        queries = ["What are the central themes and patterns discovered across all sources?"]
+        responses = []
+
+        for i in range(k):
+            self.logger.info(f"[SYNTHESIS ITER {i+1}/{k}] Query: {queries[-1]}")
+
             try:
-                resp = self.kb_manager.query(q, top_k=5)
-                if resp:
-                    perspectives.append(f"### {q}\n{resp}\n")
+                response = self.kb_manager.query(queries[-1], top_k=top_k)
+                if not response:
+                    self.logger.warning(f"Empty response, stopping at iteration {i+1}")
+                    break
+                responses.append(response)
             except Exception as e:
-                self.logger.error(f"KB query failed for '{q}': {e}")
+                self.logger.error(f"KB query failed: {e}")
+                break
 
-        if not perspectives:
-            return {"abstract": "", "artifact": "Unable to query knowledge base for synthesis."}
-        perspectives = '\n'.join(perspectives)
+            # Generate next query if not last iteration
+            if i < k - 1:
+                next_query = self._generate_next_query(queries, responses)
+                if not next_query:
+                    self.logger.info("Query generation terminated early")
+                    break
+                queries.append(next_query)
 
-        synthesis_prompt = f"""You have completed an exploration through {len(self.visited_urls)} interconnected sources, gathering {self.kb_manager.size()} insights.
+        return queries
+
+
+    def _query_kb_for_synthesis(self, queries: List[str]) -> List[Tuple[str, str]]:
+        """Execute queries against KB and return Q&A pairs"""
+        qa_pairs = []
+        for query in queries:
+            try:
+                response = self.kb_manager.query(query, top_k=top_k)
+                if response:
+                    qa_pairs.append((query, response))
+            except Exception as e:
+                self.logger.error(f"KB query failed for '{query}': {e}")
+        return qa_pairs
+
+
+    def _build_synthesis_prompt(self, qa_pairs: List[Tuple[str, str]]) -> str:
+        """Build synthesis prompt from Q&A pairs"""
+        perspectives = "\n\n".join([
+            f"### {q}\n{r}" for q, r in qa_pairs
+        ])
+
+        return f"""You completed an exploration through {len(self.visited_urls)} sources,
+    gathering {self.kb_manager.size()} insights. Through questioning, key patterns emerged:
 
 {perspectives}
 
 Create a synthesis with two parts:
 
-1. **Abstract** (100-150 tokens): A concise summary capturing the core discovery, key patterns, and significance
+1. **Abstract** (100-150 tokens): Concise summary of core discovery and significance
 
-2. **Artifact** (Up to 3000 tokens): A structured synthesis that:
-   - Identifies emergent patterns not visible in individual sources
+2. **Artifact** (Up to 3000 tokens): Structured synthesis that:
+   - Reveals emergent patterns not visible in individual sources
    - Highlights novel connections and unexpected relationships
    - Explores tensions, contradictions, or open questions
    - Proposes new directions or perspectives
 
-Make both intellectually engaging and substantive.
-
-Respond with a JSON object in this exact format:
+Respond with valid JSON only:
 {{
-    "abstract": "<your abstract text here>",
-    "artifact": "<your full synthesis text here>"
-}}
+    "abstract": "<abstract text>",
+    "artifact": "<synthesis text>"
+}}"""
 
-Your response must be valid JSON only, nothing else."""
+
+    def _synthesize_artifact(self) -> Dict[str, str]:
+        """Generate final synthesis - supports iterative or classic mode"""
+        mode = "iterative" if self.iterative_synthesis else "classic"
+        self.logger.info(f"[SYNTHESIS] Using {mode} synthesis approach")
+
+        if self.kb_manager.size() == 0:
+            return {"abstract": "", "artifact": "No insights collected during exploration."}
+
+        # Get queries (fixed or dynamically generated)
+        queries = self._get_synthesis_queries(mode)
+
+        # Execute queries against KB
+        qa_pairs = self._query_kb_for_synthesis(queries)
+
+        if not qa_pairs:
+            return {"abstract": "", "artifact": "Unable to query knowledge base for synthesis."}
+
+        # Generate synthesis from Q&A pairs
+        prompt = self._build_synthesis_prompt(qa_pairs)
 
         try:
-            response = self.chat_completion(
-                synthesis_prompt,
-                response_format={"type": "json_object"}
-            )
+            response = self.chat_completion(prompt, response_format={"type": "json_object"})
             result = self.parse_json_response(response)
 
             if not result or "abstract" not in result or "artifact" not in result:
-                self.logger.error("Invalid JSON response from LLM")
                 raise ValueError("Missing required keys in response")
         except Exception as e:
-            self.logger.error(f"Synthesis LLM call failed: {e}")
-            result = {
-                "abstract": "Synthesis generation failed.",
-                "artifact": f"Synthesis generation failed: {e}"
-            }
+            self.logger.error(f"Synthesis generation failed: {e}")
+            result = {"abstract": "Synthesis generation failed.", "artifact": f"Error: {e}"}
 
+        # Add metadata
         result["metadata"] = {
             "pages_visited": len(self.visited_urls),
             "insights_collected": self.kb_manager.size(),
+            "synthesis_mode": mode,
+            "queries_used": len(qa_pairs),
             "max_depth": self.current_depth,
             "starting_url": self.starting_url
         }
 
-        try:
-            filepath = os.path.join(self.get_repo(), f"{self.get_id()}.synthesis.json")
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(result, f, indent=4, ensure_ascii=False)
-            self.logger.info(f"Artifact saved as JSON: {filepath}")
+        # Save outputs
+        self._save_synthesis_outputs(result)
+        self.logger.info("Synthesis complete")
+        return result
 
-            filepath = os.path.splitext(filepath)[0] + ".txt"
-            with open(filepath, 'w', encoding='utf-8') as f:
+
+    def _save_synthesis_outputs(self, result: Dict) -> None:
+        """Save synthesis in both JSON and text formats"""
+        base_path = os.path.join(self.get_repo(), f"{self.get_id()}.synthesis")
+
+        try:
+            with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
+                json.dump(result, f, indent=4, ensure_ascii=False)
+            self.logger.info(f"Saved: {base_path}.json")
+
+            with open(f"{base_path}.txt", 'w', encoding='utf-8') as f:
                 f.write(f"ABSTRACT:\n{result['abstract']}\n\n")
                 f.write(f"ARTIFACT:\n{result['artifact']}\n\n")
-                f.write(f"METADATA:\n{str(result['metadata'])}")
-            self.logger.info(f"Artifact saved as txt: {filepath}")
+                f.write(f"METADATA:\n{json.dumps(result['metadata'], indent=2)}")
+            self.logger.info(f"Saved: {base_path}.txt")
         except Exception as e:
-            self.logger.error(f"Failed to save artifact: {e}")
-
-        self.logger.info("Artifact synthesis complete")
-        return result
+            self.logger.error(f"Failed to save synthesis: {e}")
