@@ -32,7 +32,6 @@ console = Console()
 # Configuration
 SERVER_IP = "biggpu"
 SERVER_DIR = "~/Desktop/rome/benchmark/result"
-LOCAL_DIR = "~/Desktop/rome/benchmark/result"
 
 def run_cmd(cmd, capture=True, timeout=None):
     """Execute command with timeout and error handling."""
@@ -112,7 +111,7 @@ Always quote wildcards to prevent local shell expansion!
     parser.add_argument("-r", "--remote-dir", default=SERVER_DIR, help=f"Remote directory (default: {SERVER_DIR})")
     parser.add_argument("-n", "--dry-run", action="store_true", help="Dry run")
     parser.add_argument("-e", "--exclude", action="append", default=[], help="Exclude pattern")
-    parser.add_argument("-l", "--local-dir", default=LOCAL_DIR, help="Local directory")
+    parser.add_argument("-l", "--local-dir", help="Local directory")
     parser.add_argument("-w", "--no-wildcard", action="store_true", help="Don't auto-append *")
     parser.add_argument("--ls", action="store_true", help="List remote directories")
 
@@ -133,11 +132,13 @@ Always quote wildcards to prevent local shell expansion!
             sys.exit(1)
 
         # Show config
+        if not args.local_dir: args.local_dir = args.remote_dir
         config = f"Server: {args.server}\nRemote: {args.remote_dir}/{pattern}\nLocal: {args.local_dir}"
         if args.exclude: config += f"\nExcludes: {', '.join(args.exclude)}"
         console.print(Panel(config, title="[bold]Download Configuration[/bold]", border_style="cyan"))
 
-        success = download(args.server, args.remote_dir, pattern, args.local_dir, args.exclude, args.dry_run)
+        success = download(args.server, args.remote_dir, pattern, args.local_dir, args.exclude,
+            args.dry_run)
 
     sys.exit(0 if success else 1)
 

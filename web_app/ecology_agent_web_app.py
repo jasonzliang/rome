@@ -756,7 +756,7 @@ with tab4:
                 st.plotly_chart(embedding_fig, use_container_width=True)
 
                 # Show top topic keywords
-                st.subheader("📚 Top Topics by Frequency")
+                st.subheader("📚 Top Topic Keywords by Frequency")
                 st.caption("Most frequently occurring words across all topics")
 
                 # Extract all topic words
