@@ -12,7 +12,7 @@ try:
     __import__('pysqlite3')
     sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 except:
-    print(f"pysqlite3 import error: {e}")
+    print(f"pysqlite3 import error: {e}"); exit(1)
 
 try:
     import chromadb
@@ -24,8 +24,7 @@ try:
     from llama_index.llms.openai import OpenAI
     from llama_index.core.node_parser import SentenceSplitter
 except ImportError as e:
-    print(f"Import error: {e}")
-    print("Install with: pip install chromadb llama-index llama-index-vector-stores-chroma llama-index-embeddings-openai llama-index-llms-openai")
+    print(f"Import error: {e}, install with: pip install chromadb llama-index llama-index-vector-stores-chroma llama-index-embeddings-openai llama-index-llms-openai")
     exit(1)
 
 from .config import set_attributes_from_config

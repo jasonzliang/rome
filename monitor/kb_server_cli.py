@@ -22,26 +22,25 @@ from typing import Dict, Optional, List, Any, Callable, Tuple, Set
 from datetime import datetime
 from functools import wraps
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from rome.kb_server import ChromaServerManager
-from rome.logger import get_logger
-from rome.config import LONG_SUMMARY_LEN
-from rome.kb_client import EMBEDDING_MODELS
-
 try:
     __import__('pysqlite3')
     sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 except:
-    print(f"pysqlite3 import error: {e}")
+    print(f"pysqlite3 import error: {e}"); exit(1)
 
 try:
     import chromadb
     from chromadb.utils.embedding_functions import (
        SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
 except ImportError as e:
-    print(f"Import error: {e}")
-    print("Install with: pip install chromadb")
+    print(f"Import error: {e}, install with: pip install chromadb")
     sys.exit(1)
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from rome.kb_server import ChromaServerManager
+from rome.logger import get_logger
+from rome.config import LONG_SUMMARY_LEN
+from rome.kb_client import EMBEDDING_MODELS
 
 logger = get_logger()
 logger.configure({
