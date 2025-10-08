@@ -12,6 +12,7 @@ from gensim.models import Word2Vec
 from sklearn.manifold import TSNE
 from sklearn.metrics.pairwise import cosine_similarity
 import warnings
+import multiprocessing
 warnings.filterwarnings('ignore')
 
 st.set_page_config(page_title="Ecology Agent Graph Explorer", layout="wide")
@@ -87,10 +88,9 @@ def create_network_graph(data, layout_type='spring'):
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
-        mode='markers+text',
+        mode='markers',
         hoverinfo='text',
-        text=node_text,
-        textposition="top center",
+        hovertext=node_text,
         marker=dict(
             showscale=True,
             colorscale='Viridis',
@@ -98,9 +98,8 @@ def create_network_graph(data, layout_type='spring'):
             color=node_color,
             colorbar=dict(
                 thickness=15,
-                title='Depth',
-                xanchor='left',
-                titleside='right'
+                title=dict(text='Depth', side='right'),
+                xanchor='left'
             ),
             line=dict(width=2, color='white')))
 
@@ -145,20 +144,40 @@ def create_evolution_plots(df):
     """Create plots showing graph evolution."""
     fig = go.Figure()
 
+    # Add nodes trace
     fig.add_trace(go.Scatter(
-        x=df['iteration'], y=df['num_nodes'],
-        name='Nodes', mode='lines+markers'))
+        x=df['iteration'],
+        y=df['num_nodes'],
+        name='Nodes',
+        mode='lines+markers',
+        line=dict(width=3, color='#1f77b4'),
+        marker=dict(size=10, color='#1f77b4'),
+        hovertemplate='<b>Iteration %{x}</b><br>Nodes: %{y}<extra></extra>'))
 
+    # Add edges trace
     fig.add_trace(go.Scatter(
-        x=df['iteration'], y=df['num_edges'],
-        name='Edges', mode='lines+markers'))
+        x=df['iteration'],
+        y=df['num_edges'],
+        name='Edges',
+        mode='lines+markers',
+        line=dict(width=3, color='#ff7f0e'),
+        marker=dict(size=10, color='#ff7f0e'),
+        hovertemplate='<b>Iteration %{x}</b><br>Edges: %{y}<extra></extra>'))
 
     fig.update_layout(
         title='Graph Growth Over Time',
         xaxis_title='Iteration',
         yaxis_title='Count',
         hovermode='x unified',
-        height=400)
+        height=500,
+        showlegend=True,
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01,
+            bgcolor='rgba(255,255,255,0.8)'
+        ))
 
     return fig
 
@@ -168,18 +187,28 @@ def create_depth_plot(df):
 
     fig.add_trace(go.Scatter(
         x=df['iteration'], y=df['avg_depth'],
-        name='Average Depth', mode='lines+markers'))
+        name='Average Depth', mode='lines+markers',
+        line=dict(width=3),
+        marker=dict(size=8)))
 
     fig.add_trace(go.Scatter(
         x=df['iteration'], y=df['max_depth'],
-        name='Max Depth', mode='lines+markers'))
+        name='Max Depth', mode='lines+markers',
+        line=dict(width=3),
+        marker=dict(size=8)))
 
     fig.update_layout(
         title='Exploration Depth Over Time',
         xaxis_title='Iteration',
-        yaxis_title='Depth',
+        yaxis_title='Depth (steps from origin)',
         hovermode='x unified',
-        height=400)
+        height=400,
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01
+        ))
 
     return fig
 
@@ -214,8 +243,8 @@ def train_word2vec_model(graphs):
             vector_size=100,
             window=5,
             min_count=2,
-            workers=1,  # Changed from 4 to 1 for compatibility
-            epochs=10,
+            workers=multiprocessing.cpu_count(),
+            epochs=20,
             seed=42
         )
         return model
@@ -308,19 +337,16 @@ def create_topic_embedding_plot(topic_vectors):
     fig.add_trace(go.Scatter(
         x=coords[:, 0],
         y=coords[:, 1],
-        mode='markers+text',
-        text=topics,
-        textposition='top center',
-        textfont=dict(size=8),
+        mode='markers',
+        hoverinfo='text',
+        hovertext=[f"<b>{topic}</b><br>Index: {i}" for i, topic in enumerate(topics)],
         marker=dict(
             size=10,
-            color=range(len(topics)),
+            color=list(range(len(topics))),  # Convert range to list
             colorscale='Viridis',
             showscale=True,
-            colorbar=dict(title="Topic Index")
-        ),
-        hovertext=[f"{topic}<br>Index: {i}" for i, topic in enumerate(topics)],
-        hoverinfo='text'
+            colorbar=dict(title=dict(text="Topic Index"))
+        )
     ))
 
     fig.update_layout(
@@ -334,7 +360,7 @@ def create_topic_embedding_plot(topic_vectors):
     return fig
 
 # Main app
-st.title("🔍 Ecology Agent Graph Explorer")
+st.title("🌿 Ecology Agent Graph Explorer")
 
 # Sidebar
 st.sidebar.header("Configuration")
@@ -345,81 +371,108 @@ st.sidebar.subheader("📁 Select Directory")
 # Initialize session state
 home_dir = os.path.expanduser("~")
 if 'current_dir' not in st.session_state:
-    st.session_state['current_dir'] = "~/Desktop/rome/ecology/result/10_6_explore_science"
+    st.session_state['current_dir'] = os.path.join(home_dir, "Desktop")
+if 'selected_dir' not in st.session_state:
+    st.session_state['selected_dir'] = None
 
-# Option to use file browser or text input
-input_method = st.sidebar.radio(
-    "Input method:",
-    ["Text Input", "Browse"],
-    help="Choose how to specify the directory")
+# Option 1: Manual path input (for local runs)
+st.sidebar.markdown("**Option 1: Enter Directory Path**")
+manual_path = st.sidebar.text_input(
+    "Directory path:",
+    placeholder="/path/to/your/graph/directory",
+    help="Paste the full path to your graph directory")
 
-if input_method == "Text Input":
-    directory = st.sidebar.text_input(
-        "Graph Directory Path",
-        value=st.session_state.get('current_dir', '~/Desktop/rome/ecology/result/10_6_explore_science'),
-        help="Enter the full path to the directory containing graph JSON files")
-    directory = os.path.expanduser(directory)
-    st.session_state['current_dir'] = directory
-else:
-    # For browse mode, provide common locations
-    home_dir = os.path.expanduser("~")
-    current_dir = st.session_state.get('current_dir', os.path.join(home_dir, "Desktop"))
-    current_dir = os.path.expanduser(current_dir)
+if manual_path and st.sidebar.button("📂 Load from Path", use_container_width=True):
+    manual_path = os.path.expanduser(manual_path)
+    if os.path.exists(manual_path) and os.path.isdir(manual_path):
+        st.session_state['selected_dir'] = manual_path
+        st.rerun()
+    else:
+        st.sidebar.error("❌ Invalid directory path")
 
-    # Show current directory
-    st.sidebar.text_input(
-        "Current Directory",
-        value=current_dir,
-        disabled=True,
-        help="Currently browsing this directory")
+st.sidebar.markdown("---")
 
-    if os.path.exists(current_dir):
-        # List directories
-        try:
-            items = os.listdir(current_dir)
-            dirs = sorted([d for d in items
-                          if os.path.isdir(os.path.join(current_dir, d))
-                          and not d.startswith('.')])
-            dirs.insert(0, "..")  # Add parent directory option
+# Option 2: Directory browser
+st.sidebar.markdown("**Option 2: Browse Directories**")
 
-            selected_dir = st.sidebar.selectbox(
-                "Select subdirectory",
-                dirs,
-                help="Choose a subdirectory or '..' to go up")
+# Directory browser
+current_dir = st.session_state.get('current_dir', home_dir)
+current_dir = os.path.expanduser(current_dir)
 
-            if selected_dir == "..":
-                directory = os.path.dirname(current_dir)
-            else:
-                directory = os.path.join(current_dir, selected_dir)
+# Show current directory
+st.sidebar.text_area(
+    "Currently browsing:",
+    value=current_dir,
+    height=60,
+    disabled=True,
+    help="Currently browsing this directory")
 
-            # Navigation buttons
-            col1, col2 = st.sidebar.columns(2)
+if os.path.exists(current_dir) and os.path.isdir(current_dir):
+    # List directories
+    try:
+        items = os.listdir(current_dir)
+        dirs = sorted([d for d in items
+                      if os.path.isdir(os.path.join(current_dir, d))
+                      and not d.startswith('.')])
+        dirs.insert(0, "..")  # Add parent directory option
+        dirs.insert(0, ".")   # Add current directory option
+
+        selected_dir = st.sidebar.selectbox(
+            "📂 Navigate to:",
+            dirs,
+            help="Select '..' to go up, '.' to use current directory, or choose a subdirectory")
+
+        # Navigation buttons
+        col1, col2, col3 = st.sidebar.columns(3)
+
+        if selected_dir == "..":
+            if col1.button("⬆️ Up", use_container_width=True):
+                st.session_state['current_dir'] = os.path.dirname(current_dir)
+                st.rerun()
+        elif selected_dir == ".":
+            if col2.button("✅ Use", use_container_width=True):
+                st.session_state['selected_dir'] = current_dir
+                st.rerun()
+        else:
             if col1.button("📂 Open", use_container_width=True):
-                st.session_state['current_dir'] = directory
+                st.session_state['current_dir'] = os.path.join(current_dir, selected_dir)
                 st.rerun()
 
             if col2.button("✅ Use", use_container_width=True):
-                st.session_state['confirmed_dir'] = directory
-                st.session_state['current_dir'] = directory
+                st.session_state['selected_dir'] = os.path.join(current_dir, selected_dir)
+                st.rerun()
 
-        except PermissionError:
-            st.sidebar.error("❌ Permission denied")
-            directory = current_dir
-        except Exception as e:
-            st.sidebar.error(f"❌ Error: {e}")
-            directory = current_dir
-    else:
-        st.sidebar.error("❌ Directory does not exist")
-        directory = home_dir
+        # Quick jump to common locations
+        st.sidebar.markdown("**Quick Jump:**")
+        jump_cols = st.sidebar.columns(2)
 
-# Use confirmed directory if available
-if 'confirmed_dir' in st.session_state:
-    directory = st.session_state['confirmed_dir']
+        if jump_cols[0].button("🏠 Home", use_container_width=True):
+            st.session_state['current_dir'] = home_dir
+            st.rerun()
+
+        if jump_cols[1].button("🖥️ Desktop", use_container_width=True):
+            st.session_state['current_dir'] = os.path.join(home_dir, "Desktop")
+            st.rerun()
+
+    except PermissionError:
+        st.sidebar.error("❌ Permission denied")
+    except Exception as e:
+        st.sidebar.error(f"❌ Error: {e}")
+else:
+    st.sidebar.error("❌ Directory does not exist")
+    if st.sidebar.button("Reset to Home"):
+        st.session_state['current_dir'] = home_dir
+        st.rerun()
+
+# Use selected directory or current
+directory = st.session_state.get('selected_dir')
+if directory is None:
+    directory = current_dir
 
 # Validate directory
-if not os.path.exists(directory):
-    st.error(f"❌ Directory not found: `{directory}`")
-    st.info("💡 Please enter a valid directory path or use the Browse option")
+if not directory or not os.path.exists(directory):
+    st.error(f"❌ Please select a directory using the browser on the left")
+    st.info("💡 Navigate to your graph directory and click '✅ Use Current' or '✅ Use This'")
     st.stop()
 
 # Show current directory being used
@@ -481,7 +534,8 @@ with tab1:
     with col2:
         layout = st.selectbox(
             "Layout Algorithm",
-            ['spring', 'circular', 'kamada', 'shell'])
+            ['kamada', 'spring', 'circular', 'shell'],
+            index=0)
 
     data = graphs[iteration]
 
@@ -538,6 +592,14 @@ with tab1:
 with tab2:
     st.header("Evolution Analysis")
 
+    st.info("""
+    📊 **Understanding the Metrics:**
+    - **Nodes**: Number of unique topics/Wikipedia pages discovered
+    - **Edges**: Number of connections/links between topics
+    - **Average Depth**: Mean distance of all nodes from the starting point (how spread out the exploration is)
+    - **Max Depth**: Furthest distance reached from the starting point (how deep the exploration went)
+    """)
+
     # Compute metrics
     df_metrics = analyze_evolution(graphs)
 
@@ -553,7 +615,9 @@ with tab2:
         x=df_metrics['iteration'],
         y=df_metrics['density'],
         mode='lines+markers',
-        name='Graph Density'))
+        name='Graph Density',
+        line=dict(width=3),
+        marker=dict(size=10)))
 
     fig_density.update_layout(
         title='Graph Density Over Time',
@@ -562,25 +626,6 @@ with tab2:
         height=400)
 
     st.plotly_chart(fig_density, use_container_width=True)
-
-    # Summary statistics
-    st.subheader("Summary Statistics")
-    st.dataframe(df_metrics.describe(), use_container_width=True)
-
-    # Growth rate analysis
-    st.subheader("Growth Rate Analysis")
-    df_metrics['node_growth_rate'] = df_metrics['num_nodes'].pct_change() * 100
-    df_metrics['edge_growth_rate'] = df_metrics['num_edges'].pct_change() * 100
-
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric(
-            "Avg Node Growth Rate",
-            f"{df_metrics['node_growth_rate'].mean():.2f}%")
-    with col2:
-        st.metric(
-            "Avg Edge Growth Rate",
-            f"{df_metrics['edge_growth_rate'].mean():.2f}%")
 
 with tab3:
     st.header("Detailed Insights Explorer")
@@ -696,11 +741,70 @@ with tab4:
 
             # Topic embedding visualization
             st.subheader("Topic Embedding Space")
-            st.markdown("Visualizes how topics are related in semantic space using t-SNE dimensionality reduction")
+            st.markdown("""
+            **What you're seeing:**
+            - Each point represents a topic (Wikipedia page) from your exploration
+            - **Topic Index**: Simply a sequential number assigned to each topic (0, 1, 2, 3...)
+            - **Position**: Topics that are semantically similar are placed closer together
+            - **t-SNE**: Reduces 100-dimensional word embeddings to 2D for visualization
+
+            💡 **How to interpret:** Topics close together have similar content/concepts, while distant topics are semantically different.
+            """)
 
             embedding_fig = create_topic_embedding_plot(topic_vectors)
             if embedding_fig:
                 st.plotly_chart(embedding_fig, use_container_width=True)
+
+                # Show top topic keywords
+                st.subheader("📚 Top Topics by Frequency")
+                st.caption("Most frequently occurring words across all topics")
+
+                # Extract all topic words
+                topic_word_freq = {}
+                for topic in topic_vectors.keys():
+                    words = topic.lower().split()
+                    for word in words:
+                        if len(word) > 3:  # Filter short words
+                            topic_word_freq[word] = topic_word_freq.get(word, 0) + 1
+
+                # Sort and display top keywords
+                if topic_word_freq:
+                    sorted_keywords = sorted(topic_word_freq.items(), key=lambda x: x[1], reverse=True)[:20]
+
+                    col1, col2 = st.columns(2)
+
+                    # Create bar chart
+                    with col1:
+                        keywords_df = pd.DataFrame(sorted_keywords, columns=['Word', 'Frequency'])
+                        fig_keywords = go.Figure()
+                        fig_keywords.add_trace(go.Bar(
+                            x=keywords_df['Frequency'],
+                            y=keywords_df['Word'],
+                            orientation='h',
+                            marker=dict(
+                                color=keywords_df['Frequency'],
+                                colorscale='Viridis',
+                                showscale=False
+                            )
+                        ))
+                        fig_keywords.update_layout(
+                            title='Top 20 Topic Keywords',
+                            xaxis_title='Frequency',
+                            yaxis_title='Keyword',
+                            height=500,
+                            yaxis={'categoryorder': 'total ascending'}
+                        )
+                        st.plotly_chart(fig_keywords, use_container_width=True)
+
+                    # Show topics containing top keywords
+                    with col2:
+                        top_keyword = sorted_keywords[0][0]
+                        st.markdown(f"**Topics containing '{top_keyword}':**")
+                        matching_topics = [t for t in topic_vectors.keys() if top_keyword in t.lower()]
+                        for topic in matching_topics[:10]:
+                            st.write(f"• {topic}")
+                        if len(matching_topics) > 10:
+                            st.caption(f"... and {len(matching_topics) - 10} more")
             else:
                 st.warning("Not enough topics for embedding visualization")
 
@@ -816,11 +920,9 @@ with tab4:
 
                         node_trace = go.Scatter(
                             x=node_x, y=node_y,
-                            mode='markers+text',
+                            mode='markers',
                             hoverinfo='text',
-                            text=node_text,
-                            textposition="top center",
-                            textfont=dict(size=8),
+                            hovertext=node_text,
                             marker=dict(
                                 size=15,
                                 color='lightblue',
