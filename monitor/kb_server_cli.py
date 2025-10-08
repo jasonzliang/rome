@@ -227,7 +227,7 @@ class CollectionManager:
 
     @staticmethod
     def delete_documents_by_metadata(collection, metadata_key: str, metadata_value: Any,
-                                   batch_size: int = 1000) -> Tuple[int, int]:
+                                   batch_size: int = 100) -> Tuple[int, int]:
         """
         Delete documents matching metadata filter
 
@@ -267,7 +267,7 @@ class CollectionManager:
         return deleted_count, total_checked
 
     @staticmethod
-    def export_to_dict(collection, include_embeddings: bool = False, batch_size: int = 1000) -> Dict[str, Any]:
+    def export_to_dict(collection, include_embeddings: bool = False, batch_size: int = 100) -> Dict[str, Any]:
         """Export collection to dictionary with batching"""
         total_count = collection.count()
         export_data = {'collection_name': collection.name, 'count': total_count, 'data': []}
@@ -294,7 +294,7 @@ class CollectionManager:
     @staticmethod
     def import_from_dict(client, data: Dict[str, Any], target_name: str = None,
                         embedding_model: str = None, overwrite: bool = False,
-                        batch_size: int = 1000) -> bool:
+                        batch_size: int = 100) -> bool:
         """Import collection from dictionary with optional embedding model"""
         collection_name = target_name or data['collection_name']
 
@@ -594,7 +594,7 @@ Examples:
         parser.add_argument('--force', action='store_true', help='Force action without confirmation')
 
     def add_batch_arg(parser):
-        parser.add_argument('--batch-size', type=int, default=1000, help='Batch size for operations')
+        parser.add_argument('--batch-size', type=int, default=100, help='Batch size for operations')
 
     def add_metadata_arg(parser):
         parser.add_argument('--metadata', help='Filter by metadata key:value (e.g., source:web)')
