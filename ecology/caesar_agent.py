@@ -19,22 +19,35 @@ CAESAR_CONFIG = {
     **DEFAULT_CONFIG,
 
     "CaesarAgent": {
+        # Total number of pages to explore before stopping
         "max_iterations": 10,
+        # Initial URL to begin exploration
         "starting_url": "https://en.wikipedia.org/wiki/Main_Page",
+        # Domains to allow exploration in; empty list uses starting_url domain; use ["*"] to allow any
         "allowed_domains": [],
+        # Maximum depth of exploration tree before backtracking
         "max_depth": 1e12,
+        # Temperature for LLM decisions (higher = more exploratory choices)
         "exploration_temperature": 0.8,
+        # Save exploration graph every N iterations
         "save_graph_interval": 5,
+        # Generate visual graph representations (requires pygraphviz)
         "draw_graph": False,
+        # Whether to follow links that point to the same page (different fragments)
         "same_page_links": False,
-        "checkpoint_interval": 1,  # Checkpoint every N iterations
-        "auto_resume": True,  # Automatically resume from checkpoint if found
+        # Save checkpoint every N iterations for resumption
+        "checkpoint_interval": 1,
+        # Automatically resume from checkpoint if found on initialization
+        "auto_resume": True,
     },
 
     "OpenAIHandler": {
         **DEFAULT_CONFIG["OpenAIHandler"],
+        # Model for exploration analysis and synthesis
         "model": "gpt-4o",
+        # Base temperature for most LLM calls (overridden by exploration_temperature for decisions)
         "temperature": 0.1,
+        # Maximum tokens per LLM response
         "max_tokens": 4096,
     }
 }

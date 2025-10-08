@@ -3,10 +3,11 @@
 CaesarAgent CLI Runner
 
 Usage:
-    python run_agent.py <repository_path> <config_path>
+    python run_agent.py <repository_path> <config_path> [--max-iterations N]
 
 Example:
     python run_agent.py ./my_project config.yaml
+    python run_agent.py ./my_project config.yaml --max-iterations 50
 """
 
 import argparse
@@ -49,12 +50,15 @@ def parse_args():
         epilog="""
 Examples:
   python run_agent.py ./my_project config.yaml
-  python run_agent.py ./other_project another_config.yaml
+  python run_agent.py ./my_project config.yaml --max-iterations 50
+  python run_agent.py ./other_project another_config.yaml --max-iterations 100
         """
     )
 
     parser.add_argument('repository', type=str, help='Path to repository directory')
     parser.add_argument('config', type=str, help='Path to YAML configuration file')
+    parser.add_argument('--max-iterations', type=int, default=None,
+                       help='Override max_iterations from config (default: use config value)')
 
     return parser.parse_args()
 
@@ -74,6 +78,8 @@ def print_config_summary(agent, logger):
             "Save Interval": agent.save_graph_interval,
             "Draw Graph": agent.draw_graph,
             "Temperature": agent.exploration_temperature,
+            "Checkpoint Interval": agent.checkpoint_interval,
+            "Auto Resume": agent.auto_resume,
         },
         "OpenAI Settings": {
             "Model": agent.openai_handler.model,
@@ -136,6 +142,13 @@ def main():
         except Exception as e:
             logger.error(f"Failed to load config: {e}")
             sys.exit(1)
+
+        # Override max_iterations if provided via CLI
+        if args.max_iterations is not None:
+            if 'CaesarAgent' not in config:
+                config['CaesarAgent'] = {}
+            config['CaesarAgent']['max_iterations'] = args.max_iterations
+            logger.info(f"Overriding max_iterations from CLI: {args.max_iterations}")
 
         # Get agent name from config
         agent_name = config.get('Agent', {}).get('name', 'CaesarAgent')
