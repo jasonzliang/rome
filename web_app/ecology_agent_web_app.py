@@ -14,7 +14,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import warnings
 warnings.filterwarnings('ignore')
 
-st.set_page_config(page_title="Graph Explorer", layout="wide")
+st.set_page_config(page_title="Ecology Agent Graph Explorer", layout="wide")
 
 @st.cache_data
 def load_graphs(directory, pattern='*.graph_iter*.json'):
@@ -334,7 +334,7 @@ def create_topic_embedding_plot(topic_vectors):
     return fig
 
 # Main app
-st.title("🔍 Graph Explorer Visualization")
+st.title("🔍 Ecology Agent Graph Explorer")
 
 # Sidebar
 st.sidebar.header("Configuration")
