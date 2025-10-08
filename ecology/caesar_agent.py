@@ -41,7 +41,7 @@ CAESAR_CONFIG = {
         # False for classic mode
         "iterative_synthesis": True,
         # Number of q/a iterations
-        "synthesis_iterations": 5,
+        "synthesis_iterations": 10,
         # KB docs per query
         "top_k": 10,
         # Temperature for LLM decisions (higher = more exploratory choices)

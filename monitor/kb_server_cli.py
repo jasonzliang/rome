@@ -418,7 +418,8 @@ class OutputFormatter:
             print(f"   Total collections: {db_info['total_collections']}")
             if db_info['collections']:
                 print(f"   Collections:")
-                for col in db_info['collections']:
+                sorted_collections = sorted(db_info['collections'], key=lambda x: x['name'])
+                for col in sorted_collections:
                     dimension_info = OutputFormatter._get_collection_dimensions(col.get('name'))
                     dim_str = f" | {dimension_info}d" if dimension_info else ""
                     print(f"     - {col['name']} ({col['count']} documents{dim_str})")
