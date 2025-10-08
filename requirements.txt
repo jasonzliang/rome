@@ -22,12 +22,15 @@ ribs
 xxhash
 
 # Web app pkgs
+gensim
 fastapi
 matplotlib
 networkx
 pandas
 pillow
+plotly
 requests
+scikit-learn
 streamlit
 tiktoken
 uvicorn
