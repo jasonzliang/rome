@@ -641,6 +641,8 @@ Your response must be valid JSON only, nothing else."""
             # Perceive
             content, links = self.perceive()
             if not content:
+                if self._should_checkpoint(iteration):
+                    self._save_checkpoint(iteration)
                 if len(self.url_stack) > 1:
                     self.url_stack.pop()
                     self.current_url = self.url_stack[-1]
