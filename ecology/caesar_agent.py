@@ -800,15 +800,18 @@ Respond with JSON:
 Key patterns emerged through querying and analyzing gathered insights
 {perspectives}
 
-Create an artifact with two parts:
+Drawing heavily upon the key patterns that emerged from the insights, create a novel, exciting, and thought provoking artifact with two parts:
 
-1. **Abstracst** (100-150 tokens): Core discovery and its significance
+1. **Abstract** (100-150 tokens):
+    Summary of core discovery and its significance
 
-2. **Artifact** (up to 3000 tokens):
-   - Emergent patterns not visible in individual sources
-   - Novel connections and unexpected relationships
-   - Tensions, contradictions, or open questions
-   - New directions or perspectives
+2. **Artifact** (1000-3000 tokens):
+    - Emergent patterns not visible in individual sources
+    - Novel discoveries and unexpected connections
+    - Tensions, contradictions, or open questions
+    - New directions or perspectives
+
+IMPORTANT: Try to keep the artifact easy to understand if explained to a layman
 
 Respond with valid JSON only:
 {{
