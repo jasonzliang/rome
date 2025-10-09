@@ -842,7 +842,7 @@ Respond with valid JSON only:
 
     def _save_synthesis_outputs(self, result: Dict) -> None:
         """Save synthesis in both JSON and text formats"""
-        timestamp = str(int(time.time()))[-8:]
+        timestamp = datetime.now().strftime("%m%d%H%M")
         base_path = os.path.join(self.get_repo(), f"{self.get_id()}.synthesis.{timestamp}")
 
         try:
