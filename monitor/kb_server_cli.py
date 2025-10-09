@@ -25,10 +25,6 @@ from functools import wraps
 try:
     __import__('pysqlite3')
     sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-except:
-    print(f"pysqlite3 import error: {e}")
-
-try:
     import chromadb
     from chromadb.utils.embedding_functions import (
        SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
