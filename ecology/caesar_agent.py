@@ -6,6 +6,7 @@ import requests
 import json
 import os
 import sys
+import time
 from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -458,25 +459,24 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
         self.logger.debug(f"Insights:\n{insights}")
         return insights
 
-    def act(self, links: List[Tuple[str, str]]) -> Optional[str]:
-        """Phase 3: Choose next URL based on accumulated knowledge"""
+    def _backtrack(self) -> bool:
+        """Backtrack to parent URL. Returns True if successful, False if at root."""
+        if len(self.url_stack) > 1:
+            self.url_stack.pop()
+            self.current_url = self.url_stack[-1]
+            self.current_depth = len(self.url_stack) - 1
+            self.logger.debug(f"[BACKTRACK] Depth {self.current_depth}: {self.current_url}")
+            return True
+        return False
 
-        if self.current_depth >= self.max_depth:
-            self.logger.debug(f"[ACT] Max depth {self.max_depth} reached - backtracking")
-            if len(self.url_stack) > 1:
-                self.url_stack.pop()
-                self.current_depth = len(self.url_stack) - 1
-                return self.url_stack[-1]
-            return None
+    def _advance_to_url(self, url: str) -> None:
+        """Advance exploration to new URL."""
+        self.url_stack.append(url)
+        self.current_url = url
+        self.current_depth = len(self.url_stack) - 1
 
-        if not links:
-            self.logger.debug("[ACT] No links - backtracking")
-            if len(self.url_stack) > 1:
-                self.url_stack.pop()
-                self.current_depth = len(self.url_stack) - 1
-                return self.url_stack[-1]
-            self.logger.assert_true(False, "No links and cannot backtrack from starting page")
-
+    def _select_next_link(self, links: List[Tuple[str, str]]) -> Tuple[int, str]:
+        """Use LLM to select best link. Returns (choice_index, reason)."""
         kb_context = ""
         if self.kb_manager.size() > 0:
             try:
@@ -488,8 +488,7 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
                 self.logger.error(f"KB query failed: {e}")
 
         link_options = '\n'.join(
-            f"{i+1}. [{text}] {url}"
-            for i, (url, text) in enumerate(links)
+            f"{i+1}. [{text}] {url}" for i, (url, text) in enumerate(links)
         )
 
         prompt = f"""Current exploration context:
@@ -514,25 +513,38 @@ Your response must be valid JSON only, nothing else."""
                 override_config={'temperature': self.exploration_temperature},
                 response_format={"type": "json_object"}
             )
-
             decision = self.parse_json_response(response)
             if decision and 'choice' in decision:
-                choice = int(decision['choice']) - 1
-                choice = max(0, min(choice, len(links) - 1))
+                choice = max(0, min(int(decision['choice']) - 1, len(links) - 1))
                 reason = decision.get('reason', 'No reason provided')
-            else:
-                self.logger.error("Invalid JSON response, using first link")
-                choice = 0
-                reason = "Fallback due to invalid response"
-
+                return choice, reason
         except Exception as e:
-            self.logger.error(f"LLM decision failed: {e}, using first link")
-            choice = 0
-            reason = "Fallback due to error"
+            self.logger.error(f"LLM decision failed: {e}")
 
+        self.logger.info("Selecting first link as fallback")
+        return 0, "Fallback due to error"
+
+    def act(self, links: List[Tuple[str, str]]) -> Optional[str]:
+        """Phase 3: Choose next URL based on accumulated knowledge"""
+
+        # Check if backtracking needed
+        if self.current_depth >= self.max_depth:
+            self.logger.debug(f"[ACT] Max depth {self.max_depth} reached")
+            self._backtrack()
+            return None
+
+        if not links:
+            self.logger.debug("[ACT] No links available")
+            if not self._backtrack():
+                self.logger.assert_true(False, "No links and cannot backtrack from starting page")
+            return None
+
+        # Select and advance to next link
+        choice, reason = self._select_next_link(links)
         next_url = links[choice][0]
 
         self.graph.add_edge(self.current_url, next_url, reason=reason)
+        self._advance_to_url(next_url)
 
         self.logger.info(f"[ACT] Selected {choice + 1}: {next_url}")
         self.logger.info(f"Reason: {reason}")
@@ -646,16 +658,12 @@ Your response must be valid JSON only, nothing else."""
             # Perceive
             content, links = self.perceive()
             if not content:
-                if self._should_checkpoint(iteration):
-                    self._save_checkpoint(iteration)
-                if len(self.url_stack) > 1:
-                    self.url_stack.pop()
-                    self.current_url = self.url_stack[-1]
-                    self.current_depth = len(self.url_stack) - 1
-                    continue
-                else:
+                if not self._backtrack():
                     self.logger.error("Cannot continue exploration")
                     break
+                if self._should_checkpoint(iteration):
+                    self._save_checkpoint(iteration)
+                continue
 
             self.visited_urls.add(self.current_url)
 
@@ -664,12 +672,8 @@ Your response must be valid JSON only, nothing else."""
 
             # Act (skip on last iteration)
             if iteration < self.max_iterations:
-                next_url = self.act(links)
-                if next_url:
-                    self.current_url = next_url
-                    self.url_stack.append(next_url)
-                    self.current_depth = len(self.url_stack) - 1
-                else:
+                if self.act(links) is None and len(self.url_stack) == 1:
+                    self.logger.error("Stuck at root")
                     break
 
             # Save graph periodically
@@ -678,11 +682,11 @@ Your response must be valid JSON only, nothing else."""
                 self._save_graph_data(iteration)
                 self._draw_graph_visualization(iteration)
 
-            # Save checkpoint AFTER act() completes - ensures we don't re-process URLs on resume
+            # Save checkpoint AFTER act() completes
             if self._should_checkpoint(iteration):
                 self._save_checkpoint(iteration)
 
-        # One more save at end of iteration
+        # Final save
         self.logger.debug(f"Loop ended at iteration {self.current_iteration}, saving")
         self._save_graph_data(self.current_iteration)
         self._draw_graph_visualization(self.current_iteration)
@@ -690,6 +694,18 @@ Your response must be valid JSON only, nothing else."""
 
         self.logger.info(f"\nExploration complete: visited {len(self.visited_urls)} pages")
         return self._synthesize_artifact()
+
+    def _execute_queries(self, queries: List[str]) -> List[Tuple[str, str]]:
+        """Execute a list of queries against KB and return Q&A pairs"""
+        qa_pairs = []
+        for query in queries:
+            try:
+                answer = self.kb_manager.query(query, top_k=self.top_k)
+                if answer:
+                    qa_pairs.append((query, answer))
+            except Exception as e:
+                self.logger.error(f"KB query failed for '{query}': {e}")
+        return qa_pairs
 
     def _generate_next_query(self, previous_queries: List[str],
                              previous_responses: List[str]) -> Optional[str]:
@@ -730,80 +746,69 @@ Respond with JSON:
             self.logger.error(f"Query generation failed: {e}")
         return None
 
-
-    def _get_synthesis_queries(self, mode: str = "iterative") -> List[str]:
-        """Get queries for synthesis - either fixed or iteratively generated"""
+    def _generate_synthesis_qa_pairs(self, mode: str) -> List[Tuple[str, str]]:
+        """Generate Q&A pairs by querying KB - handles both classic and iterative modes"""
         if mode == "classic":
-            return [
+            queries = [
                 "What are the central themes and patterns discovered?",
                 "What unexpected connections or insights emerged?",
                 "What contradictions or tensions were revealed?",
                 "What questions remain open or were raised?",
                 "What novel perspective emerged from this exploration?"
             ]
+            return self._execute_queries(queries)
 
-        # Iterative mode
-        k = self.synthesis_iterations
-        queries = ["What are the central themes and patterns discovered across all sources?"]
-        responses = []
+        # Iterative mode: generate queries dynamically based on previous answers
+        queries, answers = ["What are the central themes and patterns discovered across all sources?"], []
 
-        for i in range(k):
-            self.logger.info(f"[SYNTHESIS ITER {i+1}/{k}] Query: {queries[-1]}")
+        for i in range(self.synthesis_iterations):
+            self.logger.info(f"[SYNTHESIS {i+1}/{self.synthesis_iterations}] {queries[-1]}")
 
-            try:
-                response = self.kb_manager.query(queries[-1], top_k=self.top_k)
-                if not response:
-                    self.logger.warning(f"Empty response, stopping at iteration {i+1}")
-                    break
-                responses.append(response)
-            except Exception as e:
-                self.logger.error(f"KB query failed: {e}")
+            answer = self.kb_manager.query(queries[-1], top_k=self.top_k)
+            if not answer:
+                self.logger.error(f"Empty query response at iteration {i+1}")
                 break
+            answers.append(answer)
 
-            # Generate next query if not last iteration
-            if i < k - 1:
-                next_query = self._generate_next_query(queries, responses)
+            # Generate next query based on conversation so far
+            if i < self.synthesis_iterations - 1:
+                next_query = self._generate_next_query(queries, answers)
                 if not next_query:
-                    self.logger.info("Query generation terminated early")
+                    self.logger.error(f"Empty next query generated at iteration {i+1}")
                     break
                 queries.append(next_query)
 
-        return queries
+        return list(zip(queries, answers))
 
+    def _synthesize_artifact(self) -> Dict[str, str]:
+        """Generate final synthesis from accumulated insights"""
+        mode = "iterative" if self.iterative_synthesis else "classic"
+        self.logger.info(f"[SYNTHESIS] Using {mode} mode")
 
-    def _query_kb_for_synthesis(self, queries: List[str]) -> List[Tuple[str, str]]:
-        """Execute queries against KB and return Q&A pairs"""
-        qa_pairs = []
-        for query in queries:
-            try:
-                response = self.kb_manager.query(query, top_k=self.top_k)
-                if response:
-                    qa_pairs.append((query, response))
-            except Exception as e:
-                self.logger.error(f"KB query failed for '{query}': {e}")
-        return qa_pairs
+        if self.kb_manager.size() == 0:
+            return {"abstract": "", "artifact": "No insights collected during exploration."}
 
+        # Generate Q&A pairs from KB
+        qa_pairs = self._generate_synthesis_qa_pairs(mode)
+        if not qa_pairs:
+            return {"abstract": "", "artifact": "Unable to generate synthesis questions."}
 
-    def _build_synthesis_prompt(self, qa_pairs: List[Tuple[str, str]]) -> str:
-        """Build synthesis prompt from Q&A pairs"""
-        perspectives = "\n\n".join([
-            f"### {q}\n{r}" for q, r in qa_pairs
-        ])
+        # Create synthesis prompt
+        perspectives = "\n\n".join([f"### {q}\n{a}" for q, a in qa_pairs])
+        prompt = f"""You explored {len(self.visited_urls)} sources and gathered {self.kb_manager.size()} insights.
 
-        return f"""You completed an exploration through {len(self.visited_urls)} sources,
-    gathering {self.kb_manager.size()} insights. Through questioning, key patterns emerged:
-
+Key patterns emerged through questioning:
 {perspectives}
 
-Create an interesting artifact with two parts:
+Create an artifact with two parts:
 
-1. **Abstract** (100-150 tokens): Concise summary of core discovery and significance of artifact
+1. **Abstracst** (100-150 tokens): Core discovery and its significance
 
-2. **Artifact** (Up to 3000 tokens): Structured document that:
-   - Reveals emergent patterns not visible in individual sources
-   - Highlights novel connections and unexpected relationships
-   - Explores tensions, contradictions, or open questions
-   - Proposes new directions or perspectives
+2. **Artifact** (up to 3000 tokens):
+   - Emergent patterns not visible in individual sources
+   - Novel connections and unexpected relationships
+   - Tensions, contradictions, or open questions
+   - New directions or perspectives
 
 Respond with valid JSON only:
 {{
@@ -811,38 +816,17 @@ Respond with valid JSON only:
     "artifact": "<artifact text>"
 }}"""
 
-
-    def _synthesize_artifact(self) -> Dict[str, str]:
-        """Generate final synthesis - supports iterative or classic mode"""
-        mode = "iterative" if self.iterative_synthesis else "classic"
-        self.logger.info(f"[SYNTHESIS] Using {mode} synthesis approach")
-
-        if self.kb_manager.size() == 0:
-            return {"abstract": "", "artifact": "No insights collected during exploration."}
-
-        # Get queries (fixed or dynamically generated)
-        queries = self._get_synthesis_queries(mode)
-
-        # Execute queries against KB
-        qa_pairs = self._query_kb_for_synthesis(queries)
-
-        if not qa_pairs:
-            return {"abstract": "", "artifact": "Unable to query knowledge base for synthesis."}
-
-        # Generate synthesis from Q&A pairs
-        prompt = self._build_synthesis_prompt(qa_pairs)
-
+        # Generate synthesis
         try:
             response = self.chat_completion(prompt, response_format={"type": "json_object"})
             result = self.parse_json_response(response)
-
             if not result or "abstract" not in result or "artifact" not in result:
                 raise ValueError("Missing required keys in response")
         except Exception as e:
             self.logger.error(f"Synthesis generation failed: {e}")
-            result = {"abstract": "Synthesis generation failed.", "artifact": f"Error: {e}"}
+            return {"abstract": "Synthesis failed.", "artifact": f"Error: {e}"}
 
-        # Add metadata
+        # Add metadata and save
         result["metadata"] = {
             "pages_visited": len(self.visited_urls),
             "insights_collected": self.kb_manager.size(),
@@ -852,25 +836,24 @@ Respond with valid JSON only:
             "starting_url": self.starting_url
         }
 
-        # Save outputs
         self._save_synthesis_outputs(result)
         self.logger.info("Synthesis complete")
         return result
 
-
     def _save_synthesis_outputs(self, result: Dict) -> None:
         """Save synthesis in both JSON and text formats"""
         base_path = os.path.join(self.get_repo(), f"{self.get_id()}.synthesis")
+        timestamp = str(int(time.time()))
 
         try:
             with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
                 json.dump(result, f, indent=4, ensure_ascii=False)
-            self.logger.info(f"Saved: {base_path}.json")
+            self.logger.info(f"Saved: {base_path}.{timestamp}.json")
 
             with open(f"{base_path}.txt", 'w', encoding='utf-8') as f:
                 f.write(f"ABSTRACT:\n{result['abstract']}\n\n")
                 f.write(f"ARTIFACT:\n{result['artifact']}\n\n")
                 f.write(f"METADATA:\n{json.dumps(result['metadata'], indent=2)}")
-            self.logger.info(f"Saved: {base_path}.txt")
+            self.logger.info(f"Saved: {base_path}.{timestamp}.txt")
         except Exception as e:
             self.logger.error(f"Failed to save synthesis: {e}")

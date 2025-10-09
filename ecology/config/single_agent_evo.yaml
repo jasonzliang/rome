@@ -26,6 +26,7 @@ OpenAIHandler:
   cost_limit: 300.0
   model: gpt-5
   temperature: 0.1
+  timeout: 300
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
