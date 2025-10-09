@@ -148,8 +148,8 @@ You navigate through information space systematically yet creatively, always wit
             "starting_url must be provided")
         self.logger.assert_true(self.allowed_domains and len(self.allowed_domains) > 0,
             "allowed_domains must contain at least one domain")
-        self.logger.assert_true(self.max_iterations > 0,
-            "max_iterations must be positive")
+        self.logger.assert_true(self.max_iterations >= 0,
+            "max_iterations must be non-negative")
         self.logger.assert_true(self.max_depth > 0,
             "max_depth must be positive")
         self.logger.assert_true(self.save_graph_interval > 0,
@@ -743,7 +743,7 @@ Respond with JSON:
             self.logger.info(f"[SYNTHESIS ITER {i+1}/{k}] Query: {queries[-1]}")
 
             try:
-                response = self.kb_manager.query(queries[-1], top_k=top_k)
+                response = self.kb_manager.query(queries[-1], top_k=self.top_k)
                 if not response:
                     self.logger.warning(f"Empty response, stopping at iteration {i+1}")
                     break
@@ -768,7 +768,7 @@ Respond with JSON:
         qa_pairs = []
         for query in queries:
             try:
-                response = self.kb_manager.query(query, top_k=top_k)
+                response = self.kb_manager.query(query, top_k=self.top_k)
                 if response:
                     qa_pairs.append((query, response))
             except Exception as e:

@@ -17,6 +17,7 @@ CaesarAgent:
   exploration_temperature: 0.8
   save_graph_interval: 10
   draw_graph: false
+  synthesis_iterations: 20
 
 # ============================================================================
 # LLM CONFIGURATION

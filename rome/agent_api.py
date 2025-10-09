@@ -196,7 +196,8 @@ class AgentApi:
     def shutdown(self):
         """Gracefully shutdown the Uvicorn server."""
         self.logger.info("Shutting down AgentApi server")
-        self.server.should_exit = True  # Signal server to stop
+        if hasattr(self, 'server'):
+            self.server.should_exit = True
         if self.server_thread and self.server_thread.is_alive():
-            self.server_thread.join()   # Wait for server to stop
+            self.server_thread.join(timeout=1)  # 1 second is plenty
         self.logger.info("AgentApi server shutdown complete")
