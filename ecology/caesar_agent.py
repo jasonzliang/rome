@@ -843,7 +843,7 @@ Respond with valid JSON only:
     def _save_synthesis_outputs(self, result: Dict) -> None:
         """Save synthesis in both JSON and text formats"""
         base_path = os.path.join(self.get_repo(), f"{self.get_id()}.synthesis")
-        timestamp = str(int(time.time()))
+        timestamp = str(int(time.time()))[-8:]
 
         try:
             with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
