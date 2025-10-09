@@ -842,18 +842,18 @@ Respond with valid JSON only:
 
     def _save_synthesis_outputs(self, result: Dict) -> None:
         """Save synthesis in both JSON and text formats"""
-        base_path = os.path.join(self.get_repo(), f"{self.get_id()}.synthesis")
         timestamp = str(int(time.time()))[-8:]
+        base_path = os.path.join(self.get_repo(), f"{self.get_id()}.synthesis.{timestamp}")
 
         try:
             with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
                 json.dump(result, f, indent=4, ensure_ascii=False)
-            self.logger.info(f"Saved: {base_path}.{timestamp}.json")
+            self.logger.info(f"Saved: {base_path}.json")
 
             with open(f"{base_path}.txt", 'w', encoding='utf-8') as f:
                 f.write(f"ABSTRACT:\n{result['abstract']}\n\n")
                 f.write(f"ARTIFACT:\n{result['artifact']}\n\n")
                 f.write(f"METADATA:\n{json.dumps(result['metadata'], indent=2)}")
-            self.logger.info(f"Saved: {base_path}.{timestamp}.txt")
+            self.logger.info(f"Saved: {base_path}.txt")
         except Exception as e:
             self.logger.error(f"Failed to save synthesis: {e}")
