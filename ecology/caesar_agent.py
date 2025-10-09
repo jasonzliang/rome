@@ -696,7 +696,7 @@ Your response must be valid JSON only, nothing else."""
         """Generate next synthesis query based on accumulated context"""
 
         # Use only last N Q&A pairs to prevent context explosion
-        max_context_pairs = 5  # Only use last 2 Q&A pairs
+        max_context_pairs = 20  # Only use last 20 Q&A pairs
         recent_queries = previous_queries[-max_context_pairs:]
         recent_responses = previous_responses[-max_context_pairs:]
 
