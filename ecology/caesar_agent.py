@@ -43,7 +43,7 @@ CAESAR_CONFIG = {
         # Number of q/a iterations
         "synthesis_iterations": 10,
         # KB docs per query
-        "top_k": 8,
+        "top_k": 5,
         # Temperature for agent's ACT/THINK phases to encourage exploration
         "exploration_temperature": 0.8,
     },

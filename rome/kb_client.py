@@ -7,10 +7,10 @@ from pathlib import Path
 import re
 import time
 import sys
-
 import warnings
 warnings.filterwarnings('ignore', message='.*validate_default.*', category=UserWarning)
 
+import openai
 try:
     __import__('pysqlite3')
     sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
