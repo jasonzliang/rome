@@ -794,10 +794,10 @@ Respond with JSON:
             return {"abstract": "", "artifact": "Unable to generate synthesis questions."}
 
         # Create synthesis prompt
-        perspectives = "\n\n".join([f"### {q}\n{a}" for q, a in qa_pairs])
+        perspectives = "\n\n\n".join([f"# Question:\n{q}\n\n# Answer:\n{a}" for q, a in qa_pairs])
         prompt = f"""You explored {len(self.visited_urls)} sources and gathered {self.kb_manager.size()} insights.
 
-Key patterns emerged through questioning:
+Key patterns emerged through querying and analyzing gathered insights
 {perspectives}
 
 Create an artifact with two parts:
