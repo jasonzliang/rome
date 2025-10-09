@@ -43,7 +43,7 @@ CAESAR_CONFIG = {
         # Number of q/a iterations
         "synthesis_iterations": 10,
         # KB docs per query
-        "top_k": 10,
+        "top_k": 8,
         # Temperature for LLM decisions (higher = more exploratory choices)
         "exploration_temperature": 0.8,
     },
