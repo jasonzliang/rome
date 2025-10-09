@@ -44,7 +44,7 @@ CAESAR_CONFIG = {
         "synthesis_iterations": 10,
         # KB docs per query
         "top_k": 8,
-        # Temperature for LLM decisions (higher = more exploratory choices)
+        # Temperature for agent's ACT/THINK phases to encourage exploration
         "exploration_temperature": 0.8,
     },
 
@@ -52,7 +52,7 @@ CAESAR_CONFIG = {
         **DEFAULT_CONFIG["OpenAIHandler"],
         # Model for exploration analysis and synthesis
         "model": "gpt-4o",
-        # Base temperature for most LLM calls (overridden by exploration_temperature for decisions)
+        # Base temperature for LLM (overridden by exploration_temperature for ACT/THINK)
         "temperature": 0.1,
         # Maximum tokens per LLM response
         "max_tokens": 4096,
