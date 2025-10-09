@@ -356,31 +356,37 @@ class ChromaClientManager:
 
     def query(self, question, top_k=None, use_reranking=None, show_scores=False):
         """Enhanced query with simplified reranking logic and empty collection validation"""
-        # Check if collection is empty before proceeding
-        if self.size() == 0:
-            return None
+        try:
+            # Check if collection is empty before proceeding
+            if self.size() == 0:
+                return ""
 
-        top_k = top_k or self.top_k or 5
-        should_rerank = (use_reranking is True) or \
-            (use_reranking is None and self.reranker is not None)
+            top_k = top_k or self.top_k or 5
+            should_rerank = (use_reranking is True) or \
+                (use_reranking is None and self.reranker is not None)
 
-        if should_rerank and self.reranker:
-            # Calculate how many docs to retrieve for reranking
-            retrieval_k = self._calculate_retrieval_size(top_k)
-            # Get documents
-            nodes = self._retrieve_nodes(question, retrieval_k)
-            # Rerank and generate response
-            response = self._rerank_and_respond(question, nodes, top_k, show_scores)
-        else:
-            # Standard query without reranking
-            response = self._standard_query(question, top_k)
+            if should_rerank and self.reranker:
+                # Calculate how many docs to retrieve for reranking
+                retrieval_k = self._calculate_retrieval_size(top_k)
+                # Get documents
+                nodes = self._retrieve_nodes(question, retrieval_k)
+                # Rerank and generate response
+                response = self._rerank_and_respond(question, nodes, top_k, show_scores)
+            else:
+                # Standard query without reranking
+                response = self._standard_query(question, top_k)
 
-        if self.log_db:
-            with open(os.path.join(self.agent.get_log_dir(),
-                self.agent.get_id() + ".db-query.log"), "a") as f:
-                f.write("="*80)
-                f.write(f"\n\nQUERY: {question}\n\nRESPONSE: {response}\n\n")
-        return response
+            if self.log_db:
+                with open(os.path.join(self.agent.get_log_dir(),
+                    self.agent.get_id() + ".db-query.log"), "a") as f:
+                    f.write("="*80)
+                    f.write(f"\n\nQUERY: {question}\n\nRESPONSE: {response}\n\n")
+
+            return response
+
+        except openai.APITimeoutError as e:
+            self.logger.error(f"KB query timed out (OpenAI API): {e}")
+            return ""
 
     def _calculate_retrieval_size(self, top_k: int) -> int:
         """Calculate optimal retrieval size for reranking"""

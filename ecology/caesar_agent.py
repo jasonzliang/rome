@@ -56,6 +56,8 @@ CAESAR_CONFIG = {
         "temperature": 0.1,
         # Maximum tokens per LLM response
         "max_tokens": 4096,
+        # API timeout in seconds
+        "timeout": 120,
     }
 }
 
