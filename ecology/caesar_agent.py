@@ -694,6 +694,12 @@ Your response must be valid JSON only, nothing else."""
     def _generate_next_query(self, previous_queries: List[str],
                              previous_responses: List[str]) -> Optional[str]:
         """Generate next synthesis query based on accumulated context"""
+
+        # Use only last N Q&A pairs to prevent context explosion
+        max_context_pairs = 2  # Only use last 2 Q&A pairs
+        recent_queries = previous_queries[-max_context_pairs:]
+        recent_responses = previous_responses[-max_context_pairs:]
+
         context = "\n\n".join([
             f"Q: {q}\nA: {r}" for q, r in zip(previous_queries, previous_responses)
         ])
