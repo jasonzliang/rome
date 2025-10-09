@@ -13,8 +13,8 @@ Agent:
 # ============================================================================
 CaesarAgent:
   starting_url: "https://en.wikipedia.org/wiki/Artificial_intelligence"
-  max_iterations: 600
-  exploration_temperature: 0.8
+  max_iterations: 1000
+  exploration_temperature: 0.9
   save_graph_interval: 10
   draw_graph: false
   synthesis_iterations: 20
