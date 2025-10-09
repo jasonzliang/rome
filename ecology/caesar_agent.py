@@ -706,12 +706,12 @@ to deepen understanding and reveal emergent patterns? The question should:
 - Build on previous insights rather than repeat them
 - Seek connections between different themes
 - Identify gaps or contradictions to explore
-- Move toward synthesis rather than enumeration
+- Move toward synthesis and creation rather than enumeration
 
 Respond with JSON:
 {{
     "query": "<your next question>",
-    "reason": "<why this question advances synthesis>"
+    "reason": "<why this question deepens understanding>"
 }}"""
 
         try:
@@ -789,11 +789,11 @@ Respond with JSON:
 
 {perspectives}
 
-Create a synthesis with two parts:
+Create an interesting artifact with two parts:
 
-1. **Abstract** (100-150 tokens): Concise summary of core discovery and significance
+1. **Abstract** (100-150 tokens): Concise summary of core discovery and significance of artifact
 
-2. **Artifact** (Up to 3000 tokens): Structured synthesis that:
+2. **Artifact** (Up to 3000 tokens): Structured document that:
    - Reveals emergent patterns not visible in individual sources
    - Highlights novel connections and unexpected relationships
    - Explores tensions, contradictions, or open questions
@@ -802,7 +802,7 @@ Create a synthesis with two parts:
 Respond with valid JSON only:
 {{
     "abstract": "<abstract text>",
-    "artifact": "<synthesis text>"
+    "artifact": "<artifact text>"
 }}"""
 
 
