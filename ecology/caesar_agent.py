@@ -164,6 +164,7 @@ You navigate through information space systematically yet creatively, always wit
         """Initialize exploration-specific state"""
         self.graph = nx.DiGraph()
         self.visited_urls = set()
+        self.failed_urls = set()
         self.url_stack = [self.starting_url]
         self.current_url = self.starting_url
         self.current_depth = 0
@@ -223,6 +224,7 @@ You navigate through information space systematically yet creatively, always wit
                 'current_url': self.current_url,
                 'current_depth': self.current_depth,
                 'visited_urls': list(self.visited_urls),
+                'failed_urls': list(self.failed_urls),
                 'url_stack': self.url_stack,
                 'graph': graph_data,
                 'timestamp': datetime.now().isoformat(),
@@ -268,6 +270,7 @@ You navigate through information space systematically yet creatively, always wit
             # Restore iteration and visited URLs
             self.current_iteration = checkpoint_data['iteration']
             self.visited_urls = set(checkpoint_data['visited_urls'])
+            self.failed_urls = set(checkpoint_data['failed_urls'])
             self.url_stack = checkpoint_data['url_stack']
 
             # Validate url_stack is non-empty (critical check)
@@ -376,7 +379,7 @@ You navigate through information space systematically yet creatively, always wit
 
             if (url not in seen and
                 self._is_allowed_url(url) and
-                url not in self.visited_urls and
+                url not in self.failed_urls and
                 url.startswith('http')):
                 links.append((url, text))
                 seen.add(url)
@@ -390,6 +393,9 @@ You navigate through information space systematically yet creatively, always wit
         try:
             html = self._fetch_html(self.current_url)
             if not html:
+                self.failed_urls.add(self.current_url)
+                self.visited_urls.add(self.current_url)
+                self.logger.debug(f"Failed URL added to exclusion lists: {self.current_url}")
                 return "", []
 
             soup = BeautifulSoup(html, 'html.parser')
@@ -408,6 +414,8 @@ You navigate through information space systematically yet creatively, always wit
 
         except Exception as e:
             self.logger.error(f"Perceive phase failed: {e}")
+            self.failed_urls.add(self.current_url)
+            self.visited_urls.add(self.current_url)
             return "", []
 
     def think(self, content: str) -> str:
@@ -811,7 +819,7 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
     - Tensions, contradictions, or open questions
     - New directions or perspectives
 
-IMPORTANT: Try to keep the artifact easy to understand if explained to a layman
+IMPORTANT: Try to keep the artifact easy to understand and use simple English as much as possible
 
 Respond with valid JSON only:
 {{
