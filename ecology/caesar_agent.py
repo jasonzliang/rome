@@ -34,6 +34,8 @@ CAESAR_CONFIG = {
         "draw_graph": False,
         # Whether to follow links that point to the same page (different fragments)
         "same_page_links": False,
+        # Whether to allow agent to return to page it has seen before
+        "allow_revisit": True,
         # Save checkpoint every N iterations for resumption
         "checkpoint_interval": 1,
         # Automatically resume from checkpoint if found on initialization
@@ -380,6 +382,7 @@ You navigate through information space systematically yet creatively, always wit
             if (url not in seen and
                 self._is_allowed_url(url) and
                 url not in self.failed_urls and
+                (url not in self.visited_urls or self.allow_revisit) and
                 url.startswith('http')):
                 links.append((url, text))
                 seen.add(url)
@@ -394,8 +397,7 @@ You navigate through information space systematically yet creatively, always wit
             html = self._fetch_html(self.current_url)
             if not html:
                 self.failed_urls.add(self.current_url)
-                self.visited_urls.add(self.current_url)
-                self.logger.debug(f"Failed URL added to exclusion lists: {self.current_url}")
+                self.logger.debug(f"Failed URL added to exclusion list: {self.current_url}")
                 return "", []
 
             soup = BeautifulSoup(html, 'html.parser')
@@ -415,7 +417,6 @@ You navigate through information space systematically yet creatively, always wit
         except Exception as e:
             self.logger.error(f"Perceive phase failed: {e}")
             self.failed_urls.add(self.current_url)
-            self.visited_urls.add(self.current_url)
             return "", []
 
     def think(self, content: str) -> str:
