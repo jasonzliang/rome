@@ -57,17 +57,24 @@ class AgentMemory:
             if self.embedding_model not in EMBEDDING_MODELS:
                 raise RuntimeError(f"Invalid embedding model {self.embedding_model}")
 
+            if "OPENROUTER_API_KEY" in os.environ:
+                self.logger.debug("Removing OPENROUTER_API_KEY to prevent auto-routing")
+                del os.environ["OPENROUTER_API_KEY"]
+
             # Build base config
+            llm_config = {
+                "provider": "openai",
+                "config": {
+                    "model": "gpt-5-mini",
+                    "temperature": 0.1,
+                    "max_tokens": 4000,
+                    "api_key": os.environ.get("OPENAI_API_KEY"),
+                    "openai_base_url": "https://api.openai.com/v1"
+                }
+            }
             mem0_config = {
                 "version": "v1.1",
-                "llm": {
-                    "provider": "openai",
-                    "config": {
-                        "model": "gpt-5-mini",
-                        "temperature": 0.1,
-                        "max_tokens": 4000
-                    }
-                }
+                "llm": llm_config
             }
 
             # Embedder configuration with explicit dimensions
@@ -112,7 +119,8 @@ class AgentMemory:
                     "config": {
                         "url": self.graph_url,
                         "username": self.graph_username,
-                        "password": self.graph_password
+                        "password": self.graph_password,
+                        "llm": llm_config
                     }
                 }
                 self.logger.info(f"Mem0 initialized: ChromaDB @ {server_manager.server_url} + Neo4j @ {self.graph_url}")
@@ -154,8 +162,6 @@ class AgentMemory:
                 infer=False
             )
 
-            self.logger.info(f"Memory add result: {result}")
-
             if not result:
                 self.logger.error("No result returned from memory.add()")
                 return False
@@ -165,12 +171,13 @@ class AgentMemory:
 
             if results:
                 self.logger.info(
-                    f"Vector: {len(results)} memories | Graph: {len(relations)} relations")
+                    f"Vector DB: {len(results)} memories | Graph DB: {len(relations)} relations")
                 if not relations and self.use_graph:
-                    self.logger.error("No relations extracted, nothing to add to graph DB")
+                    self.logger.debug("No graph relations extracted")
+                self.logger.debug(f"Remembered memory: {result}")
                 return True
             else:
-                self.logger.error("No memories extracted, nothing to add to vector DB")
+                self.logger.error("No memories or graph relations extracted")
                 return False
 
         except Exception as e:
