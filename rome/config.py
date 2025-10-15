@@ -83,7 +83,7 @@ DEFAULT_CONFIG = {
         "use_graph": False,  # Enable graph memory (neo4j/memgraph required)
         "graph_url": "bolt://localhost:7687",  # Graph database connection URL
         "graph_username": "neo4j",  # Graph database username
-        "graph_password": None,  # Graph database password (set via env or config)
+        "graph_password": "neo4j",  # Graph database password (set via env or config)
         "chroma_host": "localhost",  # ChromaDB host
         "chroma_port": 8000,  # ChromaDB port
     },
@@ -229,7 +229,7 @@ DEFAULT_CONFIG = {
         "include_caller_info": None,  # Can be "rome", "rich", or None
         "base_dir": None,  # Directory for log files, overwritten by agent if set to None
         "filename": None,  # Log file name, overwritten by agent if set to None
-        "max_size_kb": 10000,  # Max log size in kb, truncates after exceeding
+        "max_size_kb": 15000,  # Max log size in kb, truncates after exceeding
         "timezone": 'US/Pacific',  # Default timezone to display
     },
 
