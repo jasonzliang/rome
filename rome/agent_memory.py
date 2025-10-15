@@ -16,7 +16,7 @@ class AgentMemory:
 
     def __init__(self, agent, config: Dict = None):
         """Initialize agent memory with vector +/- graph storage"""
-        self.mem_id = f"{agent.get_repo()}_{agent.get_id()}"
+        self.mem_id = f"{os.path.basename(agent.get_repo())}_{agent.get_id()}"
         self.logger = get_logger()
 
         # Apply config (defaults come from DEFAULT_CONFIG)
