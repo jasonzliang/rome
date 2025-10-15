@@ -7,12 +7,13 @@ psutil
 pytest
 tinydb
 
-# Knowledge-base pkgs
+# Knowledge-base and memory pkgs
 chromadb
 llama-index
 llama-index-vector-stores-chroma
 llama-index-embeddings-openai
 llama-index-llms-openai
+mem0ai
 
 # Library optional pkgs
 evalplus

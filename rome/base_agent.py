@@ -7,11 +7,12 @@ from typing import Dict, Optional, Callable
 import yaml
 
 from .openai import OpenAIHandler
-from .config import (DEFAULT_CONFIG, LOG_DIR_NAME, AGENT_NAME_LENGTH,
+from .config import (DEFAULT_CONFIG, LOG_DIR_NAME, AGENT_NAME_LENGTH, LONGEST_SUMMARY_LEN,
                      set_attributes_from_config, merge_with_default_config, format_yaml_like)
 from .logger import get_logger
 from .parsing import parse_python_response, parse_json_response
 from .process import process_managed
+from .agent_memory import AgentMemory
 
 yaml.add_representer(list, lambda dumper, data: dumper.represent_sequence(
     'tag:yaml.org,2002:seq', data, flow_style=True))
@@ -29,6 +30,7 @@ class BaseAgent:
         self._validate_name_role(name, role)
         self._setup_repository_and_logging(repository)
         self._setup_openai_handler()
+        self._setup_agent_memory()
         self._register_cleanup()
         self.export_config()
 
@@ -79,13 +81,29 @@ class BaseAgent:
         self.openai_handler = OpenAIHandler(config=openai_config)
         self.logger.debug("OpenAI handler initialized")
 
+    def _setup_agent_memory(self) -> None:
+        """Initialize agent memory system"""
+        memory_config = self.config.get('AgentMemory', {})
+
+        self.agent_memory = AgentMemory(
+            agent_name=self.get_id(pid=True),
+            log_dir=self.get_log_dir(),
+            config=memory_config
+        )
+
+        if self.agent_memory.is_enabled():
+            self.logger.info(f"Agent memory enabled (auto_inject={self.agent_memory.auto_inject}, auto_remember={self.agent_memory.auto_remember})")
+        else:
+            self.logger.debug("Agent memory disabled")
+
+
     def _register_cleanup(self) -> None:
         """Register cleanup handlers"""
         self.shutdown_called = False
 
-    def get_id(self) -> str:
+    def get_id(self, pid=False) -> str:
         """Unique identifier for agent in file system"""
-        return f'agent_{self.name}_{os.getpid()}' if self.log_pid else f'agent_{self.name}'
+        return f'agent_{self.name}_{os.getpid()}' if (self.log_pid or pid) else f'agent_{self.name}'
 
     def get_repo(self) -> str:
         """Get agent repository, creating if needed"""
@@ -104,16 +122,6 @@ class BaseAgent:
         with open(filepath, 'w', encoding='utf-8') as f:
             yaml.dump(self.config, f, default_flow_style=False, sort_keys=False, indent=4)
         self.logger.info(f"Configuration exported: {filepath}")
-
-    def chat_completion(self, prompt: str, system_message: str = None,
-                       override_config: Dict = None, response_format: Dict = None,
-                       extra_body: Dict = None) -> str:
-        """Direct access to chat completion with configuration options"""
-        system_message = system_message or self.role
-        return self.openai_handler.chat_completion(
-            prompt=prompt, system_message=system_message,
-            override_config=override_config, response_format=response_format,
-            extra_body=extra_body)
 
     def parse_json_response(self, response: str) -> Dict:
         """Parse JSON response"""
@@ -138,3 +146,58 @@ class BaseAgent:
         except Exception as e:
             self.logger.error(f"Error during shutdown: {e}")
             raise
+
+    def remember(self, content: str, context: str = None, metadata: Dict = None) -> bool:
+        """Store content in long-term memory"""
+        return self.agent_memory.remember(content, context, metadata)
+
+    def recall(self, query: str, context: str = None) -> str:
+        """Query long-term memory and get most relevant results"""
+        return self.agent_memory.recall(query, context)
+
+    # def chat_completion(self, prompt: str, system_message: str = None,
+    #                    override_config: Dict = None, response_format: Dict = None,
+    #                    extra_body: Dict = None) -> str:
+    #     """Direct access to chat completion with configuration options"""
+    #     system_message = system_message or self.role
+    #     return self.openai_handler.chat_completion(
+    #         prompt=prompt, system_message=system_message,
+    #         override_config=override_config, response_format=response_format,
+    #         extra_body=extra_body)
+
+    def chat_completion(self, prompt: str, system_message: str = None,
+                       override_config: Dict = None, response_format: Dict = None,
+                       extra_body: Dict = None) -> str:
+        """Enhanced chat completion with automatic memory integration"""
+        # Get memory context if enabled
+        system_message = system_message or self.role
+
+        memory_context = ""
+        if self.agent_memory.is_enabled() and self.agent_memory.auto_inject:
+            # Use prompt as query for recall
+            memory_context = self.agent_memory.recall(prompt[:LONGEST_SUMMARY_LEN])
+
+            if memory_context:
+                # Inject memory into system message
+                base_system = system_message or self.role
+                enhanced_system = f"{base_system}\n\n[Relevant Memory Context]\n{memory_context}"
+                system_message = enhanced_system
+                self.logger.debug(f"Injected memory: {len(memory_context)} chars")
+
+        # Call original chat completion
+        response = self.openai_handler.chat_completion(
+            prompt=prompt,
+            system_message=system_message,
+            override_config=override_config,
+            response_format=response_format,
+            extra_body=extra_body
+        )
+
+        # Auto-remember after getting response
+        if self.agent_memory.is_enabled() and self.agent_memory.auto_remember:
+            if self.agent_memory.should_remember(prompt, response):
+                summary = \
+                    f"Q: {prompt[:LONGEST_SUMMARY_LEN]}... A: {response[:LONGEST_SUMMARY_LEN]}..."
+                self.agent_memory.remember(summary, context="interaction")
+
+        return response

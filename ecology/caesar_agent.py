@@ -53,6 +53,11 @@ CAESAR_CONFIG = {
         "exploration_temperature": 0.8,
     },
 
+    "AgentMemory": {
+        # Whether to enable agent memory
+        "enabled": True,
+    },
+
     "OpenAIHandler": {
         **DEFAULT_CONFIG["OpenAIHandler"],
         # Model for exploration analysis and synthesis
@@ -371,6 +376,26 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
             self.logger.error(f"KB add_text failed: {e}")
 
         self.graph.add_node(self.current_url, insights=insights, depth=self.current_depth)
+
+        # Store rich URL visit information
+        domain = urlparse(self.current_url).netloc
+        path = urlparse(self.current_url).path
+        parent_url = self.url_stack[-2] if len(self.url_stack) > 1 else "initial"
+
+        self.remember(
+            f"Agent visited {self.current_url} (domain: {domain}, path: {path}) "
+            f"at depth {self.current_depth} from {parent_url}. "
+            f"Insights: {insights[:LONGER_SUMMARY_LEN]}...",
+            context="url_visit",
+            metadata={
+                'url': self.current_url,
+                'domain': domain,
+                'path': path,
+                'depth': self.current_depth,
+                'iteration': self.current_iteration,
+                'parent_url': parent_url
+        })
+
         return insights
 
     def _backtrack(self) -> bool:
@@ -386,31 +411,51 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
         """Advance exploration to new URL"""
         self.url_stack.append(url)
         self.current_url = url
-        self.current_depth = len(self.url_stack) - 1
+
+        # Use true tree depth from graph, not stack length
+        if url in self.graph:
+            # Revisiting - use original depth
+            self.current_depth = self.graph.nodes[url]['depth']
+        else:
+            # New node - depth is parent's depth + 1
+            parent_url = self.url_stack[-2] if len(self.url_stack) > 1 else None
+            parent_depth = self.graph.nodes[parent_url]['depth'] if parent_url else 0
+            self.current_depth = parent_depth + 1
 
     def _select_next_link(self, links: List[Tuple[str, str]]) -> Tuple[int, str]:
         """Use LLM to select best link"""
         kb_context = ""
-        if self.kb_manager.size() > 0:
-            try:
-                kb_context = self.kb_manager.query(
-                    "What patterns, gaps, or questions have emerged? What should we explore next?",
-                    top_k=self.top_k
-                )
-            except Exception as e:
-                self.logger.error(f"KB query failed: {e}")
+        try:
+            kb_context = self.kb_manager.query(
+                "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?", top_k=self.top_k)
+        except Exception as e:
+            self.logger.error(f"KB query failed: {e}")
+
+        # Query memory for historical patterns
+        memory_context = self.recall("What webpages have I visited most often and what navigation patterns emerged?")
 
         link_options = '\n'.join(
             f"{i+1}. [{text}] {url}" for i, (url, text) in enumerate(links)
         )
 
-        prompt = f"""Current exploration context:
-{kb_context if kb_context else "Beginning exploration"}
+        # Based on your role of seeking novel patterns and deeper understanding, which link offers the most promising direction for exploration?
 
-Available paths forward:
+        prompt = f"""You are selecting the next webpage link to explore based on your role
+
+CURRENT EXPLORATION INSIGHTS:
+{kb_context if kb_context else "Just beginning exploration - no insights yet."}
+
+HISTORICAL EXPLORATION PATTERNS:
+{memory_context if memory_context else "No previous exploration history available."}
+
+AVAILABLE PATHS FORWARD:
 {link_options}
 
-Based on your role of seeking novel patterns and deeper understanding, which link offers the most promising direction for exploration?
+TASK: Based on current insights and historical patterns, which link offers the most promising direction for exploration? Consider:
+- Novel connections not yet explored
+- Gaps in current understanding
+- Patterns that emerged from similar past decisions
+- Avoiding repetition while allowing productive revisits
 
 Respond with a JSON object in this exact format:
 {{
@@ -449,8 +494,26 @@ Your response must be valid JSON only, nothing else."""
 
         choice, reason = self._select_next_link(links)
         next_url = links[choice][0]
-
         self.graph.add_edge(self.current_url, next_url, reason=reason)
+
+        current_domain = urlparse(self.current_url).netloc
+        next_domain = urlparse(next_url).netloc
+        self.remember(
+            f"From {self.current_url} navigated to {next_url} "
+            f"(current domain: {current_domain}, next domain: {next_domain}). "
+            f"Selected from {len(links)} options because: {reason}",
+            context="navigation",
+            metadata={
+                'from_url': self.current_url,
+                'to_url': next_url,
+                'from_domain': current_domain,
+                'to_domain': next_domain,
+                'reason': reason,
+                'alternatives': len(links),
+                'depth': self.current_depth + 1
+            }
+        )
+
         self._advance_to_url(next_url)
 
         self.logger.info(f"[ACT] Selected {choice + 1}: {next_url}")

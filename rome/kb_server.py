@@ -14,7 +14,11 @@ import chromadb
 from .config import set_attributes_from_config
 from .logger import get_logger
 
+# Timeout for startup/shutdown
 TIMEOUT_LEN = 2
+# Base dir for Chroma DB
+CHROMA_BASE_DIR = "~/.rome/agent-chroma-db"
+
 
 class ChromaServerManager:
     """Independent ChromaDB server lifecycle manager with thread safety"""
@@ -83,8 +87,8 @@ class ChromaServerManager:
             return os.path.expanduser(self.persist_path)
 
         # Create agent-specific directory
-        base_dir = os.path.expanduser("~/.rome")
-        agent_data_dir = os.path.join(base_dir, "agent-chroma-db")
+        agent_data_dir = os.path.abspath(os.path.expanduser(CHROMA_BASE_DIR))
+        agent_data_name = os.path.basename(agent_data_dir)
 
         # Fallback to temp if home directory issues
         try:
@@ -97,7 +101,7 @@ class ChromaServerManager:
             return agent_data_dir
         except (OSError, PermissionError):
             # Fallback to session-specific temp directory
-            session_dir = os.path.join(tempfile.gettempdir(), f"agent-chroma-db-{os.getpid()}")
+            session_dir = os.path.join(tempfile.gettempdir(), f"{agent_data_name}-{os.getpid()}")
             self.logger.warning(f"Could not use user data directory, falling back to: {session_dir}")
             return session_dir
 
