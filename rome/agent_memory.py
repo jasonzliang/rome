@@ -1,4 +1,4 @@
-"""Agent Memory - Intelligent memory layer using Mem0 with ChromaDB +/- Graph backend"""
+"""Agent Memory - Intelligent memory layer using Mem0 with ChromaDB + Neo4j backend"""
 import os
 import time
 import traceback
@@ -9,6 +9,7 @@ from mem0 import Memory
 from .config import set_attributes_from_config, LONGER_SUMMARY_LEN
 from .logger import get_logger
 from .kb_server import ChromaServerManager, CHROMA_BASE_DIR
+from .kb_client import EMBEDDING_MODELS
 
 class AgentMemory:
     """Intelligent memory layer for agents using Mem0 with optional graph storage"""
@@ -24,81 +25,113 @@ class AgentMemory:
             self, config,
             ['enabled', 'auto_inject', 'auto_remember', 'remember_threshold',
                 'embedding_model', 'recall_limit', 'use_graph', 'graph_url',
-                'graph_username', 'graph_password', 'chroma_host', 'chroma_port']
+                'graph_username', 'graph_password', 'vector_host', 'vector_port']
         )
 
         self.memory = None
         if self.enabled:
             self._initialize_mem0()
-            # self.clear()
+            self.clear()
+            # if self.use_graph:
+                # self._test_neo4j_connection()
+
+    # def _test_neo4j_connection(self) -> bool:
+    #     """Test if Neo4j is accessible"""
+    #     if not self.use_graph or not self.memory:
+    #         return False
+
+    #     try:
+    #         # Try to access the graph store directly
+    #         if hasattr(self.memory, 'graph'):
+    #             # Run a simple test query
+    #             test_query = "MATCH (n) RETURN count(n) as total LIMIT 1"
+    #             result = self.memory.graph.graph.query(test_query)
+    #             self.logger.info(f"Neo4j connection test successful: {result}")
+    #             return True
+    #     except Exception as e:
+    #         self.logger.error(f"Neo4j connection test failed: {e}")
+    #         self.logger.error(traceback.format_exc())
+    #         return False
 
     def _initialize_mem0(self) -> None:
-        """Initialize Mem0 with ChromaDB vector store and optional graph store"""
+        """Initialize Mem0 with ChromaDB vector store and optional Neo4j graph store"""
         try:
+            # Validate embedding model
+            if self.embedding_model not in EMBEDDING_MODELS:
+                raise RuntimeError(f"Invalid embedding model {self.embedding_model}")
+
+            # Get embedding dimensions
+            embedding_dims = EMBEDDING_MODELS[self.embedding_model]
+
             # Build base config
             mem0_config = {
                 "version": "v1.1",
                 "llm": {
                     "provider": "openai",
-                    "config": {"model": "gpt-5-mini", "temperature": 0.1, "max_tokens": 4000}
+                    "config": {
+                        "model": "gpt-5-mini",  # Kept exactly as specified
+                        "temperature": 0.1,
+                        "max_tokens": 4000
+                    }
                 }
             }
 
-            # Add embedder if specified
-            if self.embedding_model:
-                mem0_config["embedder"] = {
-                    "provider": "openai",
-                    "config": {"model": self.embedding_model}
+            # Embedder configuration with explicit dimensions
+            embedder_config = {
+                "provider": "openai",
+                "config": {
+                    "model": self.embedding_model,
+                    "embedding_dims": embedding_dims  # Fixed: was embedding_model_dims
                 }
+            }
+            mem0_config["embedder"] = embedder_config
 
-            # Configure vector store (server-based unless using graph)
+            # ALWAYS configure vector store (required for both modes)
+            server_config = {
+                'host': self.vector_host,
+                'port': self.vector_port,
+                'persist_path': None
+            }
+
+            server_manager = ChromaServerManager.get_instance(config=server_config)
+            if not server_manager.is_running() and not server_manager.start():
+                raise RuntimeError("Failed to start ChromaDB server")
+
+            collection_name = f"mem0_{self.agent_name}"
+            mem0_config["vector_store"] = {
+                "provider": "chroma",
+                "config": {
+                    "collection_name": collection_name,
+                    "host": server_manager.host,
+                    "port": server_manager.port
+                }
+            }
+
+            # Optionally ADD graph store (works alongside vector store)
             if self.use_graph:
-                # File-based storage for graph mode
-
-                # Add graph store
                 if not self.graph_password:
                     self.logger.error("Graph enabled but no password provided")
+                    return
 
-                provider = "neo4j" if "neo4j" in self.graph_url else "memgraph"
                 mem0_config["graph_store"] = {
-                    "provider": provider,
+                    "provider": "neo4j",
                     "config": {
                         "url": self.graph_url,
                         "username": self.graph_username,
-                        "password": self.graph_password or ""
+                        "password": self.graph_password
                     }
                 }
-                self.logger.info(f"Mem0 initialized: file-based ChromaDB + {provider} graph")
+                self.logger.info(f"Mem0 initialized: ChromaDB @ {server_manager.server_url} + Neo4j @ {self.graph_url}")
             else:
-                # Server-based storage
-                server_config = {
-                    'host': self.chroma_host,
-                    'port': self.chroma_port,
-                    'persist_path': None
-                }
+                self.logger.info(f"Mem0 initialized: ChromaDB @ {server_manager.server_url}")
 
-                server_manager = ChromaServerManager.get_instance(config=server_config)
-                if not server_manager.is_running() and not server_manager.start():
-                    raise RuntimeError("Failed to start ChromaDB server")
-
-                collection_name = f"mem0_{self.agent_name}"
-                mem0_config["vector_store"] = {
-                    "provider": "chroma",
-                    "config": {
-                        "collection_name": collection_name,
-                        "host": server_manager.host,
-                        "port": server_manager.port
-                    }
-                }
-                self.logger.info(f"Mem0 initialized: ChromaDB server @ {server_manager.server_url}")
-
+            # Initialize memory with the complete configuration
             self.memory = Memory.from_config(config_dict=mem0_config)
 
         except Exception as e:
             self.logger.error(f"Memory initialization failed: {e}")
             self.logger.error(traceback.format_exc())
-            self.enabled = False
-            self.memory = None
+            self.enabled = False; self.memory = None
 
     def is_enabled(self) -> bool:
         """Check if memory is enabled and initialized"""
@@ -124,22 +157,30 @@ class AgentMemory:
                 messages,
                 user_id=self.agent_name,
                 metadata=meta,
-                infer=False  # Bypass LLM extraction - store directly!
+                infer=False
             )
 
             self.logger.info(f"Memory add result: {result}")
 
-            # Check if anything was actually stored
-            if result and result.get('results'):
-                self.logger.info(f"Successfully stored {len(result['results'])} memories")
+            if not result:
+                self.logger.error("No result returned from memory.add()")
+                return False
+
+            results = result.get('results', [])
+            relations = result.get('relations', [])
+
+            if results:
+                self.logger.info(
+                    f"Vector: {len(results)} memories | Graph: {len(relations)} relations")
+                if not relations and self.use_graph:
+                    self.logger.error("No relations extracted, nothing to add to graph DB")
                 return True
             else:
-                self.logger.error(f"No memories extracted from content (may not be memorable enough)")
+                self.logger.error("No memories extracted, nothing to add to vector DB")
                 return False
 
         except Exception as e:
             self.logger.error(f"Failed to remember: {e}")
-            import traceback
             self.logger.error(traceback.format_exc())
             return False
 
@@ -147,13 +188,6 @@ class AgentMemory:
         """
         Query memory and return most relevant results
         Uses vector similarity + graph traversal (if enabled)
-
-        Args:
-            query: Query for semantic similarity + graph search
-            context: Optional context filter
-
-        Returns:
-            Concatenated relevant memories (empty string if none found)
         """
         if not self.is_enabled():
             self.logger.error("Memory not enabled, skipping recall")
@@ -165,7 +199,7 @@ class AgentMemory:
                 query=query,
                 user_id=self.agent_name,
                 limit=self.recall_limit,
-                filters=filters
+                filters=filters,
             )
 
             if results and results.get('results'):
@@ -173,9 +207,12 @@ class AgentMemory:
                 self.logger.debug(f"Recalled: {recalled_mem}...")
                 return recalled_mem
             else:
-                raise
+                self.logger.error(f"No memories recalled, results empty")
+                return ""
+
         except Exception as e:
             self.logger.error(f"Failed to recall: {e}")
+            self.logger.error(traceback.format_exc())
             return ""
 
     def should_remember(self, prompt: str, response: str) -> bool:
@@ -195,25 +232,38 @@ class AgentMemory:
         return any(pattern in combined for pattern in memorable_patterns)
 
     def clear(self) -> bool:
-        """Clear all memories and verify deletion"""
+        """Clear all memories from vector store and Neo4j graph"""
         if not self.is_enabled():
             return False
 
         try:
-            # Delete and verify
+            # Delete from both vector and graph stores
             self.memory.delete_all(user_id=self.agent_name)
+
+            # Verify vector store cleanup
             results = self.memory.get_all(user_id=self.agent_name, limit=10000)
-            count = len(results.get('results', [])) if results else 0
+            vector_count = len(results.get('results', [])) if results else 0
 
-            if count == 0:
-                self.logger.info(f"Cleared all memories for {self.agent_name}")
+            # Verify Neo4j cleanup if graph enabled
+            graph_count = 0
+            if self.use_graph and hasattr(self.memory, 'graph'):
+                try:
+                    query = "MATCH (n {user_id: $user_id}) RETURN count(n) as total"
+                    result = self.memory.graph.graph.query(query, {"user_id": self.agent_name})
+                    graph_count = result[0]['total'] if result else 0
+                except Exception as e:
+                    self.logger.error(f"Could not verify Neo4j cleanup: {e}")
+
+            if vector_count == 0 and graph_count == 0:
+                self.logger.info(f"Cleared all memories for {self.agent_name} (Vector: 0, Graph: 0)")
                 return True
-
-            self.logger.error(f"Clear failed: {count} memories remain")
-            return False
+            else:
+                self.logger.error(f"Clear incomplete: Vector={vector_count}, Graph={graph_count} memories remain")
+                return False
 
         except Exception as e:
             self.logger.error(f"Failed to clear memories: {e}")
+            self.logger.error(traceback.format_exc())
             return False
 
     def shutdown(self) -> None:

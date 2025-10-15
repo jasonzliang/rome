@@ -79,13 +79,13 @@ DEFAULT_CONFIG = {
         "recall_limit": 10,  # Number of most relevant memories to retrieve in recall()
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model for semantic search
 
-        # Graph Memory (for tracking entities/relationships like file visits)
+        # DB settings (for tracking entities/relationships like file visits)
         "use_graph": False,  # Enable graph memory (neo4j/memgraph required)
         "graph_url": "bolt://localhost:7687",  # Graph database connection URL
         "graph_username": "neo4j",  # Graph database username
-        "graph_password": "neo4j",  # Graph database password (set via env or config)
-        "chroma_host": "localhost",  # ChromaDB host
-        "chroma_port": 8000,  # ChromaDB port
+        "graph_password": "neo4jneo4j",  # Graph database password (set via env or config)
+        "vector_host": "localhost",  # ChromaDB host
+        "vector_port": 8000,  # ChromaDB port
     },
 
     "AgentApi": {

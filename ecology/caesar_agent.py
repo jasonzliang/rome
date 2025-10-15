@@ -58,6 +58,8 @@ CAESAR_CONFIG = {
     "AgentMemory": {
         # Whether to enable agent memory
         "enabled": True,
+        # Whether to use vector DB or graph DB
+        "use_graph": False,
     },
 
     "OpenAIHandler": {
