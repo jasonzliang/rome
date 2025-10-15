@@ -163,7 +163,7 @@ You navigate through information space systematically yet creatively, always wit
     def _setup_exploration_state(self) -> None:
         """Initialize exploration state"""
         self.graph = nx.DiGraph()
-        self.visited_urls = set()
+        self.visited_urls = {}
         self.failed_urls = set()
         self.url_stack = [self.starting_url]
         self.current_url = self.starting_url
@@ -207,7 +207,7 @@ You navigate through information space systematically yet creatively, always wit
                 'iteration': iteration,
                 'current_url': self.current_url,
                 'current_depth': self.current_depth,
-                'visited_urls': list(self.visited_urls),
+                'visited_urls': self.visited_urls,
                 'failed_urls': list(self.failed_urls),
                 'url_stack': self.url_stack,
                 'graph': graph_data,
@@ -246,7 +246,7 @@ You navigate through information space systematically yet creatively, always wit
                 return False
 
             self.current_iteration = checkpoint_data['iteration']
-            self.visited_urls = set(checkpoint_data['visited_urls'])
+            self.visited_urls = checkpoint_data['visited_urls']
             self.failed_urls = set(checkpoint_data['failed_urls'])
             self.url_stack = checkpoint_data['url_stack']
 
@@ -389,26 +389,6 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
             self.logger.error(f"KB add_text failed: {e}")
 
         self.graph.add_node(self.current_url, insights=insights, depth=self.current_depth)
-
-        # Store rich URL visit information
-        domain = urlparse(self.current_url).netloc
-        path = urlparse(self.current_url).path
-        parent_url = self.url_stack[-2] if len(self.url_stack) > 1 else "initial"
-
-        # self.remember(
-        #     f"Agent visited {self.current_url} (domain: {domain}, path: {path}) "
-        #     f"at iteration {self.current_iteration} (depth {self.current_depth}) from {parent_url}. "
-        #     f"Insights: {insights[:LONGER_SUMMARY_LEN]}...",
-        #     context="url_visit",
-        #     metadata={
-        #         'url': self.current_url,
-        #         'domain': domain,
-        #         'path': path,
-        #         'depth': self.current_depth,
-        #         'iteration': self.current_iteration,
-        #         'parent_url': parent_url
-        # })
-
         return insights
 
     def _advance_to_url(self, url: str) -> None:
@@ -436,12 +416,20 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
             self.logger.error(f"KB query failed: {e}")
 
         # Query memory for historical patterns
-        memory_context = self.recall(f"What webpages have I often visited and what navigation patterns have emerged in relation to the following insights:\n{kb_context}")
+        memory_context = self.recall(f"What webpages have I frequently visited and what navigation patterns have emerged in relation to the following insights:\n{kb_context}")
 
-        link_options = '\n'.join(
-            f"{i+1}. [{text}] {url}" for i, (url, text) in enumerate(links)
-        )
+        link_options = []
+        for i, (url, text) in enumerate(links):
+            # Get the visit count from the self.visited_urls dictionary, defaulting to 0.
+            visit_count = self.visited_urls.get(url, 0)
+            link_options.append(
+                f"{i+1}. [{text}] (Visit count: {visit_count}) {url}"
+            )
+        link_options = '\n'.join(link_options)
 
+        # link_options = '\n'.join(
+        #     f"{i+1}. [{text}] {url}" for i, (url, text) in enumerate(links)
+        # )
         # Based on your role of seeking novel patterns and deeper understanding, which link offers the most promising direction for exploration?
 
         prompt = f"""You are selecting the next webpage link to explore based on your role
@@ -609,7 +597,7 @@ Your response must be valid JSON only, nothing else."""
                     self._save_checkpoint(iteration)
                 continue
 
-            self.visited_urls.add(self.current_url)
+            self.visited_urls[self.current_url] = self.visited_urls.get(self.current_url, 0) + 1
             self.think(content)
 
             if iteration < self.max_iterations:

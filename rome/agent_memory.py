@@ -40,7 +40,7 @@ class AgentMemory:
                 "version": "v1.1",
                 "llm": {
                     "provider": "openai",
-                    "config": {"model": "gpt-4o-mini", "temperature": 0.1, "max_tokens": 4000}
+                    "config": {"model": "gpt-5-mini", "temperature": 0.1, "max_tokens": 4000}
                 }
             }
 
