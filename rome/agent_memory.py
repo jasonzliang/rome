@@ -245,14 +245,10 @@ class AgentMemory:
             vector_count = len(results.get('results', [])) if results else 0
 
             # Verify Neo4j cleanup if graph enabled
-            graph_count = 0
             if self.use_graph and hasattr(self.memory, 'graph'):
-                try:
-                    query = "MATCH (n {user_id: $user_id}) RETURN count(n) as total"
-                    result = self.memory.graph.graph.query(query, {"user_id": self.agent_name})
-                    graph_count = result[0]['total'] if result else 0
-                except Exception as e:
-                    self.logger.error(f"Could not verify Neo4j cleanup: {e}")
+                query = "MATCH (n {user_id: $user_id}) RETURN count(n) as total"
+                result = self.memory.graph.graph.query(query, {"user_id": self.agent_name})
+                graph_count = result[0]['total'] if result else 0
 
             if vector_count == 0 and graph_count == 0:
                 self.logger.info(f"Cleared all memories for {self.agent_name} (Vector: 0, Graph: 0)")
