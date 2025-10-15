@@ -57,16 +57,13 @@ class AgentMemory:
             if self.embedding_model not in EMBEDDING_MODELS:
                 raise RuntimeError(f"Invalid embedding model {self.embedding_model}")
 
-            # Get embedding dimensions
-            embedding_dims = EMBEDDING_MODELS[self.embedding_model]
-
             # Build base config
             mem0_config = {
                 "version": "v1.1",
                 "llm": {
                     "provider": "openai",
                     "config": {
-                        "model": "gpt-5-mini",  # Kept exactly as specified
+                        "model": "gpt-5-mini",
                         "temperature": 0.1,
                         "max_tokens": 4000
                     }
@@ -78,7 +75,7 @@ class AgentMemory:
                 "provider": "openai",
                 "config": {
                     "model": self.embedding_model,
-                    "embedding_dims": embedding_dims  # Fixed: was embedding_model_dims
+                    "embedding_dims": EMBEDDING_MODELS[self.embedding_model]
                 }
             }
             mem0_config["embedder"] = embedder_config
