@@ -436,7 +436,7 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
             self.logger.error(f"KB query failed: {e}")
 
         # Query memory for historical patterns
-        memory_context = self.recall("What webpages have I visited most often and what navigation patterns emerged?")
+        memory_context = self.recall(f"What webpages have I often visited and what navigation patterns have emerged in relation to the following insights:\n{kb_context}")
 
         link_options = '\n'.join(
             f"{i+1}. [{text}] {url}" for i, (url, text) in enumerate(links)
