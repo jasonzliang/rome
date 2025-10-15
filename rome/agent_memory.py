@@ -14,10 +14,9 @@ from .kb_client import EMBEDDING_MODELS
 class AgentMemory:
     """Intelligent memory layer for agents using Mem0 with optional graph storage"""
 
-    def __init__(self, agent_name: str, repo_name: str, config: Dict = None):
+    def __init__(self, agent, config: Dict = None):
         """Initialize agent memory with vector +/- graph storage"""
-
-        self.agent_name = f"{repo_name}_{agent_name}"
+        self.mem_id = f"{agent.get_repo()}_{agent.get_id()}"
         self.logger = get_logger()
 
         # Apply config (defaults come from DEFAULT_CONFIG)
@@ -95,7 +94,7 @@ class AgentMemory:
             if not server_manager.is_running() and not server_manager.start():
                 raise RuntimeError("Failed to start ChromaDB server")
 
-            collection_name = f"mem0_{self.agent_name}"
+            collection_name = f"mem0_{self.mem_id}"
             mem0_config["vector_store"] = {
                 "provider": "chroma",
                 "config": {
@@ -153,7 +152,7 @@ class AgentMemory:
             messages = [{"role": "user", "content": message}]
             result = self.memory.add(
                 messages,
-                user_id=self.agent_name,
+                user_id=self.mem_id,
                 metadata=meta,
                 infer=False
             )
@@ -195,7 +194,7 @@ class AgentMemory:
             filters = {"context": context} if context else None
             results = self.memory.search(
                 query=query,
-                user_id=self.agent_name,
+                user_id=self.mem_id,
                 limit=self.recall_limit,
                 filters=filters,
             )
@@ -236,20 +235,20 @@ class AgentMemory:
 
         try:
             # Delete from both vector and graph stores
-            self.memory.delete_all(user_id=self.agent_name)
+            self.memory.delete_all(user_id=self.mem_id)
 
             # Verify vector store cleanup
-            results = self.memory.get_all(user_id=self.agent_name, limit=10000)
+            results = self.memory.get_all(user_id=self.mem_id, limit=10000)
             vector_count = len(results.get('results', [])) if results else 0
 
             # Verify Neo4j cleanup if graph enabled
             if self.use_graph and hasattr(self.memory, 'graph'):
                 query = "MATCH (n {user_id: $user_id}) RETURN count(n) as total"
-                result = self.memory.graph.graph.query(query, {"user_id": self.agent_name})
+                result = self.memory.graph.graph.query(query, {"user_id": self.mem_id})
                 graph_count = result[0]['total'] if result else 0
 
             if vector_count == 0 and graph_count == 0:
-                self.logger.info(f"Cleared all memories for {self.agent_name} (Vector: 0, Graph: 0)")
+                self.logger.info(f"Cleared all memories for {self.mem_id} (Vector: 0, Graph: 0)")
                 return True
             else:
                 self.logger.error(f"Clear incomplete: Vector={vector_count}, Graph={graph_count} memories remain")
@@ -264,4 +263,4 @@ class AgentMemory:
         """Clean up memory resources"""
         if self.memory:
             # self.clear()
-            self.logger.debug(f"Memory resources released for {self.agent_name}")
+            self.logger.debug(f"Memory resources released for {self.mem_id}")

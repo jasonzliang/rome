@@ -27,11 +27,8 @@ OpenAIHandler:
   temperature: 0.1
 
 # ============================================================================
-# Memory/KB CONFIGURATION
+# KNOWLEDGE BASE CONFIGURATION
 # ============================================================================
-ChromaClientManager:
-  log_db: true
-
 AgentMemory:
   enabled: true
   use_graph: true

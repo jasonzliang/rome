@@ -88,8 +88,7 @@ class BaseAgent:
         memory_config = self.config.get('AgentMemory', {})
 
         self.agent_memory = AgentMemory(
-            agent_name=self.get_id(),
-            repo_name=os.path.basename(self.repository),
+            agent=self,
             config=memory_config
         )
 
@@ -103,9 +102,9 @@ class BaseAgent:
         """Register cleanup handlers"""
         self.shutdown_called = False
 
-    def get_id(self, pid=False) -> str:
+    def get_id(self) -> str:
         """Unique identifier for agent in file system"""
-        return f'agent_{self.name}_{os.getpid()}' if (self.log_pid or pid) else f'agent_{self.name}'
+        return f'agent_{self.name}_{os.getpid()}' if self.log_pid else f'agent_{self.name}'
 
     def get_repo(self) -> str:
         """Get agent repository, creating if needed"""

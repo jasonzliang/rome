@@ -13,7 +13,7 @@ Agent:
 # ============================================================================
 CaesarAgent:
   starting_url: "https://en.wikipedia.org/wiki/Science"
-  max_iterations: 1000
+  max_iterations: 800
   exploration_temperature: 0.9
   save_graph_interval: 10
   draw_graph: false
@@ -24,15 +24,16 @@ CaesarAgent:
 # ============================================================================
 OpenAIHandler:
   cost_limit: 300.0
-  model: gpt-5
+  model: gpt-4o
   temperature: 0.1
   timeout: 300
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
 # ============================================================================
-# ChromaClientManager:
-#   log_db: true
+AgentMemory:
+  enabled: true
+  use_graph: true
 
 # ============================================================================
 # LOGGING CONFIGURATION
