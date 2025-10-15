@@ -14,6 +14,12 @@ import chromadb
 from .config import set_attributes_from_config
 from .logger import get_logger
 
+try:
+    __import__('pysqlite3')
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+except:
+    pass
+
 # Timeout for startup/shutdown
 TIMEOUT_LEN = 2
 # Base dir for Chroma DB
