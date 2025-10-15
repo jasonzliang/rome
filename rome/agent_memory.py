@@ -171,7 +171,7 @@ class AgentMemory:
 
             if results:
                 self.logger.info(
-                    f"Vector DB: {len(results)} memories | Graph DB: {len(relations)} relations")
+                    f"Vector DB: {len(results)} memories | graph DB: {len(relations)} relations")
                 if not relations and self.use_graph:
                     self.logger.debug("No graph relations extracted")
                 self.logger.debug(f"Remembered memory: {result}")
@@ -252,10 +252,10 @@ class AgentMemory:
                 graph_count = result[0]['total'] if result else 0
 
             if vector_count == 0 and graph_count == 0:
-                self.logger.info(f"Cleared all memories for {self.mem_id} (Vector: 0, Graph: 0)")
+                self.logger.info(f"Cleared all memories for {self.mem_id} for both vector/graph")
                 return True
             else:
-                self.logger.error(f"Clear incomplete: Vector={vector_count}, Graph={graph_count} memories remain")
+                self.logger.error(f"Clear incomplete: vector={vector_count}, graph={graph_count} memories remain")
                 return False
 
         except Exception as e:
