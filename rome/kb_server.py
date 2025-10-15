@@ -9,16 +9,16 @@ import requests
 import atexit
 from typing import Optional, Callable, List, Dict
 
-import chromadb
-
-from .config import set_attributes_from_config
-from .logger import get_logger
-
 try:
     __import__('pysqlite3')
     sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+    import chromadb
 except:
-    pass
+    print(f"Import error: {e}, install with: pip install chromadb llama-index llama-index-vector-stores-chroma llama-index-embeddings-openai llama-index-llms-openai")
+    exit(1)
+
+from .config import set_attributes_from_config
+from .logger import get_logger
 
 # Timeout for startup/shutdown
 TIMEOUT_LEN = 2
