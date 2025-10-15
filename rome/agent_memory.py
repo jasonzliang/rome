@@ -30,7 +30,7 @@ class AgentMemory:
         self.memory = None
         if self.enabled:
             self._initialize_mem0()
-            self.clear()
+            # self.clear()
 
     def _initialize_mem0(self) -> None:
         """Initialize Mem0 with ChromaDB vector store and optional graph store"""
