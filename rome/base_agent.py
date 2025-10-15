@@ -88,8 +88,8 @@ class BaseAgent:
         memory_config = self.config.get('AgentMemory', {})
 
         self.agent_memory = AgentMemory(
-            agent_name=self.get_id(pid=True),
-            log_dir=self.get_log_dir(),
+            agent_name=self.get_id(),
+            repo_name=os.path.basename(self.repository),
             config=memory_config
         )
 

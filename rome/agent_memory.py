@@ -13,17 +13,10 @@ from .kb_server import ChromaServerManager, CHROMA_BASE_DIR
 class AgentMemory:
     """Intelligent memory layer for agents using Mem0 with optional graph storage"""
 
-    def __init__(self, agent_name: str, log_dir: str, config: Dict = None):
-        """
-        Initialize agent memory with vector +/- graph storage
+    def __init__(self, agent_name: str, repo_name: str, config: Dict = None):
+        """Initialize agent memory with vector +/- graph storage"""
 
-        Args:
-            agent_name: Unique identifier for this agent's memories
-            log_dir: Directory for ChromaDB persistence
-            config: Memory configuration dictionary
-        """
-        self.agent_name = agent_name
-        self.log_dir = log_dir
+        self.agent_name = f"{repo_name}_{agent_name}"
         self.logger = get_logger()
 
         # Apply config (defaults come from DEFAULT_CONFIG)
@@ -201,45 +194,23 @@ class AgentMemory:
         combined = (prompt + ' ' + response).lower()
         return any(pattern in combined for pattern in memorable_patterns)
 
-    def get_info(self) -> Dict:
-        """Get memory system information"""
-        info = {
-            "enabled": self.enabled,
-            "agent_name": self.agent_name,
-            "auto_inject": self.auto_inject,
-            "auto_remember": self.auto_remember,
-            "remember_threshold": self.remember_threshold,
-            "recall_limit": self.recall_limit,
-            "use_graph": self.use_graph
-        }
-
-        if self.use_graph:
-            info["graph_url"] = self.graph_url
-
-        if self.is_enabled():
-            try:
-                results = self.memory.get_all(user_id=self.agent_name, limit=10000)
-                info["memory_count"] = len(results.get('results', [])) if results else 0
-            except Exception as e:
-                self.logger.error(f"Could not get memory count: {e}")
-                info["memory_count"] = "unknown"
-
-            info["storage_path"] = os.path.abspath(
-                os.path.join(self.log_dir, "agent_memory_chroma")
-            )
-
-        return info
-
     def clear(self) -> bool:
-        """Clear all memories for this agent (vector + graph)"""
+        """Clear all memories and verify deletion"""
         if not self.is_enabled():
             return False
 
         try:
-            # Mem0's delete_all handles both vector and graph stores automatically
+            # Delete and verify
             self.memory.delete_all(user_id=self.agent_name)
-            self.logger.info(f"Cleared all memories for {self.agent_name}")
-            return True
+            results = self.memory.get_all(user_id=self.agent_name, limit=10000)
+            count = len(results.get('results', [])) if results else 0
+
+            if count == 0:
+                self.logger.info(f"Cleared all memories for {self.agent_name}")
+                return True
+
+            self.logger.error(f"Clear failed: {count} memories remain")
+            return False
 
         except Exception as e:
             self.logger.error(f"Failed to clear memories: {e}")
