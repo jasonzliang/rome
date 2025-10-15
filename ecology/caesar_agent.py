@@ -19,6 +19,9 @@ from rome.config import (DEFAULT_CONFIG, merge_with_default_config, set_attribut
 from rome.logger import get_logger
 from rome.kb_client import ChromaClientManager
 
+# Maximum number of links to consider when selecting next webpage to go to
+MAX_NUM_LINKS = 2000
+
 CAESAR_CONFIG = {
     "CaesarAgent": {
         # Total number of pages to explore before stopping
@@ -425,7 +428,7 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
             link_options.append(
                 f"{i+1}. [{text}] (Visit count: {visit_count}) {url}"
             )
-        link_options = '\n'.join(link_options)
+        link_options = '\n'.join(link_options[:MAX_NUM_LINKS])
 
         # link_options = '\n'.join(
         #     f"{i+1}. [{text}] {url}" for i, (url, text) in enumerate(links)
