@@ -17,7 +17,6 @@ from rome.config import (DEFAULT_CONFIG, merge_with_default_config, set_attribut
 from rome.logger import get_logger
 from rome.kb_client import ChromaClientManager
 
-
 CAESAR_CONFIG = {
     **DEFAULT_CONFIG,
 
@@ -95,17 +94,16 @@ class CaesarAgent(BaseAgent):
         self._log_initialization()
 
     def _setup_caesar_config(self, config: Dict = None,
-                                      starting_url: str = None,
-                                      allowed_domains: List[str] = None) -> None:
+                             starting_url: str = None,
+                             allowed_domains: List[str] = None) -> None:
         """Setup Caesar config before parent init"""
+        # Start with CAESAR_CONFIG as base, then merge custom config on top
+        base_config = CAESAR_CONFIG.copy()
         if config:
-            self.config = merge_with_default_config(config)
-            caesar_defaults = CAESAR_CONFIG.get('CaesarAgent', {})
-            for key, value in caesar_defaults.items():
-                if key not in self.config.get('CaesarAgent', {}):
-                    self.config.setdefault('CaesarAgent', {})[key] = value
+            # Merge custom config into CAESAR_CONFIG base
+            self.config = merge_with_default_config({**base_config, **config})
         else:
-            self.config = CAESAR_CONFIG.copy()
+            self.config = base_config
 
         caesar_config = self.config.get('CaesarAgent', {})
         set_attributes_from_config(self, caesar_config, CAESAR_CONFIG['CaesarAgent'].keys())
