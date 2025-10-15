@@ -425,8 +425,9 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
         for i, (url, text) in enumerate(links):
             # Get the visit count from the self.visited_urls dictionary, defaulting to 0.
             visit_count = self.visited_urls.get(url, 0)
+            visit_info = f" ({visit_count} visits so far) " if visit_count > 0 else " "
             link_options.append(
-                f"{i+1}. [{text}] (visit count: {visit_count}) {url}"
+                f"{i+1}. [{text}]{visit_info}{url}"
             )
         link_options = '\n'.join(link_options[:MAX_NUM_LINKS])
 
