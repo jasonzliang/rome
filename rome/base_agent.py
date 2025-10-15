@@ -69,10 +69,12 @@ class BaseAgent:
             f"Repository path does not exist: {self.repository}")
 
         log_config = self.config.get('Logger', {}).copy()
-        log_config.setdefault('base_dir', self.get_log_dir())
-        log_config.setdefault('filename', f"{self.get_id()}.console.log")
-
+        if not log_config.get('base_dir'):
+            log_config['base_dir'] = self.get_log_dir()
+        if not log_config.get('filename'):
+            log_config['filename'] = f"{self.get_id()}.console.log"
         get_logger().configure(log_config)
+
         self.logger.info(f"Logging configured: {log_config['base_dir']}")
 
     def _setup_openai_handler(self) -> None:

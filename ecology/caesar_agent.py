@@ -3,10 +3,12 @@ import networkx as nx
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
+import copy
 import requests
 import json
 import os
 import sys
+import time
 from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -18,8 +20,6 @@ from rome.logger import get_logger
 from rome.kb_client import ChromaClientManager
 
 CAESAR_CONFIG = {
-    **DEFAULT_CONFIG,
-
     "CaesarAgent": {
         # Total number of pages to explore before stopping
         "max_iterations": 10,
@@ -30,7 +30,7 @@ CAESAR_CONFIG = {
         # Maximum depth of exploration tree before backtracking
         "max_depth": 1e12,
         # Save exploration graph every N iterations
-        "save_graph_interval": 5,
+        "save_graph_interval": 1,
         # Generate visual graph representations (requires pygraphviz)
         "draw_graph": False,
         # Whether to follow links that point to the same page (different fragments)
@@ -58,7 +58,6 @@ CAESAR_CONFIG = {
     },
 
     "OpenAIHandler": {
-        **DEFAULT_CONFIG["OpenAIHandler"],
         # Model for exploration analysis and synthesis
         "model": "gpt-4o",
         # Base temperature for LLM (overridden by exploration_temperature for ACT/THINK)
@@ -73,15 +72,21 @@ CAESAR_CONFIG = {
 
 class CaesarAgent(BaseAgent):
     """Veni, Vidi, Vici - Web exploration agent with checkpointing support"""
-
     def __init__(self, name: str = None, role: str = None,
-                 repository: str = None, config: Dict = None,
-                 starting_url: str = None, allowed_domains: List[str] = None):
+             repository: str = None, config: Dict = None,
+             starting_url: str = None, allowed_domains: List[str] = None):
 
-        self._setup_caesar_config(config, starting_url, allowed_domains)
-
+        # Prepare merged config BEFORE calling super().__init__()
+        merged_config = self._prepare_caesar_config(config, starting_url, allowed_domains)
         if not role: role = self._get_default_role()
-        super().__init__(name, role, repository, self.config)
+        # Pass the merged config to BaseAgent (this configures the logger)
+        super().__init__(name, role, repository, merged_config)
+
+        # NOW setup Caesar-specific attributes (logger is configured)
+        caesar_config = self.config.get('CaesarAgent', {})
+        set_attributes_from_config(self, caesar_config, CAESAR_CONFIG['CaesarAgent'].keys())
+        self._setup_allowed_domains()
+
         self._validate_caesar_config()
         self._setup_knowledge_base()
 
@@ -93,24 +98,32 @@ class CaesarAgent(BaseAgent):
 
         self._log_initialization()
 
-    def _setup_caesar_config(self, config: Dict = None,
-                             starting_url: str = None,
-                             allowed_domains: List[str] = None) -> None:
-        """Setup Caesar config before parent init"""
-        # Start with CAESAR_CONFIG as base, then merge custom config on top
-        base_config = CAESAR_CONFIG.copy()
-        if config:
-            # Merge custom config into CAESAR_CONFIG base
-            self.config = merge_with_default_config({**base_config, **config})
-        else:
-            self.config = base_config
+    def _prepare_caesar_config(self, config: Dict = None,
+                               starting_url: str = None,
+                               allowed_domains: List[str] = None) -> Dict:
+        """Prepare Caesar config before parent init"""
+        def deep_merge(base: Dict, overlay: Dict) -> None:
+            """Deep merge overlay into base (modifies base in place)"""
+            for key, value in overlay.items():
+                if key in base and isinstance(base[key], dict) and isinstance(value, dict):
+                    deep_merge(base[key], value)
+                else:
+                    base[key] = value
 
-        caesar_config = self.config.get('CaesarAgent', {})
-        set_attributes_from_config(self, caesar_config, CAESAR_CONFIG['CaesarAgent'].keys())
+        merged_config = copy.deepcopy(DEFAULT_CONFIG)
 
-        if starting_url: self.starting_url = starting_url
-        if allowed_domains: self.allowed_domains = allowed_domains
-        self._setup_allowed_domains()
+        # Apply CAESAR_CONFIG (Caesar defaults)
+        deep_merge(merged_config, CAESAR_CONFIG)
+
+        # Apply custom config if provided (overrides Caesar defaults)
+        if config: deep_merge(merged_config, config)
+
+        # Apply constructor parameters (highest priority)
+        if starting_url:
+            merged_config.setdefault('CaesarAgent', {})['starting_url'] = starting_url
+        if allowed_domains:
+            merged_config.setdefault('CaesarAgent', {})['allowed_domains'] = allowed_domains
+        return merged_config
 
     def _get_default_role(self) -> str:
         """Return default Caesar role"""
@@ -165,6 +178,7 @@ You navigate through information space systematically yet creatively, always wit
     def _log_initialization(self) -> None:
         """Log initialization summary"""
         self.logger.info(f"CaesarAgent '{self.name}' initialized")
+        # self.logger.info(f"Log file: {os.path.join(self.get_log_dir(), f'{self.get_id()}.console.log')}")
         self.logger.info(f"Starting: {self.starting_url}")
         self.logger.info(f"Domains: {self.allowed_domains}")
         self.logger.info(f"Iterations: {self.max_iterations}, Depth: {self.max_depth}")
@@ -209,10 +223,11 @@ You navigate through information space systematically yet creatively, always wit
             with open(self._get_checkpoint_path(), 'w', encoding='utf-8') as f:
                 json.dump(checkpoint_data, f, indent=4, ensure_ascii=False)
 
-            self.logger.info(f"Checkpoint saved at iteration {iteration}")
+            self.logger.info(
+                f"Checkpoint saved on iteration {iteration}: {self._get_checkpoint_path()}")
 
         except Exception as e:
-            self.logger.error(f"Failed to save checkpoint: {e}")
+            self.logger.error(f"Failed to save checkpoint on iteration {iteration}: {e}")
 
     def _load_checkpoint(self) -> bool:
         """Load exploration state from checkpoint"""
@@ -239,7 +254,7 @@ You navigate through information space systematically yet creatively, always wit
                 self.logger.error("Invalid checkpoint: empty url_stack")
                 return False
 
-            self.current_depth = len(self.url_stack) - 1
+            self.current_depth = len(self.url_stack)
             self.current_url = self.url_stack[-1]
 
             graph_data = checkpoint_data['graph']
@@ -380,45 +395,36 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
         path = urlparse(self.current_url).path
         parent_url = self.url_stack[-2] if len(self.url_stack) > 1 else "initial"
 
-        self.remember(
-            f"Agent visited {self.current_url} (domain: {domain}, path: {path}) "
-            f"at depth {self.current_depth} from {parent_url}. "
-            f"Insights: {insights[:LONGER_SUMMARY_LEN]}...",
-            context="url_visit",
-            metadata={
-                'url': self.current_url,
-                'domain': domain,
-                'path': path,
-                'depth': self.current_depth,
-                'iteration': self.current_iteration,
-                'parent_url': parent_url
-        })
+        # self.remember(
+        #     f"Agent visited {self.current_url} (domain: {domain}, path: {path}) "
+        #     f"at iteration {self.current_iteration} (depth {self.current_depth}) from {parent_url}. "
+        #     f"Insights: {insights[:LONGER_SUMMARY_LEN]}...",
+        #     context="url_visit",
+        #     metadata={
+        #         'url': self.current_url,
+        #         'domain': domain,
+        #         'path': path,
+        #         'depth': self.current_depth,
+        #         'iteration': self.current_iteration,
+        #         'parent_url': parent_url
+        # })
 
         return insights
+
+    def _advance_to_url(self, url: str) -> None:
+        """Advance exploration to new URL"""
+        self.url_stack.append(url)
+        self.current_url = url
+        self.current_depth = len(self.url_stack)  # Derive from stack
 
     def _backtrack(self) -> bool:
         """Backtrack to parent URL"""
         if len(self.url_stack) > 1:
             self.url_stack.pop()
             self.current_url = self.url_stack[-1]
-            self.current_depth = len(self.url_stack) - 1
+            self.current_depth = len(self.url_stack)  # Derive from stack
             return True
         return False
-
-    def _advance_to_url(self, url: str) -> None:
-        """Advance exploration to new URL"""
-        self.url_stack.append(url)
-        self.current_url = url
-
-        # Use true tree depth from graph, not stack length
-        if url in self.graph:
-            # Revisiting - use original depth
-            self.current_depth = self.graph.nodes[url]['depth']
-        else:
-            # New node - depth is parent's depth + 1
-            parent_url = self.url_stack[-2] if len(self.url_stack) > 1 else None
-            parent_depth = self.graph.nodes[parent_url]['depth'] if parent_url else 0
-            self.current_depth = parent_depth + 1
 
     def _select_next_link(self, links: List[Tuple[str, str]]) -> Tuple[int, str]:
         """Use LLM to select best link"""
@@ -481,7 +487,7 @@ Your response must be valid JSON only, nothing else."""
 
     def act(self, links: List[Tuple[str, str]]) -> Optional[str]:
         """Phase 3: Choose next URL based on accumulated knowledge"""
-        if self.current_depth >= self.max_depth:
+        if self.current_depth > self.max_depth:
             self._backtrack()
             return None
 
@@ -497,9 +503,10 @@ Your response must be valid JSON only, nothing else."""
         current_domain = urlparse(self.current_url).netloc
         next_domain = urlparse(next_url).netloc
         self.remember(
-            f"From {self.current_url} navigated to {next_url} "
-            f"(current domain: {current_domain}, next domain: {next_domain}). "
-            f"Selected from {len(links)} options because: {reason}",
+            f"Agent navigated from {self.current_url} to visit {next_url} "
+            f"(from domain {current_domain} to domain {next_domain}). "
+            f"Navigation performed on iteration {self.current_depth} at depth {self.current_depth}. "
+            f"Agent selected new webpage from {len(links)} options because: {reason}",
             context="navigation",
             metadata={
                 'from_url': self.current_url,
@@ -508,12 +515,11 @@ Your response must be valid JSON only, nothing else."""
                 'to_domain': next_domain,
                 'reason': reason,
                 'alternatives': len(links),
-                'depth': self.current_depth + 1
+                'depth': self.current_depth
             }
         )
 
         self._advance_to_url(next_url)
-
         self.logger.info(f"[ACT] Selected {choice + 1}: {next_url}")
         self.logger.info(f"Reason: {reason}")
 
