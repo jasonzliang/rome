@@ -34,12 +34,14 @@ CAESAR_CONFIG = {
         "allowed_domains": [],
         # Maximum depth of exploration tree before backtracking
         "max_depth": 10000,
-        # Save exploration graph every N iterations
-        "save_graph_interval": 1,
         # Generate visual graph representations (requires pygraphviz)
         "draw_graph": False,
+        # Save exploration graph every N iterations
+        "save_graph_interval": 1,
         # Save checkpoint every N iterations for resumption
         "checkpoint_interval": 1,
+        # Restart from starting_url every N iterations (0 = never restart)
+        "restart_interval": 0,
 
         # Whether to follow links that point to the same page (different fragments)
         "same_page_links": False,
@@ -666,6 +668,16 @@ Your response must be valid JSON only, nothing else."""
         except Exception as e:
             self.logger.error(f"Failed to create graph visualization: {e}")
 
+    def _restart_exploration(self, iteration: int) -> None:
+        """Reset to starting URL while preserving accumulated knowledge"""
+        if (self.restart_interval > 0 and
+            iteration > 1 and
+            (iteration - 1) % self.restart_interval == 0):
+            self.logger.info(f"[RESTART] Returning to starting URL: {self.starting_url}")
+            self.url_stack = [self.starting_url]
+            self.current_url = self.starting_url
+            self.current_depth = 1
+
     def explore(self) -> str:
         """Execute main exploration loop"""
         start_iteration = self.current_iteration + 1
@@ -674,6 +686,7 @@ Your response must be valid JSON only, nothing else."""
         for iteration in range(start_iteration, self.max_iterations + 1):
             if self.shutdown_called: break
             self.current_iteration = iteration
+            self._restart_exploration(iteration)
 
             self.logger.info(f"\n{'='*80}")
             self.logger.info(f"Iteration {iteration}/{self.max_iterations}")
