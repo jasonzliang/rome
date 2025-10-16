@@ -142,6 +142,12 @@ class BaseAgent:
         """Clean up resources before termination"""
         if self.shutdown_called: return
         self.shutdown_called = True
+
+        try:
+            from posthog import posthog
+            if posthog: posthog.shutdown()
+        except: pass
+
         try:
             self.logger.info("BaseAgent shutdown completed")
         except Exception as e:

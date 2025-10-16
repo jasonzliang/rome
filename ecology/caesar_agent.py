@@ -47,7 +47,7 @@ CAESAR_CONFIG = {
         "allow_revisit": True,
         # Whether to use new link display format or not
         "fancy_link_display": True,
-        # Whether to ask KB for whether to explore or go back to visited pages
+        # Whether to dynamically determine to explore or go back to visited pages
         "use_explore_strategy": True,
         # False for classic mode
         "iterative_synthesis": True,
@@ -517,8 +517,7 @@ Provide a strategic recommendation in 2-3 sentences."""
         kb_context = memory_context = explore_strategy = ""
         try:
             kb_context = self.kb_manager.query(
-                "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?",
-                top_k=self.top_k)
+                "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?", top_k=self.top_k)
             memory_context = self.recall(
                 f"What webpages have I frequently visited and what navigation patterns have emerged in relation to the following insights:\n{kb_context}")
             if self.use_explore_strategy:
