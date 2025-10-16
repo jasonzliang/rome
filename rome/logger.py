@@ -108,32 +108,35 @@ class ParentPathRichHandler(RichHandler):
     def __init__(self, *args, **kwargs):
         kwargs['show_path'] = False
         super().__init__(*args, **kwargs)
+        self._cache = {}
+        self._cache_size = 1000
 
     def emit(self, record):
         """Add parent path info before emitting."""
         import inspect
-        stack = inspect.stack()
 
-        parent_info = None
-        user_frames = []
-        for frame in stack:
-            frame_file = frame.filename
+        caller_key = (record.pathname, record.lineno)
 
-            if ('__init__.py' not in frame_file and
-                'logging' not in frame_file and
-                frame.function not in ['emit', 'handle', 'callHandlers', '_log']):
-                user_frames.append({
-                    'filename': os.path.basename(frame_file),
-                    'lineno': frame.lineno
-                })
+        if caller_key not in self._cache:
+            if len(self._cache) > self._cache_size:
+                self._cache.clear()
 
-        if len(user_frames) >= 2:
-            parent_info = user_frames[1]
+            stack = inspect.stack()
+            user_frames = [
+                {'filename': os.path.basename(f.filename), 'lineno': f.lineno}
+                for f in stack
+                if '__init__.py' not in f.filename and
+                   'logging' not in f.filename and
+                   f.function not in ['emit', 'handle', 'callHandlers', '_log']
+            ]
+
+            self._cache[caller_key] = user_frames[1] if len(user_frames) >= 2 else None
+
+        parent_info = self._cache[caller_key]
 
         if parent_info:
             parent_path = f"[{parent_info['filename']}:{parent_info['lineno']}]"
-            # Escape both the parent path and the message to prevent markup interpretation
-            record.msg = f"{escape(parent_path)} {escape(str(record.msg))}"
+            record.msg = f"{parent_path} {escape(str(record.msg))}"
 
         super().emit(record)
 
