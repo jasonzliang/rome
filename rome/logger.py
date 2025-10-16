@@ -19,7 +19,7 @@ _logger_lock = threading.Lock()
 class SizeRotatingFileHandler(logging.FileHandler):
     """Deadlock-safe size-rotating file handler with cross-platform support"""
 
-    def __init__(self, filename, max_size_kb, keep_ratio=0.5, *args, **kwargs):
+    def __init__(self, filename, max_size_kb, keep_ratio=0.67, *args, **kwargs):
         self.max_size_kb = max_size_kb
         self.max_size_bytes = max_size_kb * 1024
         self.keep_ratio = max(0.1, min(0.9, keep_ratio))
