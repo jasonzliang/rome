@@ -457,7 +457,7 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
                      if url not in self.visited_urls and url != self.current_url]
 
         if parent_url:
-            link_options.append("- IMMEDIATE PREVIOUS PAGE -")
+            link_options.append("- IMMEDIATE PREVIOUS -")
             link_options.append(f"1. [Back to previous page] ({self.visited_urls[parent_url]} visits) {parent_url}")
             url_map.append(parent_url)
             if visited_links: link_options.append("")
