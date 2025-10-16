@@ -21,6 +21,8 @@ from rome.kb_client import ChromaClientManager
 
 # Maximum number of links to consider when selecting next webpage to go to
 MAX_NUM_LINKS = 2000
+# Maximum number of visited links to consider when selecting next webpage
+MAX_NUM_VISITED_LINKS = 1000
 
 CAESAR_CONFIG = {
     "CaesarAgent": {
@@ -31,7 +33,7 @@ CAESAR_CONFIG = {
         # Domains to allow exploration in; empty list uses starting_url domain; use ["*"] to allow any
         "allowed_domains": [],
         # Maximum depth of exploration tree before backtracking
-        "max_depth": 1e12,
+        "max_depth": 10000,
         # Save exploration graph every N iterations
         "save_graph_interval": 1,
         # Generate visual graph representations (requires pygraphviz)
@@ -411,8 +413,13 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
             self.url_stack.pop()
             self.current_url = self.url_stack[-1]
             self.current_depth = len(self.url_stack)  # Derive from stack
+            self.logger.debug(f"Backtracked to parent link: {self.current_url}")
             return True
         return False
+
+    def _get_parent_url(self):
+        """Get url to parent page"""
+        return self.url_stack[-2] if len(self.url_stack) > 1 else None
 
     # link_options = '\n'.join(
     #     f"{i+1}. [{text}] {url}" for i, (url, text) in enumerate(links)
@@ -423,45 +430,50 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
     # - Gaps in current understanding
     # - Patterns that emerged from similar past decisions
 
-    def _select_next_link(self, links: List[Tuple[str, str]]) -> Tuple[int, str]:
-        """Use LLM to select best link"""
+    def _select_next_link(self, links: List[Tuple[str, str]]) -> Tuple[Optional[str], str]:
+        """Use LLM to select best link, returns (url, reason)"""
+        kb_context = ""; memory_context = ""
+
         try:
             kb_context = self.kb_manager.query(
                 "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?",
                 top_k=self.top_k)
         except Exception as e:
             self.logger.error(f"KB query failed: {e}")
-            self.logger.error(traceback.format_exc())
-            kb_context = ""
 
         # Query memory for historical patterns
         if kb_context:
             memory_context = self.recall(
                 f"What webpages have I frequently visited and what navigation patterns have emerged in relation to the following insights:\n{kb_context}")
 
-        # Categorize links: previously visited vs new
-        visited_links = [(i, url, text, self.visited_urls.get(url, 0))
-                         for i, (url, text) in enumerate(links)
-                         if url in self.visited_urls]
-        new_links = [(i, url, text)
-                     for i, (url, text) in enumerate(links)
-                     if url not in self.visited_urls]
+        # Build display for links
+        link_options = []; url_map = []
+        parent_url = self._get_parent_url()
+        visited_links = [(url, text, self.visited_urls.get(url, 0))
+                         for url, text in links
+                         if url in self.visited_urls and url != self.current_url]
+        new_links = [(url, text)
+                     for url, text in links
+                     if url not in self.visited_urls and url != self.current_url]
 
-        # Build display with index mapping
-        link_options = []; index_map = []
+        if parent_url:
+            link_options.append("- IMMEDIATE PREVIOUS PAGE -")
+            link_options.append(f"1. [Back to previous page] ({self.visited_urls[parent_url]} visits) {parent_url}")
+            url_map.append(parent_url)
+            if visited_links: link_options.append("")
 
         if visited_links:
-            link_options.append("- PREVIOUSLY VISITED LINKS -")
-            for original_idx, url, text, visit_count in visited_links[:MAX_NUM_VISITED_LINKS]:
-                link_options.append(f"{len(index_map)+1}. [{text}] ({visit_count} visits) {url}")
-                index_map.append(original_idx)
+            link_options.append("- PREVIOUSLY VISITED -")
+            for url, text, visit_count in visited_links[:MAX_NUM_VISITED_LINKS]:
+                link_options.append(f"{len(url_map)+1}. [{text}] ({visit_count} visits) {url}")
+                url_map.append(url)
             if new_links: link_options.append("")
 
         if new_links:
-            link_options.append("- NEW UNEXPLORED LINKS -")
-            for original_idx, url, text in new_links[:MAX_NUM_LINKS]:
-                link_options.append(f"{len(index_map)+1}. [{text}] {url}")
-                index_map.append(original_idx)
+            link_options.append("- NEW UNEXPLORED -")
+            for url, text in new_links[:MAX_NUM_LINKS]:
+                link_options.append(f"{len(url_map)+1}. [{text}] {url}")
+                url_map.append(url)
 
         link_options_str = '\n'.join(link_options)
 
@@ -471,7 +483,7 @@ CURRENT EXPLORATION INSIGHTS:
 {kb_context if kb_context else "No exploration insights available."}
 
 HISTORICAL EXPLORATION PATTERNS:
-{memory_context if memory_context else "No previous exploration history available."}
+{memory_context if memory_context else "No exploration history available."}
 
 AVAILABLE PATHS FORWARD:
 {link_options_str}
@@ -484,7 +496,7 @@ Consider:
 
 Respond with a JSON object in this exact format:
 {{
-    "choice": <number from 1 to {len(index_map)}>,
+    "choice": <number from 1 to {len(url_map)}>,
     "reason": "<brief explanation of why this path is promising>"
 }}
 
@@ -498,28 +510,24 @@ Your response must be valid JSON only, nothing else."""
             )
             decision = self.parse_json_response(response)
             if decision and 'choice' in decision:
-                choice_num = max(0, min(int(decision['choice']) - 1, len(index_map) - 1))
-                choice = index_map[choice_num]
+                choice_num = max(0, min(int(decision['choice']) - 1, len(url_map) - 1))
+                url = url_map[choice_num]
                 reason = decision.get('reason', 'No reason provided')
-                return choice, reason
+                return url, reason
         except Exception as e:
             self.logger.error(f"LLM decision failed: {e}")
 
-        return 0, "Fallback due to error"
+        return url_map[0] if url_map else None, "Fallback due to error"
 
     def act(self, links: List[Tuple[str, str]]) -> Optional[str]:
         """Phase 3: Choose next URL based on accumulated knowledge"""
-        if self.current_depth > self.max_depth:
-            self._backtrack()
-            return None
+        if self.current_depth > self.max_depth or not links:
+            self._backtrack(); return self.current_url
 
-        if not links:
-            if not self._backtrack():
-                self.logger.error("No links and cannot backtrack")
-            return None
+        next_url, reason = self._select_next_link(links)
+        if next_url == self._get_parent_url():
+            self._backtrack(); return self.current_url
 
-        choice, reason = self._select_next_link(links)
-        next_url = links[choice][0]
         self.graph.add_edge(self.current_url, next_url, reason=reason)
 
         current_domain = urlparse(self.current_url).netloc
@@ -542,7 +550,7 @@ Your response must be valid JSON only, nothing else."""
         )
 
         self._advance_to_url(next_url)
-        self.logger.info(f"[ACT] Selected {choice + 1}: {next_url}")
+        self.logger.info(f"[ACT] Selected link: {next_url}")
         self.logger.info(f"Reason: {reason}")
 
         return next_url
@@ -637,8 +645,7 @@ Your response must be valid JSON only, nothing else."""
             if self.shutdown_called: break
 
             if iteration < self.max_iterations:
-                if self.act(links) is None and len(self.url_stack) == 1:
-                    break
+                self.act(links)
 
             if iteration % self.save_graph_interval == 0 or iteration == self.max_iterations:
                 self._save_graph_data(iteration)

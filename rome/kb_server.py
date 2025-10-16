@@ -421,7 +421,7 @@ class ChromaServerManager:
         if not self.is_running():
             raise RuntimeError(f"ChromaDB server not running at {self.server_url}")
 
-        self.client = chromadb.HttpClient(host=self.host, port=self.port)
+        client = chromadb.HttpClient(host=self.host, port=self.port)
 
         with self._clients_lock:
             self._clients.add(client)
