@@ -6,10 +6,19 @@ from typing import Dict, Optional
 
 from mem0 import Memory
 
-from .config import set_attributes_from_config, LONGER_SUMMARY_LEN
+from .config import set_attributes_from_config, DEFAULT_CONFIG, LONGER_SUMMARY_LEN
 from .logger import get_logger
 from .kb_server import ChromaServerManager, CHROMA_BASE_DIR
 from .kb_client import EMBEDDING_MODELS
+
+OPENAI_CONFIG =  {
+    "model": "gpt-4o",
+    "temperature": 0.1,
+    "max_tokens": 2000,
+    "api_key": os.environ.get("OPENAI_API_KEY"),
+    "openai_base_url": "https://api.openai.com/v1"
+}
+
 
 class AgentMemory:
     """Intelligent memory layer for agents using Mem0 with optional graph storage"""
@@ -21,10 +30,7 @@ class AgentMemory:
 
         # Apply config (defaults come from DEFAULT_CONFIG)
         set_attributes_from_config(
-            self, config,
-            ['enabled', 'auto_recall', 'auto_remember', 'auto_remember_len',
-                'embedding_model', 'recall_limit', 'use_graph', 'graph_url',
-                'graph_username', 'graph_password', 'vector_host', 'vector_port']
+            self, config, DEFAULT_CONFIG['AgentMemory'].keys(), ['openai_config']
         )
 
         self.memory = None
@@ -62,15 +68,10 @@ class AgentMemory:
                 del os.environ["OPENROUTER_API_KEY"]
 
             # Build base config
+            openai_config = OPENAI_CONFIG | self.openai_config if self.openai_config else OPENAI_CONFIG
             llm_config = {
                 "provider": "openai",
-                "config": {
-                    "model": "gpt-4o",
-                    "temperature": 0.1,
-                    "max_tokens": 2000,
-                    "api_key": os.environ.get("OPENAI_API_KEY"),
-                    "openai_base_url": "https://api.openai.com/v1"
-                }
+                "config": openai_config
             }
             mem0_config = {
                 "version": "v1.1",
