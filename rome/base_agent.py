@@ -162,49 +162,18 @@ class BaseAgent:
         """Query long-term memory and get most relevant results"""
         return self.agent_memory.recall(query, context)
 
-    # def chat_completion(self, prompt: str, system_message: str = None,
-    #                    override_config: Dict = None, response_format: Dict = None,
-    #                    extra_body: Dict = None) -> str:
-    #     """Direct access to chat completion with configuration options"""
-    #     system_message = system_message or self.role
-    #     return self.openai_handler.chat_completion(
-    #         prompt=prompt, system_message=system_message,
-    #         override_config=override_config, response_format=response_format,
-    #         extra_body=extra_body)
-
     def chat_completion(self, prompt: str, system_message: str = None,
                        override_config: Dict = None, response_format: Dict = None,
                        extra_body: Dict = None) -> str:
-        """Enhanced chat completion with automatic memory integration"""
-        # Get memory context if enabled
-        system_message = system_message or self.role
-
-        memory_context = ""
-        if self.agent_memory.is_enabled() and self.agent_memory.auto_recall:
-            # Use prompt as query for recall
-            memory_context = self.agent_memory.recall(prompt[:LONGEST_SUMMARY_LEN])
-
-            if memory_context:
-                # Inject memory into system message
-                base_system = system_message or self.role
-                enhanced_system = f"{base_system}\n\n[Relevant Memory Context]\n{memory_context}"
-                system_message = enhanced_system
-                self.logger.debug(f"Injected memory: {len(memory_context)} chars")
-
-        # Call original chat completion
-        response = self.openai_handler.chat_completion(
-            prompt=prompt,
-            system_message=system_message,
-            override_config=override_config,
-            response_format=response_format,
-            extra_body=extra_body
-        )
-
-        # Auto-remember after getting response
-        if self.agent_memory.is_enabled() and self.agent_memory.auto_remember:
-            if self.agent_memory.should_remember(prompt, response):
-                summary = \
-                    f"Q: {prompt[:LONGEST_SUMMARY_LEN]}... A: {response[:LONGEST_SUMMARY_LEN]}..."
-                self.agent_memory.remember(summary, context="interaction")
-
-        return response
+        """Direct access to chat completion with configuration options"""
+        if self.agent_memory.is_enabled():
+            return self.agent_memory.chat_completion(
+                prompt=prompt, system_message=system_message,
+                override_config=override_config, response_format=response_format,
+                extra_body=extra_body)
+        else:
+            system_message = system_message or self.role
+            return self.openai_handler.chat_completion(
+                prompt=prompt, system_message=system_message,
+                override_config=override_config, response_format=response_format,
+                extra_body=extra_body)

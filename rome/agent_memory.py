@@ -25,6 +25,7 @@ class AgentMemory:
 
     def __init__(self, agent, config: Dict = None):
         """Initialize agent memory with vector +/- graph storage"""
+        self.agent = agent
         self.mem_id = f"{os.path.basename(agent.get_repo())}_{agent.get_id()}"
         self.logger = get_logger()
 
@@ -232,6 +233,39 @@ class AgentMemory:
 
         combined = (prompt + ' ' + response).lower()
         return any(pattern in combined for pattern in memorable_patterns)
+
+    def chat_completion(self, prompt: str, system_message: str = None,
+                       override_config: Dict = None, response_format: Dict = None,
+                       extra_body: Dict = None) -> str:
+        """Enhanced chat completion with automatic memory integration"""
+        system_message = system_message or self.agent.role
+        # Get memory context if enabled
+        if self.is_enabled() and self.auto_recall:
+            # Use prompt as query for recall
+            memory_context = self.recall(prompt[:LONGEST_SUMMARY_LEN])
+
+            if memory_context:
+                # Inject memory into system message
+                system_message = f"{system_message}\n\n[Relevant Memory Context]\n{memory_context}"
+                self.logger.debug(f"Injected memory: {len(memory_context)} chars")
+
+        # Call original chat completion
+        response = self.agent.openai_handler.chat_completion(
+            prompt=prompt,
+            system_message=system_message,
+            override_config=override_config,
+            response_format=response_format,
+            extra_body=extra_body
+        )
+
+        # Auto-remember after getting response
+        if self.is_enabled() and self.auto_remember:
+            if self.should_remember(prompt, response):
+                summary = \
+                    f"Q: {prompt[:LONGEST_SUMMARY_LEN]}... A: {response[:LONGEST_SUMMARY_LEN]}..."
+                self.remember(summary, context="interaction")
+
+        return response
 
     def clear(self) -> bool:
         """Clear all memories from vector store and Neo4j graph"""

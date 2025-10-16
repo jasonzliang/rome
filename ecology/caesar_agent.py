@@ -28,20 +28,18 @@ CAESAR_CONFIG = {
     "CaesarAgent": {
         # Total number of pages to explore before stopping
         "max_iterations": 10,
+        # Maximum depth of exploration tree before backtracking
+        "max_depth": 10000,
         # Initial URL to begin exploration
         "starting_url": "https://en.wikipedia.org/wiki/Main_Page",
         # Domains to allow exploration in; empty list uses starting_url domain; use ["*"] to allow any
         "allowed_domains": [],
-        # Maximum depth of exploration tree before backtracking
-        "max_depth": 10000,
         # Generate visual graph representations (requires pygraphviz)
         "draw_graph": False,
         # Save exploration graph every N iterations
         "save_graph_interval": 1,
         # Save checkpoint every N iterations for resumption
         "checkpoint_interval": 1,
-        # Restart from starting_url every N iterations (0 = never restart)
-        "restart_interval": 0,
 
         # Whether to follow links that point to the same page (different fragments)
         "same_page_links": False,
@@ -51,6 +49,7 @@ CAESAR_CONFIG = {
         "fancy_link_display": True,
         # Whether to dynamically determine to explore or go back to visited pages
         "use_explore_strategy": True,
+
         # False for classic mode
         "iterative_synthesis": True,
         # Number of q/a iterations
@@ -170,6 +169,17 @@ You navigate through information space systematically yet creatively, always wit
         self.logger.assert_true(self.allowed_domains, "allowed_domains required")
         self.logger.assert_true(self.max_iterations >= 0, "max_iterations must be >= 0")
         self.logger.assert_true(self.max_depth > 0, "max_depth must be > 0")
+
+        # Validate starting URL to make sure it can be reached
+        try:
+            parsed = urlparse(self.starting_url)
+            if not all([parsed.scheme, parsed.netloc]):
+                raise ValueError(f"Invalid starting URL: {self.starting_url}")
+            if parsed.scheme not in ['http', 'https']:
+                raise ValueError(f"URL must use http/https: {self.starting_url}")
+        except Exception as e:
+            raise ValueError(f"Invalid starting_url: {e}")
+
 
     def _setup_exploration_state(self) -> None:
         """Initialize exploration state"""
@@ -368,14 +378,12 @@ You navigate through information space systematically yet creatively, always wit
     def think(self, content: str) -> str:
         """Phase 2: Analyze content and extract insights"""
         self.logger.info("[THINK] Analyzing content")
-
-        if self.current_url in self.visited_urls:
-            self.visited_urls[self.current_url] += 1
-            self.logger.info(
-                f"[THINK] Already analyzed ({self.visited_urls[self.current_url]} visits), skipping")
-            prev_insights = self.graph.nodes[self.current_url].get('insights', '')
-            return prev_insights
-
+        prev_insights = self.graph.nodes[self.current_url].get('insights', '') if self.current_url in self.graph.nodes else ''
+        # if self.current_url in self.visited_urls:
+        #     self.visited_urls[self.current_url] += 1
+        #     self.logger.info(
+        #         f"[THINK] Already analyzed ({self.visited_urls[self.current_url]} visits), skipping")
+        #     return prev_insights
         if not content: return ""
 
         prompt = f"""Analyze this content and extract key insights focusing on:
@@ -383,9 +391,13 @@ You navigate through information space systematically yet creatively, always wit
 - Assumptions being made and alternatives
 - Questions raised by the content
 - How this relates to or challenges previous insights
+- Build upon insights from previous analysis
 
-Content:
+CONTENT:
 {content}
+
+PREVIOUS INSIGHTS:
+{prev_insights if prev_insights else 'No previous insights available'}
 
 Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in length total:"""
 
@@ -481,25 +493,27 @@ Provide a strategic recommendation in 2-3 sentences."""
                          for url, text in links
                          if url not in self.visited_urls and url != self.current_url]
 
+            link_options.extend([
+                "- INITIAL STARTING LINK -",
+                f"1. [Back to starting LINK] ({self.visited_urls.get(self.starting_url, 0)} visits) {self.starting_url}"
+            ])
+            url_map.append(self.starting_url)
+
             if parent_url:
                 link_options.extend([
-                    "- IMMEDIATE PREVIOUS PAGE -",
-                    f"1. [Back to previous page] ({self.visited_urls[parent_url]} visits) {parent_url}"
+                    "\n- IMMEDIATE PREVIOUS LINK -",
+                    f"2. [Back to previous link] ({self.visited_urls.get(parent_url, 0)} visits) {parent_url}"
                 ])
                 url_map.append(parent_url)
-                if visited_links:
-                    link_options.append("")
 
             if visited_links:
-                link_options.append("- PREVIOUSLY VISITED LINKS -")
+                link_options.append("\n- PREVIOUSLY VISITED LINKS -")
                 for url, text, visit_count in visited_links[:MAX_NUM_VISITED_LINKS]:
                     link_options.append(f"{len(url_map)+1}. [{text}] ({visit_count} visits) {url}")
                     url_map.append(url)
-                if new_links:
-                    link_options.append("")
 
             if new_links:
-                link_options.append("- NEW UNEXPLORED LINKS -")
+                link_options.append("\n- NEW UNEXPLORED LINKS -")
                 for url, text in new_links[:MAX_NUM_LINKS]:
                     link_options.append(f"{len(url_map)+1}. [{text}] {url}")
                     url_map.append(url)
@@ -578,6 +592,8 @@ Your response must be valid JSON only, nothing else."""
         next_url, reason = self._select_next_link(links)
         if next_url == self._get_parent_url():
             self._backtrack(); return self.current_url
+        if next_url == self.starting_url:
+            self._restart_exploration(); return self.current_url
 
         self.graph.add_edge(self.current_url, next_url, reason=reason)
 
@@ -670,12 +686,10 @@ Your response must be valid JSON only, nothing else."""
 
     def _restart_exploration(self, iteration: int) -> None:
         """Reset to starting URL while preserving accumulated knowledge"""
-        if (self.restart_interval > 0 and
-            iteration > 1 and (iteration - 1) % self.restart_interval == 0):
-            self.logger.info(f"[RESTART] Returning to starting URL: {self.starting_url}")
-            self.url_stack = [self.starting_url]
-            self.current_url = self.starting_url
-            self.current_depth = 1
+        self.logger.info(f"[RESTART] Returning to starting page: {self.starting_url}")
+        self.url_stack = [self.starting_url]
+        self.current_url = self.starting_url
+        self.current_depth = 1
 
     def explore(self) -> str:
         """Execute main exploration loop"""
@@ -685,7 +699,6 @@ Your response must be valid JSON only, nothing else."""
         for iteration in range(start_iteration, self.max_iterations + 1):
             if self.shutdown_called: break
             self.current_iteration = iteration
-            self._restart_exploration(iteration)
 
             self.logger.info(f"\n{'='*80}")
             self.logger.info(f"Iteration {iteration}/{self.max_iterations}")
@@ -694,16 +707,13 @@ Your response must be valid JSON only, nothing else."""
             self.logger.info(f"{'='*80}")
 
             content, links = self.perceive()
-            if self.shutdown_called: break
             if not content:
-                if not self._backtrack():
-                    break
+                self._backtrack()
                 if iteration % self.checkpoint_interval == 0:
                     self._save_checkpoint(iteration)
                 continue
 
             insights = self.think(content)
-            if self.shutdown_called: break
 
             if iteration < self.max_iterations:
                 next_url = self.act(links)
