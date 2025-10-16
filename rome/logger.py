@@ -35,6 +35,13 @@ class SizeRotatingFileHandler(logging.FileHandler):
             try:
                 if self._should_rotate():
                     self._rotate()
+
+                # Check if stream is valid before emitting
+                if self.stream is None:
+                    # Last resort: write to stderr
+                    sys.stderr.write(f"{record.levelname}: {record.getMessage()}\n")
+                    return
+
                 super().emit(record)
             except Exception as e:
                 self.handleError(record)
@@ -147,6 +154,22 @@ class SizeRotatingFileHandler(logging.FileHandler):
                 f.write(f"[Previous rotation attempts: {self._rotation_count}]\n")
         except Exception as e:
             sys.stderr.write(f"Emergency truncate failed: {e}\n")
+            sys.stderr.write("File logging disabled - falling back to stderr only\n")
+            # Don't try to use this handler anymore
+            self.stream = None
+
+    def close(self):
+        """Thread-safe handler close"""
+        with self._lock:
+            try:
+                if self.stream:
+                    self.stream.flush()
+                    self.stream.close()
+            except Exception:
+                pass
+            finally:
+                self.stream = None
+                super().close()
 
     def get_rotation_stats(self):
         """Get rotation statistics for monitoring"""
