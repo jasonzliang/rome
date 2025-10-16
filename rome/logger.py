@@ -1,5 +1,3 @@
-# Simplified logger.py - Removed bootstrap logger complexity
-
 import logging
 import sys
 import threading
@@ -27,79 +25,137 @@ class SizeRotatingFileHandler(logging.FileHandler):
         self.keep_ratio = max(0.1, min(0.9, keep_ratio))
         self._lock = threading.RLock()
         self._rotating = False
+        self._rotation_count = 0
+        self._last_rotation_size = 0
         super().__init__(filename, *args, **kwargs)
 
     def emit(self, record):
         """Emit record with deadlock-safe rotation"""
         with self._lock:
             try:
-                if (not self._rotating and
-                    self.max_size_bytes and
-                    os.path.exists(self.baseFilename) and
-                    os.path.getsize(self.baseFilename) >= self.max_size_bytes):
+                if self._should_rotate():
                     self._rotate()
-
                 super().emit(record)
+            except Exception as e:
+                self.handleError(record)
 
-            except Exception:
-                try:
-                    import sys
-                    sys.stderr.write(f"Logging error: {record.getMessage()}\n")
-                except:
-                    pass
+    def _should_rotate(self):
+        """Check if rotation is needed"""
+        if self._rotating or not self.max_size_bytes:
+            return False
+
+        try:
+            if not os.path.exists(self.baseFilename):
+                return False
+
+            current_size = os.path.getsize(self.baseFilename)
+            return current_size >= self.max_size_bytes
+        except (OSError, IOError):
+            return False
 
     def _rotate(self):
-        """Rotate log efficiently with Unix tools fallback to Python"""
+        """Rotate log using Unix tools"""
         try:
             self._rotating = True
-            self.stream and self.stream.close()
-            self.stream = None
 
-            if not self._unix_rotate():
-                self._python_rotate()
+            # Close stream before any file operations
+            if self.stream:
+                try:
+                    self.stream.flush()
+                    self.stream.close()
+                except Exception:
+                    pass
+                self.stream = None
 
-            self.stream = self._open()
+            # Try Unix-based rotation, emergency truncate on failure
+            if os.name == 'posix':
+                success = self._unix_rotate()
+            else:
+                sys.stderr.write("Log rotation only supported on Unix systems\n")
+                success = False
+
+            if success:
+                self._rotation_count += 1
+                try:
+                    self._last_rotation_size = os.path.getsize(self.baseFilename)
+                except Exception:
+                    self._last_rotation_size = 0
+            else:
+                self._emergency_truncate()
+
         except Exception as e:
-            self.stream = self.stream or self._open()
+            sys.stderr.write(f"Log rotation failed: {e}\n")
+            self._emergency_truncate()
         finally:
+            # Always reopen stream
+            if not self.stream:
+                try:
+                    self.stream = self._open()
+                except Exception as e:
+                    sys.stderr.write(f"Failed to reopen log stream: {e}\n")
             self._rotating = False
 
     def _unix_rotate(self) -> bool:
         """Fast Unix-based rotation with timeout protection"""
-        if os.name != 'posix':
-            return False
+        tmp = None
         try:
             lines = max(int(self.max_size_bytes * self.keep_ratio) // 80, 50)
-            fd, tmp = tempfile.mkstemp(suffix='.log')
-            with os.fdopen(fd, 'w') as f:
-                f.write(f"[ROTATED - {self.max_size_kb}KB limit]\n")
-                f.write(subprocess.run(['tail', '-n', str(lines), self.baseFilename],
-                                     capture_output=True, text=True, check=True,
-                                     timeout=5).stdout)
-            subprocess.run(['mv', tmp, self.baseFilename], check=True, timeout=2)
+
+            # Create temp file in same directory for atomic rename
+            dir_name = os.path.dirname(self.baseFilename) or '.'
+            fd, tmp = tempfile.mkstemp(dir=dir_name, suffix='.log')
+
+            try:
+                with os.fdopen(fd, 'w', encoding='utf-8') as f:
+                    f.write(f"[ROTATED - {self.max_size_kb}KB limit, kept {int(self.keep_ratio*100)}%]\n")
+
+                    # Use tail to get last N lines
+                    result = subprocess.run(
+                        ['tail', '-n', str(lines), self.baseFilename],
+                        capture_output=True,
+                        text=True,
+                        check=True,
+                        timeout=5
+                    )
+                    f.write(result.stdout)
+            except Exception:
+                # fd was already closed by os.fdopen, just cleanup tmp file
+                if tmp and os.path.exists(tmp):
+                    os.unlink(tmp)
+                return False
+
+            # Atomic rename
+            os.rename(tmp, self.baseFilename)
+            tmp = None  # Prevent cleanup since rename succeeded
             return True
-        except:
-            try: os.unlink(tmp)
-            except: pass
-            return False
 
-    def _python_rotate(self):
-        """Cross-platform Python rotation"""
-        try:
-            size = os.path.getsize(self.baseFilename)
-            keep_size = int(size * self.keep_ratio)
-
-            with open(self.baseFilename, 'rb') as f:
-                f.seek(max(0, size - keep_size))
-                size > keep_size and f.readline()
-                data = f.read()
-
-            with open(self.baseFilename, 'wb') as f:
-                f.write(f"[ROTATED - {self.max_size_kb}KB limit]\n".encode())
-                f.write(data)
         except Exception:
-            with open(self.baseFilename, 'w') as f:
-                f.write(f"[TRUNCATED - {self.max_size_kb}KB limit]\n")
+            return False
+        finally:
+            # Clean up temp file if it still exists
+            if tmp and os.path.exists(tmp):
+                try:
+                    os.unlink(tmp)
+                except Exception:
+                    pass
+
+    def _emergency_truncate(self):
+        """Emergency truncate if rotation fails"""
+        try:
+            with open(self.baseFilename, 'w', encoding='utf-8') as f:
+                f.write(f"[EMERGENCY TRUNCATE - {self.max_size_kb}KB limit]\n")
+                f.write(f"[Previous rotation attempts: {self._rotation_count}]\n")
+        except Exception as e:
+            sys.stderr.write(f"Emergency truncate failed: {e}\n")
+
+    def get_rotation_stats(self):
+        """Get rotation statistics for monitoring"""
+        return {
+            'rotation_count': self._rotation_count,
+            'last_rotation_size': self._last_rotation_size,
+            'current_size': os.path.getsize(self.baseFilename) if os.path.exists(self.baseFilename) else 0,
+            'max_size_bytes': self.max_size_bytes
+        }
 
 
 class ParentPathRichHandler(RichHandler):
@@ -118,19 +174,21 @@ class ParentPathRichHandler(RichHandler):
         caller_key = (record.pathname, record.lineno)
 
         if caller_key not in self._cache:
-            if len(self._cache) > self._cache_size:
+            if len(self._cache) >= self._cache_size:
                 self._cache.clear()
 
-            stack = inspect.stack()
-            user_frames = [
-                {'filename': os.path.basename(f.filename), 'lineno': f.lineno}
-                for f in stack
-                if '__init__.py' not in f.filename and
-                   'logging' not in f.filename and
-                   f.function not in ['emit', 'handle', 'callHandlers', '_log']
-            ]
-
-            self._cache[caller_key] = user_frames[1] if len(user_frames) >= 2 else None
+            try:
+                stack = inspect.stack()
+                user_frames = [
+                    {'filename': os.path.basename(f.filename), 'lineno': f.lineno}
+                    for f in stack
+                    if '__init__.py' not in f.filename and
+                       'logging' not in f.filename and
+                       f.function not in ['emit', 'handle', 'callHandlers', '_log']
+                ]
+                self._cache[caller_key] = user_frames[1] if len(user_frames) >= 2 else None
+            except Exception:
+                self._cache[caller_key] = None
 
         parent_info = self._cache[caller_key]
 
@@ -187,73 +245,79 @@ class Logger:
     def configure(self, log_config: dict):
         """Configure logger with provided settings, sets up console and file handlers."""
         with self._lock:
-            # if self._configured:
-            #     return  # Already configured, skip
-
-            # Clear basic handlers before full configuration
+            # Clear existing handlers and filters
             for handler in self._logger.handlers[:]:
+                try:
+                    handler.close()
+                except Exception:
+                    pass
                 self._logger.removeHandler(handler)
 
             for filter_obj in self._logger.filters[:]:
                 self._logger.removeFilter(filter_obj)
 
-            # Set attributes from config
-            if log_config:
-                for key, value in log_config.items():
-                    setattr(self, key, value)
-
-            # Handle missing config gracefully with defaults
-            self.level = getattr(self, 'level', 'INFO')
-            self.format = getattr(self, 'format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-            self.console = getattr(self, 'console', True)
-            self.include_caller_info = getattr(self, 'include_caller_info', None)
-            self.base_dir = getattr(self, 'base_dir', None)
-            self.filename = getattr(self, 'filename', None)
-            self.max_size_kb = getattr(self, 'max_size_kb', None)
-            self.timezone = getattr(self, 'timezone', 'US/Pacific')
+            # Set attributes from config with defaults
+            self.level = log_config.get('level', 'INFO')
+            self.format = log_config.get('format', '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+            self.console = log_config.get('console', True)
+            self.include_caller_info = log_config.get('include_caller_info', None)
+            self.base_dir = log_config.get('base_dir', None)
+            self.filename = log_config.get('filename', None)
+            self.max_size_kb = log_config.get('max_size_kb', None)
+            self.timezone = log_config.get('timezone', 'US/Pacific')
 
             try:
                 # Set log level
-                level = getattr(logging, self.level.upper())
+                level = getattr(logging, self.level.upper(), logging.INFO)
                 self._logger.setLevel(level)
 
                 # Set up timezone filter
-                if hasattr(self, 'timezone') and self.timezone:
-                    pacific_tz = pytz.timezone(self.timezone)
-                    class PacificTimezoneFilter(logging.Filter):
-                        def filter(self, record):
-                            dt = datetime.fromtimestamp(record.created, tz=pacific_tz)
-                            record.created = dt.timestamp()
-                            return True
-                    pacific_filter = PacificTimezoneFilter()
-                    self._logger.addFilter(pacific_filter)
+                if self.timezone:
+                    try:
+                        tz = pytz.timezone(self.timezone)
+
+                        class TimezoneFilter(logging.Filter):
+                            def filter(self, record):
+                                dt = datetime.fromtimestamp(record.created, tz=tz)
+                                record.created = dt.timestamp()
+                                return True
+
+                        self._logger.addFilter(TimezoneFilter())
+                    except Exception as e:
+                        sys.stderr.write(f"Invalid timezone '{self.timezone}': {e}\n")
 
                 # Create formatter
                 formatter = logging.Formatter(self.format, datefmt="%H:%M:%S")
 
                 # Add file handler if base_dir and filename are specified
-                if self.base_dir:
-                    os.makedirs(self.base_dir, exist_ok=True)
-
-                    if self.filename:
+                if self.base_dir and self.filename:
+                    try:
+                        os.makedirs(self.base_dir, exist_ok=True)
                         log_file_path = os.path.join(self.base_dir, self.filename)
 
                         if self.max_size_kb:
                             file_handler = SizeRotatingFileHandler(
                                 log_file_path,
                                 max_size_kb=max(self.max_size_kb, 1024),
-                                mode='a'
+                                mode='a',
+                                encoding='utf-8'
                             )
                         else:
-                            file_handler = logging.FileHandler(log_file_path, mode='a')
+                            file_handler = logging.FileHandler(
+                                log_file_path,
+                                mode='a',
+                                encoding='utf-8'
+                            )
 
                         file_handler.setFormatter(formatter)
                         file_handler.setLevel(level)
                         self._logger.addHandler(file_handler)
+                    except Exception as e:
+                        sys.stderr.write(f"Failed to create file handler: {e}\n")
 
                 # Add Rich console handler if enabled
                 if self.console:
-                    self._add_console_handler(level, formatter)
+                    self._add_console_handler(level)
 
                 # Mark as configured
                 self._configured = True
@@ -263,26 +327,26 @@ class Logger:
 
             except Exception as e:
                 # Emergency fallback - create basic working logger
-                print(f"Logger configuration failed: {e}")
+                sys.stderr.write(f"Logger configuration failed: {e}\n")
                 handler = logging.StreamHandler()
                 formatter = logging.Formatter('%(levelname)s: %(message)s')
                 handler.setFormatter(formatter)
-                handler.setLevel(logging.DEBUG)
+                handler.setLevel(logging.INFO)
                 self._logger.addHandler(handler)
                 self._configured = True
 
-    def _add_console_handler(self, level, formatter):
+    def _add_console_handler(self, level):
         """Add appropriate console handler based on caller_info setting"""
         console = Console()
-        caller_info = getattr(self, 'include_caller_info', None)
+        caller_info = self.include_caller_info
 
         if caller_info not in ["rome", "rich", None]:
-            print(f"Warning: Invalid caller_info '{caller_info}', using None")
+            sys.stderr.write(f"Warning: Invalid caller_info '{caller_info}', using None\n")
             caller_info = None
 
         try:
             if caller_info == "rome":
-                rich_handler = ParentPathRichHandler(
+                handler = ParentPathRichHandler(
                     console=console,
                     show_time=True,
                     show_path=False,
@@ -292,7 +356,7 @@ class Logger:
                     log_time_format="[%H:%M:%S]"
                 )
             elif caller_info == "rich":
-                rich_handler = RichHandler(
+                handler = RichHandler(
                     console=console,
                     show_time=True,
                     show_path=True,
@@ -302,7 +366,7 @@ class Logger:
                     log_time_format="[%H:%M:%S]"
                 )
             else:
-                rich_handler = RichHandler(
+                handler = RichHandler(
                     console=console,
                     show_time=True,
                     show_path=False,
@@ -312,17 +376,23 @@ class Logger:
                     log_time_format="[%H:%M:%S]"
                 )
 
-            rich_handler.setLevel(level)
-            self._logger.addHandler(rich_handler)
-            return rich_handler
+            handler.setLevel(level)
+            self._logger.addHandler(handler)
 
         except Exception as e:
-            print(f"Failed to create RichHandler: {e}")
-            basic_handler = logging.StreamHandler()
-            basic_handler.setFormatter(formatter)
-            basic_handler.setLevel(level)
-            self._logger.addHandler(basic_handler)
-            return basic_handler
+            sys.stderr.write(f"Failed to create RichHandler: {e}\n")
+            # Fallback to basic handler
+            handler = logging.StreamHandler()
+            handler.setFormatter(logging.Formatter('%(levelname)s: %(message)s'))
+            handler.setLevel(level)
+            self._logger.addHandler(handler)
+
+    def get_file_handler_stats(self):
+        """Get rotation statistics from file handler if available"""
+        for handler in self._logger.handlers:
+            if isinstance(handler, SizeRotatingFileHandler):
+                return handler.get_rotation_stats()
+        return None
 
     # Standard logging methods
     def info(self, message: str):
@@ -340,8 +410,12 @@ class Logger:
     def critical(self, message: str):
         self._logger.critical(message)
 
+    def exception(self, message: str):
+        """Log exception with traceback"""
+        self._logger.exception(message)
+
     def assert_true(self, condition: bool, message: str,
-                    exception_type = ValueError,
+                    exception_type=ValueError,
                     log_only: bool = True) -> None:
         """Assert condition is true, log error with traceback if false."""
         if condition:
@@ -350,19 +424,19 @@ class Logger:
         if log_only:
             try:
                 self.error(f"ASSERTION FAILED: {message}")
-            except:
-                print(f"ASSERTION FAILED: {message}")
-            exit(1)
+            except Exception:
+                sys.stderr.write(f"ASSERTION FAILED: {message}\n")
+            sys.exit(1)
         else:
             raise exception_type(message)
 
     def assert_attribute(self, obj, attr_name: str,
                          message: str = None,
-                         exception_type = ValueError) -> None:
+                         exception_type=ValueError) -> None:
         """Assert object has specified attribute"""
         if message is None:
             obj_name = obj.__class__.__name__
-            message = f"'{attr_name}' not provided in {obj_name} configuration, did you merge your config with default config?"
+            message = f"'{attr_name}' not provided in {obj_name} configuration"
 
         self.assert_true(hasattr(obj, attr_name), message, exception_type)
 

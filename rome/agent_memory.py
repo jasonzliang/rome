@@ -281,6 +281,7 @@ class AgentMemory:
             vector_count = len(results.get('results', [])) if results else 0
 
             # Verify Neo4j cleanup if graph enabled
+            graph_count = 0
             if self.use_graph and hasattr(self.memory, 'graph'):
                 query = "MATCH (n {user_id: $user_id}) RETURN count(n) as total"
                 result = self.memory.graph.graph.query(query, {"user_id": self.mem_id})
