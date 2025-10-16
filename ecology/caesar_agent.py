@@ -671,8 +671,7 @@ Your response must be valid JSON only, nothing else."""
     def _restart_exploration(self, iteration: int) -> None:
         """Reset to starting URL while preserving accumulated knowledge"""
         if (self.restart_interval > 0 and
-            iteration > 1 and
-            (iteration - 1) % self.restart_interval == 0):
+            iteration > 1 and (iteration - 1) % self.restart_interval == 0):
             self.logger.info(f"[RESTART] Returning to starting URL: {self.starting_url}")
             self.url_stack = [self.starting_url]
             self.current_url = self.starting_url
