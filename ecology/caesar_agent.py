@@ -395,6 +395,7 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
         except Exception as e:
             self.logger.error(f"KB add_text failed: {e}")
 
+        self.visited_urls[self.current_url] = self.visited_urls.get(self.current_url, 0) + 1
         self.graph.add_node(self.current_url, insights=insights, depth=self.current_depth)
         return insights
 
@@ -605,7 +606,6 @@ Your response must be valid JSON only, nothing else."""
                     self._save_checkpoint(iteration)
                 continue
 
-            self.visited_urls[self.current_url] = self.visited_urls.get(self.current_url, 0) + 1
             self.think(content)
             if self.shutdown_called: break
 
