@@ -435,6 +435,10 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
         #     f"{i+1}. [{text}] {url}" for i, (url, text) in enumerate(links)
         # )
         # Based on your role of seeking novel patterns and deeper understanding, which link offers the most promising direction for exploration?
+        # Consider:
+        # - Novel connections not yet explored
+        # - Gaps in current understanding
+        # - Patterns that emerged from similar past decisions
 
         prompt = f"""You are selecting the next webpage link to explore based on your role
 
@@ -447,11 +451,7 @@ HISTORICAL EXPLORATION PATTERNS:
 AVAILABLE PATHS FORWARD:
 {link_options}
 
-TASK: Based on current insights and historical patterns, which link offers the most promising direction for exploration? Consider:
-- Novel connections not yet explored
-- Gaps in current understanding
-- Patterns that emerged from similar past decisions
-- Avoiding repetition while allowing productive revisits
+TASK: Based on current insights and historical patterns, which link offers the most promising direction to explore and deepen understanding?
 
 Respond with a JSON object in this exact format:
 {{
