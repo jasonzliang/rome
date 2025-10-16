@@ -22,15 +22,9 @@ from typing import Dict, Optional, List, Any, Callable, Tuple, Set
 from datetime import datetime
 from functools import wraps
 
-try:
-    __import__('pysqlite3')
-    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-    import chromadb
-    from chromadb.utils.embedding_functions import (
-       SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
-except ImportError as e:
-    print(f"Import error: {e}, install with: pip install chromadb")
-    sys.exit(1)
+import chromadb
+from chromadb.utils.embedding_functions import (
+   SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.kb_server import ChromaServerManager

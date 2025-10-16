@@ -9,13 +9,8 @@ import requests
 import atexit
 from typing import Optional, Callable, List, Dict
 
-try:
-    __import__('pysqlite3')
-    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-    import chromadb
-except:
-    print(f"Import error: {e}, install with: pip install chromadb llama-index llama-index-vector-stores-chroma llama-index-embeddings-openai llama-index-llms-openai")
-    exit(1)
+import chromadb
+from chromadb.config import Settings as ChromaSettings
 
 from .config import set_attributes_from_config
 from .logger import get_logger
@@ -422,7 +417,7 @@ class ChromaServerManager:
         if not self.is_running():
             raise RuntimeError(f"ChromaDB server not running at {self.server_url}")
 
-        client = chromadb.HttpClient(host=self.host, port=self.port)
+        self.client = chromadb.HttpClient(host=self.host, port=self.port)
 
         with self._clients_lock:
             self._clients.add(client)
