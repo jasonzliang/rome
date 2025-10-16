@@ -21,6 +21,7 @@ import fnmatch
 from typing import Dict, Optional, List, Any, Callable, Tuple, Set
 from datetime import datetime
 from functools import wraps
+import warnings
 
 import chromadb
 from chromadb.utils.embedding_functions import (

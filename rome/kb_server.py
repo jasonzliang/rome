@@ -8,6 +8,10 @@ import threading
 import requests
 import atexit
 from typing import Optional, Callable, List, Dict
+import logging
+import warnings
+logging.getLogger('chromadb.telemetry.product.posthog').setLevel(logging.CRITICAL)
+warnings.filterwarnings('ignore', category=UserWarning, module='chromadb')
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings

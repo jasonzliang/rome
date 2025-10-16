@@ -8,23 +8,22 @@ import re
 import time
 import sys
 import warnings
-warnings.filterwarnings('ignore', message='.*validate_default.*', category=UserWarning)
-warnings.filterwarnings('ignore', category=UserWarning, module='chromadb')
+# warnings.filterwarnings('ignore', message='.*validate_default.*', category=UserWarning)
 
 try:
-    import chromadb; import llama_index
+    import chromadb
+    from chromadb.utils.embedding_functions import (
+       SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
+    from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
+    from llama_index.vector_stores.chroma import ChromaVectorStore
+    from llama_index.embeddings.openai import OpenAIEmbedding
+    from llama_index.llms.openai import OpenAI
+    from llama_index.core.node_parser import SentenceSplitter
 except ImportError as e:
     print(f"Import error: {e}, install with: pip install chromadb llama-index llama-index-vector-stores-chroma llama-index-embeddings-openai llama-index-llms-openai")
     exit(1)
 
 import openai
-from chromadb.utils.embedding_functions import (
-   SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
-from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
-from llama_index.vector_stores.chroma import ChromaVectorStore
-from llama_index.embeddings.openai import OpenAIEmbedding
-from llama_index.llms.openai import OpenAI
-from llama_index.core.node_parser import SentenceSplitter
 
 from .config import set_attributes_from_config
 from .logger import get_logger
