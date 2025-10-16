@@ -76,7 +76,7 @@ DEFAULT_CONFIG = {
         "auto_recall": False,  # Automatically inject relevant memories into chat_completion
         "auto_remember": False,  # Automatically extract and store important interactions
         "auto_remember_len": 100,  # Minimum characters (prompt + response) to consider storing
-        "recall_limit": 5,  # Number of most relevant memories to retrieve in recall()
+        "recall_limit": 6,  # Number of most relevant memories to retrieve in recall()
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model for semantic search
 
         # DB settings (for tracking entities/relationships like file visits)
