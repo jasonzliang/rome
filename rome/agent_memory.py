@@ -65,7 +65,7 @@ class AgentMemory:
             llm_config = {
                 "provider": "openai",
                 "config": {
-                    "model": "gpt-5-mini",
+                    "model": "gpt-4o",
                     "temperature": 0.1,
                     "max_tokens": 1000,
                     "api_key": os.environ.get("OPENAI_API_KEY"),
