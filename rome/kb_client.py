@@ -8,7 +8,7 @@ import re
 import time
 import sys
 import warnings
-# warnings.filterwarnings('ignore', message='.*validate_default.*', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*validate_default.*', category=UserWarning)
 
 try:
     import chromadb

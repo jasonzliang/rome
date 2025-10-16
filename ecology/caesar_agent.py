@@ -463,20 +463,20 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
                      if url not in self.visited_urls and url != self.current_url]
 
         if parent_url:
-            link_options.append("- IMMEDIATE PREVIOUS -")
+            link_options.append("- IMMEDIATE PREVIOUS PAGE -")
             link_options.append(f"1. [Back to previous page] ({self.visited_urls[parent_url]} visits) {parent_url}")
             url_map.append(parent_url)
             if visited_links: link_options.append("")
 
         if visited_links:
-            link_options.append("- PREVIOUSLY VISITED -")
+            link_options.append("- PREVIOUSLY VISITED LINKS -")
             for url, text, visit_count in visited_links[:MAX_NUM_VISITED_LINKS]:
                 link_options.append(f"{len(url_map)+1}. [{text}] ({visit_count} visits) {url}")
                 url_map.append(url)
             if new_links: link_options.append("")
 
         if new_links:
-            link_options.append("- NEW UNEXPLORED -")
+            link_options.append("- NEW UNEXPLORED LINKS -")
             for url, text in new_links[:MAX_NUM_LINKS]:
                 link_options.append(f"{len(url_map)+1}. [{text}] {url}")
                 url_map.append(url)
