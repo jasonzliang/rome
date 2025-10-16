@@ -49,6 +49,8 @@ CAESAR_CONFIG = {
         "fancy_link_display": True,
         # Whether to dynamically determine to explore or go back to visited pages
         "use_explore_strategy": True,
+        # Temperature for agent's ACT/THINK phases to encourage exploration
+        "exploration_temperature": 0.8,
 
         # False for classic mode
         "iterative_synthesis": True,
@@ -56,8 +58,6 @@ CAESAR_CONFIG = {
         "synthesis_iterations": 10,
         # KB docs per query
         "top_k": 10,
-        # Temperature for agent's ACT/THINK phases to encourage exploration
-        "exploration_temperature": 0.8,
     },
 
     "AgentMemory": {
