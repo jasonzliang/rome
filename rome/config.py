@@ -73,7 +73,7 @@ DEFAULT_CONFIG = {
 
     "AgentMemory": {
         "enabled": False,  # Enable/disable agent memory system
-        "auto_inject": False,  # Automatically inject relevant memories into chat_completion
+        "auto_recall": False,  # Automatically inject relevant memories into chat_completion
         "auto_remember": False,  # Automatically extract and store important interactions
         "auto_remember_len": 100,  # Minimum characters (prompt + response) to consider storing
         "recall_limit": 5,  # Number of most relevant memories to retrieve in recall()

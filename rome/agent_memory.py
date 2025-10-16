@@ -22,7 +22,7 @@ class AgentMemory:
         # Apply config (defaults come from DEFAULT_CONFIG)
         set_attributes_from_config(
             self, config,
-            ['enabled', 'auto_inject', 'auto_remember', 'auto_remember_len',
+            ['enabled', 'auto_recall', 'auto_remember', 'auto_remember_len',
                 'embedding_model', 'recall_limit', 'use_graph', 'graph_url',
                 'graph_username', 'graph_password', 'vector_host', 'vector_port']
         )

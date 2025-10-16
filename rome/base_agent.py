@@ -93,7 +93,7 @@ class BaseAgent:
         )
 
         if self.agent_memory.is_enabled():
-            self.logger.info(f"Agent memory enabled (auto_inject={self.agent_memory.auto_inject}, auto_remember={self.agent_memory.auto_remember})")
+            self.logger.info(f"Agent memory enabled (auto_recall={self.agent_memory.auto_recall}, auto_remember={self.agent_memory.auto_remember})")
         else:
             self.logger.debug("Agent memory disabled")
 
@@ -174,7 +174,7 @@ class BaseAgent:
         system_message = system_message or self.role
 
         memory_context = ""
-        if self.agent_memory.is_enabled() and self.agent_memory.auto_inject:
+        if self.agent_memory.is_enabled() and self.agent_memory.auto_recall:
             # Use prompt as query for recall
             memory_context = self.agent_memory.recall(prompt[:LONGEST_SUMMARY_LEN])
 
