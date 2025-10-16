@@ -1,0 +1,43 @@
+# Caesar Agent Configuration File
+# Only includes settings that differ from DEFAULT_CONFIG
+
+# ============================================================================
+# AGENT CONFIGURATION
+# ============================================================================
+Agent:
+  name: CaesarExplorer
+  draw_fsm: false
+
+# ============================================================================
+# CAESAR-SPECIFIC CONFIGURATION
+# ============================================================================
+CaesarAgent:
+  starting_url: "https://arcprize.org/arc-agi"
+  allowed_domains: ["*"]
+  max_iterations: 750
+  exploration_temperature: 0.9
+  save_graph_interval: 10
+  draw_graph: false
+  synthesis_iterations: 20
+
+# ============================================================================
+# LLM CONFIGURATION
+# ============================================================================
+OpenAIHandler:
+  cost_limit: 300.0
+  model: gpt-4o
+  temperature: 0.1
+  timeout: 300
+
+# ============================================================================
+# KNOWLEDGE BASE CONFIGURATION
+# ============================================================================
+AgentMemory:
+  enabled: true
+  use_graph: true
+
+# ============================================================================
+# LOGGING CONFIGURATION
+# ============================================================================
+Logger:
+  include_caller_info: "rome"
