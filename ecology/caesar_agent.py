@@ -289,8 +289,10 @@ You navigate through information space systematically yet creatively, always wit
     def _fetch_html(self, url: str) -> Optional[str]:
         """Fetch HTML content"""
         try:
-            response = requests.get(url, timeout=10,
-                headers={'User-Agent': 'CaesarBot/1.0'}, allow_redirects=True)
+            response = requests.get(url,
+                timeout=5,
+                headers={'User-Agent': 'CaesarBot/1.0'},
+                allow_redirects=True)
             response.raise_for_status()
             return response.text
         except requests.exceptions.RequestException as e:
@@ -778,13 +780,18 @@ Respond with valid JSON only:
             self.logger.error(f"Failed to save synthesis: {e}")
 
     def shutdown(self) -> None:
-        """Clean up CaesarAgent resources"""
-        if self.shutdown_called: return
+        """Clean up CaesarAgent resources with immediate flag setting"""
+        if self.shutdown_called:
+            return
+
+        # Set flags IMMEDIATELY to stop loops
         self.shutdown_called = True
-        try:
-            if hasattr(self, 'kb_manager'):
-                self.kb_manager.shutdown()
-            super().shutdown()
-        except Exception as e:
-            self.logger.error(f"Error during CaesarAgent shutdown: {e}")
-            raise
+
+        # Cleanup in reverse order of initialization
+        if hasattr(self, 'kb_manager'):
+            self.kb_manager.shutdown()
+
+        # Call parent shutdown
+        super().shutdown()
+
+        self.logger.info("CaesarAgent shutdown completed")
