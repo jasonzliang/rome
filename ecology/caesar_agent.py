@@ -365,8 +365,14 @@ You navigate through information space systematically yet creatively, always wit
         """Phase 2: Analyze content and extract insights"""
         self.logger.info("[THINK] Analyzing content")
 
-        if not content:
-            return ""
+        if self.current_url in self.visited_urls:
+            self.visited_urls[self.current_url] += 1
+            self.logger.info(
+                f"[THINK] Already analyzed ({self.visited_urls[self.current_url]} visits), skipping")
+            prev_insights = self.graph.nodes[self.current_url].get('insights', '')
+            return prev_insights
+
+        if not content: return ""
 
         prompt = f"""Analyze this content and extract key insights focusing on:
 - Novel patterns or unexpected connections
@@ -641,11 +647,11 @@ Your response must be valid JSON only, nothing else."""
                     self._save_checkpoint(iteration)
                 continue
 
-            self.think(content)
+            insights = self.think(content)
             if self.shutdown_called: break
 
             if iteration < self.max_iterations:
-                self.act(links)
+                next_url = self.act(links)
 
             if iteration % self.save_graph_interval == 0 or iteration == self.max_iterations:
                 self._save_graph_data(iteration)
