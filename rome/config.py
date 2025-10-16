@@ -75,7 +75,7 @@ DEFAULT_CONFIG = {
         "enabled": False,  # Enable/disable agent memory system
         "auto_inject": False,  # Automatically inject relevant memories into chat_completion
         "auto_remember": False,  # Automatically extract and store important interactions
-        "remember_threshold": 100,  # Minimum characters (prompt + response) to consider storing
+        "auto_remember_len": 100,  # Minimum characters (prompt + response) to consider storing
         "recall_limit": 10,  # Number of most relevant memories to retrieve in recall()
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model for semantic search
 
@@ -84,8 +84,8 @@ DEFAULT_CONFIG = {
         "graph_url": "bolt://localhost:7687",  # Graph database connection URL
         "graph_username": "neo4j",  # Graph database username
         "graph_password": "neo4jneo4j",  # Graph database password (set via env or config)
-        "vector_host": "localhost",  # ChromaDB host
-        "vector_port": 8000,  # ChromaDB port
+        "vector_host": "localhost",  # Chroma vector DB host
+        "vector_port": 8000,  # Chroma vector DB port
     },
 
     "AgentApi": {

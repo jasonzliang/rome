@@ -22,7 +22,7 @@ class AgentMemory:
         # Apply config (defaults come from DEFAULT_CONFIG)
         set_attributes_from_config(
             self, config,
-            ['enabled', 'auto_inject', 'auto_remember', 'remember_threshold',
+            ['enabled', 'auto_inject', 'auto_remember', 'auto_remember_len',
                 'embedding_model', 'recall_limit', 'use_graph', 'graph_url',
                 'graph_username', 'graph_password', 'vector_host', 'vector_port']
         )
@@ -218,7 +218,7 @@ class AgentMemory:
 
     def should_remember(self, prompt: str, response: str) -> bool:
         """Heuristic check if interaction should be remembered"""
-        if len(prompt) + len(response) < self.remember_threshold:
+        if len(prompt) + len(response) < self.auto_remember_len:
             return False
 
         memorable_patterns = [
