@@ -9,6 +9,7 @@ import time
 import sys
 import warnings
 warnings.filterwarnings('ignore', message='.*validate_default.*', category=UserWarning)
+warnings.filterwarnings('ignore', category=UserWarning, module='chromadb')
 
 try:
     import chromadb; import llama_index
