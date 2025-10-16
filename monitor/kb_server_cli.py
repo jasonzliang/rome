@@ -496,7 +496,7 @@ class OutputFormatter:
         metadata = doc.get('metadata', {})
 
         maxlen = LONG_SUMMARY_LEN
-        if len(content) > maxlen:
+        if content and len(content) > maxlen:
             truncated = content[:maxlen]
             last_space = truncated.rfind(' ')
             if last_space > maxlen * 0.8:
