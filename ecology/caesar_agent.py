@@ -414,51 +414,77 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
             return True
         return False
 
+    # link_options = '\n'.join(
+    #     f"{i+1}. [{text}] {url}" for i, (url, text) in enumerate(links)
+    # )
+    # Based on your role of seeking novel patterns and deeper understanding, which link offers the most promising direction for exploration?
+    # Consider:
+    # - Novel connections not yet explored
+    # - Gaps in current understanding
+    # - Patterns that emerged from similar past decisions
+
     def _select_next_link(self, links: List[Tuple[str, str]]) -> Tuple[int, str]:
         """Use LLM to select best link"""
-        kb_context = ""
         try:
             kb_context = self.kb_manager.query(
-                "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?", top_k=self.top_k)
+                "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?",
+                top_k=self.top_k)
         except Exception as e:
             self.logger.error(f"KB query failed: {e}")
+            self.logger.error(traceback.format_exc())
+            kb_context = ""
 
         # Query memory for historical patterns
-        memory_context = self.recall(f"What webpages have I frequently visited and what navigation patterns have emerged in relation to the following insights:\n{kb_context}")
+        if kb_context:
+            memory_context = self.recall(
+                f"What webpages have I frequently visited and what navigation patterns have emerged in relation to the following insights:\n{kb_context}")
 
-        link_options = []
-        for i, (url, text) in enumerate(links):
-            # Get the visit count from the self.visited_urls dictionary, defaulting to 0.
-            visit_count = self.visited_urls.get(url, 0)
-            visit_info = f" ({visit_count} visits so far) " if visit_count > 0 else " "
-            link_options.append(f"{i+1}. [{text}]{visit_info}{url}")
-        link_options = '\n'.join(link_options[:MAX_NUM_LINKS])
+        # Categorize links: previously visited vs new
+        visited_links = [(i, url, text, self.visited_urls.get(url, 0))
+                         for i, (url, text) in enumerate(links)
+                         if url in self.visited_urls]
+        new_links = [(i, url, text)
+                     for i, (url, text) in enumerate(links)
+                     if url not in self.visited_urls]
 
-        # link_options = '\n'.join(
-        #     f"{i+1}. [{text}] {url}" for i, (url, text) in enumerate(links)
-        # )
-        # Based on your role of seeking novel patterns and deeper understanding, which link offers the most promising direction for exploration?
-        # Consider:
-        # - Novel connections not yet explored
-        # - Gaps in current understanding
-        # - Patterns that emerged from similar past decisions
+        # Build display with index mapping
+        link_options = []; index_map = []
+
+        if visited_links:
+            link_options.append("- PREVIOUSLY VISITED LINKS -")
+            for original_idx, url, text, visit_count in visited_links[:MAX_NUM_VISITED_LINKS]:
+                link_options.append(f"{len(index_map)+1}. [{text}] ({visit_count} visits) {url}")
+                index_map.append(original_idx)
+            if new_links: link_options.append("")
+
+        if new_links:
+            link_options.append("- NEW UNEXPLORED LINKS -")
+            for original_idx, url, text in new_links[:MAX_NUM_LINKS]:
+                link_options.append(f"{len(index_map)+1}. [{text}] {url}")
+                index_map.append(original_idx)
+
+        link_options_str = '\n'.join(link_options)
 
         prompt = f"""You are selecting the next webpage link to explore based on your role
 
 CURRENT EXPLORATION INSIGHTS:
-{kb_context if kb_context else "Just beginning exploration - no insights yet."}
+{kb_context if kb_context else "No exploration insights available."}
 
 HISTORICAL EXPLORATION PATTERNS:
 {memory_context if memory_context else "No previous exploration history available."}
 
 AVAILABLE PATHS FORWARD:
-{link_options}
+{link_options_str}
 
 TASK: Based on current insights and historical patterns, which link offers the most promising direction to explore and deepen understanding?
 
+Consider:
+- Previously visited links may allow deeper analysis or revisiting from new perspective
+- New unexplored links may reveal novel patterns and connections
+
 Respond with a JSON object in this exact format:
 {{
-    "choice": <number from 1 to {len(links)}>,
+    "choice": <number from 1 to {len(index_map)}>,
     "reason": "<brief explanation of why this path is promising>"
 }}
 
@@ -472,7 +498,8 @@ Your response must be valid JSON only, nothing else."""
             )
             decision = self.parse_json_response(response)
             if decision and 'choice' in decision:
-                choice = max(0, min(int(decision['choice']) - 1, len(links) - 1))
+                choice_num = max(0, min(int(decision['choice']) - 1, len(index_map) - 1))
+                choice = index_map[choice_num]
                 reason = decision.get('reason', 'No reason provided')
                 return choice, reason
         except Exception as e:
