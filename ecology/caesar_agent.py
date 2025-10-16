@@ -38,15 +38,17 @@ CAESAR_CONFIG = {
         "save_graph_interval": 1,
         # Generate visual graph representations (requires pygraphviz)
         "draw_graph": False,
+        # Save checkpoint every N iterations for resumption
+        "checkpoint_interval": 1,
+
         # Whether to follow links that point to the same page (different fragments)
         "same_page_links": False,
         # Whether to allow agent to return to page it has seen before
         "allow_revisit": True,
-        # Save checkpoint every N iterations for resumption
-        "checkpoint_interval": 1,
-        # Automatically resume from checkpoint if found on initialization
-        "auto_resume": True,
-
+        # Whether to use new link display format or not
+        "fancy_link_display": True,
+        # Whether to ask KB for whether to explore or go back to visited pages
+        "use_explore_strategy": True,
         # False for classic mode
         "iterative_synthesis": True,
         # Number of q/a iterations
@@ -97,7 +99,7 @@ class CaesarAgent(BaseAgent):
         self._validate_caesar_config()
         self._setup_knowledge_base()
 
-        if self.auto_resume and self._load_checkpoint():
+        if self._load_checkpoint():
             self.logger.info("Resumed from checkpoint")
         else:
             self._setup_exploration_state()
@@ -427,61 +429,104 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
         """Get url to parent page"""
         return self.url_stack[-2] if len(self.url_stack) > 1 else None
 
-    # link_options = '\n'.join(
-    #     f"{i+1}. [{text}] {url}" for i, (url, text) in enumerate(links)
-    # )
-    # Based on your role of seeking novel patterns and deeper understanding, which link offers the most promising direction for exploration?
-    # Consider:
-    # - Novel connections not yet explored
-    # - Gaps in current understanding
-    # - Patterns that emerged from similar past decisions
+    def _determine_exploration_strategy(self, kb_context: str, memory_context: str) -> str:
+            """Use LLM to determine optimal exploration strategy"""
+            prompt = f"""Based on accumulated knowledge and navigation patterns, determine the optimal exploration strategy.
+
+CURRENT KNOWLEDGE STATE:
+{kb_context}
+
+HISTORICAL NAVIGATION PATTERNS:
+{memory_context}
+
+CURRENT EXPLORATION CONTEXT:
+- Current depth: {self.current_depth}/{self.max_depth}
+- Pages visited: {len(self.visited_urls)}
+- Current URL: {self.current_url}
+
+Analyze whether the agent should:
+1. **Revisit** previously seen pages to deepen understanding of known valuable areas
+2. **Explore** new unexplored links to discover novel information
+3. **Backtrack** to the previous page to try alternative paths
+
+Consider:
+- Knowledge gaps vs areas of saturation
+- Depth of current exploration branch
+- Success patterns from previous decisions
+- Risk/reward of new exploration vs consolidation
+
+Provide a strategic recommendation in 2-3 sentences."""
+
+            try:
+                return self.chat_completion(
+                    prompt,
+                    override_config={'temperature': self.exploration_temperature}
+                )
+            except Exception as e:
+                self.logger.error(f"Exploration strategy determination failed: {e}")
+                return ""
+
+    def _format_link_options(self, links: List[Tuple[str, str]]) -> Tuple[List[str], List[str]]:
+        """Format links into display options, returns (link_options, url_map)"""
+        link_options, url_map = [], []
+
+        if self.fancy_link_display:
+            parent_url = self._get_parent_url()
+            visited_links = [(url, text, self.visited_urls.get(url, 0))
+                             for url, text in links
+                             if url in self.visited_urls and url != self.current_url]
+            new_links = [(url, text)
+                         for url, text in links
+                         if url not in self.visited_urls and url != self.current_url]
+
+            if parent_url:
+                link_options.extend([
+                    "- IMMEDIATE PREVIOUS PAGE -",
+                    f"1. [Back to previous page] ({self.visited_urls[parent_url]} visits) {parent_url}"
+                ])
+                url_map.append(parent_url)
+                if visited_links:
+                    link_options.append("")
+
+            if visited_links:
+                link_options.append("- PREVIOUSLY VISITED LINKS -")
+                for url, text, visit_count in visited_links[:MAX_NUM_VISITED_LINKS]:
+                    link_options.append(f"{len(url_map)+1}. [{text}] ({visit_count} visits) {url}")
+                    url_map.append(url)
+                if new_links:
+                    link_options.append("")
+
+            if new_links:
+                link_options.append("- NEW UNEXPLORED LINKS -")
+                for url, text in new_links[:MAX_NUM_LINKS]:
+                    link_options.append(f"{len(url_map)+1}. [{text}] {url}")
+                    url_map.append(url)
+        else:
+            for url, text in links[:MAX_NUM_LINKS]:
+                if url == self.current_url:
+                    continue
+                visit_count = self.visited_urls.get(url, 0)
+                visit_info = f" ({visit_count} visits so far) " if visit_count else " "
+                link_options.append(f"{len(url_map)+1}. [{text}]{visit_info}{url}")
+                url_map.append(url)
+
+        return link_options, url_map
 
     def _select_next_link(self, links: List[Tuple[str, str]]) -> Tuple[Optional[str], str]:
         """Use LLM to select best link, returns (url, reason)"""
-        kb_context = ""; memory_context = ""
-
+        kb_context = memory_context = explore_strategy = ""
         try:
             kb_context = self.kb_manager.query(
                 "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?",
                 top_k=self.top_k)
-        except Exception as e:
-            self.logger.error(f"KB query failed: {e}")
-
-        # Query memory for historical patterns
-        if kb_context:
             memory_context = self.recall(
                 f"What webpages have I frequently visited and what navigation patterns have emerged in relation to the following insights:\n{kb_context}")
+            if self.use_explore_strategy:
+                explore_strategy = self._determine_exploration_strategy(kb_context, memory_context)
+        except Exception as e:
+            self.logger.error(f"KB/memory/explore for link selection failed: {e}")
 
-        # Build display for links
-        link_options = []; url_map = []
-        parent_url = self._get_parent_url()
-        visited_links = [(url, text, self.visited_urls.get(url, 0))
-                         for url, text in links
-                         if url in self.visited_urls and url != self.current_url]
-        new_links = [(url, text)
-                     for url, text in links
-                     if url not in self.visited_urls and url != self.current_url]
-
-        if parent_url:
-            link_options.append("- IMMEDIATE PREVIOUS PAGE -")
-            link_options.append(f"1. [Back to previous page] ({self.visited_urls[parent_url]} visits) {parent_url}")
-            url_map.append(parent_url)
-            if visited_links: link_options.append("")
-
-        if visited_links:
-            link_options.append("- PREVIOUSLY VISITED LINKS -")
-            for url, text, visit_count in visited_links[:MAX_NUM_VISITED_LINKS]:
-                link_options.append(f"{len(url_map)+1}. [{text}] ({visit_count} visits) {url}")
-                url_map.append(url)
-            if new_links: link_options.append("")
-
-        if new_links:
-            link_options.append("- NEW UNEXPLORED LINKS -")
-            for url, text in new_links[:MAX_NUM_LINKS]:
-                link_options.append(f"{len(url_map)+1}. [{text}] {url}")
-                url_map.append(url)
-
-        link_options_str = '\n'.join(link_options)
+        link_options, url_map = self._format_link_options(links)
 
         prompt = f"""You are selecting the next webpage link to explore based on your role
 
@@ -491,14 +536,13 @@ CURRENT EXPLORATION INSIGHTS:
 HISTORICAL EXPLORATION PATTERNS:
 {memory_context if memory_context else "No exploration history available."}
 
+EXPLORATION STRATEGY:
+{explore_strategy if explore_strategy else "No exploration strategy available"}
+
 AVAILABLE PATHS FORWARD:
-{link_options_str}
+{'\n'.join(link_options)}
 
-TASK: Based on current insights and historical patterns, which link offers the most promising direction to explore and deepen understanding?
-
-Consider:
-- Previously visited links may allow deeper analysis or revisiting from new perspective
-- New unexplored links may reveal novel patterns and connections
+TASK: Based on current insights and historical patterns, which page link offers the most promising direction to explore and deepen understanding? Use the exploration strategy to determine which link to select.
 
 Respond with a JSON object in this exact format:
 {{

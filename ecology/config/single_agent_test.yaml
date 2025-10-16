@@ -31,7 +31,7 @@ OpenAIHandler:
 # ============================================================================
 AgentMemory:
   enabled: true
-  use_graph: true
+  use_graph: false
   # openai_config: {'model': 'gpt-5-mini'}
 
 # ============================================================================

@@ -79,7 +79,6 @@ def print_config_summary(agent, logger):
             "Draw Graph": agent.draw_graph,
             "Temperature": agent.exploration_temperature,
             "Checkpoint Interval": agent.checkpoint_interval,
-            "Auto Resume": agent.auto_resume,
         },
         "OpenAI Settings": {
             "Model": agent.openai_handler.model,
