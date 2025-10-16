@@ -67,7 +67,7 @@ class AgentMemory:
                 "config": {
                     "model": "gpt-4o",
                     "temperature": 0.1,
-                    "max_tokens": 1000,
+                    "max_tokens": 2000,
                     "api_key": os.environ.get("OPENAI_API_KEY"),
                     "openai_base_url": "https://api.openai.com/v1"
                 }
