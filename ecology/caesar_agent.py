@@ -587,6 +587,7 @@ Your response must be valid JSON only, nothing else."""
         self.logger.info(f"Beginning exploration: iterations {start_iteration} to {self.max_iterations}")
 
         for iteration in range(start_iteration, self.max_iterations + 1):
+            if self.shutdown_called: break
             self.current_iteration = iteration
 
             self.logger.info(f"\n{'='*80}")
@@ -596,6 +597,7 @@ Your response must be valid JSON only, nothing else."""
             self.logger.info(f"{'='*80}")
 
             content, links = self.perceive()
+            if self.shutdown_called: break
             if not content:
                 if not self._backtrack():
                     break
@@ -605,6 +607,7 @@ Your response must be valid JSON only, nothing else."""
 
             self.visited_urls[self.current_url] = self.visited_urls.get(self.current_url, 0) + 1
             self.think(content)
+            if self.shutdown_called: break
 
             if iteration < self.max_iterations:
                 if self.act(links) is None and len(self.url_stack) == 1:
