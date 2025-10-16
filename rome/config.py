@@ -229,7 +229,7 @@ DEFAULT_CONFIG = {
         "include_caller_info": None,  # Can be "rome", "rich", or None
         "base_dir": None,  # Directory for log files, overwritten by agent if set to None
         "filename": None,  # Log file name, overwritten by agent if set to None
-        "max_size_kb": 15000,  # Max log size in kb, truncates after exceeding
+        "max_size_kb": 12000,  # Max log size in kb, truncates after exceeding
         "timezone": 'US/Pacific',  # Default timezone to display
     },
 
