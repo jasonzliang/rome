@@ -217,20 +217,14 @@ You navigate through information space systematically yet creatively, always wit
         return os.path.join(self.get_log_dir(), f"{self.get_id()}.checkpoint.json")
 
     def _save_checkpoint(self, iteration: int) -> None:
-        """Save exploration state to checkpoint"""
+        """Save exploration state with optional graph data"""
         if not self.url_stack:
             self.logger.error("Cannot save checkpoint: empty url_stack")
             return
 
         try:
-            graph_data = {
-                'nodes': [{'url': n, 'depth': self.graph.nodes[n].get('depth', 0),
-                          'insights': self.graph.nodes[n].get('insights', '')}
-                         for n in self.graph.nodes()],
-                'edges': [{'source': u, 'target': v,
-                          'reason': self.graph.edges[u, v].get('reason', '')}
-                         for u, v in self.graph.edges()]
-            }
+            valid_nodes = {n for n in self.graph.nodes()
+                          if self.graph.nodes[n].get('insights', '').strip()}
 
             checkpoint_data = {
                 'iteration': iteration,
@@ -239,7 +233,15 @@ You navigate through information space systematically yet creatively, always wit
                 'visited_urls': self.visited_urls,
                 'failed_urls': list(self.failed_urls),
                 'url_stack': self.url_stack,
-                'graph': graph_data,
+                'graph': {
+                    'nodes': [{'url': n, 'depth': self.graph.nodes[n].get('depth', 0),
+                              'insights': self.graph.nodes[n]['insights']}
+                             for n in valid_nodes],
+                    'edges': [{'source': u, 'target': v,
+                              'reason': self.graph.edges[u, v].get('reason', '')}
+                             for u, v in self.graph.edges()
+                             if u in valid_nodes and v in valid_nodes]
+                },
                 'timestamp': datetime.now().isoformat(),
                 'config': {
                     'starting_url': self.starting_url,
@@ -249,11 +251,20 @@ You navigate through information space systematically yet creatively, always wit
                 }
             }
 
+            # Save checkpoint
             with open(self._get_checkpoint_path(), 'w', encoding='utf-8') as f:
                 json.dump(checkpoint_data, f, indent=4, ensure_ascii=False)
+            self.logger.info(f"Checkpoint saved on iteration {iteration}")
 
-            self.logger.info(
-                f"Checkpoint saved on iteration {iteration}: {self._get_checkpoint_path()}")
+            # Save separate graph file if at interval
+            if iteration % self.save_graph_interval == 0 or iteration == self.max_iterations:
+                knowledge_graph = checkpoint_data['graph']
+                knowledge_graph['iteration'] = iteration
+                knowledge_graph['starting_url'] = self.starting_url
+                with open(os.path.join(self.get_repo(),
+                         f"{self.get_id()}.graph_iter{iteration}.json"), 'w', encoding='utf-8') as f:
+                    json.dump(knowledge_graph, f, indent=4, ensure_ascii=False)
+                self.logger.info(f"Knowledge graph saved on iteration {iteration}")
 
         except Exception as e:
             self.logger.error(f"Failed to save checkpoint on iteration {iteration}: {e}")
@@ -266,18 +277,20 @@ You navigate through information space systematically yet creatively, always wit
 
         try:
             with open(checkpoint_path, 'r', encoding='utf-8') as f:
-                checkpoint_data = json.load(f)
+                data = json.load(f)
 
-            config = checkpoint_data.get('config', {})
+            # Validate config
+            config = data.get('config', {})
             if (config.get('starting_url') != self.starting_url or
                 config.get('allowed_domains') != self.allowed_domains):
                 self.logger.error("Checkpoint config mismatch")
                 return False
 
-            self.current_iteration = checkpoint_data['iteration']
-            self.visited_urls = checkpoint_data['visited_urls']
-            self.failed_urls = set(checkpoint_data['failed_urls'])
-            self.url_stack = checkpoint_data['url_stack']
+            # Restore state
+            self.current_iteration = data['iteration']
+            self.visited_urls = data['visited_urls']
+            self.failed_urls = set(data['failed_urls'])
+            self.url_stack = data['url_stack']
 
             if not self.url_stack:
                 self.logger.error("Invalid checkpoint: empty url_stack")
@@ -286,18 +299,15 @@ You navigate through information space systematically yet creatively, always wit
             self.current_depth = len(self.url_stack)
             self.current_url = self.url_stack[-1]
 
-            graph_data = checkpoint_data['graph']
+            # Restore graph inline
+            graph_data = data['graph']
             self.graph = nx.DiGraph()
+            for node in graph_data['nodes']:
+                self.graph.add_node(node['url'], depth=node['depth'], insights=node['insights'])
+            for edge in graph_data['edges']:
+                self.graph.add_edge(edge['source'], edge['target'], reason=edge['reason'])
 
-            for node_data in graph_data['nodes']:
-                self.graph.add_node(node_data['url'], depth=node_data['depth'],
-                                   insights=node_data['insights'])
-
-            for edge_data in graph_data['edges']:
-                self.graph.add_edge(edge_data['source'], edge_data['target'],
-                                   reason=edge_data['reason'])
-
-            self.logger.info(f"Checkpoint loaded from {checkpoint_data.get('timestamp')}")
+            self.logger.info(f"Checkpoint loaded from {data.get('timestamp')}")
             return True
 
         except Exception as e:
@@ -415,7 +425,7 @@ Analyze the page content{" and prior insights" if insights else ""} to create a 
 2. {f"Builds upon themes and gaps identified in prior insights" if insights else "Focuses exploration toward most promising areas revealed by the content"}
 3. Create an overall goal for the agent to strive for
 
-Provide an adapted role description (200-400 tokens) that draws inspiration from the page content and prior insights. Be creative, innovative, and original! Your response should be in following format:
+Provide an adapted role description (300-500 tokens) that draws inspiration from the page content and prior insights. Be creative, innovative, and original! Your response should be in following format:
 
 Your role: <adapted role description>
 """
@@ -694,33 +704,6 @@ Your response must be valid JSON only, nothing else."""
 
         return next_url
 
-    def _save_graph_data(self, iteration: int) -> None:
-        """Save graph structure to JSON"""
-        try:
-            # Filter nodes with insights
-            valid_nodes = {n for n in self.graph.nodes()
-                          if self.graph.nodes[n].get('insights', '').strip()}
-
-            graph_data = {
-                'iteration': iteration,
-                'starting_url': self.starting_url,
-                'nodes': [{'url': n, 'depth': self.graph.nodes[n].get('depth', 0),
-                          'insights': self.graph.nodes[n]['insights']}
-                         for n in valid_nodes],
-                'edges': [{'source': u, 'target': v,
-                          'reason': self.graph.edges[u, v].get('reason', '')}
-                         for u, v in self.graph.edges()
-                         if u in valid_nodes and v in valid_nodes]
-            }
-
-            filepath = os.path.join(self.get_repo(),
-                                   f"{self.get_id()}.graph_iter{iteration}.json")
-            with open(filepath, 'w', encoding='utf-8') as f:
-                json.dump(graph_data, f, indent=4, ensure_ascii=False)
-
-        except Exception as e:
-            self.logger.error(f"Failed to save graph data: {e}")
-
     def _draw_graph_visualization(self, iteration: int) -> None:
         """Create Graphviz visualization"""
         if not self.draw_graph:
@@ -797,13 +780,11 @@ Your response must be valid JSON only, nothing else."""
                 next_url = self.act(links)
 
             if iteration % self.save_graph_interval == 0 or iteration == self.max_iterations:
-                self._save_graph_data(iteration)
                 self._draw_graph_visualization(iteration)
 
             if iteration % self.checkpoint_interval == 0 or iteration == self.max_iterations:
                 self._save_checkpoint(iteration)
 
-        self._save_graph_data(self.current_iteration)
         self._draw_graph_visualization(self.current_iteration)
         self._save_checkpoint(self.current_iteration)
 
