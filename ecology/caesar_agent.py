@@ -60,9 +60,9 @@ CAESAR_CONFIG = {
         "top_k": 10,
 
         # Whether to modify agent role based on starting URL and insights
-        "adapt_role": True,
-        # Insights file used to modify role
-        "insights_file": 'bnt.txt'
+        "adapt_role": False,
+        # Insights file used to modify the role
+        "insights_file": 'config/adapt_role_insights.txt'
     },
 
     "AgentMemory": {
