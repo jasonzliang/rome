@@ -41,6 +41,9 @@ def load_graphs(directory, pattern='*.graph_iter*.json'):
 def create_graph_object(data):
     """Create NetworkX graph from data."""
     G = nx.DiGraph()
+    G.graph['starting_url'] = data.get('starting_url')
+    G.graph['iteration'] = data.get('iteration')
+
     for node in data['nodes']:
         G.add_node(node['url'], depth=node['depth'], insights=node['insights'])
     for edge in data['edges']:
@@ -64,6 +67,7 @@ def get_layout_position(G, layout_type='spring'):
 
 def create_plotly_traces(G, pos):
     """Create Plotly edge and node traces."""
+    # Edge trace
     edge_x, edge_y = [], []
     for src, tgt in G.edges():
         x0, y0 = pos[src]
@@ -77,6 +81,7 @@ def create_plotly_traces(G, pos):
         hoverinfo='none',
         mode='lines')
 
+    # Node trace
     node_x, node_y, node_text, node_color = [], [], [], []
     for node in G.nodes():
         x, y = pos[node]
@@ -85,10 +90,7 @@ def create_plotly_traces(G, pos):
         title = node.split('/')[-1].replace('_', ' ')
         depth = G.nodes[node]['depth']
         node_text.append(f"{title}<br>Depth: {depth}")
-        node_color.append(depth)
-
-    # Find if there's a root node (depth 0)
-    has_root = any(G.nodes[node]['depth'] == 0 for node in G.nodes())
+        node_color.append('red' if node == G.graph.get('starting_url') else depth)
 
     node_trace = go.Scatter(
         x=node_x, y=node_y,
@@ -97,9 +99,7 @@ def create_plotly_traces(G, pos):
         hovertext=node_text,
         marker=dict(
             showscale=True,
-            colorscale=[[0, 'red'], [0.001, 'rgb(68,1,84)'], [0.25, 'rgb(59,82,139)'],
-                       [0.5, 'rgb(33,145,140)'], [0.75, 'rgb(94,201,98)'], [1, 'rgb(253,231,37)']] if has_root
-                       else 'Viridis',
+            colorscale='Viridis',
             size=20,
             color=node_color,
             colorbar=dict(thickness=15, title=dict(text='Depth', side='right'), xanchor='left'),
