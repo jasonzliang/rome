@@ -690,7 +690,7 @@ Your response must be valid JSON only, nothing else."""
         except Exception as e:
             self.logger.error(f"Failed to create graph visualization: {e}")
 
-    def _restart_exploration(self, iteration: int) -> None:
+    def _restart_exploration(self) -> None:
         """Reset to starting URL while preserving accumulated knowledge"""
         self.logger.info(f"[RESTART] Returning to starting page: {self.starting_url}")
         self.url_stack = [self.starting_url]
