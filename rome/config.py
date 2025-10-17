@@ -110,6 +110,7 @@ DEFAULT_CONFIG = {
 
         # Model Parameters
         "model": "gpt-4o",  # LLM model name
+        "reasoning_effort": None,  # Reasoning effort for reasoning models (None to disable)
         "temperature": 0.1,  # LLM temperature
         "max_tokens": 8192,  # LLM response max tokens
         "top_p": 1.0,  # LLM top-P

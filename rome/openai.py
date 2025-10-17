@@ -6,7 +6,7 @@ import os
 from typing import Dict, Optional, Any, Union, List
 
 from .logger import get_logger
-from .config import set_attributes_from_config
+from .config import set_attributes_from_config, DEFAULT_CONFIG
 
 
 class CostLimitExceededException(Exception):
@@ -85,17 +85,17 @@ class OpenAIHandler:
 
     # Newer models with different API
     NEW_MODELS = {
-        "gpt-5",
-        "gpt-5-mini",
-        "gpt-5-nano",
-        "gpt-5-pro",
+        "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro",
 
-        "o1",
-        "o1-mini",
-        "o1-pro",
-        "o3",
-        "o3-mini",
-        "o4-mini",
+        "o1", "o1-mini", "o1-pro", "o3", "o3-mini", "o4-mini",
+    }
+
+    REASONING_MODELS = {
+        # GPT-5 series (support minimal, low, medium, high)
+        "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro",
+
+        # o-series (support low, medium, high only - NOT minimal)
+        "o1", "o3", "o3-mini", "o4-mini"
     }
 
     def __init__(self, config: Dict = None):
@@ -108,11 +108,7 @@ class OpenAIHandler:
         self.cost_history = []
 
         # Set attributes from config
-        set_attributes_from_config(self, self.config, [
-            'model', 'temperature', 'max_tokens', 'timeout', 'top_p', 'base_url',
-            'system_message', 'key_name', 'manage_context', 'max_input_tokens',
-            'token_count_thres', 'chars_per_token', 'seed', 'cost_limit'
-        ])
+        set_attributes_from_config(self, self.config, DEFAULT_CONFIG['OpenAIHandler'].keys())
 
         # Initialize client
         api_key = os.getenv(self.key_name or 'OPENAI_API_KEY')
@@ -376,6 +372,10 @@ class OpenAIHandler:
 
         if self.seed:
             kwargs["seed"] = self.seed
+        if self.reasoning_effort and self.model in self.REASONING_MODELS:
+            if self.model.startswith("o") and self.reasoning_effort == "minimal":
+                self.reasoning_effort = "low"
+            kwargs["reasoning_effort"] = self.reasoning_effort
         if response_format:
             kwargs["response_format"] = response_format
         if override_config:
