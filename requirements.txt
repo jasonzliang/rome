@@ -1,4 +1,4 @@
-# Library core pkgs
+# Library core packages
 colorama
 numpy
 openai
@@ -7,35 +7,21 @@ psutil
 pytest
 tinydb
 
-# Knowledge-base and memory pkgs
-chromadb
-llama-index
-llama-index-vector-stores-chroma
-llama-index-embeddings-openai
-llama-index-llms-openai
-mem0ai
-
-# Library optional pkgs
+# Library optional packages
 evalplus
 graphviz
 llmlingua
 ribs
 xxhash
 
-# Web app pkgs
-gensim
-fastapi
-matplotlib
-networkx
-pandas
-pillow
-plotly
-requests
-scikit-learn
-streamlit
-tiktoken
-uvicorn
+# Knowledge-base/memory packages
+chromadb
+llama-index
+llama-index-vector-stores-chroma
+llama-index-embeddings-openai
+llama-index-llms-openai
+mem0ai[graph]
 
-# Ecology agent pkgs
+# Ecology agent packages
 beautifulsoup4
 pygraphviz
