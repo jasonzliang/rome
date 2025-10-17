@@ -262,7 +262,7 @@ You navigate through information space systematically yet creatively, always wit
                 knowledge_graph['iteration'] = iteration
                 knowledge_graph['starting_url'] = self.starting_url
                 with open(os.path.join(self.get_repo(),
-                         f"{self.get_id()}.graph_iter{iteration}.json"), 'w', encoding='utf-8') as f:
+                    f"{self.get_id()}.graph_iter{iteration}.json"), 'w', encoding='utf-8') as f:
                     json.dump(knowledge_graph, f, indent=4, ensure_ascii=False)
                 self.logger.info(f"Knowledge graph saved on iteration {iteration}")
 
