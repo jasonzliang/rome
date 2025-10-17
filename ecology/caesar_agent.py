@@ -390,7 +390,7 @@ You navigate through information space systematically yet creatively, always wit
             try:
                 with open(self.insights_file, 'r', encoding='utf-8') as f:
                     insights = f.read()
-                self.logger.info(f"Loaded insights from {self.insights_file}")
+                self.logger.debug(f"Loaded insights from {self.insights_file}")
             except Exception as e:
                 self.logger.error(f"Failed to load insights file: {e}")
 
@@ -422,7 +422,9 @@ Your role: <adapted role description>
 
         try:
             self.role = self.chat_completion(prompt)
-            self.logger.info("[ADAPT ROLE] Role successfully adapted")
+            with open(os.path.join(self.get_log_dir(), "adapted_role.txt"), 'w') as f:
+                f.write(self.role)
+            self.logger.info(f"[ADAPT ROLE] Role successfully adapted:\n{self.role}")
         except Exception as e:
             self.logger.error(f"Role adaptation failed: {e}")
 
