@@ -58,6 +58,11 @@ CAESAR_CONFIG = {
         "synthesis_iterations": 10,
         # KB docs per query
         "top_k": 10,
+
+        # Whether to modify agent role based on starting URL and insights
+        "adapt_role": True,
+        # Insights file used to modify role
+        "insights_file": 'bnt.txt'
     },
 
     "AgentMemory": {
@@ -109,6 +114,7 @@ class CaesarAgent(BaseAgent):
             self.logger.info("Starting fresh exploration")
 
         self._log_initialization()
+        self._adapt_role()
 
     def _prepare_caesar_config(self, config: Dict = None,
                                starting_url: str = None,
@@ -352,6 +358,74 @@ You navigate through information space systematically yet creatively, always wit
 
         return links
 
+    def _extract_text_from_html(self, html: str, max_length: int = LONGEST_SUMMARY_LEN*100) -> str:
+        """Extract clean text content from HTML"""
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
+            for tag in soup(["script", "style", "nav", "footer", "header"]):
+                tag.decompose()
+            text = soup.get_text(separator=' ', strip=True)
+            return ' '.join(text.split())[:max_length]
+        except Exception as e:
+            self.logger.error(f"HTML text extraction failed: {e}")
+            return ""
+
+    def _adapt_role(self):
+        """Adapt agent role based on starting URL content and optional insights"""
+        if not self.adapt_role: return
+        self.logger.info(f"[ADAPT ROLE] Analyzing {self.starting_url}")
+
+        # Fetch and extract content using existing methods
+        html = self._fetch_html(self.starting_url)
+        if not html:
+            self.logger.error("Failed to fetch starting URL"); return
+
+        content = self._extract_text_from_html(html)
+        if not content:
+            self.logger.error("Failed to extract content from starting URL"); return
+
+        # Load insights if provided
+        insights = ""
+        if self.insights_file and os.path.exists(self.insights_file):
+            try:
+                with open(self.insights_file, 'r', encoding='utf-8') as f:
+                    insights = f.read()
+                self.logger.info(f"Loaded insights from {self.insights_file}")
+            except Exception as e:
+                self.logger.error(f"Failed to load insights file: {e}")
+
+        # Generate adapted role
+        prompt = f"""You are adapting your current role based on the starting page and prior insights.
+
+STARTING PAGE URL:
+{self.starting_url}
+
+PAGE CONTENT:
+{content}
+
+{"PRIOR INSIGHTS:" if insights else ""}
+{insights if insights else ""}
+
+CURRENT ROLE:
+{self.role}
+
+YOUR TASK:
+Analyze the page content{" and prior insights" if insights else ""} to create a specialized role that:
+1. Improves upon core exploration philosophy
+2. {f"Builds upon themes and gaps identified in prior insights" if insights else "Focuses exploration toward most promising areas revealed by the content"}
+3. Create an overall goal for the agent to strive for
+
+Provide an adapted role description (200-400 tokens) that draws inspiration from the page content and prior insights. Be creative, innovative, and original! Your response should be in following format:
+
+Your role: <adapted role description>
+"""
+
+        try:
+            self.role = self.chat_completion(prompt)
+            self.logger.info("[ADAPT ROLE] Role successfully adapted")
+        except Exception as e:
+            self.logger.error(f"Role adaptation failed: {e}")
+
     def perceive(self) -> Tuple[str, List[Tuple[str, str]]]:
         """Phase 1: Extract content and links from current page"""
         self.logger.info(f"[PERCEIVE] {self.current_url}")
@@ -362,14 +436,8 @@ You navigate through information space systematically yet creatively, always wit
                 self.failed_urls.add(self.current_url)
                 return "", []
 
-            soup = BeautifulSoup(html, 'html.parser')
-            for tag in soup(["script", "style", "nav", "footer", "header"]):
-                tag.decompose()
-
-            text = soup.get_text(separator=' ', strip=True)
-            text = ' '.join(text.split())[:LONGEST_SUMMARY_LEN*100]
+            text = self._extract_text_from_html(html)
             links = self._extract_links(html, self.current_url)
-
             return text, links
 
         except Exception as e:

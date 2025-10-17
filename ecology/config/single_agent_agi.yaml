@@ -14,7 +14,7 @@ Agent:
 CaesarAgent:
   starting_url: "https://arcprize.org/arc-agi"
   allowed_domains: ["*"]
-  max_iterations: 800
+  max_iterations: 600
   exploration_temperature: 0.9
   save_graph_interval: 50
   draw_graph: false
@@ -25,7 +25,7 @@ CaesarAgent:
 # ============================================================================
 OpenAIHandler:
   cost_limit: 300.0
-  model: gpt-4o
+  model: gpt-5
   temperature: 0.1
   timeout: 300
 
