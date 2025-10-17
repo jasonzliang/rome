@@ -100,7 +100,7 @@ def create_plotly_traces(G, pos):
         marker=dict(
             showscale=True,
             colorscale='Viridis',
-            size=20,
+            size=10,
             color=node_color,
             colorbar=dict(thickness=15, title=dict(text='Depth', side='right'), xanchor='left'),
             line=dict(width=2, color='white')))
@@ -199,9 +199,10 @@ def train_word2vec_model(graphs):
             sentences=sentences,
             vector_size=100,
             window=5,
-            min_count=2,
+            min_count=3,  # Reduce noise
             workers=multiprocessing.cpu_count(),
-            epochs=20,
+            epochs=15,  # More efficient
+            sg=0,  # Skip-gram
             seed=42)
     except Exception as e:
         st.error(f"Error training Word2Vec model: {e}")
@@ -586,16 +587,22 @@ with tab4:
             vectors = np.array([topic_vectors[t] for t in topics])
             coords = reduce_dimensions(vectors)
 
+            # Get starting URL and create color mapping
+            starting_url = graphs[max(graphs.keys())].get('starting_url')
+            starting_topic = starting_url.split('/')[-1].replace('_', ' ') if starting_url else None
+            node_colors = ['red' if t == starting_topic else i for i, t in enumerate(topics)]
+
             embedding_fig = go.Figure(go.Scatter(
                 x=coords[:, 0], y=coords[:, 1],
                 mode='markers',
-                hovertext=[f"<b>{t}</b><br>Index: {i}" for i, t in enumerate(topics)],
+                hovertext=[f"<b>{t}</b><br>Index: {i}{' (Start)' if t == starting_topic else ''}"
+                           for i, t in enumerate(topics)],
                 marker=dict(
                     size=10,
-                    color=list(range(len(topics))),
+                    color=node_colors,
                     colorscale='Viridis',
                     showscale=True,
-                    colorbar=dict(title=dict(text="Topic Index")))))
+                    colorbar=dict(title="Topic Index"))))
 
             embedding_fig.update_layout(
                 title='Topic Embedding Space (t-SNE)',
