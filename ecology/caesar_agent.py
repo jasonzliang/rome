@@ -188,7 +188,7 @@ You navigate through information space systematically yet creatively, always wit
         self.failed_urls = set()
         self.url_stack = [self.starting_url]
         self.current_url = self.starting_url
-        self.current_depth = 0
+        self.current_depth = len(self.url_stack)
         self.current_iteration = 0
 
     def _setup_knowledge_base(self) -> None:
@@ -695,7 +695,7 @@ Your response must be valid JSON only, nothing else."""
         self.logger.info(f"[RESTART] Returning to starting page: {self.starting_url}")
         self.url_stack = [self.starting_url]
         self.current_url = self.starting_url
-        self.current_depth = 1
+        self.current_depth = len(self.url_stack)
 
     def explore(self) -> str:
         """Execute main exploration loop"""
