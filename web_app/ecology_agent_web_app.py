@@ -15,6 +15,7 @@ import numpy as np
 from gensim.models import Word2Vec
 from sklearn.manifold import TSNE
 from sklearn.metrics.pairwise import cosine_similarity
+# pip install watchdog
 
 st.set_page_config(page_title="Ecology Agent Graph Explorer", layout="wide")
 
