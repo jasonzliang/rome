@@ -9,6 +9,7 @@ import hashlib
 import graphviz
 import tempfile
 import os
+# pip install watchdog
 
 # ======== Configuration ========
 st.set_page_config(
