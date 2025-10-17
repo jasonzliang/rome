@@ -422,7 +422,7 @@ Your role: <adapted role description>
 
         try:
             self.role = self.chat_completion(prompt)
-            with open(os.path.join(self.get_log_dir(), "adapted_role.txt"), 'w') as f:
+            with open(os.path.join(self.get_log_dir(), f"{self.get_id()}.adapted_role.txt"), 'w') as f:
                 f.write(self.role)
             self.logger.info(f"[ADAPT ROLE] Role successfully adapted:\n{self.role}")
         except Exception as e:
