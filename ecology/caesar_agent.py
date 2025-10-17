@@ -625,18 +625,24 @@ Your response must be valid JSON only, nothing else."""
     def _save_graph_data(self, iteration: int) -> None:
         """Save graph structure to JSON"""
         try:
+            # Filter nodes with insights
+            valid_nodes = {n for n in self.graph.nodes()
+                          if self.graph.nodes[n].get('insights', '').strip()}
+
             graph_data = {
                 'iteration': iteration,
+                'starting_url': self.starting_url,
                 'nodes': [{'url': n, 'depth': self.graph.nodes[n].get('depth', 0),
-                          'insights': self.graph.nodes[n].get('insights', '')}
-                         for n in self.graph.nodes()],
+                          'insights': self.graph.nodes[n]['insights']}
+                         for n in valid_nodes],
                 'edges': [{'source': u, 'target': v,
                           'reason': self.graph.edges[u, v].get('reason', '')}
-                         for u, v in self.graph.edges()]
+                         for u, v in self.graph.edges()
+                         if u in valid_nodes and v in valid_nodes]
             }
 
             filepath = os.path.join(self.get_repo(),
-                f"{self.get_id()}.graph_iter{iteration}.json")
+                                   f"{self.get_id()}.graph_iter{iteration}.json")
             with open(filepath, 'w', encoding='utf-8') as f:
                 json.dump(graph_data, f, indent=4, ensure_ascii=False)
 

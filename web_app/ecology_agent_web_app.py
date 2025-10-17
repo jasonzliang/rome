@@ -87,6 +87,9 @@ def create_plotly_traces(G, pos):
         node_text.append(f"{title}<br>Depth: {depth}")
         node_color.append(depth)
 
+    # Find if there's a root node (depth 0)
+    has_root = any(G.nodes[node]['depth'] == 0 for node in G.nodes())
+
     node_trace = go.Scatter(
         x=node_x, y=node_y,
         mode='markers',
@@ -94,7 +97,9 @@ def create_plotly_traces(G, pos):
         hovertext=node_text,
         marker=dict(
             showscale=True,
-            colorscale='Viridis',
+            colorscale=[[0, 'red'], [0.001, 'rgb(68,1,84)'], [0.25, 'rgb(59,82,139)'],
+                       [0.5, 'rgb(33,145,140)'], [0.75, 'rgb(94,201,98)'], [1, 'rgb(253,231,37)']] if has_root
+                       else 'Viridis',
             size=20,
             color=node_color,
             colorbar=dict(thickness=15, title=dict(text='Depth', side='right'), xanchor='left'),
