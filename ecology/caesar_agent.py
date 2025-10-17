@@ -625,7 +625,7 @@ Provide a strategic recommendation in 2-3 sentences."""
 
         link_options, url_map = self._format_link_options(links)
 
-        prompt = f"""You are selecting the next webpage link to explore based on your role
+        prompt = f"""You are selecting the next webpage link to explore
 
 CURRENT EXPLORATION INSIGHTS:
 {kb_context if kb_context else "No exploration insights available."}
@@ -639,7 +639,7 @@ EXPLORATION STRATEGY:
 AVAILABLE PATHS FORWARD:
 {'\n'.join(link_options)}
 
-TASK: Based on current insights and historical patterns, which page link offers the most promising direction to explore and deepen understanding? Use the exploration strategy to determine which link to select.
+TASK: Based on current insights, historical patterns, and exploration strategy, which page link is the most interesting, deepens understanding, and offers the most promising direction to explore?
 
 Respond with a JSON object in this exact format:
 {{
