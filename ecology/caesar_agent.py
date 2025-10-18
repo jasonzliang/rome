@@ -289,7 +289,8 @@ You navigate through information space systematically yet creatively, always wit
             # Restore state
             self.current_iteration = data['iteration']
             self.visited_urls = data['visited_urls']
-            self.failed_urls = set(data['failed_urls'])
+            # Do not load failed urls, so we can give them another try
+            # self.failed_urls = set(data['failed_urls'])
             self.url_stack = data['url_stack']
 
             if not self.url_stack:
