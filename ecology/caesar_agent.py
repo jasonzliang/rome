@@ -386,48 +386,44 @@ You navigate through information space systematically yet creatively, always wit
     def _update_role(self):
         """Adapt agent role based on starting URL content and optional insights"""
         try:
-            # Handle role overwrite (highest priority)
+            role_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.adapted_role.txt")
+
+            # Check overwrite (highest priority)
             if self.overwrite_role_file and os.path.exists(self.overwrite_role_file):
                 with open(self.overwrite_role_file, 'r', encoding='utf-8') as f:
-                    overwritten_role = f.read().strip()
-                if overwritten_role:
-                    self.role = overwritten_role
-                    self.logger.info(f"[OVERWRITE ROLE] Using overwritten role:\n{self.role}")
+                    if role := f.read().strip():
+                        self.role = role
+                        self.logger.info(f"[OVERWRITE ROLE] Using overwritten role:\n{self.role}")
                 return
 
             # Early return if adaptation disabled
-            if not self.adapt_role:
-                return
+            if not self.adapt_role: return
 
-            # Check for existing adapted role
-            role_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.adapted_role.txt")
+            # Check cached adapted role
             if os.path.exists(role_file) and os.path.getsize(role_file) > 0:
                 with open(role_file, 'r', encoding='utf-8') as f:
-                    cached_role = f.read().strip()
-                if cached_role:
-                    self.role = cached_role
-                    self.logger.info(f"[ADAPT ROLE] Using cached adapted role:\n{self.role}")
-                    return
+                    if cached_role := f.read().strip():
+                        self.role = cached_role
+                        self.logger.info(f"[ADAPT ROLE] Using cached adapted role:\n{self.role}")
+                        return
 
-            # Fetch starting URL content
+            # Fetch and extract content
             self.logger.info(f"[ADAPT ROLE] Analyzing {self.starting_url}")
             html = self._fetch_html(self.starting_url)
-            content = self._extract_text_from_html(html)
-            if not content:
-                self.logger.error("[ADAPT ROLE] Failed to extract content, keeping default role")
-                return
+            content = self._extract_text_from_html(html) if html else ""
+            if not content: return
 
             # Load insights if available
             insights = ""
             if self.adapt_role_file and os.path.exists(self.adapt_role_file):
                 with open(self.adapt_role_file, 'r', encoding='utf-8') as f:
                     insights = f.read().strip()
-                if insights:
-                    self.logger.debug(f"[ADAPT ROLE] Loaded insights from {self.adapt_role_file}")
 
             # Generate adapted role
+            insights_info = " and prior insights" if insights else ""
             insights_section = f"\nPRIOR INSIGHTS:\n{insights}\n" if insights else ""
-            prompt = f"""You are adapting your current role based on the starting page{" and prior insights" if insights else ""}.
+
+            prompt = f"""You are adapting your current role based on the starting page{insights_info}.
 
 STARTING PAGE URL:
 {self.starting_url}
@@ -439,19 +435,16 @@ CURRENT ROLE:
 {self.role}
 
 YOUR TASK:
-Analyze the page content{" and prior insights" if insights else ""} to create a specialized role that:
+Analyze the page content{insights_info} to create a specialized role that:
 1. Improves upon core exploration philosophy
 2. {f"Builds upon themes and gaps identified in prior insights" if insights else "Focuses exploration toward most promising areas revealed by the content"}
 3. Creates an overall goal for the agent to strive for
 
-Provide an adapted role description (300-500 tokens) that draws inspiration from the page content{" and prior insights" if insights else ""}. Be creative, innovative, and original!
+Provide an adapted role description (300-500 tokens) that draws inspiration from the page content{insights_info}. Be creative, innovative, and original!
 
 Your response must start with "Your role:" followed by the adapted role description."""
 
-            adapted_role = self.chat_completion(prompt).strip()
-
-            # Validate response
-            if not adapted_role or len(adapted_role) < 50:
+            if not (adapted_role := self.chat_completion(prompt).strip()) or len(adapted_role) < 50:
                 self.logger.error("[ADAPT ROLE] Invalid LLM response, keeping default role")
                 return
 
