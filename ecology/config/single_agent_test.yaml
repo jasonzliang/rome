@@ -17,7 +17,10 @@ CaesarAgent:
   exploration_temperature: 0.8
   save_graph_interval: 1
   draw_graph: true
+
+  overwrite_role_file: config/self_transcendence.txt
   adapt_role: true
+  adapt_role_file: config/adapt_role_insights.txt
 
 # ============================================================================
 # LLM CONFIGURATION

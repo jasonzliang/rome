@@ -59,10 +59,12 @@ CAESAR_CONFIG = {
         # KB docs per query
         "top_k": 10,
 
-        # Whether to modify agent role based on starting URL and insights
+        # Overwrites the default role with new role from file, order is [overwrite] -> [adapt]
+        "overwrite_role_file": None,
+        # Whether to modify agent role based on starting URL and/or insights
         "adapt_role": False,
-        # Insights file used to modify the role
-        "insights_file": 'config/adapt_role_insights.txt'
+        # Insights file path used to adapt the role and change it
+        "adapt_role_file": None
     },
 
     "AgentMemory": {
@@ -95,8 +97,8 @@ class CaesarAgent(BaseAgent):
 
         # Prepare merged config BEFORE calling super().__init__()
         merged_config = self._prepare_caesar_config(config, starting_url, allowed_domains)
-        if not role: role = self._get_default_role()
         # Pass the merged config to BaseAgent (this configures the logger)
+        if not role: role = self._get_default_role()
         super().__init__(name, role, repository, merged_config)
 
         # NOW setup Caesar-specific attributes (logger is configured)
@@ -113,8 +115,8 @@ class CaesarAgent(BaseAgent):
             self._setup_exploration_state()
             self.logger.info("Starting fresh exploration")
 
+        self._update_role()
         self._log_initialization()
-        self._adapt_role()
 
     def _prepare_caesar_config(self, config: Dict = None,
                                starting_url: str = None,
@@ -382,63 +384,78 @@ You navigate through information space systematically yet creatively, always wit
             self.logger.error(f"HTML text extraction failed: {e}")
             return ""
 
-    def _adapt_role(self):
+    def _update_role(self):
         """Adapt agent role based on starting URL content and optional insights"""
-        if not self.adapt_role: return
-        self.logger.info(f"[ADAPT ROLE] Analyzing {self.starting_url}")
+        try:
+            role_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.adapted_role.txt")
 
-        # Fetch and extract content using existing methods
-        html = self._fetch_html(self.starting_url)
-        if not html:
-            self.logger.error("Failed to fetch starting URL"); return
+            # Check overwrite (highest priority)
+            if self.overwrite_role_file and os.path.exists(self.overwrite_role_file):
+                with open(self.overwrite_role_file, 'r', encoding='utf-8') as f:
+                    if role := f.read().strip():
+                        self.role = role
+                        self.logger.info(f"[OVERWRITE ROLE] Using overwritten role:\n{self.role}")
 
-        content = self._extract_text_from_html(html)
-        if not content:
-            self.logger.error("Failed to extract content from starting URL"); return
+            # Early return if adaptation disabled
+            if not self.adapt_role: return
 
-        # Load insights if provided
-        insights = ""
-        if self.insights_file and os.path.exists(self.insights_file):
-            try:
-                with open(self.insights_file, 'r', encoding='utf-8') as f:
-                    insights = f.read()
-                self.logger.debug(f"Loaded insights from {self.insights_file}")
-            except Exception as e:
-                self.logger.error(f"Failed to load insights file: {e}")
+            # Check cached adapted role
+            if os.path.exists(role_file) and os.path.getsize(role_file) > 0:
+                with open(role_file, 'r', encoding='utf-8') as f:
+                    if cached_role := f.read().strip():
+                        self.role = cached_role
+                        self.logger.info(f"[ADAPT ROLE] Using cached adapted role:\n{self.role}")
+                        return
 
-        # Generate adapted role
-        prompt = f"""You are adapting your current role based on the starting page and prior insights.
+            # Fetch and extract content
+            self.logger.info(f"[ADAPT ROLE] Analyzing {self.starting_url}")
+            html = self._fetch_html(self.starting_url)
+            content = self._extract_text_from_html(html) if html else ""
+            if not content: return
+
+            # Load insights if available
+            insights = ""
+            if self.adapt_role_file and os.path.exists(self.adapt_role_file):
+                with open(self.adapt_role_file, 'r', encoding='utf-8') as f:
+                    insights = f.read().strip()
+
+            # Generate adapted role
+            insights_info = " and prior insights" if insights else ""
+            insights_section = f"\nPRIOR INSIGHTS:\n{insights}\n" if insights else ""
+
+            prompt = f"""You are adapting your current role based on the starting page{insights_info}.
 
 STARTING PAGE URL:
 {self.starting_url}
 
 PAGE CONTENT:
 {content}
-
-{"PRIOR INSIGHTS:" if insights else ""}
-{insights if insights else ""}
-
+{insights_section}
 CURRENT ROLE:
 {self.role}
 
 YOUR TASK:
-Analyze the page content{" and prior insights" if insights else ""} to create a specialized role that:
+Analyze the page content{insights_info} to create a specialized role that:
 1. Improves upon core exploration philosophy
 2. {f"Builds upon themes and gaps identified in prior insights" if insights else "Focuses exploration toward most promising areas revealed by the content"}
-3. Create an overall goal for the agent to strive for
+3. Creates an overall goal for the agent to strive for
 
-Provide an adapted role description (300-500 tokens) that draws inspiration from the page content and prior insights. Be creative, innovative, and original! Your response should be in following format:
+Provide an adapted role description (300-500 tokens) that draws inspiration from the page content{insights_info}. Be creative, innovative, and original!
 
-Your role: <adapted role description>
-"""
+Your response must start with "Your role:" followed by the adapted role description."""
 
-        try:
-            self.role = self.chat_completion(prompt)
-            with open(os.path.join(self.get_log_dir(), f"{self.get_id()}.adapted_role.txt"), 'w') as f:
+            if not (adapted_role := self.chat_completion(prompt).strip()) or len(adapted_role) < 50:
+                self.logger.error("[ADAPT ROLE] Invalid LLM response, keeping default role")
+                return
+
+            # Save and apply
+            self.role = adapted_role
+            with open(role_file, 'w', encoding='utf-8') as f:
                 f.write(self.role)
-            self.logger.info(f"[ADAPT ROLE] Role successfully adapted:\n{self.role}")
+            self.logger.info(f"[ADAPT ROLE] Using newly adapted role:\n{self.role}")
+
         except Exception as e:
-            self.logger.error(f"Role adaptation failed: {e}")
+            self.logger.error(f"[ADAPT ROLE] Role adaptation failed: {e}, keeping default role")
 
     def perceive(self) -> Tuple[str, List[Tuple[str, str]]]:
         """Phase 1: Extract content and links from current page"""
@@ -474,8 +491,9 @@ Your role: <adapted role description>
 - Novel patterns or unexpected connections
 - Assumptions being made and alternatives
 - Questions raised by the content
-- How this relates to or challenges previous insights
-- Build upon insights from previous analysis
+- How this builds upon or challenges previous insights
+
+IMPORTANT: Use your role as a guide on how to respond!
 
 CONTENT:
 {content}
@@ -552,6 +570,8 @@ Consider:
 - Depth of current exploration branch
 - Success patterns from previous decisions
 - Risk/reward of new exploration vs consolidation
+
+IMPORTANT: Use your role as a guide on how to respond!
 
 Provide a strategic recommendation in 2-3 sentences."""
 
@@ -642,6 +662,8 @@ AVAILABLE PATHS FORWARD:
 {'\n'.join(link_options)}
 
 TASK: Based on current insights, historical patterns, and exploration strategy, which page link is the most interesting, deepens understanding, and offers the most promising direction to explore?
+
+IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with a JSON object in this exact format:
 {{
@@ -825,6 +847,8 @@ to deepen understanding and reveal emergent patterns? The question should:
 - Identify gaps or contradictions to explore
 - Move toward synthesis and creation rather than enumeration
 
+IMPORTANT: Use your role as a guide on how to respond!
+
 Respond with JSON:
 {{
     "query": "<your next question>",
@@ -904,6 +928,7 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
     - New directions or perspectives
 
 IMPORTANT: Try to keep the artifact easy to understand and use simple English as much as possible
+IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with valid JSON only:
 {{
