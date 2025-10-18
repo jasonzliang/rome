@@ -394,7 +394,6 @@ You navigate through information space systematically yet creatively, always wit
                     if role := f.read().strip():
                         self.role = role
                         self.logger.info(f"[OVERWRITE ROLE] Using overwritten role:\n{self.role}")
-                return
 
             # Early return if adaptation disabled
             if not self.adapt_role: return

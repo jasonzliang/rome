@@ -19,7 +19,7 @@ CaesarAgent:
   draw_graph: true
 
   overwrite_role_file: config/self_transcendence.txt
-  adapt_role: false
+  adapt_role: true
   adapt_role_file: config/adapt_role_insights.txt
 
 # ============================================================================
