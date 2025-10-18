@@ -13,7 +13,7 @@ Agent:
 # ============================================================================
 CaesarAgent:
   starting_url: "https://en.wikipedia.org/wiki/Evolution"
-  max_iterations: 600
+  max_iterations: 800
   exploration_temperature: 0.9
   save_graph_interval: 50
   draw_graph: false
