@@ -384,9 +384,13 @@ You navigate through information space systematically yet creatively, always wit
     def _adapt_role(self):
         """Adapt agent role based on starting URL content and optional insights"""
         if not self.adapt_role: return
-        self.logger.info(f"[ADAPT ROLE] Analyzing {self.starting_url}")
+        role_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.adapted_role.txt")
+        if os.path.exists(role_file) and os.path.size(role_file) > 0:
+            with open(role_file, 'r') as f: self.role = f.read()
+            return
 
         # Fetch and extract content using existing methods
+        self.logger.info(f"[ADAPT ROLE] Analyzing {self.starting_url}")
         html = self._fetch_html(self.starting_url)
         if not html:
             self.logger.error("Failed to fetch starting URL"); return
@@ -433,8 +437,7 @@ Your role: <adapted role description>
 
         try:
             self.role = self.chat_completion(prompt)
-            with open(os.path.join(self.get_log_dir(), f"{self.get_id()}.adapted_role.txt"), 'w') as f:
-                f.write(self.role)
+            with open(role_file, 'w') as f: f.write(self.role)
             self.logger.info(f"[ADAPT ROLE] Role successfully adapted:\n{self.role}")
         except Exception as e:
             self.logger.error(f"Role adaptation failed: {e}")
