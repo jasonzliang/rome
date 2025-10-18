@@ -18,7 +18,9 @@ CaesarAgent:
   save_graph_interval: 50
   draw_graph: false
   synthesis_iterations: 20
+
   adapt_role: True
+  adapt_role_file: config/adapt_role_insights.txt
 
 # ============================================================================
 # LLM CONFIGURATION
