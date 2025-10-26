@@ -366,7 +366,7 @@ class OpenAIHandler:
             "model": self.model,
             "messages": messages,
             "top_p": self.top_p,
-            "max_tokens": self.max_tokens,
+            "max_completion_tokens": self.max_tokens,
             "temperature": self.temperature
         }
 
@@ -386,9 +386,9 @@ class OpenAIHandler:
         if self._is_new_model(kwargs["model"]):
             if "temperature" in kwargs:
                 del kwargs["temperature"]
-            if "max_tokens" in kwargs:
-                kwargs["max_completion_tokens"] = kwargs["max_tokens"]
-                del kwargs["max_tokens"]
+            # if "max_tokens" in kwargs:
+            #     kwargs["max_completion_tokens"] = kwargs["max_tokens"]
+            #     del kwargs["max_tokens"]
 
         # Check cost limit (including accumulated costs)
         self._check_and_log_cost(messages, self.max_tokens, kwargs["model"])

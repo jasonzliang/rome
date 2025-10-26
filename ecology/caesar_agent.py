@@ -78,11 +78,11 @@ CAESAR_CONFIG = {
         # Model for exploration analysis and synthesis
         "model": "gpt-4o",
         # Reasoning effort for GPT-5/O models
-        "reasoning_effort": "minimal",
+        "reasoning_effort": "low",
         # Base temperature for LLM (overridden by exploration_temperature for ACT/THINK)
         "temperature": 0.1,
         # Maximum tokens per LLM response
-        "max_tokens": 4096,
+        "max_tokens": 8000,
         # API timeout in seconds
         "timeout": 120,
     }
