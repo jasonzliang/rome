@@ -237,25 +237,23 @@ DEFAULT_CONFIG = {
     # KNOWLEDGE BASE MANAGEMENT
 
     "ChromaClientManager": {
+        # Note: LLM model and temperature are inherited from agent's OpenAIHandler config
         "collection_name": None,  # ChromaDB collection name, set to None to use agent repo
-        "enable_reranking": False,  # Enable OpenAI reranking
+        "enable_reranking": False,  # Enable LLMRerank reranking
         "use_shared_server": True,  # Use shared server instance across KB instances
 
         # LlamaIndex configuration
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model
         "chunk_size": 400,  # Chunk size for text splitting
         "chunk_overlap": 80,  # Overlap between chunks
-        "top_k": 10,
-        "log_db": True
-        # Note: LLM model and temperature are inherited from agent's OpenAIHandler config
+        "top_k": 10,  # Number of chunks to retrieve
+        "log_db": True,  # Log adding docs and queries to file
+
+        # LLMRerank config
+        "rerank_batch_size": 10,  # Batch size for reranking choices
+        "rerank_top_n": 3,  # Number of top documents to return after reranking
     },
 
-    "OpenAIReranker": {
-        # Note: Model settings are inherited from agent's OpenAIHandler config
-        "direct_rerank_limit": 40,  # Max docs for direct reranking (triggers hierarchical above this)
-        "batch_size": 10,  # Batch size for reranking
-        "min_score_threshold": 0.4,  # Minimum relevance score to include in context
-    },
 
     "ChromaServerManager": {
         "host": "localhost",  # ChromaDB server host

@@ -54,7 +54,7 @@ CAESAR_CONFIG = {
             "model": "gpt-4o",
             "reasoning_effort": "low",
             "temperature": 0.8,
-            "max_tokens": 8000,
+            "max_completion_tokens": 8000,
             "timeout": 120,
         },
 
@@ -89,7 +89,7 @@ CAESAR_CONFIG = {
         # Base temperature for LLM (overridden by exploration_llm_config for ACT/THINK)
         "temperature": 0.1,
         # Maximum tokens per LLM response
-        "max_tokens": 8000,
+        "max_completion_tokens": 8000,
         # API timeout in seconds
         "timeout": 120,
     }
@@ -513,7 +513,7 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
         try:
             insights = self.chat_completion(
                 prompt,
-                **self.exploration_llm_config
+                override_config=self.exploration_llm_config
             )
         except Exception as e:
             self.logger.error(f"LLM call failed in think phase: {e}")
@@ -585,7 +585,7 @@ Provide a strategic recommendation in 2-3 sentences."""
             try:
                 return self.chat_completion(
                     prompt,
-                    **self.exploration_llm_config
+                    override_config=self.exploration_llm_config
                 )
             except Exception as e:
                 self.logger.error(f"Exploration strategy determination failed: {e}")
@@ -683,7 +683,7 @@ Your response must be valid JSON only, nothing else."""
         try:
             response = self.chat_completion(
                 prompt,
-                **self.exploration_llm_config,
+                override_config=self.exploration_llm_config,
                 response_format={"type": "json_object"}
             )
             decision = self.parse_json_response(response)

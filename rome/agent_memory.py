@@ -235,8 +235,7 @@ class AgentMemory:
         return any(pattern in combined for pattern in memorable_patterns)
 
     def chat_completion(self, prompt: str, system_message: str = None,
-                       override_config: Dict = None, response_format: Dict = None,
-                       extra_body: Dict = None) -> str:
+                       override_config: Dict = None, response_format: Dict = None) -> str:
         """Enhanced chat completion with automatic memory integration"""
         system_message = system_message or self.agent.role
         # Get memory context if enabled
@@ -255,7 +254,6 @@ class AgentMemory:
             system_message=system_message,
             override_config=override_config,
             response_format=response_format,
-            extra_body=extra_body
         )
 
         # Auto-remember after getting response

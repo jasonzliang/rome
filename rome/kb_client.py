@@ -19,6 +19,7 @@ try:
     from llama_index.embeddings.openai import OpenAIEmbedding
     from llama_index.llms.openai import OpenAI
     from llama_index.core.node_parser import SentenceSplitter
+    from llama_index.core.postprocessor.llm_rerank import LLMRerank
 except ImportError as e:
     print(f"Import error: {e}, install with: pip install chromadb llama-index llama-index-vector-stores-chroma llama-index-embeddings-openai llama-index-llms-openai")
     exit(1)
@@ -40,105 +41,6 @@ EMBEDDING_MODELS = {
     "all-MiniLM-L12-v2": 384,
     "paraphrase-MiniLM-L6-v2": 384
 }
-
-
-class OpenAIReranker:
-    """Simplified OpenAI reranker with hierarchical scaling for large document sets"""
-
-    def __init__(self, config: Dict = None, agent=None):
-        self.config = config or {}
-        self.agent = agent
-        self.logger = get_logger()
-
-        # Set attributes from config
-        set_attributes_from_config(self, self.config,
-            ['batch_size', 'direct_rerank_limit', 'min_score_threshold'])
-        self.logger.info(f"OpenAI reranker initialized")
-
-    def rerank_with_scores(self, query: str, texts: List[str], top_k: int = 5) -> List[dict]:
-        """Returns list of {text, score, index} sorted by relevance"""
-        if not texts:
-            return []
-
-        # Use hierarchical approach for large document sets
-        if len(texts) > self.direct_rerank_limit:
-            return self._hierarchical_rerank(query, texts, top_k)
-        else:
-            return self._direct_rerank(query, texts, top_k)
-
-    def _hierarchical_rerank(self, query: str, texts: List[str], top_k: int) -> List[dict]:
-        """Two-stage reranking for large document sets"""
-        # Stage 1: Quick filtering to manageable size
-        stage1_size = min(self.direct_rerank_limit, len(texts) // 2)
-        stage1_results = self._score_texts(query, texts, batch_size=10, quick_mode=True)
-        stage1_results.sort(key=lambda x: x['score'], reverse=True)
-
-        # Stage 2: Detailed reranking of filtered set
-        stage1_texts = [item['text'] for item in stage1_results[:stage1_size]]
-        stage2_results = self._direct_rerank(query, stage1_texts, top_k)
-
-        # Map back to original indices
-        index_map = {i: stage1_results[i]['index'] for i in range(len(stage1_results[:stage1_size]))}
-        for result in stage2_results:
-            result['index'] = index_map.get(result['index'], result['index'])
-
-        return stage2_results
-
-    def _direct_rerank(self, query: str, texts: List[str], top_k: int) -> List[dict]:
-        """Direct reranking for smaller document sets"""
-        scored_docs = self._score_texts(query, texts, self.batch_size)
-        scored_docs.sort(key=lambda x: x['score'], reverse=True)
-        return scored_docs[:top_k]
-
-    def _score_texts(self, query: str, texts: List[str], batch_size: int, quick_mode: bool = False) -> List[dict]:
-        """Score texts in batches with LLM"""
-        all_results = []
-
-        for i in range(0, len(texts), batch_size):
-            batch = texts[i:i + batch_size]
-            batch_results = self._score_batch(query, batch, i, quick_mode)
-            all_results.extend(batch_results)
-
-        return all_results
-
-    def _score_batch(self, query: str, texts: List[str], start_idx: int, quick_mode: bool = False) -> List[dict]:
-        """Score a single batch of documents"""
-        # Build document list for prompt
-        doc_list = ""
-        max_len = 300 if quick_mode else 800
-        for i, text in enumerate(texts):
-            content = text[:max_len] + "..." if len(text) > max_len else text
-            doc_list += f"\nDoc {start_idx + i + 1}: {content}\n"
-
-        # Create scoring prompt
-        if quick_mode:
-            prompt = f"Rate relevance (0.0-1.0) for filtering:\nQuery: {query}\n{doc_list}\nJSON array only: [0.8, 0.2, ...]"
-        else:
-            prompt = f"""Rate each document's relevance to the query (0.0-1.0):
-1.0 = Perfect match, 0.7-0.9 = Highly relevant, 0.4-0.6 = Somewhat relevant, 0.1-0.3 = Barely relevant, 0.0 = Not relevant
-
-Query: {query}
-{doc_list}
-
-Respond with ONLY a JSON array of scores: [0.8, 0.2, 0.9]"""
-
-        # Get LLM response
-        response = self.agent.chat_completion(prompt=prompt)
-        scores = parse_json_response(response)
-
-        # Validate and format results
-        if not isinstance(scores, list) or len(scores) < len(texts):
-            raise ValueError(f"Expected {len(texts)} scores, got {len(scores) if isinstance(scores, list) else type(scores)}")
-
-        return [{'text': text,
-                'score': max(0.0, min(1.0, float(scores[i]))),
-                'index': start_idx + i}
-                for i, text in enumerate(texts)]
-
-    def rerank_texts(self, query: str, texts: List[str], top_k: int = 5) -> List[str]:
-        """Simple interface that returns only reranked texts"""
-        scored = self.rerank_with_scores(query, texts, top_k)
-        return [item['text'] for item in scored]
 
 
 class ChromaClientManager:
@@ -306,11 +208,14 @@ class ChromaClientManager:
         )
 
     def _setup_reranker(self):
-        """Setup reranker if enabled"""
+        """Setup LLMRerank if enabled"""
         if self.enable_reranking:
-            reranker_config = self.agent.config.get('OpenAIReranker', {})
-            self.reranker = OpenAIReranker(reranker_config, self.agent)
-            self.logger.debug("OpenAI reranker enabled")
+            self.reranker = LLMRerank(
+                choice_batch_size=self.rerank_batch_size,
+                top_n=self.rerank_top_n,
+                llm=self.llm
+            )
+            self.logger.debug("LLMRerank enabled")
         else:
             self.reranker = None
             self.logger.debug("Reranking disabled")
@@ -354,7 +259,7 @@ class ChromaClientManager:
         return True
 
     def query(self, question, top_k=None, use_reranking=None, show_scores=False):
-        """Enhanced query with simplified reranking logic and empty collection validation"""
+        """Enhanced query with LLMRerank and empty collection validation"""
         try:
             # Check if collection is empty before proceeding
             if self.size() == 0:
@@ -365,12 +270,10 @@ class ChromaClientManager:
                 (use_reranking is None and self.reranker is not None)
 
             if should_rerank and self.reranker:
-                # Calculate how many docs to retrieve for reranking
-                retrieval_k = self._calculate_retrieval_size(top_k)
-                # Get documents
+                # Get more documents for reranking (use simple multiplier)
+                retrieval_k = max(top_k * 3, 10)
                 nodes = self._retrieve_nodes(question, retrieval_k)
-                # Rerank and generate response
-                response = self._rerank_and_respond(question, nodes, top_k, show_scores)
+                response = self._rerank_and_respond(question, nodes, top_k)
             else:
                 # Standard query without reranking
                 response = self._standard_query(question, top_k)
@@ -387,11 +290,6 @@ class ChromaClientManager:
             self.logger.error(f"KB query timed out (OpenAI API): {e}")
             return ""
 
-    def _calculate_retrieval_size(self, top_k: int) -> int:
-        """Calculate optimal retrieval size for reranking"""
-        multiplier = 4 if self.reranker.direct_rerank_limit >= 100 else 3 if self.reranker.direct_rerank_limit >= 50 else 2
-        return max(top_k, min(top_k * multiplier, self.reranker.direct_rerank_limit))
-
     def _retrieve_nodes(self, question: str, retrieval_k: int):
         """Retrieve nodes with instance-specific embed model"""
         retriever = self.index.as_retriever(
@@ -399,43 +297,23 @@ class ChromaClientManager:
             embed_model=self.embed_model)
         return retriever.retrieve(question)
 
-    def _rerank_and_respond(self, question: str, nodes, top_k: int, show_scores: bool) -> str:
-        """Handle reranking and response generation"""
+    def _rerank_and_respond(self, question: str, nodes, top_k: int) -> str:
+        """Handle reranking with LLMRerank and response generation"""
         if len(nodes) <= 1:
             # Not enough nodes for reranking, use standard query
             return self._standard_query(question, top_k)
 
-        # Extract and rerank
-        texts = [node.node.get_content() for node in nodes]
-        scored_results = self.reranker.rerank_with_scores(question, texts, top_k)
+        # Use LLMRerank to rerank nodes
+        reranked_nodes = self.reranker.postprocess_nodes(nodes, query_str=question)
 
-        # Optional score logging
-        if show_scores:
-            self._log_rerank_scores(question, scored_results)
-
-        # Filter by score threshold and create context
-        context = self._build_context(scored_results)
+        # Build context from reranked nodes
+        context = "\n\n".join([node.node.get_content() for node in reranked_nodes[:top_k]])
 
         # Generate response
         response = self.agent.chat_completion(
             prompt=f"Context:\n{context}\n\nQuestion: {question}",
-            system_message="Answer based on the provided context. Use the relevance scores to prioritize information. Be concise and cite relevant details.")
+            system_message="Answer based on the provided context. Be concise and cite relevant details.")
         return response
-
-    def _log_rerank_scores(self, question: str, scored_results: List[dict]):
-        """Log reranking scores for debugging"""
-        self.logger.info(f"Reranking scores for: {question}")
-        for i, item in enumerate(scored_results):
-            self.logger.info(f"{i+1}. Score: {item['score']:.2f} | {item['text'][:100]}...")
-
-    def _build_context(self, scored_results: List[dict]) -> str:
-        """Build context string from scored results"""
-        context_parts = [
-            f"[Relevance: {item['score']:.1f}] {item['text']}"
-            for item in scored_results
-            if item['score'] >= self.reranker.min_score_threshold
-        ]
-        return "\n\n".join(context_parts)
 
     def _standard_query(self, question: str, top_k: int) -> str:
         """Standard query with optional system prompt prepended"""

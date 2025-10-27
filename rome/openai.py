@@ -84,18 +84,10 @@ class OpenAIHandler:
     }
 
     # Newer models with different API
-    NEW_MODELS = {
+    REASONING_MODELS = {
         "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro",
 
         "o1", "o1-mini", "o1-pro", "o3", "o3-mini", "o4-mini",
-    }
-
-    REASONING_MODELS = {
-        # GPT-5 series (support minimal, low, medium, high)
-        "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro",
-
-        # o-series (support low, medium, high only - NOT minimal)
-        "o1", "o3", "o3-mini", "o4-mini"
     }
 
     def __init__(self, config: Dict = None):
@@ -126,14 +118,14 @@ class OpenAIHandler:
         if self.cost_limit:
             self.logger.info(f"Cost limit enabled: ${self.cost_limit:.2f}")
 
-    def _is_new_model(self, model: str = None) -> bool:
+    def _is_reasoning_model(self, model: str = None) -> bool:
         """Check if model is older one."""
         model = model or self.model
-        return model in self.NEW_MODELS
+        return model in self.REASONING_MODELS
 
     def _get_max_input_tokens(self) -> int:
         """Get max input tokens."""
-        return max(self.max_input_tokens or (self._get_model_context_length() - self.max_tokens), 0)
+        return max(self.max_input_tokens or (self._get_model_context_length() - self.max_completion_tokens), 0)
 
     @lru_cache(maxsize=128)
     def _get_encoding(self, model: str = None):
@@ -296,13 +288,13 @@ class OpenAIHandler:
             'accumulated_cost': self.accumulated_cost
         })
 
-    def _check_and_log_cost(self, messages: List[Dict], max_tokens: int, model: str):
+    def _check_and_log_cost(self, messages: List[Dict], max_completion_tokens: int, model: str):
         """Check cost limit including accumulated costs and log estimation."""
         if not self.cost_limit:
             return
 
         input_tokens = self._count_tokens(messages, precise=True)
-        estimated_cost = self._estimate_cost(input_tokens, max_tokens, model)
+        estimated_cost = self._estimate_cost(input_tokens, max_completion_tokens, model)
         total_projected_cost = self.accumulated_cost + estimated_cost
 
         if total_projected_cost > self.cost_limit:
@@ -345,9 +337,12 @@ class OpenAIHandler:
         self.cost_history.clear()
         self.logger.info("Cost tracking reset to zero")
 
-    def chat_completion(self, prompt: str, system_message: str = None, override_config: Dict = None,
-                       response_format: Dict = None, extra_body: Dict = None,
-                       conversation_history: List[Dict] = None) -> str:
+    def chat_completion(self, prompt: str,
+        system_message: str = None,
+        override_config: Dict = None,
+        response_format: Dict = None,
+        conversation_history: List[Dict] = None,
+        **kwargs) -> str:
         """Chat completion with cost limiting and context management."""
 
         # Build messages
@@ -366,32 +361,29 @@ class OpenAIHandler:
             "model": self.model,
             "messages": messages,
             "top_p": self.top_p,
-            "max_completion_tokens": self.max_tokens,
+            "max_completion_tokens": self.max_completion_tokens,
             "temperature": self.temperature
         }
+        if override_config:
+            kwargs.update(override_config)
 
         if self.seed:
             kwargs["seed"] = self.seed
-        if self.reasoning_effort and self.model in self.REASONING_MODELS:
+        if response_format:
+            kwargs["response_format"] = response_format
+        if self.reasoning_effort and self._is_reasoning_model(kwargs['model']):
             if self.model.startswith("o") and self.reasoning_effort == "minimal":
                 self.reasoning_effort = "low"
             kwargs["reasoning_effort"] = self.reasoning_effort
-        if response_format:
-            kwargs["response_format"] = response_format
-        if override_config:
-            kwargs.update(override_config)
-        if extra_body:
-            kwargs.update(extra_body)
-
-        if self._is_new_model(kwargs["model"]):
+        if not self._is_reasoning_model(kwargs['model']):
+            if 'reasoning_effort' in kwargs:
+                del kwargs['reasoning_effort']
+        if self._is_reasoning_model(kwargs["model"]):
             if "temperature" in kwargs:
                 del kwargs["temperature"]
-            # if "max_tokens" in kwargs:
-            #     kwargs["max_completion_tokens"] = kwargs["max_tokens"]
-            #     del kwargs["max_tokens"]
 
         # Check cost limit (including accumulated costs)
-        self._check_and_log_cost(messages, self.max_tokens, kwargs["model"])
+        self._check_and_log_cost(messages, self.max_completion_tokens, kwargs["model"])
 
         # Log request
         self.logger.debug(f"OpenAI API request parameters: {json.dumps({k: v for k, v in kwargs.items() if k != 'messages'}, indent=4)}")

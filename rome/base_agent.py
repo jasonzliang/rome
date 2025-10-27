@@ -163,17 +163,14 @@ class BaseAgent:
         return self.agent_memory.recall(query, context)
 
     def chat_completion(self, prompt: str, system_message: str = None,
-                       override_config: Dict = None, response_format: Dict = None,
-                       extra_body: Dict = None) -> str:
+                       override_config: Dict = None, response_format: Dict = None) -> str:
         """Direct access to chat completion with configuration options"""
         if self.agent_memory.is_enabled():
             return self.agent_memory.chat_completion(
                 prompt=prompt, system_message=system_message,
-                override_config=override_config, response_format=response_format,
-                extra_body=extra_body)
+                override_config=override_config, response_format=response_format)
         else:
             system_message = system_message or self.role
             return self.openai_handler.chat_completion(
                 prompt=prompt, system_message=system_message,
-                override_config=override_config, response_format=response_format,
-                extra_body=extra_body)
+                override_config=override_config, response_format=response_format)
