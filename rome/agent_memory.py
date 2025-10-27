@@ -176,7 +176,7 @@ class AgentMemory:
                     f"Vector DB: {len(results)} new memories | Graph DB: {len(relations)} new relations")
                 if not relations and self.use_graph:
                     self.logger.debug("No graph relations extracted")
-                self.logger.debug(f"Remembered memory: {result}")
+                self.logger.debug(f"Remembered memories/relations: {result}")
                 return True
             else:
                 self.logger.error("No memories or graph relations extracted")
