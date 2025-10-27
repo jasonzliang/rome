@@ -77,7 +77,7 @@ def print_config_summary(agent, logger):
             "Max Depth": agent.max_depth,
             "Save Interval": agent.save_graph_interval,
             "Draw Graph": agent.draw_graph,
-            "Temperature": agent.exploration_temperature,
+            "Exploration LLM Config": agent.exploration_llm_config,
             "Checkpoint Interval": agent.checkpoint_interval,
         },
         "OpenAI Settings": {
