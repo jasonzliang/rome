@@ -239,7 +239,7 @@ DEFAULT_CONFIG = {
     "ChromaClientManager": {
         # Note: LLM model and temperature are inherited from agent's OpenAIHandler config
         "collection_name": None,  # ChromaDB collection name, set to None to use agent repo
-        "enable_reranking": False,  # Enable LLMRerank reranking
+        "enable_reranking": True,  # Enable LLMRerank reranking
         "use_shared_server": True,  # Use shared server instance across KB instances
 
         # LlamaIndex configuration
@@ -249,7 +249,7 @@ DEFAULT_CONFIG = {
         "top_k": 10,  # Number of chunks to retrieve
         "log_db": True,  # Log adding docs and queries to file
 
-        # LLMRerank config
+        # LLM reranking config
         "rerank_batch_size": 10,  # Batch size for reranking choices
         "rerank_top_n": 3,  # Number of top documents to return after reranking
     },

@@ -13,7 +13,7 @@ from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.base_agent import BaseAgent
-from rome.config import (DEFAULT_CONFIG, merge_with_default_config, set_attributes_from_config,
+from rome.config import (DEFAULT_CONFIG, set_attributes_from_config,
                      SHORT_SUMMARY_LEN, SUMMARY_LENGTH, LONG_SUMMARY_LEN,
                      LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN)
 from rome.logger import get_logger
@@ -53,8 +53,8 @@ CAESAR_CONFIG = {
         "exploration_llm_config": {
             "model": "gpt-4o",
             "reasoning_effort": "low",
-            "temperature": 0.8,
-            "max_completion_tokens": 8000,
+            "temperature": 0.9,
+            "max_completion_tokens": 5000,
             "timeout": 120,
         },
 
@@ -85,13 +85,13 @@ CAESAR_CONFIG = {
         # Model name for LLM
         "model": "gpt-4o",
         # Reasoning effort for GPT-5/O models
-        "reasoning_effort": "low",
+        "reasoning_effort": "medium",
         # Base temperature for LLM (overridden by exploration_llm_config for ACT/THINK)
         "temperature": 0.1,
         # Maximum tokens per LLM response
-        "max_completion_tokens": 8000,
+        "max_completion_tokens": 10000,
         # API timeout in seconds
-        "timeout": 120,
+        "timeout": 240,
     }
 }
 
