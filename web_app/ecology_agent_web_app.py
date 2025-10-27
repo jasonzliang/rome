@@ -43,16 +43,22 @@ def load_graphs(directory, pattern='*.graph_iter*.json'):
                 st.warning(f"Failed to load {file.name}: {e}")
     return dict(sorted(graphs.items()))
 
-def create_graph_object(data):
-    """Create NetworkX graph from data."""
-    G = nx.DiGraph()
-    G.graph['starting_url'] = data.get('starting_url')
-    G.graph['iteration'] = data.get('iteration')
-    for node in data['nodes']:
-        G.add_node(node['url'], depth=node['depth'], insights=node['insights'])
-    for edge in data['edges']:
-        if edge['source'] in G.nodes() and edge['target'] in G.nodes():
-            G.add_edge(edge['source'], edge['target'], reason=edge['reason'])
+def create_graph_object(data, filter_empty_insights=True):
+    """Create NetworkX graph from data, optionally filtering nodes without insights."""
+
+    # Use NetworkX built-in deserialization
+    G = nx.node_link_graph(data, edges="links")
+    # Add graph metadata if present
+    if 'starting_url' in data:
+        G.graph['starting_url'] = data['starting_url']
+    if 'iteration' in data:
+        G.graph['iteration'] = data['iteration']
+
+    # Filter nodes without insights if requested
+    if filter_empty_insights:
+        nodes_to_remove = [n for n in G.nodes() if not G.nodes[n].get('insights', '').strip()]
+        G.remove_nodes_from(nodes_to_remove)
+
     return G
 
 # ============================================================================

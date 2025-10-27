@@ -42,11 +42,11 @@ class CaesarAgent(BaseAgent):
         self._setup_allowed_domains()
         self._setup_brave_search()
         self._setup_knowledge_base()
-        self._update_role()
 
         if self._load_checkpoint():
             self.logger.info("Resumed from checkpoint")
         else:
+            self._update_role()
             self._setup_exploration_state()
             self.logger.info("Starting fresh exploration")
 
@@ -139,12 +139,12 @@ You navigate through information space systematically yet creatively, always wit
             if not self.adapt_role: return
 
             # Check cached adapted role
-            if os.path.exists(role_file) and os.path.getsize(role_file) > 0:
-                with open(role_file, 'r', encoding='utf-8') as f:
-                    if cached_role := f.read().strip():
-                        self.role = cached_role
-                        self.logger.info(f"[ADAPT ROLE] Using cached adapted role:\n{self.role}")
-                        return
+            # if os.path.exists(role_file) and os.path.getsize(role_file) > 0:
+            #     with open(role_file, 'r', encoding='utf-8') as f:
+            #         if cached_role := f.read().strip():
+            #             self.role = cached_role
+            #             self.logger.info(f"[ADAPT ROLE] Using cached adapted role:\n{self.role}")
+            #             return
 
             # Fetch and extract content
             self.logger.info(f"[ADAPT ROLE] Analyzing {self.starting_url}")
@@ -159,15 +159,19 @@ You navigate through information space systematically yet creatively, always wit
                     insights = f.read().strip()
 
             # Generate adapted role
-            insights_info = " and prior insights" if insights else ""
+            starting_query = f"\nSTARTING QUERY:\n{self.starting_query}\n" if self.starting_query else ""
+            starting_query_task = " based on the starting query" if self.starting_query else ""
+
             insights_section = f"\nPRIOR INSIGHTS:\n{insights}\n" if insights else ""
+            insights_info = " and prior insights" if insights else ""
+            insights_task = " - Builds upon themes and gaps identified in prior insights"
 
-            prompt = f"""You are adapting your current role based on the starting page{insights_info}.
-
-STARTING PAGE URL:
+            prompt = f"""You are adapting your current role based on the following starting content{insights_info}.
+{starting_query}
+STARTING URL:
 {self.starting_url}
 
-PAGE CONTENT:
+STARTING CONTENT:
 {content}
 {insights_section}
 CURRENT ROLE:
@@ -175,11 +179,12 @@ CURRENT ROLE:
 
 YOUR TASK:
 Analyze the page content{insights_info} to create a specialized role that:
-1. Improves upon core exploration philosophy
-2. {f"Builds upon themes and gaps identified in prior insights" if insights else "Focuses exploration toward most promising areas revealed by the content"}
-3. Creates an overall goal for the agent to strive for
+ - Improves upon core exploration philosophy
+ - Creates an overall goal for the agent to strive for{starting_query_task}
+ - Focuses exploration toward most promising areas revealed by the page content
+{insights_task}
 
-Provide an adapted role description (300-500 tokens) that draws inspiration from the page content{insights_info}. Be creative, innovative, and original!
+Provide an adapted role description (300-500 tokens) that is creative, innovative, and original!
 
 Your response must start with "Your role:" followed by the adapted role description."""
 
@@ -248,33 +253,23 @@ Your response must start with "Your role:" followed by the adapted role descript
             return
 
         try:
-            valid_nodes = {n for n in self.graph.nodes()
-                          if self.graph.nodes[n].get('insights', '').strip()}
-
             checkpoint_data = {
                 'iteration': iteration,
                 'current_url': self.current_url,
                 'current_depth': self.current_depth,
-                'visited_urls': self.visited_urls,
-                'failed_urls': list(self.failed_urls),
                 'url_stack': self.url_stack,
-                'graph': {
-                    'nodes': [{'url': n, 'depth': self.graph.nodes[n].get('depth', 0),
-                              'insights': self.graph.nodes[n]['insights']}
-                             for n in valid_nodes],
-                    'edges': [{'source': u, 'target': v,
-                              'reason': self.graph.edges[u, v].get('reason', '')}
-                             for u, v in self.graph.edges()
-                             if u in valid_nodes and v in valid_nodes]
-                },
-                'timestamp': datetime.now().isoformat(),
+                'failed_urls': list(self.failed_urls),
+                'visited_urls': self.visited_urls,
+                'role': self.role,
+                'graph': nx.node_link_data(self.graph, edges="edges"),
                 'config': {
                     'starting_url': self.starting_url,
                     'starting_query': self.starting_query,
                     'allowed_domains': self.allowed_domains,
                     'max_iterations': self.max_iterations,
                     'max_depth': self.max_depth,
-                }
+                },
+                'timestamp': datetime.now().isoformat(),
             }
 
             # Save checkpoint
@@ -305,7 +300,7 @@ Your response must start with "Your role:" followed by the adapted role descript
             with open(checkpoint_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
 
-            # Validate config
+            # Check config changes
             config = data.get('config', {})
             if config.get('starting_query') != self.starting_query:
                 self.logger.error(f"Checkpoint starting_query mismatch: '{config.get('starting_query')}' vs '{self.starting_query}'")
@@ -321,6 +316,7 @@ Your response must start with "Your role:" followed by the adapted role descript
             # self.failed_urls = set(data['failed_urls'])
             self.failed_urls = set()
             self.url_stack = data['url_stack']
+            self.role = data['role']
 
             if not self.url_stack:
                 self.logger.error("Invalid checkpoint: empty url_stack")
@@ -330,14 +326,10 @@ Your response must start with "Your role:" followed by the adapted role descript
             self.current_url = self.url_stack[-1]
 
             # Restore graph inline
-            graph_data = data['graph']
-            self.graph = nx.DiGraph()
-            for node in graph_data['nodes']:
-                self.graph.add_node(node['url'], depth=node['depth'], insights=node['insights'])
-            for edge in graph_data['edges']:
-                self.graph.add_edge(edge['source'], edge['target'], reason=edge['reason'])
+            self.graph = nx.node_link_graph(data['graph'], edges="edges")
 
             self.logger.info(f"Checkpoint loaded from {data.get('timestamp')}")
+            time.sleep(2)
             return True
 
         except Exception as e:
@@ -702,7 +694,8 @@ Your response must be valid JSON only, nothing else."""
             viz = pgv.AGraph(directed=True, strict=False)
             viz.graph_attr.update(rankdir='TB', size='16,12', dpi='150')
             viz.node_attr.update(shape='box', style='rounded,filled',
-                               fillcolor='lightblue', fontsize='10')
+                               fillcolor='lightblue', fontsize='8')
+            viz.edge_attr.update(fontsize='8')
 
             for node in self.graph.nodes():
                 parsed = urlparse(node)
@@ -931,7 +924,7 @@ Respond with valid JSON only:
             with open(f"{base_path}.txt", 'w', encoding='utf-8') as f:
                 f.write(f"ABSTRACT:\n{result['abstract']}\n\n")
                 f.write(f"ARTIFACT:\n{result['artifact']}\n\n")
-                f.write(f"METADATA:\n{json.dumps(result['metadata'], indent=2)}")
+                f.write(f"METADATA:\n{json.dumps(result['metadata'], indent=4)}")
         except Exception as e:
             self.logger.error(f"Failed to save synthesis: {e}")
 
