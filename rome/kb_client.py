@@ -3,7 +3,6 @@ import json
 import hashlib
 from typing import Optional, List, Dict
 import os
-os.environ['CHROMA_OPENAI_API_KEY'] = os.environ['OPENAI_API_KEY']
 from pathlib import Path
 import re
 import time
@@ -22,6 +21,8 @@ try:
     from llama_index.core.node_parser import SentenceSplitter
     from llama_index.core.postprocessor.llm_rerank import LLMRerank
     from llama_index.core.response_synthesizers import get_response_synthesizer
+    # Needed for OpenAIEmbeddingFunction
+    os.environ['CHROMA_OPENAI_API_KEY'] = os.environ['OPENAI_API_KEY']
 except ImportError as e:
     print(f"Import error: {e}, install with: pip install chromadb llama-index llama-index-vector-stores-chroma llama-index-embeddings-openai llama-index-llms-openai")
     exit(1)
