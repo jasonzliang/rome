@@ -22,12 +22,42 @@ st.set_page_config(page_title="Ecology Agent Graph Explorer", layout="wide")
 # DATA LOADING & PROCESSING
 # ============================================================================
 
+def normalize_node(node):
+    """Normalize a single node to consistent format."""
+    url_key = 'id' if 'id' in node else 'url'
+    return {
+        'url': node.get(url_key, ''),
+        'depth': node.get('depth', 0),
+        'iteration': node.get('iteration', 0),
+        'insights': node.get('insights', '')
+    }
+
+def normalize_data(data):
+    """Normalize graph data to consistent format."""
+    return {
+        'nodes': [normalize_node(n) for n in data.get('nodes', [])],
+        'edges': data.get('edges', data.get('links', [])),
+        'iteration': data.get('iteration'),
+        'starting_url': data.get('starting_url')
+    }
+
+def get_nodes(data):
+    """Get normalized nodes from data."""
+    return normalize_data(data)['nodes']  # Reuse normalize_data
+
+def get_edges(data):
+    """Get edges from data (handles both 'edges' and 'links' keys)."""
+    return data.get('edges', data.get('links', []))
+
 def extract_label_from_url(url):
     """Extract clean label from URL, handling trailing slashes and empty segments."""
     if not url:
         return '[No URL]'
+    if not isinstance(url, str):
+        return str(url)
+
     url_parts = [p for p in url.rstrip('/').split('/') if p]
-    return url_parts[-1].replace('_', ' ') if url_parts else url
+    return url_parts[-1] if url_parts else url
 
 @st.cache_data
 def load_graphs(directory, pattern='*.graph_iter*.json'):
@@ -44,20 +74,38 @@ def load_graphs(directory, pattern='*.graph_iter*.json'):
     return dict(sorted(graphs.items()))
 
 def create_graph_object(data, filter_empty_insights=True):
-    """Create NetworkX graph from data, optionally filtering nodes without insights."""
+    """Create NetworkX graph from data, supporting both formats."""
+    # Check if data is in node_link format (has 'directed', 'multigraph', 'graph' keys)
+    is_node_link = all(k in data for k in ('directed', 'multigraph', 'graph', 'nodes'))
 
-    # Use NetworkX built-in deserialization
-    G = nx.node_link_graph(data, edges="links")
-    # Add graph metadata if present
-    if 'starting_url' in data:
-        G.graph['starting_url'] = data['starting_url']
-    if 'iteration' in data:
-        G.graph['iteration'] = data['iteration']
+    if is_node_link:
+        edges_key = 'links' if 'links' in data else 'edges'
+        G = nx.node_link_graph(data, edges=edges_key)
+    else:
+        # Manual format
+        G = nx.DiGraph()
+        for node in data.get('nodes', []):
+            G.add_node(
+                node.get('url'),
+                depth=node.get('depth'),
+                insights=node.get('insights', '')
+            )
+        for edge in data.get('edges', []):
+            src, tgt = edge.get('source'), edge.get('target')
+            if src in G and tgt in G:
+                G.add_edge(src, tgt, reason=edge.get('reason', ''))
 
-    # Filter nodes without insights if requested
+    # Filter nodes missing depth or insights
     if filter_empty_insights:
-        nodes_to_remove = [n for n in G.nodes() if not G.nodes[n].get('insights', '').strip()]
+        nodes_to_remove = [
+            n for n in G.nodes()
+            if G.nodes[n].get('depth') is None or not G.nodes[n].get('insights', '').strip()
+        ]
         G.remove_nodes_from(nodes_to_remove)
+
+    # Copy metadata
+    G.graph['starting_url'] = data.get('starting_url', G.graph.get('starting_url'))
+    G.graph['iteration'] = data.get('iteration', G.graph.get('iteration'))
 
     return G
 
@@ -92,8 +140,9 @@ def create_plotly_traces(G, pos):
         node_x.append(x)
         node_y.append(y)
         title = extract_label_from_url(node)
-        depth = G.nodes[node]['depth']
-        node_text.append(f"{title}<br>Depth: {depth}")
+        depth = G.nodes[node].get('depth', 0)
+        iteration = G.nodes[node].get('iteration', 0)
+        node_text.append(f"{title}<br>Depth: {depth}<br>Iteration: {iteration}")
         node_color.append('red' if node == G.graph.get('starting_url') else depth)
 
     node_trace = go.Scatter(
@@ -123,8 +172,10 @@ def compute_graph_metrics(graphs):
     """Compute evolution metrics for all graphs."""
     metrics = defaultdict(list)
     for iter_num, data in graphs.items():
-        depths = [n['depth'] for n in data['nodes']]
-        n_nodes, n_edges = len(data['nodes']), len(data['edges'])
+        nodes = get_nodes(data)
+        edges = get_edges(data)
+        depths = [n['depth'] for n in nodes]
+        n_nodes, n_edges = len(nodes), len(edges)
         metrics['iteration'].append(iter_num)
         metrics['num_nodes'].append(n_nodes)
         metrics['num_edges'].append(n_edges)
@@ -156,37 +207,61 @@ def create_metric_plot(df, x_col, y_cols, title, y_label):
 
 @st.cache_data
 def train_word2vec_model(graphs):
-    """Train Word2Vec on insights and topics."""
-    sentences = []
+    sentences, topics = [], []
     for data in graphs.values():
-        for node in data['nodes']:
-            words = re.findall(r'\b[a-z]{3,}\b', node['insights'].lower())
+        for node in get_nodes(data):
+            words = re.findall(r'\b[a-z0-9]{2,}\b', node['insights'].lower())
             if len(words) > 5:
                 sentences.append(words)
-            topic_words = extract_label_from_url(node['url']).lower().split()
-            if topic_words:
-                sentences.append(topic_words)
+            # Keep topic as single token
+            # topic = extract_label_from_url(node['url']).lower().replace(' ', '-')
+            # topics.append(topic)
+
+    # Add topics as single-word sentences to preserve them
+    sentences.extend([[t] for t in topics])
+
     if len(sentences) < 2:
         return None
-    try:
-        return Word2Vec(sentences=sentences, vector_size=100, window=5, min_count=3,
-                       workers=multiprocessing.cpu_count(), epochs=15, sg=0, seed=42)
-    except Exception as e:
-        st.error(f"Error training Word2Vec model: {e}")
-        return None
+    return Word2Vec(sentences=sentences, vector_size=100, window=8, min_count=1,
+                   workers=multiprocessing.cpu_count(), epochs=20, sg=0, negative=10, seed=42)
+
+def compute_topic_similarity(model, node1, node2):
+    """Compute similarity based on insight content, not just URL labels."""
+    # Get word vectors from insights
+    words1 = [w for w in re.findall(r'\b[a-z0-9]{2,}\b', node1['insights'].lower())
+              if w in model.wv]
+    words2 = [w for w in re.findall(r'\b[a-z0-9]{2,}\b', node2['insights'].lower())
+              if w in model.wv]
+
+    if not words1 or not words2:
+        return 0.0
+
+    # Average word vectors for each insight
+    vec1 = np.mean([model.wv[w] for w in words1], axis=0)
+    vec2 = np.mean([model.wv[w] for w in words2], axis=0)
+
+    # Cosine similarity
+    return float(np.dot(vec1, vec2) / (np.linalg.norm(vec1) * np.linalg.norm(vec2)))
 
 def get_topic_embeddings(graphs, model):
-    """Extract topic vectors using Word2Vec."""
+    """Extract topic vectors from insight content using Word2Vec."""
     if model is None:
         return {}, {}
+
     topic_vectors, topic_to_url = {}, {}
     for data in graphs.values():
-        for node in data['nodes']:
-            topic = extract_label_from_url(node['url'])
-            topic_to_url[topic] = node['url']
-            vectors = [model.wv[word] for word in topic.lower().split() if word in model.wv]
-            if vectors:
-                topic_vectors[topic] = np.mean(vectors, axis=0)
+        for node in get_nodes(data):
+            topic_label = extract_label_from_url(node['url'])
+            topic_to_url[topic_label] = node['url']
+
+            # Get words from insights (not just the label)
+            words = [w for w in re.findall(r'\b[a-z0-9]{2,}\b', node['insights'].lower())
+                     if w in model.wv]
+
+            if words:
+                # Average of word vectors from insights
+                topic_vectors[topic_label] = np.mean([model.wv[w] for w in words], axis=0)
+
     return topic_vectors, topic_to_url
 
 def reduce_dimensions(vectors, method='tsne'):
@@ -287,37 +362,45 @@ def setup_directory_browser():
     return st.session_state.get('selected_dir') or current_dir
 
 def render_node_details(data, node_labels=None):
-    """Render node detail section."""
-    if node_labels is None:
-        node_labels = {n['url']: extract_label_from_url(n['url']) for n in data['nodes']}
+    """Compact node detail renderer - handles both formats."""
+    nodes = get_nodes(data)
+    edges = get_edges(data)
+    iteration = data.get('iteration', 'N/A')
 
-    label_counts, unique_labels = {}, {}
-    for url, label in node_labels.items():
-        count = label_counts.get(label, 0)
-        label_counts[label] = count + 1
-        unique_labels[url] = f"{label} ({count + 1})" if count > 0 else label
+    if not nodes:
+        return st.warning("No nodes to display")
 
-    selected_unique_label = st.selectbox("Select Node", sorted(unique_labels.values()))
-    selected_node = [url for url, label in unique_labels.items() if label == selected_unique_label][0]
-    node_data = next(n for n in data['nodes'] if n['url'] == selected_node)
+    # Build unique labels (handle duplicates)
+    node_labels = node_labels or {n['url']: extract_label_from_url(n['url']) for n in nodes}
+    counts, unique = {}, {}
+    for url, lbl in node_labels.items():
+        c = counts.get(lbl, 0)
+        counts[lbl] = c + 1
+        unique[url] = f"{lbl} ({c + 1})" if c > 0 else lbl
 
-    st.write(f"**Title:** {selected_unique_label}")
-    st.write(f"**URL:** [{node_data['url']}]({node_data['url']})")
-    st.write(f"**Depth:** {node_data['depth']}")
-    st.write("**Insights:**")
-    with st.expander("View full insights", expanded=True):
-        st.markdown(node_data['insights'])
+    # Node selection
+    selected_lbl = st.selectbox("**Select Node**", sorted(unique.values()))
+    url = next(u for u, l in unique.items() if l == selected_lbl)
+    node = next(n for n in nodes if n['url'] == url)
 
-    connected_edges = [e for e in data['edges'] if e['source'] == selected_node or e['target'] == selected_node]
-    if connected_edges:
-        st.subheader("Connected Edges")
-        for i, edge in enumerate(connected_edges, 1):
-            direction = "→" if edge['source'] == selected_node else "←"
-            other = edge['target'] if edge['source'] == selected_node else edge['source']
-            other_label = extract_label_from_url(other)
-            with st.expander(f"{i}. {direction} {other_label}"):
-                st.write(f"**Connection:** {extract_label_from_url(edge['source'])} → {extract_label_from_url(edge['target'])}")
-                st.write(f"**Reason:** {edge['reason']}")
+    # Display
+    cols = st.columns([3, 1, 1])
+    cols[0].write(f"**{selected_lbl}**")
+    cols[1].metric("Depth", node['depth'])
+    cols[2].metric("Iteration", iteration)
+    st.write(f"**URL:** [{node['url']}]({node['url']})")
+    with st.expander("📝 Insights", expanded=True):
+        st.markdown(node['insights'] or "_No insights_")
+
+    # Edges
+    conn = [e for e in edges if e.get('source') == url or e.get('target') == url]
+    if conn:
+        st.write(f"**🔗 {len(conn)} Connection(s)**")
+        for i, e in enumerate(conn, 1):
+            other = e['target'] if e['source'] == url else e['source']
+            arrow = "→" if e['source'] == url else "←"
+            with st.expander(f"{i}. {arrow} {extract_label_from_url(other)}", expanded=False):
+                st.caption(e.get('reason', '_No reason_'))
 
 # ============================================================================
 # MAIN APP
@@ -385,11 +468,13 @@ with tab1:
     fig, G = create_network_graph(data, layout)
     st.plotly_chart(fig, config={'displayModeBar': True, 'responsive': True})
 
+    nodes = get_nodes(data)
+    edges = get_edges(data)
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Nodes", len(data['nodes']))
-    col2.metric("Edges", len(data['edges']))
-    col3.metric("Max Depth", max([n['depth'] for n in data['nodes']]))
-    col4.metric("Avg Degree", f"{2*len(data['edges'])/len(data['nodes']):.2f}")
+    col1.metric("Nodes", len(nodes))
+    col2.metric("Edges", len(edges))
+    col3.metric("Max Depth", max([n['depth'] for n in nodes]) if nodes else 0)
+    col4.metric("Avg Degree", f"{2*len(edges)/len(nodes):.2f}" if nodes else "0.00")
 
     st.subheader("Node Details")
     render_node_details(data)
@@ -426,8 +511,8 @@ with tab3:
 
     if iter1 != iter2:
         data1, data2 = graphs[iter1], graphs[iter2]
-        urls1 = set(n['url'] for n in data1['nodes'])
-        urls2 = set(n['url'] for n in data2['nodes'])
+        urls1 = set(n['url'] for n in get_nodes(data1))
+        urls2 = set(n['url'] for n in get_nodes(data2))
         new_nodes = urls2 - urls1
         col1, col2, col3 = st.columns(3)
         col1.metric("New Nodes", len(new_nodes))
@@ -442,11 +527,11 @@ with tab3:
     st.subheader("Topic Evolution")
     all_urls = set()
     for data in graphs.values():
-        all_urls.update([n['url'] for n in data['nodes']])
+        all_urls.update(n['url'] for n in get_nodes(data))
 
     url_timeline = defaultdict(list)
     for iter_num, data in graphs.items():
-        for node in data['nodes']:
+        for node in get_nodes(data):
             url_timeline[node['url']].append(iter_num)
 
     topic_data = [{'Topic': extract_label_from_url(url), 'First Seen': min(iterations),
@@ -458,7 +543,7 @@ with tab3:
     cumulative_topics = []
     seen_urls = set()
     for iter_num in sorted(graphs.keys()):
-        for node in graphs[iter_num]['nodes']:
+        for node in get_nodes(graphs[iter_num]):
             seen_urls.add(node['url'])
         cumulative_topics.append(len(seen_urls))
 
@@ -548,38 +633,53 @@ with tab4:
                     topics_list = sorted(topic_vectors.keys())
                     selected_topic = st.selectbox("Select a topic to find similar topics:", topics_list)
                 with col2:
-                    top_k = st.slider("Number of similar topics", 5, min(20, len(topic_vectors)-1), min(10, len(topic_vectors)-1))
+                    n_topics = len(topic_vectors) - 1
+                    if n_topics >= 5:
+                        top_k = st.slider("Number of similar topics", 5, min(20, n_topics), min(10, n_topics))
+                    else:
+                        st.warning(f"Only {n_topics} topics available. Showing all.")
+                        top_k = max(1, n_topics)
 
                 if selected_topic and selected_topic in topic_vectors:
-                    selected_vec = topic_vectors[selected_topic]
-                    similarities = []
-                    for topic, vec in topic_vectors.items():
-                        if topic != selected_topic:
-                            try:
-                                sim = cosine_similarity([selected_vec], [vec])[0][0]
-                                similarities.append((topic, float(sim)))
-                            except:
-                                continue
+                    selected_url = topic_to_url.get(selected_topic)
+                    if selected_url:
+                        selected_node = next((n for n in nodes if n['url'] == selected_url), None)
+                        similarities = []
+                        for other_node in nodes:
+                            if other_node['url'] != selected_node['url']:
+                                similarity = compute_topic_similarity(
+                                    w2v_model,
+                                    selected_node,
+                                    other_node
+                                )
+                                similarities.append((other_node, similarity))
 
-                    if similarities:
-                        similarities.sort(key=lambda x: x[1], reverse=True)
-                        st.markdown(f"**Most similar topics to '{selected_topic}':**")
-                        top_similar = similarities[:top_k]
-                        similar_topics = [t[0] for t in top_similar]
-                        similar_scores = [t[1] for t in top_similar]
-                        fig_sim = go.Figure()
-                        fig_sim.add_trace(go.Bar(x=similar_scores, y=similar_topics, orientation='h',
-                                                marker=dict(color=similar_scores, colorscale='Viridis', showscale=True)))
-                        fig_sim.update_layout(title=f'Top {len(top_similar)} Most Similar Topics',
-                                            xaxis_title='Cosine Similarity', yaxis_title='Topic', height=400,
-                                            yaxis={'categoryorder': 'total ascending'})
-                        st.plotly_chart(fig_sim, config={'displayModeBar': True, 'responsive': True})
-                        with st.expander("View similarity details"):
-                            df_sim = pd.DataFrame(similarities[:top_k], columns=['Topic', 'Similarity'])
-                            df_sim['URL'] = df_sim['Topic'].map(topic_to_url)
-                            st.dataframe(df_sim, width="stretch")
+                        if similarities:
+                            similarities.sort(key=lambda x: x[1], reverse=True)
+                            st.markdown(f"**Most similar topics to '{selected_topic}':**")
+                            top_similar = similarities[:top_k]
+                            similar_topics = [extract_label_from_url(t[0]['url']) for t in top_similar]
+                            similar_scores = [t[1] for t in top_similar]
+                            fig_sim = go.Figure()
+                            fig_sim.add_trace(go.Bar(x=similar_scores, y=similar_topics, orientation='h',
+                                                    marker=dict(color=similar_scores, colorscale='Viridis', showscale=True)))
+                            fig_sim.update_layout(title=f'Top {len(top_similar)} Most Similar Topics',
+                                                xaxis_title='Cosine Similarity', yaxis_title='Topic',
+                                                height=max(400, len(top_similar) * 30),
+                                                yaxis={'categoryorder': 'total ascending'})
+                            st.plotly_chart(fig_sim, config={'displayModeBar': True, 'responsive': True})
+                            with st.expander("View similarity details"):
+                                df_sim = pd.DataFrame([
+                                    {'Topic': extract_label_from_url(t[0]['url']),
+                                     'Similarity': t[1],
+                                     'URL': t[0]['url']}
+                                    for t in top_similar
+                                ])
+                                st.dataframe(df_sim, width='stretch')
+                        else:
+                            st.warning("Could not calculate similarities")
                     else:
-                        st.warning("Could not calculate similarities")
+                        st.error(f"Selected topic '{selected_topic}' not found in nodes")
             else:
                 st.warning("Need at least 2 topics for similarity analysis")
 
@@ -588,9 +688,16 @@ with tab4:
             if len(topic_vectors) > 1:
                 col1, col2 = st.columns(2)
                 with col1:
-                    max_topics = st.slider("Max topics to display", 10, min(100, len(topic_vectors)), min(50, len(topic_vectors)))
+                    n_topics = len(topic_vectors)
+                    if n_topics > 10:
+                        max_topics = st.slider("Max topics to display",
+                            10, min(100, n_topics), min(50, n_topics))
+                    else:
+                        max_topics = n_topics
+                        st.caption(f"Showing all {n_topics} topics")
+
                 with col2:
-                    threshold = st.slider("Similarity threshold", 0.0, 1.0, 0.7, 0.05)
+                    threshold = st.slider("Similarity threshold", 0.0, 1.0, 0.8, 0.01)
 
                 result = create_similarity_network(topic_vectors, topic_to_url, top_n=max_topics, threshold=threshold)
                 if result:
