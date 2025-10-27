@@ -13,14 +13,13 @@ Agent:
 # ============================================================================
 CaesarAgent:
   starting_url: "https://arcprize.org/arc-agi"
-  max_iterations: 5
-  exploration_temperature: 0.8
   save_graph_interval: 1
   draw_graph: true
+  max_iterations: 10
   synthesis_iterations: 5
 
   overwrite_role_file: config/self_transcendence.txt
-  adapt_role: true
+  adapt_role: false
   adapt_role_file: config/adapt_role_insights.txt
 
 # ============================================================================
