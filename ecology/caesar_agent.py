@@ -19,79 +19,8 @@ from rome.config import (DEFAULT_CONFIG, set_attributes_from_config,
 from rome.logger import get_logger
 from rome.kb_client import ChromaClientManager
 
-# Maximum number of links to consider when selecting next webpage to go to
-MAX_NUM_LINKS = 2000
-# Maximum number of visited links to consider when selecting next webpage
-MAX_NUM_VISITED_LINKS = 1000
-
-CAESAR_CONFIG = {
-    "CaesarAgent": {
-        # Total number of pages to explore before stopping
-        "max_iterations": 10,
-        # Maximum depth of exploration tree before backtracking
-        "max_depth": 10000,
-        # Initial URL to begin exploration
-        "starting_url": "https://en.wikipedia.org/wiki/Main_Page",
-        # Domains to allow exploration; empty list uses starting_url domain; use ["*"] to allow any
-        "allowed_domains": [],
-        # Generate visual graph representations (requires pygraphviz)
-        "draw_graph": False,
-        # Save exploration graph every N iterations
-        "save_graph_interval": 1,
-        # Save checkpoint every N iterations for resumption
-        "checkpoint_interval": 1,
-
-        # Whether to follow links that point to the same page (different fragments)
-        "same_page_links": False,
-        # Whether to allow agent to return to page it has seen before
-        "allow_revisit": True,
-        # Whether to use new link display format or not
-        "fancy_link_display": True,
-        # Whether to dynamically determine to explore or go back to visited pages
-        "use_explore_strategy": True,
-        # LLM config for agent's ACT/THINK phases to encourage exploration
-        "exploration_llm_config": {
-            "model": "gpt-4o",
-            "reasoning_effort": "low",
-            "temperature": 0.9,
-            "max_completion_tokens": 5000,
-            "timeout": 120,
-        },
-
-        # False for classic mode
-        "iterative_synthesis": True,
-        # Number of q/a iterations
-        "synthesis_iterations": 10,
-
-        # Overwrites the default role with new role from file, order is [overwrite] -> [adapt]
-        "overwrite_role_file": None,
-        # Whether to modify agent role based on starting URL and/or insights
-        "adapt_role": False,
-        # Insights file path used to adapt the role and change it
-        "adapt_role_file": None
-    },
-
-    "AgentMemory": {
-        # Whether to enable agent memory
-        "enabled": True,
-        # Whether to use vector DB or graph DB
-        "use_graph": False,
-    },
-
-    # Default config for LLM outside of agent exploration
-    "OpenAIHandler": {
-        # Model name for LLM
-        "model": "gpt-4o",
-        # Reasoning effort for GPT-5/O models
-        "reasoning_effort": "medium",
-        # Base temperature for LLM (overridden by exploration_llm_config for ACT/THINK)
-        "temperature": 0.1,
-        # Maximum tokens per LLM response
-        "max_completion_tokens": 10000,
-        # API timeout in seconds
-        "timeout": 240,
-    }
-}
+from .brave_search import BraveSearch
+from .caesar_config import CAESAR_CONFIG, MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS
 
 
 class CaesarAgent(BaseAgent):
@@ -107,12 +36,13 @@ class CaesarAgent(BaseAgent):
         super().__init__(name, role, repository, merged_config)
 
         # NOW setup Caesar-specific attributes (logger is configured)
-        caesar_config = self.config.get('CaesarAgent', {})
-        set_attributes_from_config(self, caesar_config, CAESAR_CONFIG['CaesarAgent'].keys())
-        self._setup_allowed_domains()
+        self.caesar_config = self.config.get('CaesarAgent', {})
+        set_attributes_from_config(self, self.caesar_config, CAESAR_CONFIG['CaesarAgent'].keys())
 
-        self._validate_caesar_config()
+        self._setup_allowed_domains()
+        self._setup_brave_search()
         self._setup_knowledge_base()
+        self._update_role()
 
         if self._load_checkpoint():
             self.logger.info("Resumed from checkpoint")
@@ -120,7 +50,8 @@ class CaesarAgent(BaseAgent):
             self._setup_exploration_state()
             self.logger.info("Starting fresh exploration")
 
-        self._update_role()
+        self._validate_caesar_config()
+        self._validate_starting_url()
         self._log_initialization()
 
     def _prepare_caesar_config(self, config: Dict = None,
@@ -163,236 +94,39 @@ Your approach:
 You navigate through information space systematically yet creatively, always within defined boundaries, building a web of understanding that reveals emergent patterns."""
 
     def _setup_allowed_domains(self) -> None:
-        """Configure allowed domains (called before super().__init__)"""
-        # Use get_logger() directly since self.logger not yet initialized
-        logger = get_logger()
-
+        """Configure allowed domains"""
         if not self.allowed_domains:
-            if self.starting_url:
-                self.allowed_domains = [urlparse(self.starting_url).netloc]
-                logger.info(f"Auto-extracted domain: {self.allowed_domains[0]}")
+            if self.starting_query:
+                self.allowed_domains = ["*"]
+                self.logger.info("Starting query detected - allowing ALL domains")
+            elif self.starting_url:
+                netloc = urlparse(self.starting_url).netloc
+                self.allowed_domains = [netloc] if netloc else ["*"]
+                self.logger.info(f"Auto-extracted domain: {netloc}" if netloc else "Cannot extract domain - allowing ALL domains")
             else:
-                raise ValueError("Must provide starting_url and/or allowed_domains")
+                raise ValueError("Must provide starting_url, starting_query, and/or allowed_domains")
 
         self.allow_all_domains = "*" in self.allowed_domains
         if self.allow_all_domains:
-            logger.info("Wildcard '*' detected - ALL domains allowed!")
+            self.logger.info("Wildcard '*' detected - allowing ALL domains")
 
-    def _validate_caesar_config(self) -> None:
-        """Validate Caesar-specific configuration"""
-        self.logger.assert_true(self.starting_url, "starting_url required")
-        self.logger.assert_true(self.allowed_domains, "allowed_domains required")
-        self.logger.assert_true(self.max_iterations >= 0, "max_iterations must be >= 0")
-        self.logger.assert_true(self.max_depth > 0, "max_depth must be > 0")
-
-        # Validate starting URL to make sure it can be reached
-        try:
-            parsed = urlparse(self.starting_url)
-            if not all([parsed.scheme, parsed.netloc]):
-                raise ValueError(f"Invalid starting URL: {self.starting_url}")
-            if parsed.scheme not in ['http', 'https']:
-                raise ValueError(f"URL must use http/https: {self.starting_url}")
-        except Exception as e:
-            raise ValueError(f"Invalid starting_url: {e}")
-
-
-    def _setup_exploration_state(self) -> None:
-        """Initialize exploration state"""
-        self.graph = nx.DiGraph()
-        self.visited_urls = {}
-        self.failed_urls = set()
-        self.url_stack = [self.starting_url]
-        self.current_url = self.starting_url
-        self.current_depth = len(self.url_stack)
-        self.current_iteration = 0
+    def _setup_brave_search(self) -> None:
+        """Setup brave base"""
+        if self.starting_query:
+            old_starting_url = self.starting_url
+            search_engine = BraveSearch(agent=self, config=self.config.get("BraveSearch", {}))
+            self.starting_url = search_engine.search_and_save(self.starting_query)
+            self.logger.info(f"Overwriting existing starting_url ({old_starting_url}) with starting_query ({self.starting_query}) search results")
 
     def _setup_knowledge_base(self) -> None:
         """Setup knowledge base"""
         self.kb_manager = ChromaClientManager(agent=self)
         self.logger.info(f"Knowledge base initialized: {self.kb_manager.info()}")
 
-    def _log_initialization(self) -> None:
-        """Log initialization summary"""
-        self.logger.info(f"CaesarAgent '{self.name}' initialized")
-        # self.logger.info(f"Log file: {os.path.join(self.get_log_dir(), f'{self.get_id()}.console.log')}")
-        self.logger.info(f"Starting: {self.starting_url}")
-        self.logger.info(f"Domains: {self.allowed_domains}")
-        self.logger.info(f"Iterations: {self.max_iterations}, Depth: {self.max_depth}")
-
-    def _get_checkpoint_path(self) -> str:
-        """Get checkpoint file path"""
-        return os.path.join(self.get_log_dir(), f"{self.get_id()}.checkpoint.json")
-
-    def _save_checkpoint(self, iteration: int) -> None:
-        """Save exploration state with optional graph data"""
-        if not self.url_stack:
-            self.logger.error("Cannot save checkpoint: empty url_stack")
-            return
-
-        try:
-            valid_nodes = {n for n in self.graph.nodes()
-                          if self.graph.nodes[n].get('insights', '').strip()}
-
-            checkpoint_data = {
-                'iteration': iteration,
-                'current_url': self.current_url,
-                'current_depth': self.current_depth,
-                'visited_urls': self.visited_urls,
-                'failed_urls': list(self.failed_urls),
-                'url_stack': self.url_stack,
-                'graph': {
-                    'nodes': [{'url': n, 'depth': self.graph.nodes[n].get('depth', 0),
-                              'insights': self.graph.nodes[n]['insights']}
-                             for n in valid_nodes],
-                    'edges': [{'source': u, 'target': v,
-                              'reason': self.graph.edges[u, v].get('reason', '')}
-                             for u, v in self.graph.edges()
-                             if u in valid_nodes and v in valid_nodes]
-                },
-                'timestamp': datetime.now().isoformat(),
-                'config': {
-                    'starting_url': self.starting_url,
-                    'allowed_domains': self.allowed_domains,
-                    'max_iterations': self.max_iterations,
-                    'max_depth': self.max_depth,
-                }
-            }
-
-            # Save checkpoint
-            with open(self._get_checkpoint_path(), 'w', encoding='utf-8') as f:
-                json.dump(checkpoint_data, f, indent=4, ensure_ascii=False)
-            self.logger.info(f"Checkpoint saved on iteration {iteration}")
-
-            # Save separate graph file if at interval
-            if iteration % self.save_graph_interval == 0 or iteration == self.max_iterations:
-                knowledge_graph = checkpoint_data['graph']
-                knowledge_graph['iteration'] = iteration
-                knowledge_graph['starting_url'] = self.starting_url
-                with open(os.path.join(self.get_repo(),
-                    f"{self.get_id()}.graph_iter{iteration}.json"), 'w', encoding='utf-8') as f:
-                    json.dump(knowledge_graph, f, indent=4, ensure_ascii=False)
-                self.logger.info(f"Knowledge graph saved on iteration {iteration}")
-
-        except Exception as e:
-            self.logger.error(f"Failed to save checkpoint on iteration {iteration}: {e}")
-
-    def _load_checkpoint(self) -> bool:
-        """Load exploration state from checkpoint"""
-        checkpoint_path = self._get_checkpoint_path()
-        if not os.path.exists(checkpoint_path):
-            return False
-
-        try:
-            with open(checkpoint_path, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-
-            # Validate config
-            config = data.get('config', {})
-            if (config.get('starting_url') != self.starting_url or
-                config.get('allowed_domains') != self.allowed_domains):
-                self.logger.error("Checkpoint config mismatch")
-                return False
-
-            # Restore state
-            self.current_iteration = data['iteration']
-            self.visited_urls = data['visited_urls']
-            # Do not load failed urls, so we can give them another try
-            # self.failed_urls = set(data['failed_urls'])
-            self.failed_urls = set()
-            self.url_stack = data['url_stack']
-
-            if not self.url_stack:
-                self.logger.error("Invalid checkpoint: empty url_stack")
-                return False
-
-            self.current_depth = len(self.url_stack)
-            self.current_url = self.url_stack[-1]
-
-            # Restore graph inline
-            graph_data = data['graph']
-            self.graph = nx.DiGraph()
-            for node in graph_data['nodes']:
-                self.graph.add_node(node['url'], depth=node['depth'], insights=node['insights'])
-            for edge in graph_data['edges']:
-                self.graph.add_edge(edge['source'], edge['target'], reason=edge['reason'])
-
-            self.logger.info(f"Checkpoint loaded from {data.get('timestamp')}")
-            return True
-
-        except Exception as e:
-            self.logger.error(f"Failed to load checkpoint: {e}")
-            return False
-
-    def _is_allowed_url(self, url: str) -> bool:
-        """Check if URL is within allowed domains"""
-        if self.allow_all_domains: return True
-        parsed = urlparse(url)
-        return any(domain in parsed.netloc for domain in self.allowed_domains)
-
-    def _fetch_html(self, url: str) -> Optional[str]:
-        """Fetch HTML content"""
-        try:
-            response = requests.get(url,
-                timeout=5,
-                headers={'User-Agent': 'CaesarBot/1.0'},
-                allow_redirects=True)
-            response.raise_for_status()
-            return response.text
-        except requests.exceptions.RequestException as e:
-            self.logger.error(f"Failed to fetch {url}: {e}")
-            return None
-
-    def _extract_links(self, html: str, base_url: str) -> List[Tuple[str, str]]:
-        """Extract links with anchor text"""
-        try:
-            soup = BeautifulSoup(html, 'html.parser')
-        except Exception:
-            return []
-
-        links = []
-        seen = set()
-        base_parsed = urlparse(base_url)
-        base_path = f"{base_parsed.scheme}://{base_parsed.netloc}{base_parsed.path}"
-
-        for a in soup.find_all('a', href=True):
-            try:
-                url = urljoin(base_url, a['href'])
-            except Exception:
-                continue
-
-            if not self.same_page_links:
-                parsed = urlparse(url)
-                url_without_fragment = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
-                if url_without_fragment == base_path:
-                    continue
-
-            text = a.get_text(strip=True)[:LONGER_SUMMARY_LEN] or "[no text]"
-
-            if (url not in seen and self._is_allowed_url(url) and
-                url not in self.failed_urls and
-                (url not in self.visited_urls or self.allow_revisit) and
-                url.startswith('http')):
-                links.append((url, text))
-                seen.add(url)
-
-        return links
-
-    def _extract_text_from_html(self, html: str, max_length: int = LONGEST_SUMMARY_LEN*100) -> str:
-        """Extract clean text content from HTML"""
-        try:
-            soup = BeautifulSoup(html, 'html.parser')
-            for tag in soup(["script", "style", "nav", "footer", "header"]):
-                tag.decompose()
-            text = soup.get_text(separator=' ', strip=True)
-            return ' '.join(text.split())[:max_length]
-        except Exception as e:
-            self.logger.error(f"HTML text extraction failed: {e}")
-            return ""
-
     def _update_role(self):
         """Adapt agent role based on starting URL content and optional insights"""
         try:
-            role_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.adapted_role.txt")
+            role_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.updated_role.txt")
 
             # Check overwrite (highest priority)
             if self.overwrite_role_file and os.path.exists(self.overwrite_role_file):
@@ -461,6 +195,225 @@ Your response must start with "Your role:" followed by the adapted role descript
 
         except Exception as e:
             self.logger.error(f"[ADAPT ROLE] Role adaptation failed: {e}, keeping default role")
+
+    def _setup_exploration_state(self) -> None:
+        """Initialize exploration state"""
+        self.graph = nx.DiGraph()
+        self.visited_urls = {}
+        self.failed_urls = set()
+        self.url_stack = [self.starting_url]
+        self.current_url = self.starting_url
+        self.current_depth = len(self.url_stack)
+        self.current_iteration = 0
+
+    def _validate_caesar_config(self) -> None:
+        """Validate Caesar-specific configuration"""
+        self.logger.assert_true(self.starting_url, "starting_url required")
+        self.logger.assert_true(self.allowed_domains, "allowed_domains required")
+        self.logger.assert_true(self.max_iterations >= 0, "max_iterations must be >= 0")
+        self.logger.assert_true(self.max_depth > 0, "max_depth must be > 0")
+
+    def _validate_starting_url(self):
+        """Validate starting URL (http/https/file)"""
+        parsed = urlparse(self.starting_url)
+
+        if parsed.scheme == 'file':
+            file_path = parsed.path
+            if not os.path.isfile(file_path):
+                raise ValueError(f"File does not exist or not readable: {file_path}")
+            if not os.access(file_path, os.R_OK):
+                raise ValueError(f"File is not readable: {file_path}")
+        elif parsed.scheme in ['http', 'https']:
+            if not parsed.netloc:
+                raise ValueError(f"Invalid URL - missing domain: {self.starting_url}")
+        else:
+            raise ValueError(f"URL must use http/https/file scheme: {self.starting_url}")
+
+    def _log_initialization(self) -> None:
+        """Log initialization summary"""
+        self.logger.info(f"CaesarAgent '{self.name}' initialized")
+        self.logger.info(f"Log dir: {self.get_log_dir()}")
+        self.logger.info(f"Starting: {self.starting_url}")
+        self.logger.info(f"Domains: {self.allowed_domains}")
+        self.logger.info(f"Iterations: {self.max_iterations}, Depth: {self.max_depth}")
+
+    def _get_checkpoint_path(self) -> str:
+        """Get checkpoint file path"""
+        return os.path.join(self.get_log_dir(), f"{self.get_id()}.checkpoint.json")
+
+    def _save_checkpoint(self, iteration: int) -> None:
+        """Save exploration state with optional graph data"""
+        if not self.url_stack:
+            self.logger.error("Cannot save checkpoint: empty url_stack")
+            return
+
+        try:
+            valid_nodes = {n for n in self.graph.nodes()
+                          if self.graph.nodes[n].get('insights', '').strip()}
+
+            checkpoint_data = {
+                'iteration': iteration,
+                'current_url': self.current_url,
+                'current_depth': self.current_depth,
+                'visited_urls': self.visited_urls,
+                'failed_urls': list(self.failed_urls),
+                'url_stack': self.url_stack,
+                'graph': {
+                    'nodes': [{'url': n, 'depth': self.graph.nodes[n].get('depth', 0),
+                              'insights': self.graph.nodes[n]['insights']}
+                             for n in valid_nodes],
+                    'edges': [{'source': u, 'target': v,
+                              'reason': self.graph.edges[u, v].get('reason', '')}
+                             for u, v in self.graph.edges()
+                             if u in valid_nodes and v in valid_nodes]
+                },
+                'timestamp': datetime.now().isoformat(),
+                'config': {
+                    'starting_url': self.starting_url,
+                    'starting_query': self.starting_query,
+                    'allowed_domains': self.allowed_domains,
+                    'max_iterations': self.max_iterations,
+                    'max_depth': self.max_depth,
+                }
+            }
+
+            # Save checkpoint
+            with open(self._get_checkpoint_path(), 'w', encoding='utf-8') as f:
+                json.dump(checkpoint_data, f, indent=4, ensure_ascii=False)
+            self.logger.info(f"Checkpoint saved on iteration {iteration}")
+
+            # Save separate graph file if at interval
+            if iteration % self.save_graph_interval == 0 or iteration == self.max_iterations:
+                knowledge_graph = checkpoint_data['graph']
+                knowledge_graph['iteration'] = iteration
+                knowledge_graph['starting_url'] = self.starting_url
+                with open(os.path.join(self.get_repo(),
+                    f"{self.get_id()}.graph_iter{iteration}.json"), 'w', encoding='utf-8') as f:
+                    json.dump(knowledge_graph, f, indent=4, ensure_ascii=False)
+                self.logger.info(f"Knowledge graph saved on iteration {iteration}")
+
+        except Exception as e:
+            self.logger.error(f"Failed to save checkpoint on iteration {iteration}: {e}")
+
+    def _load_checkpoint(self) -> bool:
+        """Load exploration state from checkpoint"""
+        checkpoint_path = self._get_checkpoint_path()
+        if not os.path.exists(checkpoint_path):
+            return False
+
+        try:
+            with open(checkpoint_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            # Validate config
+            config = data.get('config', {})
+            if config.get('starting_query') != self.starting_query:
+                self.logger.error(f"Checkpoint starting_query mismatch: '{config.get('starting_query')}' vs '{self.starting_query}'")
+            if config.get('starting_url') != self.starting_url:
+                self.logger.error(f"Checkpoint starting_url mismatch")
+            if config.get('allowed_domains') != self.allowed_domains:
+                self.logger.error(f"Checkpoint allowed_domains mismatch: {config.get('allowed_domains')} vs {self.allowed_domains}")
+
+            # Restore state
+            self.current_iteration = data['iteration']
+            self.visited_urls = data['visited_urls']
+            # Do not load failed urls, so we can give them another try
+            # self.failed_urls = set(data['failed_urls'])
+            self.failed_urls = set()
+            self.url_stack = data['url_stack']
+
+            if not self.url_stack:
+                self.logger.error("Invalid checkpoint: empty url_stack")
+                return False
+
+            self.current_depth = len(self.url_stack)
+            self.current_url = self.url_stack[-1]
+
+            # Restore graph inline
+            graph_data = data['graph']
+            self.graph = nx.DiGraph()
+            for node in graph_data['nodes']:
+                self.graph.add_node(node['url'], depth=node['depth'], insights=node['insights'])
+            for edge in graph_data['edges']:
+                self.graph.add_edge(edge['source'], edge['target'], reason=edge['reason'])
+
+            self.logger.info(f"Checkpoint loaded from {data.get('timestamp')}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to load checkpoint: {e}")
+            return False
+
+    def _is_allowed_url(self, url: str) -> bool:
+        """Check if URL is within allowed domains"""
+        if self.allow_all_domains: return True
+        parsed = urlparse(url)
+        return any(domain in parsed.netloc for domain in self.allowed_domains)
+
+    def _fetch_html(self, url: str) -> Optional[str]:
+        """Fetch HTML content"""
+        try:
+            if url.startswith('file://'):
+                file_path = url[7:]  # Remove 'file://' prefix
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+
+            response = requests.get(url,
+                timeout=5,
+                headers={'User-Agent': 'CaesarBot/1.0'},
+                allow_redirects=True)
+            response.raise_for_status()
+            return response.text
+        except (requests.exceptions.RequestException, IOError, OSError) as e:
+            self.logger.error(f"Failed to fetch {url}: {e}")
+            return None
+
+    def _extract_links(self, html: str, base_url: str) -> List[Tuple[str, str]]:
+        """Extract links with anchor text"""
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
+        except Exception:
+            return []
+
+        links = []
+        seen = set()
+        base_parsed = urlparse(base_url)
+        base_path = f"{base_parsed.scheme}://{base_parsed.netloc}{base_parsed.path}"
+
+        for a in soup.find_all('a', href=True):
+            try:
+                url = urljoin(base_url, a['href'])
+            except Exception:
+                continue
+
+            if not self.same_page_links:
+                parsed = urlparse(url)
+                url_without_fragment = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+                if url_without_fragment == base_path:
+                    continue
+
+            text = a.get_text(strip=True)[:LONGER_SUMMARY_LEN] or "[no text]"
+
+            if (url not in seen and self._is_allowed_url(url) and
+                url not in self.failed_urls and
+                (url not in self.visited_urls or self.allow_revisit) and
+                url.startswith('http')):
+                links.append((url, text))
+                seen.add(url)
+
+        return links
+
+    def _extract_text_from_html(self, html: str, max_length: int = LONGEST_SUMMARY_LEN*100) -> str:
+        """Extract clean text content from HTML"""
+        try:
+            soup = BeautifulSoup(html, 'html.parser')
+            for tag in soup(["script", "style", "nav", "footer", "header"]):
+                tag.decompose()
+            text = soup.get_text(separator=' ', strip=True)
+            return ' '.join(text.split())[:max_length]
+        except Exception as e:
+            self.logger.error(f"HTML text extraction failed: {e}")
+            return ""
 
     def perceive(self) -> Tuple[str, List[Tuple[str, str]]]:
         """Phase 1: Extract content and links from current page"""
@@ -873,18 +826,20 @@ Respond with JSON:
 
     def _generate_synthesis_qa_pairs(self, mode: str) -> List[Tuple[str, str]]:
         """Generate Q&A pairs by querying KB"""
+        queries = [
+            "What are the central themes and patterns discovered?",
+            "What unexpected connections or insights emerged?",
+            "What contradictions or tensions were revealed?",
+            "What questions remain open or were raised?",
+            "What novel perspective emerged from this exploration?"
+        ]
+        if self.starting_query is not None:
+            queries = [self.starting_query] + queries
         if mode == "classic":
-            queries = [
-                "What are the central themes and patterns discovered?",
-                "What unexpected connections or insights emerged?",
-                "What contradictions or tensions were revealed?",
-                "What questions remain open or were raised?",
-                "What novel perspective emerged from this exploration?"
-            ]
             return self._execute_queries(queries)
 
         # Iterative mode
-        queries = ["What are the central themes and patterns discovered across all sources?"]
+        queries = [queries[0]]
         answers = []
 
         for i in range(self.synthesis_iterations):

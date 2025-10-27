@@ -13,6 +13,7 @@ Agent:
 # ============================================================================
 CaesarAgent:
   starting_url: "https://arcprize.org/arc-agi"
+  starting_query: "What is ARC-AGI benchmark?"
   save_graph_interval: 1
   draw_graph: true
   max_iterations: 10
