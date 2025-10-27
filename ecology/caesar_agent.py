@@ -701,6 +701,9 @@ Your response must be valid JSON only, nothing else."""
             self._backtrack(); return self.current_url
 
         next_url, reason = self._select_next_link(links)
+        self.logger.info(f"[ACT] Selected link: {next_url}")
+        self.logger.info(f"Reason: {reason}")
+
         if next_url == self._get_parent_url():
             self._backtrack(); return self.current_url
         if next_url == self.starting_url:
@@ -728,9 +731,6 @@ Your response must be valid JSON only, nothing else."""
         )
 
         self._advance_to_url(next_url)
-        self.logger.info(f"[ACT] Selected link: {next_url}")
-        self.logger.info(f"Reason: {reason}")
-
         return next_url
 
     def _draw_graph_visualization(self, iteration: int) -> None:
