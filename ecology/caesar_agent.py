@@ -32,7 +32,7 @@ CAESAR_CONFIG = {
         "max_depth": 10000,
         # Initial URL to begin exploration
         "starting_url": "https://en.wikipedia.org/wiki/Main_Page",
-        # Domains to allow exploration in; empty list uses starting_url domain; use ["*"] to allow any
+        # Domains to allow exploration; empty list uses starting_url domain; use ["*"] to allow any
         "allowed_domains": [],
         # Generate visual graph representations (requires pygraphviz)
         "draw_graph": False,
@@ -527,7 +527,9 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
             self.logger.error(f"KB add_text failed: {e}")
 
         self.visited_urls[self.current_url] = self.visited_urls.get(self.current_url, 0) + 1
-        self.graph.add_node(self.current_url, insights=insights, depth=self.current_depth)
+        self.graph.add_node(self.current_url, insights=insights,
+            depth=self.current_depth, iteration=self.current_iteration,
+            visit_count=self.visited_urls[self.current_url])
         return insights
 
     def _advance_to_url(self, url: str) -> None:
