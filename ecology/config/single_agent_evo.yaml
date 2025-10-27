@@ -15,10 +15,11 @@ CaesarAgent:
   # starting_url: "https://en.wikipedia.org/wiki/Evolution"
   starting_query: "How can multi-agent AI systems use LLMs to solve complex enterprise decision-making problems?"
   max_iterations: 800
-  exploration_temperature: 0.9
   save_graph_interval: 50
-  draw_graph: false
-  synthesis_iterations: 20
+  synthesis_iterations: 25
+
+  exploration_llm_config:
+    model: gpt-5
 
   adapt_role: True
   adapt_role_file: config/adapt_role_insights.txt
