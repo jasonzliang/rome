@@ -49,8 +49,14 @@ CAESAR_CONFIG = {
         "fancy_link_display": True,
         # Whether to dynamically determine to explore or go back to visited pages
         "use_explore_strategy": True,
-        # Temperature for agent's ACT/THINK phases to encourage exploration
-        "exploration_temperature": 0.8,
+        # LLM config for agent's ACT/THINK phases to encourage exploration
+        "exploration_llm_config": {
+            "model": "gpt-4o",
+            "reasoning_effort": "low",
+            "temperature": 0.8,
+            "max_tokens": 8000,
+            "timeout": 120,
+        },
 
         # False for classic mode
         "iterative_synthesis": True,
@@ -74,12 +80,13 @@ CAESAR_CONFIG = {
         "use_graph": False,
     },
 
+    # Default config for LLM outside of agent exploration
     "OpenAIHandler": {
-        # Model for exploration analysis and synthesis
+        # Model name for LLM
         "model": "gpt-4o",
         # Reasoning effort for GPT-5/O models
         "reasoning_effort": "low",
-        # Base temperature for LLM (overridden by exploration_temperature for ACT/THINK)
+        # Base temperature for LLM (overridden by exploration_llm_config for ACT/THINK)
         "temperature": 0.1,
         # Maximum tokens per LLM response
         "max_tokens": 8000,
@@ -506,7 +513,7 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
         try:
             insights = self.chat_completion(
                 prompt,
-                override_config={'temperature': self.exploration_temperature}
+                **self.exploration_llm_config
             )
         except Exception as e:
             self.logger.error(f"LLM call failed in think phase: {e}")
@@ -578,7 +585,7 @@ Provide a strategic recommendation in 2-3 sentences."""
             try:
                 return self.chat_completion(
                     prompt,
-                    override_config={'temperature': self.exploration_temperature}
+                    **self.exploration_llm_config
                 )
             except Exception as e:
                 self.logger.error(f"Exploration strategy determination failed: {e}")
@@ -676,7 +683,7 @@ Your response must be valid JSON only, nothing else."""
         try:
             response = self.chat_completion(
                 prompt,
-                override_config={'temperature': self.exploration_temperature},
+                **self.exploration_llm_config,
                 response_format={"type": "json_object"}
             )
             decision = self.parse_json_response(response)
