@@ -251,7 +251,7 @@ DEFAULT_CONFIG = {
 
         # LLM reranking config
         # "rerank_batch_size": 10,  # Batch size for reranking choices
-        "rerank_top_k": 15,  # Number of docs to retrieve before reranking
+        "rerank_top_k": 12,  # Number of docs to retrieve before reranking
         "rerank_top_n": 3,  # Number of top docs to return after reranking
     },
 
