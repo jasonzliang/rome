@@ -241,15 +241,18 @@ DEFAULT_CONFIG = {
         "collection_name": None,  # ChromaDB collection name, set to None to use agent repo
         "enable_reranking": True,  # Enable LLMRerank reranking
         "use_shared_server": True,  # Use shared server instance across KB instances
+        "log_db": True,  # Log adding docs and queries to file
 
         # LlamaIndex configuration
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model
+        "llm_model": "gpt-4o"  # OpenAI llm model (for query/reranking)
+        "llm_temperature": 0.1  # OpenAI llm model (for query/reranking)
+
         "chunk_size": 400,  # Chunk size for text splitting
         "chunk_overlap": 80,  # Overlap between chunks
-        "log_db": True,  # Log adding docs and queries to file
         "top_k": 10,  # Number of docs to retrieve (without reranking)
 
-        # LLM reranking config
+        # Reranking configuration
         # "rerank_batch_size": 10,  # Batch size for reranking choices
         "rerank_top_k": 15,  # Number of docs to retrieve before reranking
         "rerank_top_n": 3,  # Number of top docs to return after reranking

@@ -179,8 +179,8 @@ class ChromaClientManager:
         # Use agent's OpenAI configuration if available, otherwise use defaults
         if self.agent:
             self.llm = OpenAI(
-                model=self.agent.openai_handler.model,
-                temperature=self.agent.openai_handler.temperature
+                model=self.llm_model,
+                temperature=self.llm_temperature
             )
             self.embed_model = OpenAIEmbedding(model=self.embedding_model)
 
