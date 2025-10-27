@@ -20,13 +20,14 @@ try:
     from llama_index.llms.openai import OpenAI
     from llama_index.core.node_parser import SentenceSplitter
     from llama_index.core.postprocessor.llm_rerank import LLMRerank
+    from llama_index.core.response_synthesizers import get_response_synthesizer
 except ImportError as e:
     print(f"Import error: {e}, install with: pip install chromadb llama-index llama-index-vector-stores-chroma llama-index-embeddings-openai llama-index-llms-openai")
     exit(1)
 
 import openai
 
-from .config import set_attributes_from_config
+from .config import set_attributes_from_config, DEFAULT_CONFIG
 from .logger import get_logger
 from .kb_server import ChromaServerManager
 from .parsing import parse_json_response
@@ -57,11 +58,14 @@ class ChromaClientManager:
 
         # Set attributes from config
         set_attributes_from_config(self, self.config,
-            ['enable_reranking', 'chunk_size', 'chunk_overlap', 'embedding_model', 'use_shared_server'],
-            ['top_k', 'log_db', 'collection_name'])
+            DEFAULT_CONFIG['ChromaClientManager'].keys())
 
-        assert self.embedding_model in EMBEDDING_MODELS, \
-            f"Invalid embedding model: {self.embedding_model}"
+        self.logger.assert_true(self.top_k > 0 and self.rerank_top_k > 0 and self.rerank_top_n > 0,
+            "top_k/rerank_top_k/rerank_top_n must be > 0")
+        self.logger.assert_true(self.chunk_size > 0 and self.chunk_overlap > 0
+            "chunk_size/chunk_overlap must be > 0")
+        self.logger.assert_true(self.embedding_model in EMBEDDING_MODELS,
+            f"Invalid embedding model: {self.embedding_model}")
 
         # Get or create server manager instance
         if self.use_shared_server:
@@ -211,13 +215,20 @@ class ChromaClientManager:
         """Setup LLMRerank if enabled"""
         if self.enable_reranking:
             self.reranker = LLMRerank(
-                choice_batch_size=self.rerank_batch_size,
+                # choice_batch_size=self.rerank_batch_size,
                 top_n=self.rerank_top_n,
                 llm=self.llm
+            )
+            self.response_synthesizer = get_response_synthesizer(
+                response_mode="compact",
+                llm=self.llm,
+                # streaming=False,
+                # use_async=False
             )
             self.logger.debug("LLMRerank enabled")
         else:
             self.reranker = None
+            self.response_synthesizer = None
             self.logger.debug("Reranking disabled")
 
     def size(self):
@@ -258,22 +269,25 @@ class ChromaClientManager:
 
         return True
 
-    def query(self, question, top_k=None, use_reranking=None, show_scores=False):
+    def query(self, question, top_k=None):
         """Enhanced query with LLMRerank and empty collection validation"""
         try:
             # Check if collection is empty before proceeding
             if self.size() == 0:
                 return ""
 
-            top_k = top_k or self.top_k or 5
-            should_rerank = (use_reranking is True) or \
-                (use_reranking is None and self.reranker is not None)
+            should_rerank = self.reranker is not None
+            if should_rerank:
+                top_k = max([top_k or self.rerank_top_k, self.rerank_top_n, 1])
+                # self.logger.assert_true(top_k >= self.rerank_top_n,
+                    # "top_k must be >= top_n for reranking")
+            else:
+                top_k = max(top_k or self.top_k, 1)
 
-            if should_rerank and self.reranker:
+            if should_rerank:
                 # Get more documents for reranking (use simple multiplier)
-                retrieval_k = max(top_k * 3, 10)
-                nodes = self._retrieve_nodes(question, retrieval_k)
-                response = self._rerank_and_respond(question, nodes, top_k)
+                nodes = self._retrieve_nodes(question, top_k)
+                response = self._rerank_and_respond(question, nodes)
             else:
                 # Standard query without reranking
                 response = self._standard_query(question, top_k)
@@ -295,24 +309,22 @@ class ChromaClientManager:
         retriever = self.index.as_retriever(
             similarity_top_k=retrieval_k,
             embed_model=self.embed_model)
+
+        self.logger.debug(f"Using retriever (n={retrieval_k}) for query")
         return retriever.retrieve(question)
 
-    def _rerank_and_respond(self, question: str, nodes, top_k: int) -> str:
+    def _rerank_and_respond(self, question: str, nodes) -> str:
         """Handle reranking with LLMRerank and response generation"""
-        if len(nodes) <= 1:
-            # Not enough nodes for reranking, use standard query
-            return self._standard_query(question, top_k)
-
         # Use LLMRerank to rerank nodes
         reranked_nodes = self.reranker.postprocess_nodes(nodes, query_str=question)
 
         # Build context from reranked nodes
-        context = "\n\n".join([node.node.get_content() for node in reranked_nodes[:top_k]])
+        context = "\n\n".join([node.node.get_content() for node in reranked_nodes])
 
         # Generate response
-        response = self.agent.chat_completion(
-            prompt=f"Context:\n{context}\n\nQuestion: {question}",
-            system_message="Answer based on the provided context. Be concise and cite relevant details.")
+        response = self.response_synthesizer.synthesize(question, nodes=reranked_nodes)
+
+        self.logger.debug(f"Using reranker (n={self.rerank_top_n}) for query")
         return response
 
     def _standard_query(self, question: str, top_k: int) -> str:

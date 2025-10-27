@@ -246,12 +246,13 @@ DEFAULT_CONFIG = {
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model
         "chunk_size": 400,  # Chunk size for text splitting
         "chunk_overlap": 80,  # Overlap between chunks
-        "top_k": 10,  # Number of chunks to retrieve
         "log_db": True,  # Log adding docs and queries to file
+        "top_k": 10,  # Number of docs to retrieve (without reranking)
 
         # LLM reranking config
-        "rerank_batch_size": 10,  # Batch size for reranking choices
-        "rerank_top_n": 3,  # Number of top documents to return after reranking
+        # "rerank_batch_size": 10,  # Batch size for reranking choices
+        "rerank_top_k": 15,  # Number of docs to retrieve before reranking
+        "rerank_top_n": 3,  # Number of top docs to return after reranking
     },
 
 

@@ -62,8 +62,6 @@ CAESAR_CONFIG = {
         "iterative_synthesis": True,
         # Number of q/a iterations
         "synthesis_iterations": 10,
-        # KB docs per query
-        "top_k": 10,
 
         # Overwrites the default role with new role from file, order is [overwrite] -> [adapt]
         "overwrite_role_file": None,
@@ -644,7 +642,7 @@ Provide a strategic recommendation in 2-3 sentences."""
         kb_context = memory_context = explore_strategy = ""
         try:
             kb_context = self.kb_manager.query(
-                "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?", top_k=self.top_k)
+                "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?")
             memory_context = self.recall(
                 f"What webpages have I frequently visited and what navigation patterns have emerged in relation to the following insights:\n{kb_context}")
             if self.use_explore_strategy:
@@ -827,7 +825,7 @@ Your response must be valid JSON only, nothing else."""
         qa_pairs = []
         for query in queries:
             try:
-                answer = self.kb_manager.query(query, top_k=self.top_k)
+                answer = self.kb_manager.query(query)
                 if answer:
                     qa_pairs.append((query, answer))
             except Exception as e:
@@ -890,7 +888,7 @@ Respond with JSON:
         for i in range(self.synthesis_iterations):
             self.logger.info(f"[SYNTHESIS {i+1}/{self.synthesis_iterations}] {queries[-1]}")
 
-            answer = self.kb_manager.query(queries[-1], top_k=self.top_k)
+            answer = self.kb_manager.query(queries[-1])
             if not answer:
                 break
             answers.append(answer)
