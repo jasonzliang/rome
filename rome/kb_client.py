@@ -3,6 +3,7 @@ import json
 import hashlib
 from typing import Optional, List, Dict
 import os
+os.environ['CHROMA_OPENAI_API_KEY'] = os.environ['OPENAI_API_KEY']
 from pathlib import Path
 import re
 import time
@@ -138,8 +139,7 @@ class ChromaClientManager:
         else:
             if not os.getenv('OPENAI_API_KEY'):
                 raise ValueError(f"OPENAI_API_KEY required for {self.embedding_model}")
-            embedding_fn = OpenAIEmbeddingFunction(
-                model_name=self.embedding_model, api_key=os.getenv('OPENAI_API_KEY'))
+            embedding_fn = OpenAIEmbeddingFunction(model_name=self.embedding_model)
 
         try:
             self.collection = self.client.create_collection(
@@ -180,7 +180,8 @@ class ChromaClientManager:
         if self.agent:
             self.llm = OpenAI(
                 model=self.llm_model,
-                temperature=self.llm_temperature
+                temperature=self.llm_temperature,
+                max_tokens=DEFAULT_CONFIG['OpenAIHandler']['max_completion_tokens']
             )
             self.embed_model = OpenAIEmbedding(model=self.embedding_model)
 

@@ -112,7 +112,7 @@ DEFAULT_CONFIG = {
         "model": "gpt-4o",  # LLM model name
         "reasoning_effort": None,  # Reasoning effort for reasoning models (None to disable)
         "temperature": 0.1,  # LLM temperature
-        "max_tokens": 8192,  # LLM response max tokens
+        "max_completion_tokens": 8192,  # LLM response max tokens
         "top_p": 1.0,  # LLM top-P
         "seed": None,  # LLM random seed
 
@@ -245,8 +245,8 @@ DEFAULT_CONFIG = {
 
         # LlamaIndex configuration
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model
-        "llm_model": "gpt-4o"  # OpenAI llm model (for query/reranking)
-        "llm_temperature": 0.1  # OpenAI llm model (for query/reranking)
+        "llm_model": "gpt-4o",  # OpenAI llm model (for query/reranking)
+        "llm_temperature": 0.1,  # OpenAI llm model (for query/reranking)
 
         "chunk_size": 400,  # Chunk size for text splitting
         "chunk_overlap": 80,  # Overlap between chunks
