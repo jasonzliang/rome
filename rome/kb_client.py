@@ -62,7 +62,7 @@ class ChromaClientManager:
 
         self.logger.assert_true(self.top_k > 0 and self.rerank_top_k > 0 and self.rerank_top_n > 0,
             "top_k/rerank_top_k/rerank_top_n must be > 0")
-        self.logger.assert_true(self.chunk_size > 0 and self.chunk_overlap > 0
+        self.logger.assert_true(self.chunk_size > 0 and self.chunk_overlap > 0,
             "chunk_size/chunk_overlap must be > 0")
         self.logger.assert_true(self.embedding_model in EMBEDDING_MODELS,
             f"Invalid embedding model: {self.embedding_model}")
