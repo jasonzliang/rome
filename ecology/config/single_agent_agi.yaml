@@ -12,9 +12,9 @@ Agent:
 # CAESAR-SPECIFIC CONFIGURATION
 # ============================================================================
 CaesarAgent:
-  starting_url: "https://arcprize.org/arc-agi"
-  starting_query: "How do I solve the ARC-AGI-1 benchmark using large language models?"
-  allowed_domains: ["*"]
+  # starting_url: "https://arcprize.org/arc-agi"
+  # allowed_domains: ["*"]
+  starting_query: "How do I solve the ARC-AGI-1 benchmark using LLMs?"
   max_iterations: 1000
   save_graph_interval: 50
   synthesis_iterations: 25

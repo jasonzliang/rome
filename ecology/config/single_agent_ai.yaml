@@ -12,7 +12,8 @@ Agent:
 # CAESAR-SPECIFIC CONFIGURATION
 # ============================================================================
 CaesarAgent:
-  starting_url: "https://en.wikipedia.org/wiki/Artificial_intelligence"
+  # starting_url: "https://en.wikipedia.org/wiki/Artificial_intelligence"
+  starting_query: "What are the most promising emergent capabilities in LLMs?"
   max_iterations: 800
   exploration_temperature: 0.9
   save_graph_interval: 50

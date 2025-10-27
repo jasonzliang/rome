@@ -104,7 +104,8 @@ You navigate through information space systematically yet creatively, always wit
                 self.allowed_domains = [netloc] if netloc else ["*"]
                 self.logger.info(f"Auto-extracted domain: {netloc}" if netloc else "Cannot extract domain - allowing ALL domains")
             else:
-                raise ValueError("Must provide starting_url, starting_query, and/or allowed_domains")
+                raise ValueError(
+                    "Must provide starting_url, starting_query, and/or allowed_domains")
 
         self.allow_all_domains = "*" in self.allowed_domains
         if self.allow_all_domains:
