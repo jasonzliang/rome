@@ -74,11 +74,11 @@ DEFAULT_CONFIG = {
     "AgentMemory": {
         "enabled": False,  # Enable/disable agent memory system
         "auto_recall": False,  # Automatically inject relevant memories into chat_completion
+        "clear_memory": False,  # Whether to automatically clear memory on startup
         "auto_remember": False,  # Automatically extract and store important interactions
         "auto_remember_len": 100,  # Minimum characters (prompt + response) to consider storing
         "recall_limit": 8,  # Number of most relevant memories to retrieve in recall()
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model for semantic search
-
         # DB settings (for tracking entities/relationships like file visits)
         "use_graph": False,  # Enable graph memory (neo4j/memgraph required)
         "graph_url": "bolt://localhost:7687",  # Graph database connection URL

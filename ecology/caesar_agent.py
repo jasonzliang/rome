@@ -360,10 +360,8 @@ Your response must start with "Your role:" followed by the adapted role descript
                     return f.read()
 
             # Remote URL handling
-            response = requests.get(url,
-                timeout=REQUESTS_TIMEOUT,
-                headers=REQUESTS_HEADERS,
-                allow_redirects=True)
+            response = requests.get(url, timeout=REQUESTS_TIMEOUT,
+                headers=REQUESTS_HEADERS, allow_redirects=True)
             response.raise_for_status()
 
             # PDF detection and extraction

@@ -37,7 +37,37 @@ class AgentMemory:
         self.memory = None
         if self.enabled:
             self._initialize_mem0()
-            # self.clear()
+
+            # Handle automatic or interactive memory clearing
+            if self.clear_memory: self.clear()
+            else: self._prompt_clear_memory()
+
+    def _prompt_clear_memory(self) -> None:
+        """Interactive prompt to ask user if they want to clear memory"""
+        results = self.memory.get_all(user_id=self.mem_id, limit=10000)
+        memory_count = len(results.get('results', [])) if results else 0
+        if self.use_graph:
+            result = self.memory.graph.graph.query(
+                "MATCH (n {user_id: $user_id}) RETURN count(n) as total",
+                {"user_id": self.mem_id}
+            )
+            memory_count += result[0]['total']
+            # self.logger.info(f"Found {result[0]['total']} graph nodes/relations")
+        if memory_count == 0:
+            self.logger.info("No existing memories, skipping clear"); return
+
+        # Display status
+        sep = '=' * 80
+        self.logger.info(f"\n{sep}\nAgent Memory Status for: {self.mem_id}\n{sep}")
+        self.logger.info(f"Found {memory_count} existing memories\n{sep}")
+
+        # Prompt and clear
+        response = input(f"Clear all existing memories? [y/N]: ").strip().lower()
+        if response in ('y', 'yes'):
+            self.logger.info("Clearing memories...")
+            self.logger.info("✓ Memories cleared successfully\n" if self.clear() else "✗ Failed to clear memories\n")
+        else:
+            self.logger.info("Keeping existing memories")
 
     # def _test_neo4j_connection(self) -> bool:
     #     """Test if Neo4j is accessible"""
