@@ -26,3 +26,4 @@ mem0ai[graph]
 # Ecology agent packages
 beautifulsoup4
 pygraphviz
+PyPDF2

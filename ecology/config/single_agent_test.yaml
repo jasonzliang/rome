@@ -12,16 +12,16 @@ Agent:
 # CAESAR-SPECIFIC CONFIGURATION
 # ============================================================================
 CaesarAgent:
-  starting_url: "https://arcprize.org/arc-agi"
+  # starting_url: "https://arxiv.org/pdf/1911.01547"
   starting_query: "What is ARC-AGI benchmark?"
   save_graph_interval: 1
   draw_graph: true
   max_iterations: 10
   synthesis_iterations: 5
 
-  # overwrite_role_file: config/self_transcendence.txt
-  adapt_role: true
-  adapt_role_file: config/adapt_role_insights.txt
+  overwrite_role_file: config/self_transcendence.txt
+  # adapt_role: true
+  # adapt_role_file: config/adapt_role_insights.txt
 
 # ============================================================================
 # LLM CONFIGURATION

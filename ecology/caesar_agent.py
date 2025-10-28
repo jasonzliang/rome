@@ -1,15 +1,18 @@
 """Caesar Agent - Web exploration agent with graph-based navigation"""
-import networkx as nx
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
-from bs4 import BeautifulSoup
 import copy
+import io
 import requests
 import json
 import os
 import sys
 import time
 from datetime import datetime
+
+import networkx as nx
+from bs4 import BeautifulSoup
+from PyPDF2 import PdfReader
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.base_agent import BaseAgent
@@ -344,21 +347,37 @@ Your response must start with "Your role:" followed by the adapted role descript
         return any(domain in parsed.netloc for domain in self.allowed_domains)
 
     def _fetch_html(self, url: str) -> Optional[str]:
-        """Fetch HTML content"""
+        """Fetch HTML or PDF content from URL or local file"""
         try:
+            # Local file handling
             if url.startswith('file://'):
-                file_path = url[7:]  # Remove 'file://' prefix
+                file_path = url[7:]
+                if file_path.lower().endswith('.pdf'):
+                    with open(file_path, 'rb') as f:
+                        text = '\n\n'.join(page.extract_text() for page in PdfReader(f).pages)
+                    return f"<html><body><div>{text}</div></body></html>"
                 with open(file_path, 'r', encoding='utf-8') as f:
                     return f.read()
 
+            # Remote URL handling
             response = requests.get(url,
-                headers=REQUESTS_HEADERS,
                 timeout=REQUESTS_TIMEOUT,
+                headers=REQUESTS_HEADERS,
                 allow_redirects=True)
             response.raise_for_status()
+
+            # PDF detection and extraction
+            is_pdf = ('application/pdf' in response.headers.get('content-type', '').lower() or
+                      response.content[:4] == b'%PDF')
+            if is_pdf:
+                text = '\n\n'.join(page.extract_text()
+                                  for page in PdfReader(io.BytesIO(response.content)).pages)
+                return f"<html><body><div>{text}</div></body></html>"
+
             return response.text
-        except (requests.exceptions.RequestException, IOError, OSError) as e:
-            self.logger.error(f"Failed to fetch {url}: {e}")
+
+        except Exception as e:
+            self.logger.error(f"Fetch failed for {url}: {e}")
             return None
 
     def _extract_links(self, html: str, base_url: str) -> List[Tuple[str, str]]:
@@ -396,7 +415,7 @@ Your response must start with "Your role:" followed by the adapted role descript
 
         return links
 
-    def _extract_text_from_html(self, html: str, max_length: int = LONGEST_SUMMARY_LEN*100) -> str:
+    def _extract_text_from_html(self, html: str, max_length: int = LONGEST_SUMMARY_LEN*150) -> str:
         """Extract clean text content from HTML"""
         try:
             soup = BeautifulSoup(html, 'html.parser')
@@ -492,6 +511,9 @@ Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in len
             self.current_depth = len(self.url_stack)  # Derive from stack
             self.logger.debug(f"Backtracked to parent link: {self.current_url}")
             return True
+        else:
+            self.logger.error(
+                f"Cannot backtrack, no parent link for {self.current_url} (url_stack size <= 1)")
         return False
 
     def _get_parent_url(self):
@@ -645,6 +667,9 @@ Your response must be valid JSON only, nothing else."""
 
     def act(self, links: List[Tuple[str, str]]) -> Optional[str]:
         """Phase 3: Choose next URL based on accumulated knowledge"""
+        if not links and len(self.url_stack) == 1:
+            self.logger.error("[ACT] No links at starting_url - exploration exhausted")
+            return ""
         if self.current_depth > self.max_depth or not links:
             self._backtrack(); return self.current_url
 
@@ -733,7 +758,7 @@ Your response must be valid JSON only, nothing else."""
     def explore(self) -> str:
         """Execute main exploration loop"""
         start_iteration = self.current_iteration + 1
-        self.logger.info(f"Beginning exploration: iterations {start_iteration} to {self.max_iterations}")
+        self.logger.info(f"[EXPLORE] Beginning exploration: iterations {start_iteration} to {self.max_iterations}")
 
         for iteration in range(start_iteration, self.max_iterations + 1):
             if self.shutdown_called: break
@@ -756,6 +781,9 @@ Your response must be valid JSON only, nothing else."""
 
             if iteration < self.max_iterations:
                 next_url = self.act(links)
+                if not next_url:
+                    self.logger.error("[EXPLORE] No links to explore, exiting loop early")
+                    break
 
             if iteration % self.save_graph_interval == 0 or iteration == self.max_iterations:
                 self._draw_graph_visualization(iteration)
@@ -766,7 +794,7 @@ Your response must be valid JSON only, nothing else."""
         self._draw_graph_visualization(self.current_iteration)
         self._save_checkpoint(self.current_iteration)
 
-        self.logger.info(f"\nExploration complete: visited {len(self.visited_urls)} pages")
+        self.logger.info(f"\n[EXPLORE] Exploration complete: visited {len(self.visited_urls)} pages")
         return self._synthesize_artifact()
 
     def _generate_qa_pairs_classic(self, queries: List[str]) -> List[Tuple[str, str]]:
