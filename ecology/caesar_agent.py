@@ -42,11 +42,11 @@ class CaesarAgent(BaseAgent):
         self._setup_allowed_domains()
         self._setup_brave_search()
         self._setup_knowledge_base()
+        self._update_role()
 
         if self._load_checkpoint():
             self.logger.info("Resumed from checkpoint")
         else:
-            self._update_role()
             self._setup_exploration_state()
             self.logger.info("Starting fresh exploration")
 
@@ -127,8 +127,6 @@ You navigate through information space systematically yet creatively, always wit
     def _update_role(self):
         """Adapt agent role based on starting URL content and optional insights"""
         try:
-            role_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.updated_role.txt")
-
             # Check overwrite (highest priority)
             if self.overwrite_role_file and os.path.exists(self.overwrite_role_file):
                 with open(self.overwrite_role_file, 'r', encoding='utf-8') as f:
@@ -140,12 +138,13 @@ You navigate through information space systematically yet creatively, always wit
             if not self.adapt_role: return
 
             # Check cached adapted role
-            # if os.path.exists(role_file) and os.path.getsize(role_file) > 0:
-            #     with open(role_file, 'r', encoding='utf-8') as f:
-            #         if cached_role := f.read().strip():
-            #             self.role = cached_role
-            #             self.logger.info(f"[ADAPT ROLE] Using cached adapted role:\n{self.role}")
-            #             return
+            role_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.updated_role.txt")
+            if os.path.exists(role_file) and os.path.getsize(role_file) > 0:
+                with open(role_file, 'r', encoding='utf-8') as f:
+                    if cached_role := f.read().strip():
+                        self.role = cached_role
+                        self.logger.info(f"[ADAPT ROLE] Using cached adapted role:\n{self.role}")
+                        return
 
             # Fetch and extract content
             self.logger.info(f"[ADAPT ROLE] Analyzing {self.starting_url}")
@@ -317,7 +316,8 @@ Your response must start with "Your role:" followed by the adapted role descript
             # self.failed_urls = set(data['failed_urls'])
             self.failed_urls = set()
             self.url_stack = data['url_stack']
-            self.role = data['role']
+            # Backwards compatibility with old checkpoints, remove in future
+            self.role = data.get('role', self.role)
 
             if not self.url_stack:
                 self.logger.error("Invalid checkpoint: empty url_stack")
@@ -769,12 +769,13 @@ Your response must be valid JSON only, nothing else."""
         self.logger.info(f"\nExploration complete: visited {len(self.visited_urls)} pages")
         return self._synthesize_artifact()
 
-    def _execute_queries(self, queries: List[str]) -> List[Tuple[str, str]]:
+    def _generate_qa_pairs_classic(self, queries: List[str]) -> List[Tuple[str, str]]:
         """Execute queries against KB"""
         qa_pairs = []
         for query in queries:
             try:
-                answer = self.kb_manager.query(query)
+                answer = self.kb_manager.query(query,
+                    top_k=self.synthesis_top_k, top_n=self.synthesis_top_n)
                 if answer:
                     qa_pairs.append((query, answer))
             except Exception as e:
@@ -794,6 +795,7 @@ Your response must be valid JSON only, nothing else."""
         prompt = f"""Previous exploration queries and responses:
 {context}
 
+Your task:
 Based on the insights gathered so far, what is the next most important question to ask
 to deepen understanding and reveal emergent patterns? The question should:
 - Build on previous insights rather than repeat them
@@ -818,7 +820,7 @@ Respond with JSON:
             self.logger.error(f"Query generation failed: {e}")
         return None
 
-    def _generate_synthesis_qa_pairs(self, mode: str) -> List[Tuple[str, str]]:
+    def _generate_qa_pairs(self, mode: str) -> List[Tuple[str, str]]:
         """Generate Q&A pairs by querying KB"""
         queries = [
             "What are the central themes and patterns discovered?",
@@ -830,19 +832,19 @@ Respond with JSON:
         if self.starting_query is not None:
             queries = [self.starting_query] + queries
         if mode == "classic":
-            return self._execute_queries(queries)
+            return self._generate_qa_pairs_classic(queries)
 
         # Iterative mode
         queries = [queries[0]]
         answers = []
 
         for i in range(self.synthesis_iterations):
-            self.logger.info(f"[SYNTHESIS {i+1}/{self.synthesis_iterations}] {queries[-1]}")
-
-            answer = self.kb_manager.query(queries[-1])
-            if not answer:
-                break
+            answer = self.kb_manager.query(queries[-1],
+                top_k=self.synthesis_top_k, top_n=self.synthesis_top_n)
+            if not answer: break
             answers.append(answer)
+
+            self.logger.info(f"[SYNTHESIS {i+1}/{self.synthesis_iterations}]\nQ: {queries[-1]}\nA: {answers[-1]}")
 
             if i < self.synthesis_iterations - 1:
                 next_query = self._generate_next_query(queries, answers)
@@ -860,7 +862,7 @@ Respond with JSON:
         if self.kb_manager.size() == 0:
             return {"abstract": "", "artifact": "No insights collected during exploration."}
 
-        qa_pairs = self._generate_synthesis_qa_pairs(mode)
+        qa_pairs = self._generate_qa_pairs(mode)
         if not qa_pairs:
             return {"abstract": "", "artifact": "Unable to generate synthesis questions."}
 

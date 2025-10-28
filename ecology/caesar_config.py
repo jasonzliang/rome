@@ -39,10 +39,14 @@ CAESAR_CONFIG = {
             "timeout": 120,
         },
 
-        # False for classic mode
+        # Set to False for classic mode (ask all queries at once)
         "iterative_synthesis": True,
-        # Number of q/a iterations
+        # Number of Q/A iterations
         "synthesis_iterations": 10,
+        # Top_k for synthesis query and retrieval from DB
+        "synthesis_top_k": 50,
+        # Top_n for synthesis query and retrieval from DB
+        "synthesis_top_n": 10,
 
         # Overwrites the default role with new role from file, order is [overwrite] -> [adapt]
         "overwrite_role_file": None,

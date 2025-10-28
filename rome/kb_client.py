@@ -267,7 +267,7 @@ class ChromaClientManager:
 
         return True
 
-    def query(self, question, top_k=None):
+    def query(self, question, top_k=None, top_n=None):
         """Enhanced query with LLMRerank and empty collection validation"""
         try:
             # Check if collection is empty before proceeding
@@ -277,15 +277,13 @@ class ChromaClientManager:
             should_rerank = self.reranker is not None
             if should_rerank:
                 top_k = max([top_k or self.rerank_top_k, self.rerank_top_n, 1])
-                # self.logger.assert_true(top_k >= self.rerank_top_n,
-                    # "top_k must be >= top_n for reranking")
             else:
                 top_k = max(top_k or self.top_k, 1)
 
             if should_rerank:
                 # Get more documents for reranking (use simple multiplier)
                 nodes = self._retrieve_nodes(question, top_k)
-                response = self._rerank_and_respond(question, nodes)
+                response = self._rerank_and_respond(question, nodes, top_n)
             else:
                 # Standard query without reranking
                 response = self._standard_query(question, top_k)
@@ -311,8 +309,11 @@ class ChromaClientManager:
         self.logger.debug(f"Using retriever (n={retrieval_k}) for query")
         return retriever.retrieve(question)
 
-    def _rerank_and_respond(self, question: str, nodes) -> str:
+    def _rerank_and_respond(self, question: str, nodes: list, top_n=None) -> str:
         """Handle reranking with LLMRerank and response generation"""
+        top_n = max([top_n or self.rerank_top_n, self.rerank_top_n, 1])
+        if top_n != self.rerank_top_n: self.reranker = LLMRerank(top_n=top_n, llm=self.llm)
+
         # Use LLMRerank to rerank nodes
         reranked_nodes = self.reranker.postprocess_nodes(nodes, query_str=question)
 
@@ -322,7 +323,7 @@ class ChromaClientManager:
         # Generate response
         response = self.response_synthesizer.synthesize(question, nodes=reranked_nodes)
 
-        self.logger.debug(f"Using reranker (n={self.rerank_top_n}) for query")
+        self.logger.debug(f"Using reranker (n={top_n}) for query")
         return response
 
     def _standard_query(self, question: str, top_k: int) -> str:
