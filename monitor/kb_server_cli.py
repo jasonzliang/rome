@@ -316,8 +316,11 @@ class CollectionManager:
                     print(f"   Deleting existing collection '{collection_name}'")
                     client.delete_collection(collection_name)
                 else:
-                    print(f"   Collection '{collection_name}' already exists (use --overwrite to replace)")
-                    return False
+                    if not confirm_action(f"   Collection '{collection_name}' already exists. Overwrite?"):
+                        print(f"   Skipping import for '{collection_name}'")
+                        return False
+                    print(f"   Deleting existing collection '{collection_name}'")
+                    client.delete_collection(collection_name)
         except Exception as e:
             print(f"   Warning: Could not check existing collections: {e}")
 
