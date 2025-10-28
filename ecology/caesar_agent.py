@@ -878,10 +878,10 @@ Key patterns emerged through querying and analyzing gathered insights
 
 Drawing heavily upon the key patterns that emerged from the insights, create a novel, exciting, and thought provoking artifact{starting_query_task}:
 
-1. **Abstract of Artifact** (100-150 tokens):
-    - Summary of core discovery and its significance
+1. **Artifact Abstract** (100-150 tokens):
+    - Summary of the artifact's core discovery and its significance
 
-2. **Artifact** (1000-3000 tokens):
+2. **Artifact Main Text** (1000-3000 tokens):
     - Emergent patterns not visible in individual sources
     - Novel discoveries and unexpected connections
     - Tensions, contradictions, or open questions

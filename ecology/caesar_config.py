@@ -2,9 +2,9 @@
 MAX_NUM_LINKS = 2000
 # Maximum number of visited links to consider when selecting next webpage
 MAX_NUM_VISITED_LINKS = 1000
-# Timeout for fetch webpage html using requests
+# Timeout for fetching webpage html using requests
 REQUESTS_TIMEOUT = 10
-# Headers to use for requests
+# Headers to use for requests when fetching html
 REQUESTS_HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
