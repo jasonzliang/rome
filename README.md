@@ -1,4 +1,6 @@
-![Alt text](https://img.freepik.com/premium-photo/ancient-roman-gladiator-entering-colosseum-back-view-ai_894067-4649.jpg)
+<p align="center">
+  <img src="https://img.freepik.com/premium-photo/ancient-roman-gladiator-entering-colosseum-back-view-ai_894067-4649.jpg" alt="Rome" width="500"/>
+</p>
 
 # Rome
 
