@@ -20,7 +20,7 @@ from rome.logger import get_logger
 from rome.kb_client import ChromaClientManager
 
 from .brave_search import BraveSearch
-from .caesar_config import CAESAR_CONFIG, MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS
+from .caesar_config import CAESAR_CONFIG, MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS, REQUESTS_TIMEOUT, REQUESTS_HEADERS
 
 
 class CaesarAgent(BaseAgent):
@@ -352,8 +352,8 @@ Your response must start with "Your role:" followed by the adapted role descript
                     return f.read()
 
             response = requests.get(url,
-                timeout=5,
-                headers={'User-Agent': 'CaesarBot/1.0'},
+                headers=REQUESTS_HEADERS,
+                timeout=REQUESTS_TIMEOUT,
                 allow_redirects=True)
             response.raise_for_status()
             return response.text
