@@ -1,5 +1,6 @@
 # Library core packages
 colorama
+networkx
 numpy
 openai
 portalocker
