@@ -37,7 +37,7 @@ class AgentMemory:
         self.memory = None
         if self.enabled:
             self._initialize_mem0()
-            self.clear()
+            # self.clear()
 
     # def _test_neo4j_connection(self) -> bool:
     #     """Test if Neo4j is accessible"""

@@ -869,14 +869,16 @@ Respond with JSON:
         perspectives = "\n\n\n".join([f"({i+1}) Question: {q}\n\nAnswer: {a}"
                                      for i, (q, a) in enumerate(qa_pairs)])
 
+        starting_query_task = f" that creatively answers this query - {self.starting_query}" if self.starting_query else ""
+
         prompt = f"""You explored {len(self.visited_urls)} sources and gathered {self.kb_manager.size()} insights.
 
 Key patterns emerged through querying and analyzing gathered insights
 {perspectives}
 
-Drawing heavily upon the key patterns that emerged from the insights, create a novel, exciting, and thought provoking artifact with two parts:
+Drawing heavily upon the key patterns that emerged from the insights, create a novel, exciting, and thought provoking artifact{starting_query_task}:
 
-1. **Abstract** (100-150 tokens):
+1. **Abstract of Artifact** (100-150 tokens):
     - Summary of core discovery and its significance
 
 2. **Artifact** (1000-3000 tokens):
@@ -887,7 +889,6 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
 
 IMPORTANT: Try to keep the artifact easy to understand and use simple English as much as possible
 IMPORTANT: Use your role as a guide on how to respond!
-
 Respond with valid JSON only:
 {{
     "abstract": "<abstract text>",
