@@ -136,7 +136,7 @@ class BraveSearch:
                 last_exception = e
                 self.logger.error(f"Request timeout. Retry {attempt + 1}/{self.max_retries} after {delay}s...")
                 time.sleep(delay)
-                delay *= self.backoff_multiplier
+                delay *= BACKOFF_MULTIPLIER
 
                 if attempt == self.max_retries - 1:
                     raise BraveSearchError(f"Request timeout after {self.max_retries} retries") from e
@@ -145,7 +145,7 @@ class BraveSearch:
                 last_exception = e
                 self.logger.error(f"Network error. Retry {attempt + 1}/{self.max_retries} after {delay}s...")
                 time.sleep(delay)
-                delay *= self.backoff_multiplier
+                delay *= BACKOFF_MULTIPLIER
 
                 if attempt == self.max_retries - 1:
                     raise BraveSearchError(f"Network error after {self.max_retries} retries") from e

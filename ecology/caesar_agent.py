@@ -251,11 +251,11 @@ Your response must start with "Your role:" followed by the adapted role descript
 
     def _save_checkpoint(self, iteration: int) -> None:
         """Save exploration state with optional graph data"""
-        if not self.url_stack:
-            self.logger.error("Cannot save checkpoint: empty url_stack")
-            return
-
         try:
+            if not self.url_stack:
+                error_msg = f"Cannot save checkpoint on iteration {iteration}: empty url_stack"
+                raise RuntimeError(error_msg)
+
             checkpoint_data = {
                 'iteration': iteration,
                 'current_url': self.current_url,
@@ -687,7 +687,7 @@ Your response must be valid JSON only, nothing else."""
         self.remember(
             f"Agent navigated from {self.current_url} to visit {next_url} "
             f"(from domain {current_domain} to domain {next_domain}). "
-            f"Navigation performed on iteration {self.current_depth} at depth {self.current_depth}. "
+            f"Navigation performed on iteration {self.current_iteration} at depth {self.current_depth}. "
             f"Agent selected new webpage from {len(links)} options because: {reason}",
             context="navigation",
             metadata={
