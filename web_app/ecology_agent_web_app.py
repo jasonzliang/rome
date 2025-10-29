@@ -21,6 +21,27 @@ st.set_page_config(page_title="Ecology Agent Graph Explorer", layout="wide")
 # ============================================================================
 # DATA LOADING & PROCESSING
 # ============================================================================
+NLTK_STOPWORDS = {
+    'i', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', "you're",
+    "you've", "you'll", "you'd", 'your', 'yours', 'yourself', 'yourselves', 'he',
+    'him', 'his', 'himself', 'she', "she's", 'her', 'hers', 'herself', 'it', "it's",
+    'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'what', 'which',
+    'who', 'whom', 'this', 'that', "that'll", 'these', 'those', 'am', 'is', 'are',
+    'was', 'were', 'be', 'been', 'being', 'have', 'has', 'had', 'having', 'do',
+    'does', 'did', 'doing', 'a', 'an', 'the', 'and', 'but', 'if', 'or', 'because',
+    'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with', 'about', 'against',
+    'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
+    'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again',
+    'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all',
+    'both', 'each', 'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor',
+    'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 's', 't', 'can',
+    'will', 'just', 'don', "don't", 'should', "should've", 'now', 'd', 'll', 'm',
+    'o', 're', 've', 'y', 'ain', 'aren', "aren't", 'couldn', "couldn't", 'didn',
+    "didn't", 'doesn', "doesn't", 'hadn', "hadn't", 'hasn', "hasn't", 'haven',
+    "haven't", 'isn', "isn't", 'ma', 'mightn', "mightn't", 'mustn', "mustn't",
+    'needn', "needn't", 'shan', "shan't", 'shouldn', "shouldn't", 'wasn', "wasn't",
+    'weren', "weren't", 'won', "won't", 'wouldn', "wouldn't"
+}
 
 def extract_label_from_url(url):
     """Extract clean label from URL, handling trailing slashes and empty segments."""
@@ -180,7 +201,7 @@ def train_word2vec_model(graphs):
         G = create_graph_object(data)
         for node in G.nodes():
             insights = G.nodes[node].get('insights', '')
-            words = re.findall(r'\b[a-z0-9]{2,}\b', insights.lower())
+            words = re.findall(r'\b[a-z0-9]{4,}\b', insights.lower())
             if len(words) > 4:
                 sentences.append(words)
 
@@ -246,7 +267,7 @@ def get_topic_embeddings(graphs, model):
             topic_label = extract_label_from_url(node)
             topic_to_url[topic_label] = node
             insights = G.nodes[node].get('insights', '')
-            words = [w for w in re.findall(r'\b[a-z0-9]{2,}\b', insights.lower()) if w in model.wv]
+            words = [w for w in re.findall(r'\b[a-z0-9]{4,}\b', insights.lower()) if w in model.wv]
 
             if words:
                 topic_vectors[topic_label] = np.mean([model.wv[w] for w in words], axis=0)
@@ -607,7 +628,8 @@ with tab4:
                     insights = G.nodes[node].get('insights', '')
                     words = re.findall(r'\b[a-z]{4,}\b', insights.lower())  # words 4+ chars
                     for word in words:
-                        topic_word_freq[word] = topic_word_freq.get(word, 0) + 1
+                        if word not in NLTK_STOPWORDS:
+                            topic_word_freq[word] = topic_word_freq.get(word, 0) + 1
 
             if topic_word_freq:
                 sorted_keywords = sorted(topic_word_freq.items(), key=lambda x: x[1], reverse=True)[:20]
@@ -623,7 +645,19 @@ with tab4:
                 with col2:
                     top_keyword = sorted_keywords[0][0]
                     st.markdown(f"**Topics containing '{top_keyword}':**")
-                    matching_topics = [t for t in topic_vectors.keys() if top_keyword in t.lower()]
+                    matching_topics = []
+                    for topic in topic_vectors.keys():
+                        url = topic_to_url.get(topic)
+                        if url:
+                            # Search across all graphs for this node's insights
+                            for data in graphs.values():
+                                G = create_graph_object(data)
+                                if url in G.nodes():
+                                    insights = G.nodes[url].get('insights', '').lower()
+                                    if top_keyword in insights:
+                                        matching_topics.append(topic)
+                                        break  # Found it, no need to check other iterations
+
                     for topic in matching_topics[:10]:
                         st.write(f"• {topic}")
                     if len(matching_topics) > 10:
