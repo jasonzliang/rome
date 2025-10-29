@@ -181,13 +181,12 @@ def train_word2vec_model(graphs):
         for node in G.nodes():
             insights = G.nodes[node].get('insights', '')
             words = re.findall(r'\b[a-z0-9]{2,}\b', insights.lower())
-            if len(words) > 5:
+            if len(words) > 4:
                 sentences.append(words)
 
-    if len(sentences) < 2:
-        return None
+    if len(sentences) < 2: return None
     return Word2Vec(sentences=sentences, vector_size=100, window=8, min_count=1,
-                   workers=multiprocessing.cpu_count(), epochs=20, sg=0, negative=10, seed=42)
+                   workers=multiprocessing.cpu_count(), epochs=30, sg=0, negative=10, seed=42)
 
 def compute_insight_vector(model, insights):
     """Compute average vector for insights text."""
@@ -206,15 +205,7 @@ def compute_topic_similarity(vec1, vec2):
     return float(np.dot(vec1, vec2) / norm_product)
 
 def compute_all_similarities(model, nodes_data):
-    """Efficiently compute all pairwise similarities using vectorized operations.
-
-    Args:
-        model: Word2Vec model
-        nodes_data: List of (url, insights) tuples
-
-    Returns:
-        Dict mapping (url1, url2) to similarity score
-    """
+    """Efficiently compute all pairwise similarities using vectorized operations."""
     # Precompute all insight vectors
     vectors = []
     valid_urls = []
