@@ -575,13 +575,25 @@ with tab4:
             G_latest = create_graph_object(graphs[max(graphs.keys())])
             starting_url = G_latest.graph.get('starting_url')
             starting_topic = extract_label_from_url(starting_url) if starting_url else None
-            node_colors = ['red' if t == starting_topic else i for i, t in enumerate(topics)]
+            node_colors = []
+            for t in topics:
+                if t == starting_topic:
+                    node_colors.append('red')
+                else:
+                    url = topic_to_url.get(t)
+                    # Find depth from any graph containing this node
+                    depth = 0
+                    for data in graphs.values():
+                        if url in G_latest.nodes():
+                            depth = G_latest.nodes[url].get('depth', 0)
+                            break
+                    node_colors.append(depth)
 
             embedding_fig = go.Figure(go.Scatter(
                 x=coords[:, 0], y=coords[:, 1], mode='markers',
-                hovertext=[f"<b>{t}</b><br>Index: {i}{' (Start)' if t == starting_topic else ''}" for i, t in enumerate(topics)],
+                hovertext=[f"<b>{t}</b><br>Depth: {node_colors[i]}{' (Start)' if t == starting_topic else ''}" for i, t in enumerate(topics)],
                 marker=dict(size=10, color=node_colors, colorscale='Viridis', showscale=True,
-                           colorbar=dict(title="Topic Index"))))
+                           colorbar=dict(title="Depth"))))
             embedding_fig.update_layout(title='Topic Embedding Space (t-SNE)', xaxis_title='Dimension 1',
                                        yaxis_title='Dimension 2', height=600, hovermode='closest')
             st.plotly_chart(embedding_fig, config={'displayModeBar': True, 'responsive': True})
@@ -589,9 +601,12 @@ with tab4:
             st.subheader("📚 Top Topic Keywords by Frequency")
             st.caption("Most frequently occurring words across all topics")
             topic_word_freq = {}
-            for topic in topic_vectors.keys():
-                for word in topic.lower().split():
-                    if len(word) > 3:
+            for data in graphs.values():
+                G = create_graph_object(data)
+                for node in G.nodes():
+                    insights = G.nodes[node].get('insights', '')
+                    words = re.findall(r'\b[a-z]{4,}\b', insights.lower())  # words 4+ chars
+                    for word in words:
                         topic_word_freq[word] = topic_word_freq.get(word, 0) + 1
 
             if topic_word_freq:
