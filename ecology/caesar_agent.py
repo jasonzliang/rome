@@ -934,9 +934,10 @@ Respond with valid JSON only:
             "pages_visited": len(self.visited_urls),
             "insights_collected": self.kb_manager.size(),
             "synthesis_mode": mode,
-            "queries_used": len(qa_pairs),
+            "synthesis_queries": len(qa_pairs),
             "max_depth": self.current_depth,
-            "starting_url": self.starting_url
+            "starting_url": self.starting_url,
+            "starting_query": self.starting_query,
         }
 
         self._save_synthesis_outputs(result)
