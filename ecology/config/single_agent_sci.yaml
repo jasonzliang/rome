@@ -12,8 +12,8 @@ Agent:
 # CAESAR-SPECIFIC CONFIGURATION
 # ============================================================================
 CaesarAgent:
-  # starting_url: "https://en.wikipedia.org/wiki/Science"
-  starting_query: "What are the most effective approaches to combining evolutionary algorithms with LLMs for optimization and decision-making??"
+  starting_url: "https://en.wikipedia.org/wiki/Science"
+  # starting_query: "What are the most effective approaches to combining evolutionary algorithms with LLMs for optimization and decision-making??"
   max_iterations: 1000
   save_graph_interval: 50
   synthesis_iterations: 25
@@ -22,7 +22,7 @@ CaesarAgent:
     model: gpt-5
 
   adapt_role: True
-  adapt_role_file: config/adapt_role_insights.txt
+  adapt_role_file: config/self_transcend_insights.txt
 
 # ============================================================================
 # LLM CONFIGURATION
