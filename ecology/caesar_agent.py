@@ -470,7 +470,7 @@ Your response must start with "Your role:" followed by the adapted role descript
 
         prompt = f"""Analyze this content and extract key insights focusing on:
 - Novel patterns or unexpected connections
-- Assumptions being made and reasoning behind them
+- Assumptions being made and possible alternative perspectives
 - Interesting questions raised by the content
 - How this builds upon or challenges previous and related insights
 
