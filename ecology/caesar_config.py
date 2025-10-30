@@ -2,6 +2,8 @@
 MAX_NUM_LINKS = 2000
 # Maximum number of visited links to consider when selecting next webpage
 MAX_NUM_VISITED_LINKS = 1000
+# Maximum of neighboring nodes to look for related insights
+MAX_NUM_NEIGHBORS = 10
 # Timeout for fetching webpage html using requests
 REQUESTS_TIMEOUT = 10
 # Headers to use for requests when fetching html

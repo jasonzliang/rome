@@ -465,7 +465,11 @@ with tab1:
     st.header("Individual Graph Visualization")
     col1, col2 = st.columns([2, 1])
     with col1:
-        iteration = st.select_slider("Select Iteration", options=list(graphs.keys()), value=max(graphs.keys()))
+        if len(graphs.keys()) > 1:
+            iteration = st.select_slider("Select Iteration", options=list(graphs.keys()), value=max(graphs.keys()))
+        else:
+            st.warning("Need at least 2 checkpoints for select iteration")
+            iteration = list(graphs.keys())[0]
     with col2:
         layout = st.selectbox("Layout Algorithm", ['kamada', 'spring', 'circular', 'shell'], index=0)
 

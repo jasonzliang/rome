@@ -23,7 +23,7 @@ from rome.logger import get_logger
 from rome.kb_client import ChromaClientManager
 
 from .brave_search import BraveSearch
-from .caesar_config import CAESAR_CONFIG, MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS, REQUESTS_TIMEOUT, REQUESTS_HEADERS
+from .caesar_config import MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS, MAX_NUM_NEIGHBORS, REQUESTS_TIMEOUT, REQUESTS_HEADERS, CAESAR_CONFIG
 
 
 class CaesarAgent(BaseAgent):
@@ -447,19 +447,32 @@ Your response must start with "Your role:" followed by the adapted role descript
     def think(self, content: str) -> str:
         """Phase 2: Analyze content and extract insights"""
         self.logger.info("[THINK] Analyzing content")
-        prev_insights = self.graph.nodes[self.current_url].get('insights', '') if self.current_url in self.graph.nodes else ''
-        # if self.current_url in self.visited_urls:
-        #     self.visited_urls[self.current_url] += 1
-        #     self.logger.info(
-        #         f"[THINK] Already analyzed ({self.visited_urls[self.current_url]} visits), skipping")
-        #     return prev_insights
         if not content: return ""
+
+        prev_insights = ''; related_insights = ''
+        if self.current_url in self.graph.nodes:
+            prev_insights = self.graph.nodes[self.current_url].get('insights', '')
+
+            # Get neighbor URLs (not node dicts)
+            neighbors = (set(self.graph.successors(self.current_url)) |
+                         set(self.graph.predecessors(self.current_url))) - {self.current_url}
+
+            # Get insights from neighbor nodes
+            related_insights = [
+                (n, self.graph.nodes[n].get('insights', ''))
+                for n in neighbors if n in self.graph.nodes
+                and self.graph.nodes[n].get('insights')
+            ]
+            related_insights = "\n\n".join(
+                f"[{i+1}] Source: {url}\n{insight}"
+                for i, (url, insight) in enumerate(related_insights[:MAX_NUM_NEIGHBORS])
+            )
 
         prompt = f"""Analyze this content and extract key insights focusing on:
 - Novel patterns or unexpected connections
-- Assumptions being made and alternatives
-- Questions raised by the content
-- How this builds upon or challenges previous insights
+- Assumptions being made and reasoning behind them
+- Interesting questions raised by the content
+- How this builds upon or challenges previous and related insights
 
 IMPORTANT: Use your role as a guide on how to respond!
 
@@ -468,6 +481,9 @@ CONTENT:
 
 PREVIOUS INSIGHTS:
 {prev_insights if prev_insights else 'No previous insights available'}
+
+RELATED INSIGHTS:
+{related_insights if related_insights else 'No related insights available'}
 
 Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in length total:"""
 
