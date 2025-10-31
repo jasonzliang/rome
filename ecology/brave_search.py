@@ -75,25 +75,18 @@ class BraveSearch:
         return f"{safe_query}_{query_hash}.html"
 
     def search_and_save(self, queries: Union[str, List[str]]) -> str:
-        """Execute search with retries and return local file URL
-
-        Args:
-            queries: Single query string or list of query strings
-
-        Returns:
-            Local file URL to saved HTML results
-        """
+        """Execute search with retries and return local file URL"""
         # Normalize to list
+        query_list = [queries] if isinstance(queries, str) else queries
+        self.logger.debug(f"Brave search queries: {query_list}")
+
+        # Setup file name and check cached file
         filename = self._generate_filename(query_list[0] if len(query_list) == 1
-                                          else f"merged_{len(query_list)}_queries")
+            else f"merged_{len(query_list)}_queries")
         html_file = os.path.abspath(os.path.join(self.output_dir, filename))
         if os.path.exists(html_file):
             self.logger.debug(f"Using cached search results html file: {html_file}")
             return f"file://{html_file}"
-
-        query_list = [queries] if isinstance(queries, str) else queries
-
-        self.logger.debug(f"Brave search queries: {query_list}")
 
         # Execute all searches
         all_results = []
