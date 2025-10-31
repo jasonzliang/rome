@@ -48,4 +48,4 @@ AgentMemory:
 # ============================================================================
 Logger:
   include_caller_info: "rome"
-  level: "info"
+  level: "debug"
