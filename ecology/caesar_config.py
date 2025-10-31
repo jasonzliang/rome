@@ -51,7 +51,7 @@ CAESAR_CONFIG = {
 
         # Whether to follow links that point to the same page (different fragments)
         "same_page_links": False,
-        # Maximum times to allow agent to return to page it has seen before
+        # Maximum times to revisiting page it has seen before during exploration
         "max_allowed_revisits": 20,
         # Whether to use new link display format or not
         "fancy_link_display": True,
