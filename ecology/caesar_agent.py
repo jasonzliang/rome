@@ -593,14 +593,16 @@ HISTORICAL NAVIGATION PATTERNS:
 {memory_context if memory_context else "No exploration history available."}
 
 CURRENT EXPLORATION CONTEXT:
+- Current iteration: {self.current_iteration}/{self.max_iterations}
 - Current depth: {self.current_depth}/{self.max_depth}
-- Pages visited: {len(self.visited_urls)}
+- Web pages visited: {len(self.visited_urls)}
+- Average visits per page: {float(np.mean(x) for x in self.visited_urls.values())}
 - Current URL: {self.current_url}
 
 Analyze whether the agent should:
-1. **REVISIT** previously seen links to deepen understanding of relevant known areas
-2. **EXPLORE** new unseen links to discover novel information or knowledge
-3. **BACKTRACK** to the immediate previous link to try alternative paths{web_search_option}
+1. **REVISIT** previously seen pages to deepen understanding of relevant known areas
+2. **EXPLORE** new unseen pages to discover novel information or knowledge
+3. **BACKTRACK** to the immediate previous page to try alternative paths{web_search_option}
 
 Consider:
 - Knowledge gaps vs areas of saturation
