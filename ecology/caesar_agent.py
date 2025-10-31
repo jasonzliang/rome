@@ -440,10 +440,10 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
 
             text = a.get_text(strip=True)[:LONGER_SUMMARY_LEN] or "[no text]"
 
-            if url not in seen and
-                self._is_allowed_url(url) and
-                url not in self.failed_urls and
-                self.visited_urls.get(url, 0) <= self.max_allowed_revisits and
+            if url not in seen and \
+                self._is_allowed_url(url) and \
+                url not in self.failed_urls and \
+                self.visited_urls.get(url, 0) <= self.max_allowed_revisits and \
                 url.startswith('http'):
                 links.append((url, text))
                 seen.add(url)
