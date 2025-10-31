@@ -4,7 +4,7 @@ import re
 import os
 import requests
 import sys
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Union, Tuple
 from datetime import datetime
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -23,6 +23,8 @@ SEARCH_RESULT_DIR = "search_result"
 MAX_NUM_RESULTS = 20
 # Multiplier for backoff during search
 BACKOFF_MULTIPLIER = 2
+# Delay in sec between each search to avoid hitting rate limit
+SEARCH_DELAY = 1
 
 
 class BraveSearchError(Exception):
@@ -69,19 +71,39 @@ class BraveSearch:
 
         return f"{safe_query}_{query_hash}.html"
 
-    def search_and_save(self, query: str) -> str:
-        """Execute search with retries and return local file URL"""
-        self.logger.debug(f"Brave search query: {query}")
+    def search_and_save(self, queries: Union[str, List[str]]) -> str:
+        """Execute search with retries and return local file URL
 
-        results = self._search_with_retry(query)
-        html = self._json_to_html(results, query)
-        self.logger.debug(f"Brave search results: {results}")
+        Args:
+            queries: Single query string or list of query strings
+
+        Returns:
+            Local file URL to saved HTML results
+        """
+        # Normalize to list
+        query_list = [queries] if isinstance(queries, str) else queries
+
+        self.logger.debug(f"Brave search queries: {query_list}")
+
+        # Execute all searches
+        all_results = []
+        for q in query_list:
+            all_results.append((q, self._search_with_retry(q)))
+            time.sleep(SEARCH_DELAY)
+
+        # Generate HTML (merged or single)
+        html = (self._json_to_html_merged(all_results) if len(query_list) > 1
+                else self._json_to_html(all_results[0][1], all_results[0][0]))
+
+        for _, results in all_results:
+            self.logger.debug(f"Brave search results: {results}")
 
         # Write html to file in log dir
         output_dir = os.path.join(self.agent.get_log_dir(), SEARCH_RESULT_DIR)
         os.makedirs(output_dir, exist_ok=True)
 
-        filename = self._generate_filename(query)
+        filename = self._generate_filename(query_list[0] if len(query_list) == 1
+                                          else f"merged_{len(query_list)}_queries")
         output_file = os.path.join(output_dir, filename)
         abs_path = os.path.abspath(output_file)
         with open(abs_path, 'w', encoding='utf-8') as f:
@@ -199,8 +221,8 @@ class BraveSearch:
 <body>
     <h1>Search Results: {api_query}</h1>
     <div class="query-info">
-        <strong>Original Query:</strong> {query}<br>
-        <strong>Results Found:</strong> {len(results)}
+        <strong>Query:</strong> {query}<br>
+        <strong>Search Results:</strong> {len(results)}
     </div>
 """
 
@@ -217,6 +239,63 @@ class BraveSearch:
         <div class="url">{url}</div>
         <div class="description">{description}</div>
         <div class="meta">Language: {language} | Published: {page_age}</div>
+    </div>
+"""
+
+        html += """
+</body>
+</html>
+"""
+        return html
+
+    def _json_to_html_merged(self, query_results: List[Tuple[str, Dict]]) -> str:
+        """Convert multiple query results to merged HTML"""
+        total_results = sum(len(results.get('web', {}).get('results', []))
+                          for _, results in query_results)
+
+        html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Merged Search Results</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; max-width: 1200px; margin: 20px auto; padding: 0 20px; }}
+        h1 {{ color: #1a0dab; border-bottom: 2px solid #ddd; padding-bottom: 10px; }}
+        h2 {{ color: #1a0dab; margin-top: 30px; font-size: 20px; }}
+        .summary {{ background: #f0f0f0; padding: 15px; margin: 20px 0; border-radius: 5px; }}
+        .result {{ margin: 15px 0; padding: 12px; border-left: 3px solid #4285f4; background: #f9f9f9; }}
+        .result h3 {{ margin: 0 0 6px 0; }}
+        .result a {{ color: #1a0dab; text-decoration: none; font-size: 16px; }}
+        .result a:hover {{ text-decoration: underline; }}
+        .url {{ color: #006621; font-size: 13px; margin: 4px 0; }}
+        .description {{ color: #545454; margin: 8px 0; line-height: 1.4; }}
+    </style>
+</head>
+<body>
+    <h1>Merged Search Results</h1>
+    <div class="summary">
+        <strong>Queries:</strong> {len(query_results)} | <strong>Total Search Results:</strong> {total_results}
+    </div>
+"""
+
+        for query, search_results in query_results:
+            results = search_results.get('web', {}).get('results', [])
+            api_query = search_results.get('query', {}).get('original', query)
+
+            html += f"""
+    <h2>Query: {api_query}</h2>
+"""
+
+            for r in results:
+                title = r.get('title', 'No Title')
+                url = r.get('url', '')
+                description = r.get('description', 'No description available')
+
+                html += f"""
+    <div class="result">
+        <h3><a href="{url}">{title}</a></h3>
+        <div class="url">{url}</div>
+        <div class="description">{description}</div>
     </div>
 """
 

@@ -16,14 +16,12 @@ from PyPDF2 import PdfReader
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.base_agent import BaseAgent
-from rome.config import (DEFAULT_CONFIG, set_attributes_from_config,
-                     SHORT_SUMMARY_LEN, SUMMARY_LENGTH, LONG_SUMMARY_LEN,
-                     LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN)
+from rome.config import set_attributes_from_config, DEFAULT_CONFIG, SHORT_SUMMARY_LEN, SUMMARY_LENGTH, LONG_SUMMARY_LEN, LONGER_SUMMARY_LEN, LONGEST_SUMMARY_LEN
 from rome.logger import get_logger
 from rome.kb_client import ChromaClientManager
 
 from .brave_search import BraveSearch
-from .caesar_config import MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS, MAX_NUM_NEIGHBORS, REQUESTS_TIMEOUT, REQUESTS_HEADERS, CAESAR_CONFIG
+from .caesar_config import MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS, MAX_NUM_NEIGHBORS, MAX_TEXT_LENGTH, REQUESTS_TIMEOUT, REQUESTS_HEADERS, CAESAR_CONFIG
 
 
 class CaesarAgent(BaseAgent):
@@ -115,12 +113,46 @@ You navigate through information space systematically yet creatively, always wit
             self.logger.info("Wildcard '*' detected - allowing ALL domains")
 
     def _setup_brave_search(self) -> None:
-        """Setup brave base"""
+        """Setup brave search"""
         if self.starting_query:
             old_starting_url = self.starting_url
             search_engine = BraveSearch(agent=self, config=self.config.get("BraveSearch", {}))
-            self.starting_url = search_engine.search_and_save(self.starting_query)
-            self.logger.info(f"Overwriting existing starting_url ({old_starting_url}) with starting_query ({self.starting_query}) search results")
+
+            # Generate additional queries if requested
+            queries = [self.starting_query]
+            if self.additional_starting_queries > 0:
+                try:
+                    prompt = f"""Given this query: "{self.starting_query}"
+
+Generate anywhere from 0 to {self.additional_starting_queries} additional search queries that would help comprehensively answer the original query. These queries should:
+- Explore different aspects or angles of the original query
+- Cover related concepts that provide essential context
+- Include specific technical or domain-specific variations
+- Be concise (1-6 words each for optimal search results)
+
+IMPORTANT: Use your role as a guide on how to respond!
+IMPORTANT: If no additional queries are generated, return an empty list
+
+Respond with valid JSON only:
+{{
+    "queries": ["query1", "query2", ...]
+}}"""
+
+                    response = self.chat_completion(
+                        prompt,
+                        response_format={"type": "json_object"}
+                    )
+                    result = self.parse_json_response(response)
+                    if result and result.get("queries"):
+                        additional = result["queries"][:self.additional_starting_queries]
+                        queries.extend(additional)
+                        self.logger.info(f"Generated {len(additional)} additional queries: {additional}")
+                except Exception as e:
+                    self.logger.error(f"Failed to generate additional queries: {e}")
+
+            # Execute search with all queries
+            self.starting_url = search_engine.search_and_save(queries)
+            self.logger.info(f"Overwriting existing starting_url ({old_starting_url}) with {len(queries)} query search results")
 
     def _setup_knowledge_base(self) -> None:
         """Setup knowledge base"""
@@ -413,7 +445,7 @@ Your response must start with "Your role:" followed by the adapted role descript
 
         return links
 
-    def _extract_text_from_html(self, html: str, max_length: int = LONGEST_SUMMARY_LEN*150) -> str:
+    def _extract_text_from_html(self, html: str, max_length: int = MAX_TEXT_LENGTH) -> str:
         """Extract clean text content from HTML"""
         try:
             soup = BeautifulSoup(html, 'html.parser')
@@ -468,16 +500,20 @@ Your response must start with "Your role:" followed by the adapted role descript
                 for i, (url, insight) in enumerate(related_insights[:MAX_NUM_NEIGHBORS])
             )
 
+        query_task = "- How to answer the query\n" if self.starting_query else ""
+        prev_insight_task = "- How this builds upon or challenges previous/related insights" if (prev_insights or related_insights) else ""
+
         prompt = f"""Analyze this content and extract key insights focusing on:
 - Novel patterns or unexpected connections
-- Assumptions being made and possible alternative perspectives
+- Assumptions being made and alternative perspectives
 - Interesting questions raised by the content
-- How this builds upon or challenges previous and related insights
-
-IMPORTANT: Use your role as a guide on how to respond!
+{query_task}{prev_insight_task}
 
 CONTENT:
 {content}
+
+QUERY:
+{self.starting_query if self.starting_query else 'No query is available'}
 
 PREVIOUS INSIGHTS:
 {prev_insights if prev_insights else 'No previous insights available'}
@@ -485,7 +521,10 @@ PREVIOUS INSIGHTS:
 RELATED INSIGHTS:
 {related_insights if related_insights else 'No related insights available'}
 
-Provide 3-5 concise, substantive insights that are roughly 250-500 tokens in length total:"""
+IMPORTANT: Use your role as a guide on how to respond!
+
+YOUR TASK:
+Depending on the complexity of the content, provide anywhere from 1 to 6 concise but substantive insights, but do not exceed ~800 tokens in total length:"""
 
         try:
             insights = self.chat_completion(
@@ -625,8 +664,11 @@ Provide a strategic recommendation in 2-3 sentences."""
         """Use LLM to select best link, returns (url, reason)"""
         kb_context = memory_context = explore_strategy = ""
         try:
-            kb_context = self.kb_manager.query(
-                "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?")
+            if self.starting_query:
+                kb_context = self.kb_manager.query(f"In order to answer this query ({self.starting_query}), what should we explore next?")
+            else:
+                kb_context = self.kb_manager.query(
+                    "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?")
             memory_context = self.recall(
                 f"What webpages have I frequently visited and what navigation patterns have emerged in relation to the following insights:\n{kb_context}")
             if self.use_explore_strategy:
@@ -850,7 +892,7 @@ IMPORTANT: Use your role as a guide on how to respond!
 Respond with JSON:
 {{
     "query": "<your next question>",
-    "reason": "<why this question deepens understanding>"
+    "reason": "<brief explanation of why this question deepens understanding>"
 }}"""
 
         try:
@@ -931,6 +973,7 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
 
 IMPORTANT: Try to keep the artifact easy to understand and use simple English as much as possible
 IMPORTANT: Use your role as a guide on how to respond!
+
 Respond with valid JSON only:
 {{
     "abstract": "<abstract text>",

@@ -13,7 +13,8 @@ Agent:
 # ============================================================================
 CaesarAgent:
   # starting_url: "https://arxiv.org/pdf/1911.01547"
-  starting_query: "What is ARC-AGI benchmark?"
+  starting_query: "Novel way to solve ARC-AGI benchmark"
+  # additional_starting_queries: 4
   save_graph_interval: 1
   draw_graph: true
   max_iterations: 10

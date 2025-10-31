@@ -3,7 +3,9 @@ MAX_NUM_LINKS = 2000
 # Maximum number of visited links to consider when selecting next webpage
 MAX_NUM_VISITED_LINKS = 1000
 # Maximum of neighboring nodes to look for related insights
-MAX_NUM_NEIGHBORS = 10
+MAX_NUM_NEIGHBORS = 5
+# Maximum length (characters) of text to extract from a webpage
+MAX_TEXT_LENGTH = 100000
 # Timeout for fetching webpage html using requests
 REQUESTS_TIMEOUT = 10
 # Headers to use for requests when fetching html
@@ -36,6 +38,8 @@ CAESAR_CONFIG = {
         "starting_url": "https://en.wikipedia.org/wiki/Main_Page",
         # Initial query to being exploration (enabling means starting_url must be None)
         "starting_query": None,
+        # Additional queries to generate from initial query to help agent
+        "additional_starting_queries": 0,
         # Domains to allow exploration; empty list uses starting_url domain; use ["*"] to allow any
         "allowed_domains": [],
         # Generate visual graph representations (requires pygraphviz)
