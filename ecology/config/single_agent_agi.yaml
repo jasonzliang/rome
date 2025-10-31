@@ -14,7 +14,9 @@ Agent:
 CaesarAgent:
   # starting_url: "https://arcprize.org/arc-agi"
   # allowed_domains: ["*"]
-  starting_query: "Come up with a creative solution for solving the ARC-AGI-1 benchmark"
+  starting_query: "Novel way to solve ARC-AGI-1 benchmark"
+  additional_starting_queries: 6
+  max_web_searches: 30
   max_iterations: 1000
   save_graph_interval: 50
   synthesis_iterations: 25
