@@ -369,7 +369,7 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
             self.graph = nx.node_link_graph(data.get('graph', self.graph), edges="edges")
 
             self.logger.info(f"Checkpoint loaded from {data.get('timestamp')}")
-            time.sleep(2)
+            # time.sleep(2)
             return True
 
         except Exception as e:
