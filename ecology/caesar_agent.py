@@ -580,7 +580,7 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
     def _determine_exploration_strategy(self, kb_context, memory_context) -> Dict:
         """Chooses best exploration strategy based on current knowledge and memory"""
         if self.web_searches_used < self.max_web_searches:
-            web_search_option = f"\n4. **WEB_SEARCH** relevant topics to improve current exploration insights (remaining uses: {self.max_web_searches - self.web_searches_used})"
+            web_search_option = f"\n4. **WEB_SEARCH** relevant topics to address current exploration insights (remaining uses: {self.max_web_searches - self.web_searches_used})"
         else:
             web_search_option = f"\n4. **WEB_SEARCH** (do NOT pick, no uses remaining)"
 
@@ -608,7 +608,7 @@ Consider:
 - Success patterns from previous decisions
 - Risk/reward of new exploration vs consolidation
 
-IMPORTANT: Do not pick web search if there are no more uses remaining
+IMPORTANT: Select WEB_SEARCH if you believe exploration has stagnated, but do not choose WEB_SEARCH if there are no more uses remaining
 IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with a JSON object in this exact format:
