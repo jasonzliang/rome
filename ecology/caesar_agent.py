@@ -440,10 +440,11 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
 
             text = a.get_text(strip=True)[:LONGER_SUMMARY_LEN] or "[no text]"
 
-            if (url not in seen and self._is_allowed_url(url) and
+            if url not in seen and
+                self._is_allowed_url(url) and
                 url not in self.failed_urls and
-                (url not in self.visited_urls or self.allow_revisit) and
-                url.startswith('http')):
+                self.visited_urls.get(url, 0) <= self.max_allowed_revisits and
+                url.startswith('http'):
                 links.append((url, text))
                 seen.add(url)
 
@@ -586,12 +587,6 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
 
         prompt = f"""Based on accumulated knowledge and navigation patterns, determine the optimal exploration strategy.
 
-CURRENT EXPLORATION INSIGHTS:
-{kb_context if kb_context else "No exploration insights available."}
-
-HISTORICAL NAVIGATION PATTERNS:
-{memory_context if memory_context else "No exploration history available."}
-
 CURRENT EXPLORATION CONTEXT:
 - Current iteration: {self.current_iteration}/{self.max_iterations}
 - Current depth: {self.current_depth}/{self.max_depth}
@@ -599,10 +594,16 @@ CURRENT EXPLORATION CONTEXT:
 - Average visits per page: {float(np.mean(list(self.visited_urls.values())))}
 - Current URL: {self.current_url}
 
+CURRENT EXPLORATION INSIGHTS:
+{kb_context if kb_context else "No exploration insights available."}
+
+HISTORICAL NAVIGATION PATTERNS:
+{memory_context if memory_context else "No exploration history available."}
+
 Analyze whether the agent should:
-1. **REVISIT** previously seen pages to deepen understanding of relevant known areas
-2. **EXPLORE** new unseen pages to discover novel information or knowledge
-3. **BACKTRACK** to the immediate previous page to try alternative paths{web_search_option}
+1. **REVISIT** previously visited pages to deepen understanding of relevant known areas
+2. **EXPLORE** new un-visited pages to discover novel information or knowledge
+3. **BACKTRACK** to the immediate previously visited page to try alternative paths{web_search_option}
 
 Consider:
 - Knowledge gaps vs areas of saturation
@@ -723,7 +724,7 @@ Respond with a JSON object in this exact format:
                     web_search_links = self._get_web_search_links(strat['search_query'])
                     if web_search_links: links = web_search_links
                 else:
-                    explore_strategy = f"{strat['action']} -- {strat['reasoning']}"
+                    explore_strategy = f"{strat['reasoning']}"
 
         except Exception as e:
             self.logger.error(f"KB/memory/explore for link selection failed: {e}")
@@ -731,6 +732,13 @@ Respond with a JSON object in this exact format:
         link_options, url_map = self._format_link_options(links)
 
         prompt = f"""You are selecting the next webpage link to explore
+
+CURRENT EXPLORATION CONTEXT:
+- Current iteration: {self.current_iteration}/{self.max_iterations}
+- Current depth: {self.current_depth}/{self.max_depth}
+- Web pages visited: {len(self.visited_urls)}
+- Average visits per page: {float(np.mean(list(self.visited_urls.values())))}
+- Current URL: {self.current_url}
 
 CURRENT EXPLORATION INSIGHTS:
 {kb_context if kb_context else "No exploration insights available."}
@@ -744,7 +752,7 @@ EXPLORATION STRATEGY:
 AVAILABLE PATHS FORWARD:
 {'\n'.join(link_options)}
 
-TASK: Based on current insights, historical patterns, and exploration strategy, which page link is the most interesting, deepens understanding, and offers the most promising direction to explore?
+TASK: Based on current exploration context/insights, historical exploration patterns, and exploration strategy, which page link is the most interesting, deepens understanding, and offers the most promising direction to explore?
 
 IMPORTANT: Use your role as a guide on how to respond!
 
