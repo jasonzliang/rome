@@ -46,10 +46,10 @@ class CaesarAgent(BaseAgent):
         self._setup_knowledge_base()
         self._update_role()
 
+        self._setup_exploration_state()
         if self._load_checkpoint():
             self.logger.info("Resumed from checkpoint")
         else:
-            self._setup_exploration_state()
             self.logger.info("Starting fresh exploration")
 
         self._validate_caesar_config()
@@ -349,15 +349,14 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
                 self.logger.error(f"Checkpoint allowed_domains mismatch: {config.get('allowed_domains')} vs {self.allowed_domains}")
 
             # Restore state
-            self.current_iteration = data['iteration']
-            self.visited_urls = data['visited_urls']
-            # Do not load failed urls, so we can give them another try
-            # self.failed_urls = set(data['failed_urls'])
-            self.failed_urls = set()
-            self.url_stack = data['url_stack']
-            self.web_searches_used = data['web_searches_used']
-            # Backwards compatibility with old checkpoints, remove in future
-            self.role = data.get('role', self.role)
+            self.current_iteration = data.get('iteration', self.current_iteration)
+            self.visited_urls = data.get('visited_urls', self.visited_urls)
+            self.url_stack = data.get('url_stack', self.url_stack)
+            self.web_searches_used = data.get('web_searches_used', self.web_searches_used)
+
+            # Disabled due to having separating loading mechanism or not necessary
+            # self.failed_urls = set(data.get('failed_urls', self.failed_urls))
+            # self.role = data.get('role', self.role)
 
             if not self.url_stack:
                 self.logger.error("Invalid checkpoint: empty url_stack")
@@ -367,7 +366,7 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
             self.current_url = self.url_stack[-1]
 
             # Restore graph inline
-            self.graph = nx.node_link_graph(data['graph'], edges="edges")
+            self.graph = nx.node_link_graph(data.get('graph', self.graph), edges="edges")
 
             self.logger.info(f"Checkpoint loaded from {data.get('timestamp')}")
             time.sleep(2)
