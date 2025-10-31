@@ -965,13 +965,13 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the artifact's core discovery and its significance
 
-2. **Artifact Main Text** (1000-3000 tokens):
+2. **Artifact Main Text** (up to ~3000 tokens):
     - Emergent patterns not visible in individual sources
     - Novel discoveries and unexpected connections
     - Tensions, contradictions, or open questions
     - New directions or perspectives
 
-IMPORTANT: Try to keep the artifact easy to understand and use simple English as much as possible
+IMPORTANT: Keep the artifact clear and easy to understand, but convincing to a skeptical reader
 IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with valid JSON only:
