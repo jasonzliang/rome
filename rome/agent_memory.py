@@ -191,7 +191,8 @@ class AgentMemory:
                 messages,
                 user_id=self.mem_id,
                 metadata=meta,
-                infer=False
+                infer=False,
+                enable_graph=True
             )
 
             if not result:
@@ -231,6 +232,7 @@ class AgentMemory:
                 user_id=self.mem_id,
                 limit=self.recall_limit,
                 filters=filters,
+                enable_graph=True,
             )
 
             if results and results.get('results'):
