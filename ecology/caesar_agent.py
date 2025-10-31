@@ -625,7 +625,7 @@ Respond with a JSON object in this exact format:
             data = self.parse_json_response(response)
             if not data or "action" not in data or "reasoning" not in data or \
                 "search_query" not in data:
-                raise Exception("Invalid JSON parsing")
+                raise ValueError("Missing required keys in response")
             return data
         except Exception as e:
             self.logger.error(f"Exploration strategy determination failed: {e}")
