@@ -712,7 +712,7 @@ Respond with a JSON object in this exact format:
                     "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?")
 
             memory_context = self.recall(
-                f"What webpages have I frequently visited? Has exploration stagnated? What navigation patterns have emerged in relation to the following insights:\n{kb_context}")
+                f"What webpages have I frequently visited and has exploration stagnated? What navigation patterns have emerged in relation to the following insights:\n{kb_context}")
 
             if self.use_explore_strategy:
                 strat = self._determine_exploration_strategy(kb_context, memory_context)
