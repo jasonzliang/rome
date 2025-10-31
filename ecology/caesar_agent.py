@@ -10,6 +10,7 @@ import sys
 import time
 from datetime import datetime
 
+import numpy as np
 import networkx as nx
 from bs4 import BeautifulSoup
 from PyPDF2 import PdfReader
