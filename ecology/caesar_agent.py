@@ -596,7 +596,7 @@ CURRENT EXPLORATION CONTEXT:
 - Current iteration: {self.current_iteration}/{self.max_iterations}
 - Current depth: {self.current_depth}/{self.max_depth}
 - Web pages visited: {len(self.visited_urls)}
-- Average visits per page: {float(np.mean(x) for x in self.visited_urls.values())}
+- Average visits per page: {float(np.mean(list(self.visited_urls.values())))}
 - Current URL: {self.current_url}
 
 Analyze whether the agent should:
