@@ -221,7 +221,7 @@ Analyze the page content{insights_info} to create a specialized role that:
 
 Provide an adapted role description (300-500 tokens) that is creative, innovative, and original!
 
-Your response must start with "Your role:" followed by the adapted role description."""
+IMPORATNT: Your response must start with "Your role:" followed by the adapted role description."""
 
             if not (adapted_role := self.chat_completion(prompt).strip()) or len(adapted_role) < 50:
                 self.logger.error("[ADAPT ROLE] Invalid LLM response, keeping default role")
@@ -503,13 +503,7 @@ Your response must start with "Your role:" followed by the adapted role descript
         query_task = "- How to answer the query\n" if self.starting_query else ""
         prev_insight_task = "- How this builds upon or challenges previous/related insights" if (prev_insights or related_insights) else ""
 
-        prompt = f"""Analyze this content and extract key insights focusing on:
-- Novel patterns or unexpected connections
-- Assumptions being made and alternative perspectives
-- Interesting questions raised by the content
-{query_task}{prev_insight_task}
-
-CONTENT:
+        prompt = f"""CONTENT:
 {content}
 
 QUERY:
@@ -521,9 +515,15 @@ PREVIOUS INSIGHTS:
 RELATED INSIGHTS:
 {related_insights if related_insights else 'No related insights available'}
 
+YOUR TASK:
+Analyze this content and extract key insights focusing on:
+- Novel patterns or unexpected connections
+- Assumptions being made and alternative perspectives
+- Interesting questions raised by the content
+{query_task}{prev_insight_task}
+
 IMPORTANT: Use your role as a guide on how to respond!
 
-YOUR TASK:
 Depending on the complexity of the content, provide anywhere from 1 to 6 concise but substantive insights, but do not exceed ~800 tokens in total length:"""
 
         try:
@@ -879,7 +879,7 @@ Your response must be valid JSON only, nothing else."""
         prompt = f"""Previous exploration queries and responses:
 {context}
 
-Your task:
+YOUR TASK:
 Based on the insights gathered so far, what is the next most important question to ask
 to deepen understanding and reveal emergent patterns? The question should:
 - Build on previous insights rather than repeat them
@@ -960,6 +960,7 @@ Respond with JSON:
 Key patterns emerged through querying and analyzing gathered insights
 {perspectives}
 
+YOUR TASK:
 Drawing heavily upon the key patterns that emerged from the insights, create a novel, exciting, and thought provoking artifact{starting_query_task}:
 
 1. **Artifact Abstract** (100-150 tokens):
@@ -971,7 +972,7 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
     - Tensions, contradictions, or open questions
     - New directions or perspectives
 
-IMPORTANT: Keep the artifact clear and easy to understand, but convincing to a skeptical reader
+IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
 IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with valid JSON only:
