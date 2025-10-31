@@ -623,6 +623,9 @@ Respond with a JSON object in this exact format:
                 override_config=self.exploration_llm_config,
                 response_format={"type": "json_object"})
             data = self.parse_json_response(response)
+            if not data or "action" not in data or "reasoning" not in data or \
+                "search_query" not in data:
+                raise Exception("Invalid JSON parsing")
             return data
         except Exception as e:
             self.logger.error(f"Exploration strategy determination failed: {e}")
@@ -713,9 +716,9 @@ Respond with a JSON object in this exact format:
 
             if self.use_explore_strategy:
                 strat = self._determine_exploration_strategy(kb_context, memory_context)
-                if strat["action"] == "WEB_SEARCH":
+                if strat['action'] == "WEB_SEARCH":
                     explore_strategy = ""
-                    web_search_links = self._get_web_search_links(strat["search_query"])
+                    web_search_links = self._get_web_search_links(strat['search_query'])
                     if web_search_links: links = web_search_links
                 else:
                     explore_strategy = f"{strat['action']} -- {strat['reasoning']}"
