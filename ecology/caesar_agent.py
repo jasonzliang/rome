@@ -608,7 +608,7 @@ Consider:
 - Success patterns from previous decisions
 - Risk/reward of new exploration vs consolidation
 
-IMPORTANT: Select WEB_SEARCH if you believe exploration has stagnated, but do not choose WEB_SEARCH if there are no more uses remaining
+IMPORTANT: Select WEB_SEARCH if exploration has stagnated or to increase exploration diversity, but only if there are still uses remaining
 IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with a JSON object in this exact format:
