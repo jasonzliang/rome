@@ -58,6 +58,9 @@ class BraveSearch:
             self.logger.error(f"num_results={self.num_results} exceeds API limit, capping to {MAX_NUM_RESULTS}")
             self.num_results = MAX_NUM_RESULTS
 
+        self.output_dir = os.path.join(self.agent.get_log_dir(), SEARCH_RESULT_DIR)
+        os.makedirs(self.output_dir, exist_ok=True)
+
     def _generate_filename(self, query: str) -> str:
         """Generate filename from query and timestamp"""
         # Sanitize query for filename (remove special chars, limit length)
@@ -81,6 +84,13 @@ class BraveSearch:
             Local file URL to saved HTML results
         """
         # Normalize to list
+        filename = self._generate_filename(query_list[0] if len(query_list) == 1
+                                          else f"merged_{len(query_list)}_queries")
+        html_file = os.path.abspath(os.path.join(self.output_dir, filename))
+        if os.path.exists(html_file):
+            self.logger.debug(f"Using cached search results html file: {html_file}")
+            return f"file://{html_file}"
+
         query_list = [queries] if isinstance(queries, str) else queries
 
         self.logger.debug(f"Brave search queries: {query_list}")
@@ -99,18 +109,11 @@ class BraveSearch:
             self.logger.debug(f"Brave search results: {results}")
 
         # Write html to file in log dir
-        output_dir = os.path.join(self.agent.get_log_dir(), SEARCH_RESULT_DIR)
-        os.makedirs(output_dir, exist_ok=True)
-
-        filename = self._generate_filename(query_list[0] if len(query_list) == 1
-                                          else f"merged_{len(query_list)}_queries")
-        output_file = os.path.join(output_dir, filename)
-        abs_path = os.path.abspath(output_file)
-        with open(abs_path, 'w', encoding='utf-8') as f:
+        with open(html_file, 'w', encoding='utf-8') as f:
             f.write(html)
 
-        self.logger.debug(f"Saved brave search results to html file: {abs_path}")
-        return f"file://{abs_path}"
+        self.logger.debug(f"Saved search results to html file: {html_file}")
+        return f"file://{html_file}"
 
     def _search_with_retry(self, query: str) -> Dict:
         """Execute search with exponential backoff retry logic"""
