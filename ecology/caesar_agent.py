@@ -114,6 +114,7 @@ You navigate through information space systematically yet creatively, always wit
 
     def _setup_brave_search(self) -> None:
         """Setup brave search"""
+        self.web_searches_used = 0
         if self.starting_query:
             old_starting_url = self.starting_url
             search_engine = BraveSearch(agent=self, config=self.config.get("BraveSearch", {}))
@@ -152,6 +153,7 @@ Respond with valid JSON only:
 
             # Execute search with all queries
             self.starting_url = search_engine.search_and_save(queries)
+            self.web_searches_used += len(queries)
             self.logger.info(f"Overwriting existing starting_url ({old_starting_url}) with {len(queries)} query search results")
 
     def _setup_knowledge_base(self) -> None:
@@ -289,13 +291,14 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
                 raise RuntimeError(error_msg)
 
             checkpoint_data = {
+                'role': self.role,
                 'iteration': iteration,
                 'current_url': self.current_url,
                 'current_depth': self.current_depth,
                 'url_stack': self.url_stack,
                 'failed_urls': list(self.failed_urls),
                 'visited_urls': self.visited_urls,
-                'role': self.role,
+                'web_searches_used': self.web_searches_used,
                 'graph': nx.node_link_data(self.graph, edges="edges"),
                 'config': {
                     'starting_url': self.starting_url,
@@ -351,6 +354,7 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
             # self.failed_urls = set(data['failed_urls'])
             self.failed_urls = set()
             self.url_stack = data['url_stack']
+            self.web_searches_used = data['web_searches_used']
             # Backwards compatibility with old checkpoints, remove in future
             self.role = data.get('role', self.role)
 
@@ -573,15 +577,20 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
         """Get url to parent page"""
         return self.url_stack[-2] if len(self.url_stack) > 1 else None
 
-    def _determine_exploration_strategy(self, kb_context: str, memory_context: str) -> str:
-            """Use LLM to determine optimal exploration strategy"""
-            prompt = f"""Based on accumulated knowledge and navigation patterns, determine the optimal exploration strategy.
+    def _determine_exploration_strategy(self, kb_context, memory_context) -> Dict:
+        """Chooses best exploration strategy based on current knowledge and memory"""
+        if self.web_searches_used < self.max_web_searches:
+            web_search_option = f"\n4. **WEB_SEARCH** relevant topics to improve current exploration insights (remaining uses: {self.max_web_searches - self.web_searches_used})"
+        else:
+            web_search_option = f"\n4. **WEB_SEARCH** (do NOT pick, no uses remaining)"
 
-CURRENT KNOWLEDGE STATE:
-{kb_context}
+        prompt = f"""Based on accumulated knowledge and navigation patterns, determine the optimal exploration strategy.
+
+CURRENT EXPLORATION INSIGHTS:
+{kb_context if kb_context else "No exploration insights available."}
 
 HISTORICAL NAVIGATION PATTERNS:
-{memory_context}
+{memory_context if memory_context else "No exploration history available."}
 
 CURRENT EXPLORATION CONTEXT:
 - Current depth: {self.current_depth}/{self.max_depth}
@@ -589,9 +598,9 @@ CURRENT EXPLORATION CONTEXT:
 - Current URL: {self.current_url}
 
 Analyze whether the agent should:
-1. **Revisit** previously seen pages to deepen understanding of known valuable areas
-2. **Explore** new unexplored links to discover novel information
-3. **Backtrack** to the previous page to try alternative paths
+1. **REVISIT** previously seen links to deepen understanding of relevant known areas
+2. **EXPLORE** new unseen links to discover novel information or knowledge
+3. **BACKTRACK** to the immediate previous link to try alternative paths{web_search_option}
 
 Consider:
 - Knowledge gaps vs areas of saturation
@@ -599,18 +608,47 @@ Consider:
 - Success patterns from previous decisions
 - Risk/reward of new exploration vs consolidation
 
+IMPORTANT: Do not pick web search if there are no more uses remaining
 IMPORTANT: Use your role as a guide on how to respond!
 
-Provide a strategic recommendation in 2-3 sentences."""
+Respond with a JSON object in this exact format:
+{{
+    "action": "choose one action from EXPLORE, REVISIT, BACKTRACK, or WEB_SEARCH",
+    "reasoning": "strategic recommendation of exploration strategy in 2-3 sentences",
+    "search_query": "short query to find relevant topics or N/A if not WEB_SEARCH"
+}}"""
 
-            try:
-                return self.chat_completion(
-                    prompt,
-                    override_config=self.exploration_llm_config
-                )
-            except Exception as e:
-                self.logger.error(f"Exploration strategy determination failed: {e}")
-                return ""
+        try:
+            response = self.chat_completion(prompt,
+                override_config=self.exploration_llm_config,
+                response_format={"type": "json_object"})
+            data = self.parse_json_response(response)
+            return data
+        except Exception as e:
+            self.logger.error(f"Exploration strategy determination failed: {e}")
+            return ""
+
+    def _get_web_search_links(self, query: str) -> List[Tuple[str, str]]:
+        """Execute web search and return links"""
+        if self.web_searches_used >= self.max_web_searches:
+            self.logger.error(f"Web search limit reached during exploration: {self.max_web_searches}")
+            return []
+
+        try:
+            search_engine = BraveSearch(agent=self, config=self.config.get("BraveSearch", {}))
+            search_results_url = search_engine.search_and_save([query])
+            self.web_searches_used += 1
+
+            html = self._fetch_html(search_results_url)
+            if not html: return []
+
+            links = self._extract_links(html, search_results_url)
+            self.logger.info(f"Web search '{query}' returned {len(links)} links")
+            return links
+
+        except Exception as e:
+            self.logger.error(f"Web search during exploration failed for '{query}': {e}")
+            return []
 
     def _format_link_options(self, links: List[Tuple[str, str]]) -> Tuple[List[str], List[str]]:
         """Format links into display options, returns (link_options, url_map)"""
@@ -669,10 +707,19 @@ Provide a strategic recommendation in 2-3 sentences."""
             else:
                 kb_context = self.kb_manager.query(
                     "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?")
+
             memory_context = self.recall(
                 f"What webpages have I frequently visited and what navigation patterns have emerged in relation to the following insights:\n{kb_context}")
+
             if self.use_explore_strategy:
-                explore_strategy = self._determine_exploration_strategy(kb_context, memory_context)
+                strat = self._determine_exploration_strategy(kb_context, memory_context)
+                if strat["action"] == "WEB_SEARCH":
+                    explore_strategy = ""
+                    web_search_links = self._get_web_search_links(strat["search_query"])
+                    if web_search_links: links = web_search_links
+                else:
+                    explore_strategy = f"{strat['action']} -- {strat['reasoning']}"
+
         except Exception as e:
             self.logger.error(f"KB/memory/explore for link selection failed: {e}")
 
