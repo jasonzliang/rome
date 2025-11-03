@@ -16,7 +16,7 @@ OPENAI_CONFIG =  {
     "temperature": 0.1,
     "max_tokens": DEFAULT_CONFIG['OpenAIHandler']['max_completion_tokens'],
     "api_key": os.environ.get("OPENAI_API_KEY"),
-    "openai_base_url": "https://api.openai.com/v1"
+    "openai_base_url": DEFAULT_CONFIG['OpenAIHandler']['base_url'],
 }
 
 
