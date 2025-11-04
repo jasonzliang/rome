@@ -178,6 +178,9 @@ class AgentMemory:
             return False
 
         try:
+            # Sanitize content to avoid hyphens in potential relationship names
+            # content = content.replace('-', '_')
+
             # Make content more "memorable" by adding personal/experiential context
             message = f"{context}: {content}" if context else content
 
