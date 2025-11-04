@@ -1030,7 +1030,7 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
     - Emergent patterns not visible in individual sources
     - Novel discoveries and unexpected connections
     - Tensions, contradictions, or open questions
-    - New directions or perspectives
+    - Surprising new directions or perspectives
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
 IMPORTANT: Use your role as a guide on how to respond!

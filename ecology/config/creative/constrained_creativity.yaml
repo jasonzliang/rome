@@ -1,0 +1,51 @@
+# Caesar Agent Configuration File
+# Only includes settings that differ from DEFAULT_CONFIG
+
+# ============================================================================
+# AGENT CONFIGURATION
+# ============================================================================
+Agent:
+  name: CaesarExplorer
+  draw_fsm: false
+
+# ============================================================================
+# CAESAR-SPECIFIC CONFIGURATION
+# ============================================================================
+CaesarAgent:
+  # starting_url: "https://arcprize.org/arc-agi"
+  # allowed_domains: ["*"]
+  starting_query: "Invent a new emotion that humans don't experience. Describe when it occurs, what causes it, and why evolution hasn't produced it in us. Come up with a creative answer that is new, surprising, and useful."
+  additional_starting_queries: 7
+  max_web_searches: 50
+  max_iterations: 1000
+  save_graph_interval: 50
+  synthesis_iterations: 30
+
+  exploration_llm_config:
+    model: gpt-5
+
+  adapt_role: True
+  adapt_role_file: config/self_transcend_insights.txt
+
+# ============================================================================
+# LLM CONFIGURATION
+# ============================================================================
+OpenAIHandler:
+  cost_limit: 300.0
+  model: gpt-5
+  temperature: 0.1
+  timeout: 300
+
+# ============================================================================
+# KNOWLEDGE BASE CONFIGURATION
+# ============================================================================
+AgentMemory:
+  enabled: true
+  use_graph: true
+
+# ============================================================================
+# LOGGING CONFIGURATION
+# ============================================================================
+Logger:
+  include_caller_info: "rome"
+  level: "debug"
