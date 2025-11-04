@@ -739,8 +739,7 @@ Respond with a JSON object in this exact format:
             if self.starting_query:
                 kb_context = self.kb_manager.query(f"In order to answer this query ({self.starting_query}), what should we explore next?")
             else:
-                kb_context = self.kb_manager.query(
-                    "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?")
+                kb_context = self.kb_manager.query("What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?")
 
             # memory_context = self.recall(
             #     f"What webpages have I frequently visited and has exploration stagnated? What navigation patterns have emerged in relation to the following insights:\n{kb_context}")

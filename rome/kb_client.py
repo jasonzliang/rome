@@ -324,7 +324,7 @@ class ChromaClientManager:
         response = self.response_synthesizer.synthesize(question, nodes=reranked_nodes)
 
         self.logger.debug(f"Using reranker (n={top_n}) for query")
-        return response
+        return str(response)
 
     def _standard_query(self, question: str, top_k: int) -> str:
         """Standard query with optional system prompt prepended"""
