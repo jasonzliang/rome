@@ -707,7 +707,6 @@ Respond with a JSON object in this exact format:
 
     def _recall_navigation_history(self, kb_context: str = None, num_kb_terms: int = 5) -> str:
         """Recall navigation history with optional context awareness"""
-
         # Base navigation query
         base_query = "visited domains pages backtracked repeated"
 
@@ -1044,7 +1043,7 @@ Respond with JSON:
         perspectives = "\n\n\n".join([f"({i+1}) Question: {q}\n\nAnswer: {a}"
                                      for i, (q, a) in enumerate(qa_pairs)])
 
-        starting_query_task = f" that creatively answers this query - {self.starting_query}" if self.starting_query else ""
+        starting_query_task = f" that creatively answers this query: {self.starting_query}" if self.starting_query else ":"
 
         prompt = f"""You explored {len(self.visited_urls)} sources and gathered {self.kb_manager.size()} insights.
 
@@ -1052,16 +1051,16 @@ Key patterns emerged through querying and analyzing gathered insights
 {perspectives}
 
 YOUR TASK:
-Drawing heavily upon the key patterns that emerged from the insights, create a novel, exciting, and thought provoking artifact{starting_query_task}:
+Drawing heavily upon the key patterns that emerged from the insights, create a novel, exciting, and thought provoking artifact{starting_query_task}
 
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the artifact's core discovery and its significance
 
-2. **Artifact Main Text** (up to ~5000 tokens):
+2. **Artifact Main Text** (up to ~{self.synthesis_max_tokens} tokens):
     - Emergent patterns not visible in individual sources
     - Novel discoveries and unexpected connections
-    - Tensions, contradictions, or open questions
     - Surprising new directions or perspectives
+    - Interesting tensions, contradictions, or open questions
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
 IMPORTANT: Use your role as a guide on how to respond!

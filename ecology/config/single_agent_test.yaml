@@ -21,7 +21,7 @@ CaesarAgent:
   max_iterations: 10
   synthesis_iterations: 5
 
-  overwrite_role_file: config/role/self_transcendence.txt
+  overwrite_role_file: config/role/self_transcend_role.txt
   adapt_role: true
   # adapt_role_file: config/role/self_transcend_insights_v1.txt
 
