@@ -77,7 +77,7 @@ DEFAULT_CONFIG = {
         "clear_memory": False,  # Whether to automatically clear memory on startup
         "auto_remember": False,  # Automatically extract and store important interactions
         "auto_remember_len": 100,  # Minimum characters (prompt + response) to consider storing
-        "recall_limit": 8,  # Number of most relevant memories to retrieve in recall()
+        "recall_limit": 10,  # Number of most relevant memories to retrieve in recall()
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model for semantic search
         # DB settings (for tracking entities/relationships like file visits)
         "use_graph": False,  # Enable graph memory (neo4j/memgraph required)

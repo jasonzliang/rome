@@ -1,14 +1,15 @@
 """Caesar Agent - Web exploration agent with graph-based navigation"""
-from typing import Dict, List, Optional, Tuple
-from urllib.parse import urljoin, urlparse
+from collections import Counter
 import copy
+from datetime import datetime
 import io
-import requests
 import json
 import os
+import requests
 import sys
 import time
-from datetime import datetime
+from typing import Dict, List, Optional, Tuple
+from urllib.parse import urljoin, urlparse
 
 import numpy as np
 import networkx as nx
@@ -704,6 +705,35 @@ Respond with a JSON object in this exact format:
 
         return link_options, url_map
 
+    def _recall_navigation_history(self, kb_context: str = None, num_kb_terms: int = 5) -> str:
+        """Recall navigation history with optional context awareness"""
+
+        # Base navigation query
+        base_query = "visited domains pages backtracked repeated"
+
+        # If kb_context exists and is substantial, enhance query
+        if kb_context:
+            # Extract and count key terms
+            words = kb_context.lower().split()
+            stop_words = {'the', 'a', 'an', 'and', 'or', 'is', 'are', 'was', 'were',
+                          'this', 'that', 'with', 'from', 'about', 'has', 'have'}
+
+            # Filter and clean words
+            filtered_words = [w.strip('.,!?:;') for w in words
+                             if len(w) > 5 and w not in stop_words]
+
+            # Count frequency and get top 5
+            word_counts = Counter(filtered_words)
+            key_terms = [term for term, count in word_counts.most_common(num_kb_terms)]
+
+            if key_terms:
+                # Append up to 5 key terms to base query
+                enhanced_query = f"{base_query} {' '.join(key_terms)}"
+                return self.recall(enhanced_query)
+
+        # Default: just navigation query
+        return self.recall(base_query)
+
     def _select_next_link(self, links: List[Tuple[str, str]]) -> Tuple[Optional[str], str]:
         """Use LLM to select best link, returns (url, reason)"""
         kb_context = memory_context = explore_strategy = ""
@@ -714,8 +744,9 @@ Respond with a JSON object in this exact format:
                 kb_context = self.kb_manager.query(
                     "What patterns, gaps, or questions have emerged from our knowledge? What should we explore next?")
 
-            memory_context = self.recall(
-                f"What webpages have I frequently visited and has exploration stagnated? What navigation patterns have emerged in relation to the following insights:\n{kb_context}")
+            # memory_context = self.recall(
+            #     f"What webpages have I frequently visited and has exploration stagnated? What navigation patterns have emerged in relation to the following insights:\n{kb_context}")
+            memory_context = self._recall_navigation_history(kb_context)
 
             if self.use_explore_strategy:
                 strat = self._determine_exploration_strategy(kb_context, memory_context)
@@ -1026,7 +1057,7 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the artifact's core discovery and its significance
 
-2. **Artifact Main Text** (up to ~3000 tokens):
+2. **Artifact Main Text** (up to ~5000 tokens):
     - Emergent patterns not visible in individual sources
     - Novel discoveries and unexpected connections
     - Tensions, contradictions, or open questions

@@ -22,7 +22,7 @@ CaesarAgent:
     model: gpt-5
 
   adapt_role: True
-  adapt_role_file: config/self_transcend_insights.txt
+  adapt_role_file: config/role/self_transcend_insights_v1.txt
 
 # ============================================================================
 # LLM CONFIGURATION

@@ -12,17 +12,21 @@ Agent:
 # CAESAR-SPECIFIC CONFIGURATION
 # ============================================================================
 CaesarAgent:
-  starting_url: "https://en.wikipedia.org/wiki/Artificial_intelligence"
-  # starting_query: "What are the most promising emergent capabilities in LLMs?"
+  # starting_url: "https://arcprize.org/arc-agi"
+  # allowed_domains: ["*"]
+  starting_query: "If humans evolved with echolocation instead of color vision, how would that change painting, architecture, and mathematics? Walk through each consequence. Come up with a creative answer that is new, surprising, and useful."
+  additional_starting_queries: 5
+  max_web_searches: 50
   max_iterations: 1000
   save_graph_interval: 50
-  synthesis_iterations: 25
+  synthesis_iterations: 30
 
   exploration_llm_config:
     model: gpt-5
 
+  overwrite_role_file: config/role/self_transcendence.txt
   adapt_role: True
-  adapt_role_file: config/role/self_transcend_insights_v1.txt
+  # adapt_role_file: config/self_transcend_insights.txt
 
 # ============================================================================
 # LLM CONFIGURATION
@@ -45,4 +49,4 @@ AgentMemory:
 # ============================================================================
 Logger:
   include_caller_info: "rome"
-  level: "info"
+  level: "debug"
