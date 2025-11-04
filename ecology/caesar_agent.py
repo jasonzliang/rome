@@ -42,10 +42,10 @@ class CaesarAgent(BaseAgent):
         self.caesar_config = self.config.get('CaesarAgent', {})
         set_attributes_from_config(self, self.caesar_config, CAESAR_CONFIG['CaesarAgent'].keys())
 
+        self._update_role()
         self._setup_allowed_domains()
         self._setup_brave_search()
         self._setup_knowledge_base()
-        self._update_role()
 
         self._setup_exploration_state()
         if self._load_checkpoint():
