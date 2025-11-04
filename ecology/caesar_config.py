@@ -98,7 +98,7 @@ CAESAR_CONFIG = {
         # Number of search results to fetch
         "num_results": 20,
         # Number of tries to attempt to search
-        "max_retries": 3,
+        "max_retries": 1000,
         # Delay between search retries
         "retry_delay": 1,
         # Request timeout in seconds
