@@ -203,7 +203,7 @@ Respond with valid JSON only:
 
             insights_section = f"\nPRIOR INSIGHTS:\n{insights}\n" if insights else ""
             insights_info = " and prior insights" if insights else ""
-            insights_task = " - Builds upon themes and gaps identified in prior insights"
+            insights_task = "\n - Builds upon themes and gaps identified in prior insights" if insights else ""
 
             prompt = f"""You are adapting your current role based on the following starting content{insights_info}.
 {starting_query}
@@ -217,11 +217,10 @@ CURRENT ROLE:
 {self.role}
 
 YOUR TASK:
-Analyze the page content{insights_info} to create a specialized role that:
+Using your current role as basis, analyze the page content{insights_info} to create a specialized role that:
  - Improves upon core exploration philosophy
  - Creates an overall goal for the agent to strive for{starting_query_task}
- - Focuses exploration toward most promising areas revealed by the page content
-{insights_task}
+ - Focuses exploration toward most promising areas revealed by the page content{insights_task}
 
 Provide an adapted role description (300-500 tokens) that is creative, innovative, and original!
 
