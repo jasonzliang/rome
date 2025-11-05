@@ -1057,7 +1057,7 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the artifact's core discovery and its significance
 
-2. **Artifact Main Text** (up to ~{self.synthesis_max_tokens} tokens):
+2. **Artifact Main Text** (~{self.synthesis_max_tokens} tokens):
     - Some suggestions (you do not have to follow them exactly):
         a. Emergent patterns not visible in individual sources
         b. Novel discoveries, connections, or applications
