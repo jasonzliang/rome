@@ -1044,6 +1044,7 @@ Respond with JSON:
                                      for i, (q, a) in enumerate(qa_pairs)])
 
         starting_query_task = f" that creatively answers this query: {self.starting_query}" if self.starting_query else ":"
+        starting_query_role = f" and on how to creatively answer the query!" if self.starting_query else "!"
 
         prompt = f"""You explored {len(self.visited_urls)} sources and gathered {self.kb_manager.size()} insights.
 
@@ -1064,7 +1065,7 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
         d. Interesting tensions, contradictions, or open questions
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
-IMPORTANT: Use your role as a guide on how to respond!
+IMPORTANT: Use your role as a guide on how to respond{starting_query_role}
 
 Respond with valid JSON only:
 {{
