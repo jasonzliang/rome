@@ -117,15 +117,17 @@ You navigate through information space systematically yet creatively, always wit
     def _setup_brave_search(self) -> None:
         """Setup brave search"""
         self.web_searches_used = 0
-        if self.starting_query:
-            old_starting_url = self.starting_url
-            search_engine = BraveSearch(agent=self, config=self.config.get("BraveSearch", {}))
+        if not self.starting_query or self.max_iterations == 0:
+            return
 
-            # Generate additional queries if requested
-            queries = [self.starting_query]
-            if self.additional_starting_queries > 0:
-                try:
-                    prompt = f"""Given this query: "{self.starting_query}"
+        old_starting_url = self.starting_url
+        search_engine = BraveSearch(agent=self, config=self.config.get("BraveSearch", {}))
+
+        # Generate additional queries if requested
+        queries = [self.starting_query]
+        if self.additional_starting_queries > 0:
+            try:
+                prompt = f"""Given this query: "{self.starting_query}"
 
 Generate anywhere from 0 to {self.additional_starting_queries} additional search queries that would help comprehensively answer the original query. These queries should:
 - Explore different aspects or angles of the original query
@@ -138,25 +140,25 @@ IMPORTANT: If no additional queries are generated, return an empty list
 
 Respond with valid JSON only:
 {{
-    "queries": ["query1", "query2", ...]
+"queries": ["query1", "query2", ...]
 }}"""
 
-                    response = self.chat_completion(
-                        prompt,
-                        response_format={"type": "json_object"}
-                    )
-                    result = self.parse_json_response(response)
-                    if result and result.get("queries"):
-                        additional = result["queries"][:self.additional_starting_queries]
-                        queries.extend(additional)
-                        self.logger.info(f"Generated {len(additional)} additional queries: {additional}")
-                except Exception as e:
-                    self.logger.error(f"Failed to generate additional queries: {e}")
+                response = self.chat_completion(
+                    prompt,
+                    response_format={"type": "json_object"}
+                )
+                result = self.parse_json_response(response)
+                if result and result.get("queries"):
+                    additional = result["queries"][:self.additional_starting_queries]
+                    queries.extend(additional)
+                    self.logger.info(f"Generated {len(additional)} additional queries: {additional}")
+            except Exception as e:
+                self.logger.error(f"Failed to generate additional queries: {e}")
 
-            # Execute search with all queries
-            self.starting_url = search_engine.search_and_save(queries)
-            self.web_searches_used += len(queries)
-            self.logger.info(f"Overwriting existing starting_url ({old_starting_url}) with {len(queries)} query search results")
+        # Execute search with all queries
+        self.starting_url = search_engine.search_and_save(queries)
+        self.web_searches_used += len(queries)
+        self.logger.info(f"Overwriting existing starting_url ({old_starting_url}) with {len(queries)} query search results")
 
     def _setup_knowledge_base(self) -> None:
         """Setup knowledge base"""
