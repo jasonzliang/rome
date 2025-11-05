@@ -1045,10 +1045,6 @@ Respond with JSON:
 
         starting_query_task = f" that creatively answers this query: {self.starting_query}" if self.starting_query else ":"
 
-    # - Emergent patterns not visible in individual sources
-    # - Novel discoveries and unexpected connections
-    # - Surprising new directions or perspectives
-    # - Interesting tensions, contradictions, or open questions
         prompt = f"""You explored {len(self.visited_urls)} sources and gathered {self.kb_manager.size()} insights.
 
 Key patterns emerged through querying and analyzing gathered insights
@@ -1061,9 +1057,15 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
     - Summary of the artifact's core discovery and its significance
 
 2. **Artifact Main Text** (up to ~{self.synthesis_max_tokens} tokens):
-    - Creative answer that is new, surprising, and useful
-    - Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
-    - IMPORTANT: Use your role as a guide on how to respond!
+    - Generate a creative answer that is new, surprising, and useful
+    - For example (you do not have to follow them exactly):
+        a. Emergent patterns not visible in individual sources
+        b. Novel discoveries and unexpected connections
+        c. Surprising new directions or perspectives
+        d. Interesting tensions, contradictions, or open questions
+
+IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
+IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with valid JSON only:
 {{
