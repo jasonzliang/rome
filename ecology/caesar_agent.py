@@ -1057,10 +1057,9 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
     - Summary of the artifact's core discovery and its significance
 
 2. **Artifact Main Text** (up to ~{self.synthesis_max_tokens} tokens):
-    - Generate a creative answer that is new, surprising, and useful
-    - For example (you do not have to follow them exactly):
+    - Some suggestions (you do not have to follow them exactly):
         a. Emergent patterns not visible in individual sources
-        b. Novel discoveries and unexpected connections
+        b. Novel discoveries, connections, or applications
         c. Surprising new directions or perspectives
         d. Interesting tensions, contradictions, or open questions
 
