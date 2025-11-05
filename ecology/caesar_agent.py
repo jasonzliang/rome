@@ -224,7 +224,7 @@ Using your current role as basis, analyze the page content{insights_info} to cre
  - Creates an overall goal for the agent to strive for{starting_query_task}
  - Focuses exploration toward most promising areas revealed by the page content{insights_task}
 
-Provide an adapted role description (300-500 tokens) that is creative, innovative, and original!
+Provide an adapted role description (~{self.role_max_tokens} tokens) that is creative, innovative, and original!
 
 IMPORATNT: Your response must start with "Your role:" followed by the adapted role description."""
 

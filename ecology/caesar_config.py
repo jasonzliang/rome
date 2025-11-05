@@ -30,6 +30,8 @@ REQUESTS_HEADERS = {
 
 CAESAR_CONFIG = {
     "CaesarAgent": {
+        # Maximum number of tokens for adapting agent role description
+        "role_max_tokens": 500,
         # Total number of pages to explore before stopping
         "max_iterations": 10,
         # Maximum depth of exploration tree before backtracking
