@@ -179,7 +179,7 @@ cython_debug/
 benchmark/result
 test/result
 ecology/*result
-bnt.txt
+query_result.zip
 .DS_Store
 .tags*
 *.log
