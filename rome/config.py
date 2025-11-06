@@ -112,7 +112,7 @@ DEFAULT_CONFIG = {
         "model": "gpt-4o",  # LLM model name
         "reasoning_effort": None,  # Reasoning effort for reasoning models (None to disable)
         "temperature": 0.1,  # LLM temperature
-        "max_completion_tokens": 8192,  # LLM response max tokens
+        "max_completion_tokens": 10000,  # LLM response max tokens
         "top_p": 1.0,  # LLM top-P
         "seed": None,  # LLM random seed
 

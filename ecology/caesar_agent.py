@@ -903,10 +903,11 @@ Your response must be valid JSON only, nothing else."""
 
     def explore(self) -> str:
         """Execute main exploration loop"""
-        start_iteration = self.current_iteration + 1
-        self.logger.info(f"[EXPLORE] Beginning exploration: iterations {start_iteration} to {self.max_iterations}")
+        start_iteration = self.current_iteration + 1; end_iteration = self.max_iterations + 1
+        if start_iteration < end_iteration:
+            self.logger.info(f"[EXPLORE] Beginning exploration: iterations {start_iteration} to {self.max_iterations}")
 
-        for iteration in range(start_iteration, self.max_iterations + 1):
+        for iteration in range(start_iteration, end_iteration):
             if self.shutdown_called: break
             self.current_iteration = iteration
 
