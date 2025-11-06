@@ -16,7 +16,7 @@ CaesarAgent:
   # allowed_domains: ["*"]
   starting_query: "If humans evolved with echolocation instead of color vision, how would that change painting, architecture, and mathematics? Walk through each consequence."
   additional_starting_queries: 5
-  max_web_searches: 50
+  max_web_searches: 30
   max_iterations: 1000
   save_graph_interval: 50
   synthesis_iterations: 30

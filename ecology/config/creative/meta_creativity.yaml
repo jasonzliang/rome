@@ -16,7 +16,7 @@ CaesarAgent:
   # allowed_domains: ["*"]
   starting_query: "Create a creativity metric for AI systems that doesn't rely on human judgment, novelty, usefulness, or surprise. Make it objectively measurable."
   additional_starting_queries: 5
-  max_web_searches: 50
+  max_web_searches: 30
   max_iterations: 1000
   save_graph_interval: 50
   synthesis_iterations: 30

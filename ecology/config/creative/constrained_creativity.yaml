@@ -15,8 +15,8 @@ CaesarAgent:
   # starting_url: "https://arcprize.org/arc-agi"
   # allowed_domains: ["*"]
   starting_query: "Invent a new emotion that humans don't experience. Describe when it occurs, what causes it, and why evolution hasn't produced it in us."
-  additional_starting_queries: 7
-  max_web_searches: 50
+  additional_starting_queries: 5
+  max_web_searches: 30
   max_iterations: 1000
   save_graph_interval: 50
   synthesis_iterations: 30
