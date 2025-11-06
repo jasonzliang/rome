@@ -1,0 +1,117 @@
+ABSTRACT:
+We propose a biologically and computationally plausible emotion humans do not natively experience: Preemptive Containment. It is a low‑arousal, high‑dominance affective mode that activates when weak, early cues suggest future instability in shared systems. Rather than mobilizing fight‑or‑flight, it calmly reshapes the environment in advance—adding constraints, checklists, and precommitments—so the bad thing simply does not arise. Mechanistically, it prioritizes predictions about absences and long‑range risks, rewards prevention credit from non‑occurrence, and signals quiet resolve. We argue evolution did not install it because prevention credit is hard to assign, calm signals are cheap to fake, and over‑pruning would crush exploration. We outline physiological signatures, social markers, cross‑cultural falsifiers, and conditions under which modern scaffolds could make it an evolutionarily stable strategy.
+
+ARTIFACT:
+A new emotion humans don't have: Preemptive Containment
+
+1) One‑sentence definition
+Preemptive Containment is an affective mode that turns faint signs of future trouble into calm, confident prevention now: a felt impulse to quietly reshape the situation so the problem never materializes.
+
+2) What it feels like (and how it differs from familiar states)
+- Core feel: Steady, cool agency; a quiet click of commitment; a sense that the floor is firm because you just reinforced it.
+- Not anxiety: Anxiety is tense, high‑arousal, and vigilant. Preemptive Containment is low‑arousal, steady, and decisive.
+- Not conscientiousness: Trait conscientiousness is a personality style; Preemptive Containment is a short‑lived, stateful control mode with specific triggers, physiology, and social signals.
+- Not relief or pride: Relief and pride arrive after outcomes. Preemptive Containment is felt before the event, when there is only weak evidence that something could go wrong.
+
+3) When it occurs (eliciting conditions)
+It arises when three appraisals co‑occur:
+- Early, weak evidence: Small irregularities, near‑misses, rising variance, cracks in coordination. Nothing has failed yet.
+- High leverage on affordances: You can change the setup now—add a checklist, cap a risky option, add a deliberate delay, make a public precommitment—so later options are constrained.
+- Shared consequences: The risk is social or systemic (teams, partnerships, shared infrastructure) so prevention outperforms personal vigilance.
+
+Everyday examples: You notice that team handovers keep slipping by five minutes and two details get lost each time; you feel the gentle urge to add a two‑line checklist and a shared timer before anyone gets burned. Or you sense a relationship will drift into resentment if small frictions accumulate; you calmly propose a weekly ten‑minute check‑in with a fixed question order and commit to it in writing.
+
+4) Mechanism in plain language (predictive brain, interoception, and precision)
+Brains survive by predicting what bodily and worldly signals will do next and adjusting confidence (precision) in those predictions. Most emotions push precision toward obvious threats or opportunities: fear boosts attention and readiness; anger raises dominance and mobilization; curiosity boosts sampling. Preemptive Containment does something humans rarely do by default: it boosts confidence in counterfactual predictions about absences and long‑range risks and then acts to make those predictions true by changing the world.
+
+- Computational move: Upweight weak, early cues about what could go wrong; downweight momentary rewards; select actions that reduce future uncertainty by changing affordances (rules, layouts, defaults) instead of reacting later.
+- Interoceptive move: Keep the body quiet while committing—high vagal tone, low stress hormones—so the signal to others is calm inevitability, not alarm.
+- Learning move: Treat non‑occurrence (the bad thing didn’t happen) as real evidence that the earlier commitment worked, so future prevention feels rewarding.
+
+5) Where it lives in VAD (Valence–Arousal–Dominance) space
+- Valence: Slightly negative to neutral at onset (you sense a potential problem), trending neutral to slightly positive after committing.
+- Arousal: Low and gently decreasing; breathing steady; startle blunted.
+- Dominance: High and increasing as you shape the situation and publicly own the commitment.
+
+Trajectory signature: A diagonal glide from mildly negative/low arousal/moderate dominance toward neutral/low arousal/high dominance. This cleanly separates it from anxiety (negative/high arousal/low dominance) and from conscientious effort (often neutral/medium arousal/medium dominance).
+
+6) Physiological and neural fingerprints (testable)
+- Heart: Elevated high‑frequency heart rate variability (HF‑HRV), indicating strong vagal regulation and calm control.
+- Pupils: Small tonic diameter (restful baseline) with brief phasic dilations at verification points (when you check that the prevention is in place or that the bad event did not occur).
+- Hormones: Low cortisol relative to task demands; no sustained adrenaline surge.
+- Brain systems: Reduced tonic norepinephrine (less background volatility), preserved phasic orienting; slightly elevated acetylcholine (better context precision); a dopamine bump at the moment of precommitment (policy confidence), not at last‑minute success.
+- Connectivity: Increased coupling between ventromedial prefrontal cortex (valuation and calm control) and dorsal anterior cingulate (commitment and monitoring); amygdala quieted without being numbed.
+
+These are ordinary parts, recombined. The novelty lies not in the parts but in the precision policy they implement and the social meaning they carry.
+
+7) Social signaling profile
+- Expressive stance: Even tempo, clipped yes‑no responses, steady gaze, minimal gesture; you put your name on a small, verifiable constraint and do it publicly.
+- Costly honesty: The state becomes credible when behaviors are hard to fake in the moment and are later checkable: timestamped checklists, visible defaults changed, shared timers, or mutual precommitment tokens.
+- Group effect: Others relax slightly and coordinate more tightly; conversations compress; failure‑modes are named calmly and bound.
+
+8) Why evolution has not installed it (the constraint stack)
+Evolutionary counterfactual: If our ancestors had this emotion, would they have out‑reproduced those without it? Not reliably, because of five hard limits.
+
+- Credit assignment for non‑events is noisy: When the bad thing does not happen, it is unclear whether your earlier action deserves the credit. In ancestral environments with delayed and ambiguous feedback, reinforcing prevention would often misfire.
+- Calm is cheap to fake: A low‑arousal, high‑dominance signal can be mimicked without paying the cost of actual prevention. Unless there is reliable verification, free‑riders would exploit the signal, breaking its value as a coordination tool.
+- Over‑pruning kills exploration: A state that feels good when removing options risks becoming compulsive. In volatile ecologies, groups that prune too early miss rare opportunities and lose to braver competitors.
+- Language and tools already do some of the job: Humans invented checklists, rituals, and norms. These external scaffolds substitute for a baked‑in emotion; selection pressure to wire it deeply into affect may have been too weak compared to building better tools and stories.
+- Development without clean feedback is risky: Calibrating an emotion around absences needs consistent, verifiable teaching signals. Childhood environments rarely provide clean, repeated proof that prevention was causal, making innate calibration fragile and costly.
+
+Together, these constraints make Preemptive Containment a shaky evolutionary investment: too easy to fake, too hard to credit, and too liable to overshoot. It is not that the parts are impossible; it is that the package is not a robust strategy without modern scaffolds.
+
+9) How to tell it apart from anxiety, prudence, or relief (falsifiers)
+- Arousal profile: Anxiety elevates arousal now; Preemptive Containment lowers it during commitment and shows small, time‑locked arousal blips only at verification points.
+- Reward timing: Relief and pride spike after the outcome; Preemptive Containment shows a reward‑like signal at the instant of precommitment, not at the finish line.
+- Social behavior: Anxiety seeks reassurance; Preemptive Containment offers a measurable constraint and invites audit.
+- Physiology under stress: With rising volatility, Preemptive Containment maintains high HF‑HRV and small tonic pupils unless leverage disappears. Anxiety shows progressive HRV collapse and pupil enlargement.
+
+If these signatures are not observed across contexts and cultures, the proposal fails.
+
+10) Cross‑species hints (not proofs)
+- Beavers dam before floods; meerkats post sentinels; social insects pre‑allocate roles. These look like prevention strategies but do not demonstrate a human‑like felt state with low arousal and high dominance. They show that nature uses prevention, but not necessarily this affective packaging.
+
+11) Developmental feasibility (if cultivated)
+- Sensitive windows: Adolescence may be ideal—executive networks mature, social credit matters, sleep patterns are plastic.
+- Training loop: Short daily interoceptive drills (one minute of down‑regulation with steady breathing), tiny public precommitments with immediate verification, and sleep‑based consolidation (review what did not happen and tag it to the step that prevented it).
+- Safety rails: Explicit guardrails to prevent over‑pruning—rules like when in doubt, leave two options open; require an outside view before locking constraints; time‑box commitments.
+
+12) When it would be adaptive today (the positive case)
+Modern environments provide exactly what evolution lacked: reliable logs, cheap audits, and formal precommitments. In air traffic control, open‑source security, hospital handovers, and nuclear safety, calm precommitment beats reactive heroics. Teams that reliably induce this state when variance rises should make fewer catastrophic errors with less stress.
+
+13) Minimal conditions to stabilize it socially (what would make it an evolutionarily stable strategy now)
+- Verifiable signals: Public, time‑stamped commitments and randomized audits that catch free‑riders.
+- Honest costs: Small, non‑trivial costs to prevent cheap mimicry (you must do one hard thing now to claim the calm signal).
+- Calibration rituals: Shared check‑in moments that credit non‑occurrence to earlier constraints when causal attribution is strong, and withhold credit when it is not.
+- Diversity of roles: Maintain a population mix—some people lean exploratory, some preventive, some mobilizing—to prevent over‑pruning and preserve adaptability.
+
+14) A field guide to the state (practitioner’s view)
+- Early cue: You notice a near‑miss or growing variance.
+- Bodily switch: You exhale; shoulders drop; pace slows.
+- Choice: You install a constraint that is small, visible, and hard to undo; you invite verification.
+- Social tell: Your tone becomes flat but friendly; you name the failure mode without drama.
+- Closure: You schedule a tiny audit, then stop thinking about it.
+
+15) Concrete predictions you can test
+- Physiological: In people trained to use the state, HF‑HRV rises during commitment; tonic pupil size decreases; there are brief pupil dilations at verification time points; cortisol stays low for the task.
+- Behavioral: Increased use of small, verifiable precommitments after near‑misses; reduced last‑minute firefighting; fewer status displays than anger or urgency.
+- VAD trajectory: Negative valence to neutral; arousal slightly decreases; dominance increases. This should repeat across cultures when signals are verifiable.
+- Failure signatures: If audits are noisy or unverifiable, the state collapses into (a) anxiety‑like vigilance (arousal up, dominance down), (b) over‑pruning rituals (dominance high but exploration suppressed), or (c) free‑riding (flat affect, no verifiable changes).
+
+16) Tensions, contradictions, and open questions
+- Can non‑occurrence ever be reliably credited without creating perverse incentives? If not, the state remains scaffold‑dependent and is not an emotion proper.
+- Will people Goodhart the signals—optimizing checklists and audits while neglecting real risk? If so, we need rotating metrics and randomized checks.
+- Can low arousal coexist with high dominance under disaster‑level stakes? Or does urgency inevitably crowd it out? Perhaps the state is only optimal in moderate volatility with clear leverage.
+- Do some languages that mark evidentiality (how you know what you claim) make this easier to learn? If so, grammar may serve as an affective prosthesis.
+
+17) Why this matters
+We have anger to mobilize, fear to avoid, joy to bond, curiosity to explore. But we lack a native, rewarding feel for reshaping today so that tomorrow’s risk never appears. Preemptive Containment fills that blank: the quiet, confident pleasure of making a crack stop spreading—felt before the wall falls.
+
+18) In summary (skeptic‑ready claims)
+- Definition: A low‑arousal, high‑dominance affect that calmly installs constraints when early cues signal future instability, especially in shared systems.
+- Mechanism: Precision over counterfactual risks, low‑volatility interoception, precommitment rewarded at the moment of commitment, not at outcome.
+- Signatures: HF‑HRV up; tonic pupils small with phasic verification blips; cortisol low; VAD drift from slightly negative/low arousal/moderate dominance to neutral/low arousal/high dominance; compressed prosody and public, verifiable commitments.
+- Absence in Homo: Non‑event credit is hard to identify; calm signals are cheap to fake; over‑pruning suppresses exploration; cultural tools substituted; developmental calibration is brittle without clean feedback.
+- Modern feasibility: With logs, audits, and rituals that make calm precommitment costly to fake and easy to verify, the state could become common and adaptive.
+
+If the predicted physiological and social signatures fail to appear when these conditions are met, the idea should be rejected. If they do appear, we will have named and engineered a missing piece of human affect: a way to feel good about problems that never happen.
