@@ -6,10 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "rome"
 version = "0.3.3"
 authors = [
-    {name = "Jason Liang", email = "jasonzliang@gmail.com"},
+    {name = "August Caesar", email = "augustus.caesar@gmail.com"},
 ]
 maintainers = [
-    {name = "Jason Liang", email = "jasonzliang@gmail.com"},
+    {name = "August Caesar", email = "augustus.caesar@gmail.com"},
 ]
 description = "Rome - An AI agent framework for code analysis and execution"
 readme = "README.md"
@@ -67,7 +67,7 @@ dependencies = {file = ["requirements.txt"]}
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["rome", "rome.*"]
-exclude = ["test*", "tests*", "benchmark*", "ecology*", "monitor*", "web_app*", "docs*"]
+exclude = ["test*", "benchmark*", "ecology*", "monitor*", "web_app*"]
 
 [tool.setuptools.package-data]
 rome = ["py.typed", "*.json", "*.yaml", "*.yml", "*.txt", "*.md"]
