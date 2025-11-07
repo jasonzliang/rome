@@ -46,11 +46,11 @@ class CaesarAgent(BaseAgent):
         self._setup_brave_search()
         self._setup_knowledge_base()
 
+        self._setup_exploration_state()
         if self._load_checkpoint():
             self.logger.info("Resumed from checkpoint")
         else:
             self._update_role()
-            self._setup_exploration_state()
             self.logger.info("Starting fresh exploration")
 
         self._validate_caesar_config()
