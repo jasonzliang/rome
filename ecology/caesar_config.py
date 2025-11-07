@@ -37,7 +37,7 @@ CAESAR_CONFIG = {
         # Maximum depth of exploration tree before backtracking
         "max_depth": 10000,
         # Initial URL to begin exploration (enabling means start_query must be None)
-        "starting_url": "https://en.wikipedia.org/wiki/Main_Page",
+        "starting_url": None,
         # Initial query to being exploration (enabling means starting_url must be None)
         "starting_query": None,
         # Additional queries to generate from initial query to help agent

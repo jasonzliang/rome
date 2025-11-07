@@ -61,11 +61,16 @@ class BraveSearch:
         self.output_dir = os.path.join(self.agent.get_log_dir(), SEARCH_RESULT_DIR)
         os.makedirs(self.output_dir, exist_ok=True)
 
-    def _generate_filename(self, query: str) -> str:
+    def _generate_filename(self, query) -> str:
         """Generate filename from query and timestamp"""
         # Sanitize query for filename (remove special chars, limit length)
+        if type(query) is list:
+            query = f"merged_{len(query)}_{query[0]}"
+        else:
+            self.logger.assert_true(type(query) is str, "Query must be string or list")
+
         safe_query = re.sub(r'[^\w\s-]', '', query)
-        safe_query = re.sub(r'[-\s]+', '_', safe_query)
+        safe_query = re.sub(r'[-\s]+', '-', safe_query)
         safe_query = safe_query[:SHORT_SUMMARY_LEN]  # Limit length
 
         # Add timestamp/hash for uniqueness
@@ -81,8 +86,7 @@ class BraveSearch:
         self.logger.debug(f"Brave search queries: {query_list}")
 
         # Setup file name and check cached file
-        filename = self._generate_filename(query_list[0] if len(query_list) == 1
-            else f"merged_{len(query_list)}_queries")
+        filename = self._generate_filename(queries)
         html_file = os.path.abspath(os.path.join(self.output_dir, filename))
         if os.path.exists(html_file):
             self.logger.debug(f"Using cached search results html file: {html_file}")
