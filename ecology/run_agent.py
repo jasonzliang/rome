@@ -73,6 +73,7 @@ def print_config_summary(agent, logger):
         },
         "Caesar Settings": {
             "Starting URL": agent.starting_url,
+            "Starting Query": agent.starting_query,
             "Allowed Domains": ', '.join(agent.allowed_domains) if not agent.allow_all_domains else "* (ALL DOMAINS)",
             "Max Depth": agent.max_depth,
             "Save Interval": agent.save_graph_interval,
