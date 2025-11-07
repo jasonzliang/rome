@@ -65,7 +65,7 @@ class BraveSearch:
         """Generate filename from query and timestamp"""
         # Sanitize query for filename (remove special chars, limit length)
         if type(query) is list and len(query) > 1:
-            query = f"merged_{len(query)}_{query[0]}"
+            query = f"multi-query-{len(query)}_{query[0]}"
         elif type(query) is list and len(query) == 1:
             query = query[0]
         self.logger.assert_true(type(query) is str, "Query must be string or list")
