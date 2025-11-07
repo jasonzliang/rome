@@ -90,7 +90,7 @@ class OpenAIHandler:
         "o1", "o1-mini", "o1-pro", "o3", "o3-mini", "o4-mini",
     }
 
-    # Unique identifier for requests
+    # Unique identifier for chat completion requests
     USER_ID = "cognizant-ai-labs-jason"
 
     def __init__(self, config: Dict = None):
