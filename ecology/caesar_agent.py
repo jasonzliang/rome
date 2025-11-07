@@ -45,12 +45,12 @@ class CaesarAgent(BaseAgent):
         self._setup_allowed_domains()
         self._setup_brave_search()
         self._setup_knowledge_base()
-        self._update_role()
 
-        self._setup_exploration_state()
         if self._load_checkpoint():
             self.logger.info("Resumed from checkpoint")
         else:
+            self._update_role()
+            self._setup_exploration_state()
             self.logger.info("Starting fresh exploration")
 
         self._validate_caesar_config()
@@ -179,13 +179,13 @@ Respond with valid JSON only:
             if not self.adapt_role: return
 
             # Check cached adapted role
-            role_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.updated_role.txt")
-            if os.path.exists(role_file) and os.path.getsize(role_file) > 0:
-                with open(role_file, 'r', encoding='utf-8') as f:
-                    if cached_role := f.read().strip():
-                        self.role = cached_role
-                        self.logger.info(f"[ADAPT ROLE] Using cached adapted role:\n{self.role}")
-                        return
+            # role_file = os.path.join(self.get_log_dir(), f"{self.get_id()}.updated_role.txt")
+            # if os.path.exists(role_file) and os.path.getsize(role_file) > 0:
+            #     with open(role_file, 'r', encoding='utf-8') as f:
+            #         if cached_role := f.read().strip():
+            #             self.role = cached_role
+            #             self.logger.info(f"[ADAPT ROLE] Using cached adapted role:\n{self.role}")
+            #             return
 
             # Fetch and extract content
             self.logger.info(f"[ADAPT ROLE] Analyzing {self.starting_url}")
@@ -234,8 +234,8 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
 
             # Save and apply
             self.role = adapted_role
-            with open(role_file, 'w', encoding='utf-8') as f:
-                f.write(self.role)
+            # with open(role_file, 'w', encoding='utf-8') as f:
+                # f.write(self.role)
             self.logger.info(f"[ADAPT ROLE] Using newly adapted role:\n{self.role}")
 
         except Exception as e:
@@ -358,7 +358,7 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
 
             # Disabled due to having separating loading mechanism or not necessary
             # self.failed_urls = set(data.get('failed_urls', self.failed_urls))
-            # self.role = data.get('role', self.role)
+            self.role = data.get('role', self.role)
 
             if not self.url_stack:
                 self.logger.error("Invalid checkpoint: empty url_stack")
