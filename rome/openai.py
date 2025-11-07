@@ -90,6 +90,9 @@ class OpenAIHandler:
         "o1", "o1-mini", "o1-pro", "o3", "o3-mini", "o4-mini",
     }
 
+    # Unique identifier for requests
+    USER_ID = "cognizant-ai-labs-jason"
+
     def __init__(self, config: Dict = None):
         self.config = config or {}
         self.logger = get_logger()
@@ -362,7 +365,8 @@ class OpenAIHandler:
             "messages": messages,
             "top_p": self.top_p,
             "max_completion_tokens": self.max_completion_tokens,
-            "temperature": self.temperature
+            "temperature": self.temperature,
+            "user": self.USER_ID,
         }
         if override_config:
             kwargs.update(override_config)
