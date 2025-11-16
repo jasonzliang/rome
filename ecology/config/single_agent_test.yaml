@@ -18,7 +18,7 @@ CaesarAgent:
   max_web_searches: 3
   save_graph_interval: 1
   draw_graph: true
-  max_iterations: 10
+  max_iterations: 5
   synthesis_iterations: 5
 
   overwrite_role_file: config/role/self_transcend_role_v1.txt

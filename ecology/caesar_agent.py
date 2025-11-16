@@ -23,7 +23,7 @@ from rome.logger import get_logger
 from rome.kb_client import ChromaClientManager
 
 from .brave_search import BraveSearch
-from .caesar_config import MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS, MAX_NUM_NEIGHBORS, MAX_TEXT_LENGTH, REQUESTS_TIMEOUT, REQUESTS_HEADERS, CAESAR_CONFIG
+from .caesar_config import MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS, MAX_NUM_NEIGHBORS, MAX_SOURCES_PER_QUERY, MAX_TEXT_LENGTH, REQUESTS_TIMEOUT, REQUESTS_HEADERS, CAESAR_CONFIG
 
 
 class CaesarAgent(BaseAgent):
@@ -944,15 +944,16 @@ Your response must be valid JSON only, nothing else."""
         self.logger.info(f"\n[EXPLORE] Exploration complete: visited {len(self.visited_urls)} pages")
         return self._synthesize_artifact()
 
-    def _generate_qa_pairs_classic(self, queries: List[str]) -> List[Tuple[str, str]]:
-        """Execute queries against KB"""
+    def _generate_qa_pairs_classic(self, queries: List[str]) -> List[Tuple[str, str, List[Dict]]]:
+        """Execute queries against KB with sources"""
         qa_pairs = []
         for query in queries:
             try:
-                answer = self.kb_manager.query(query,
-                    top_k=self.synthesis_top_k, top_n=self.synthesis_top_n)
+                answer, sources = self.kb_manager.query(
+                    query, top_k=self.synthesis_top_k, top_n=self.synthesis_top_n,
+                    return_sources=True)
                 if answer:
-                    qa_pairs.append((query, answer))
+                    qa_pairs.append((query, answer, sources))
             except Exception as e:
                 self.logger.error(f"KB query failed for '{query}': {e}")
         return qa_pairs
@@ -995,8 +996,8 @@ Respond with JSON:
             self.logger.error(f"Query generation failed: {e}")
         return None
 
-    def _generate_qa_pairs(self, mode: str) -> List[Tuple[str, str]]:
-        """Generate Q&A pairs by querying KB"""
+    def _generate_qa_pairs(self, mode: str) -> List[Tuple[str, str, List[Dict]]]:
+        """Generate Q&A pairs with sources"""
         queries = [
             "What are the central themes and patterns discovered?",
             "What unexpected connections or insights emerged?",
@@ -1004,33 +1005,35 @@ Respond with JSON:
             "What questions remain open or were raised?",
             "What novel perspective emerged from this exploration?"
         ]
-        if self.starting_query is not None:
+        if self.starting_query:
             queries = [self.starting_query] + queries
+
         if mode == "classic":
             return self._generate_qa_pairs_classic(queries)
 
         # Iterative mode
-        queries = [queries[0]]
-        answers = []
+        queries, answers, all_sources = [queries[0]], [], []
 
         for i in range(self.synthesis_iterations):
-            answer = self.kb_manager.query(queries[-1],
-                top_k=self.synthesis_top_k, top_n=self.synthesis_top_n)
+            answer, sources = self.kb_manager.query(
+                queries[-1], top_k=self.synthesis_top_k, top_n=self.synthesis_top_n,
+                return_sources=True)
             if not answer: break
+
             answers.append(answer)
+            all_sources.append(sources)
 
             self.logger.info(f"[SYNTHESIS {i+1}/{self.synthesis_iterations}]\nQ: {queries[-1]}\nA: {answers[-1]}")
 
             if i < self.synthesis_iterations - 1:
-                next_query = self._generate_next_query(queries, answers)
-                if not next_query:
+                if not (next_query := self._generate_next_query(queries, answers)):
                     break
                 queries.append(next_query)
 
-        return list(zip(queries, answers))
+        return list(zip(queries, answers, all_sources))
 
     def _synthesize_artifact(self) -> Dict[str, str]:
-        """Generate final synthesis from accumulated insights"""
+        """Generate final synthesis with citations"""
         mode = "iterative" if self.iterative_synthesis else "classic"
         self.logger.info(f"[SYNTHESIS] Using {mode} mode")
 
@@ -1041,31 +1044,51 @@ Respond with JSON:
         if not qa_pairs:
             return {"abstract": "", "artifact": "Unable to generate synthesis questions."}
 
-        perspectives = "\n\n\n".join([f"({i+1}) Question: {q}\n\nAnswer: {a}"
-                                     for i, (q, a) in enumerate(qa_pairs)])
+        # Build source index and perspectives
+        all_sources = {}
+        perspectives = []
+        for i, (q, a, sources) in enumerate(qa_pairs):
+            # Add new sources to index
+            for src in sources:
+                if (url := src['url']) and url not in all_sources:
+                    all_sources[url] = len(all_sources) + 1
+
+            # Format with citations
+            refs = ", ".join([f"[{all_sources[s['url']]}]" for s in sources[:MAX_SOURCES_PER_QUERY] if s.get('url')])
+            perspectives.append(f"({i+1}) Question: {q}\n\nAnswer: {a} {refs}")
+
+        perspectives = "\n\n\n".join(perspectives)
+        source_list = "\n".join([f"[{idx}] {url}" for url, idx in sorted(all_sources.items(), key=lambda x: x[1])])
 
         starting_query_task = f" that creatively answers this query: {self.starting_query}" if self.starting_query else ":"
         starting_query_role = f" and on how to creatively answer the query!" if self.starting_query else "!"
 
         prompt = f"""You explored {len(self.visited_urls)} sources and gathered {self.kb_manager.size()} insights.
 
-Key patterns emerged through querying and analyzing gathered insights
+Key patterns emerged through querying and analyzing gathered insights (with source citations [n]):
 {perspectives}
+
+SOURCES:
+{source_list}
 
 YOUR TASK:
 Drawing heavily upon the key patterns that emerged from the insights, create a novel, exciting, and thought provoking artifact{starting_query_task}
 
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the artifact's core discovery and its significance
+    - Include source citations [n] for key claims
 
 2. **Artifact Main Text** (~{self.synthesis_max_tokens} tokens):
-    - Some suggestions (you do not have to follow them exactly):
+    - Some general suggestions for artifact:
         a. Emergent patterns not visible in individual sources
         b. Novel discoveries, connections, or applications
         c. Surprising new directions or perspectives
         d. Interesting tensions, contradictions, or open questions
+    - Cite sources using [n] notation after relevant claims (e.g., "This pattern emerged [1,3]")
+    - Use multiple citations when synthesizing across sources
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
+IMPORTANT: Cite sources [n] to support your claims and insights
 IMPORTANT: Use your role as a guide on how to respond{starting_query_role}
 
 Respond with valid JSON only:
@@ -1083,9 +1106,11 @@ Respond with valid JSON only:
             self.logger.error(f"Synthesis generation failed: {e}")
             return {"abstract": "Synthesis failed.", "artifact": f"Error: {e}"}
 
+        result["sources"] = dict(sorted(all_sources.items(), key=lambda x: x[1]))
         result["metadata"] = {
             "pages_visited": len(self.visited_urls),
             "insights_collected": self.kb_manager.size(),
+            "sources_cited": len(all_sources),
             "synthesis_mode": mode,
             "synthesis_queries": len(qa_pairs),
             "max_depth": self.current_depth,
@@ -1097,7 +1122,7 @@ Respond with valid JSON only:
         return result
 
     def _save_synthesis_outputs(self, result: Dict) -> None:
-        """Save synthesis in JSON and text formats"""
+        """Save synthesis with sources in JSON and text formats"""
         timestamp = datetime.now().strftime("%m%d%H%M")
         base_path = os.path.join(self.get_repo(), f"{self.get_id()}.synthesis.{timestamp}")
 
@@ -1108,6 +1133,11 @@ Respond with valid JSON only:
             with open(f"{base_path}.txt", 'w', encoding='utf-8') as f:
                 f.write(f"ABSTRACT:\n{result['abstract']}\n\n")
                 f.write(f"ARTIFACT:\n{result['artifact']}\n\n")
+                if sources := result.get('sources'):
+                    f.write("SOURCES:\n")
+                    for url, idx in sorted(sources.items(), key=lambda x: x[1]):
+                        f.write(f"[{idx}] {url}\n")
+                    f.write("\n")
                 f.write(f"METADATA:\n{json.dumps(result['metadata'], indent=4)}")
         except Exception as e:
             self.logger.error(f"Failed to save synthesis: {e}")

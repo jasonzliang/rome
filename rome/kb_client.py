@@ -267,25 +267,24 @@ class ChromaClientManager:
 
         return True
 
-    def query(self, question, top_k=None, top_n=None):
-        """Enhanced query with LLMRerank and empty collection validation"""
+    def query(self, question, top_k=None, top_n=None, return_sources=False):
+        """Enhanced query with optional source URLs"""
         try:
-            # Check if collection is empty before proceeding
             if self.size() == 0:
-                return ""
+                return ("", []) if return_sources else ""
 
             should_rerank = self.reranker is not None
-            if should_rerank:
-                top_k = max([top_k or self.rerank_top_k, self.rerank_top_n, 1])
-            else:
-                top_k = max(top_k or self.top_k, 1)
+            top_k = max([top_k or self.rerank_top_k, self.rerank_top_n, 1]) if should_rerank else max(top_k or self.top_k, 1)
+
+            nodes = self._retrieve_nodes(question, top_k)
 
             if should_rerank:
-                # Get more documents for reranking (use simple multiplier)
-                nodes = self._retrieve_nodes(question, top_k)
+                top_n = max([top_n or self.rerank_top_n, self.rerank_top_n, 1])
+                if top_n != self.rerank_top_n:
+                    self.reranker = LLMRerank(top_n=top_n, llm=self.llm)
+                nodes = self.reranker.postprocess_nodes(nodes, query_str=question)
                 response = self._rerank_and_respond(question, nodes, top_n)
             else:
-                # Standard query without reranking
                 response = self._standard_query(question, top_k)
 
             if self.log_db:
@@ -294,11 +293,19 @@ class ChromaClientManager:
                     f.write("="*80)
                     f.write(f"\n\nQUERY: {question}\n\nRESPONSE: {response}\n\n")
 
+            if return_sources:
+                sources = [
+                    {'url': m.get('url'), 'depth': m.get('depth'), 'iteration': m.get('iteration')}
+                    for node in nodes
+                    if (m := (node.node if hasattr(node, 'node') else node).metadata) and m.get('url')
+                ]
+                return response, sources
+
             return response
 
         except openai.APITimeoutError as e:
             self.logger.error(f"KB query timed out (OpenAI API): {e}")
-            return ""
+            return ("", []) if return_sources else ""
 
     def _retrieve_nodes(self, question: str, retrieval_k: int):
         """Retrieve nodes with instance-specific embed model"""
