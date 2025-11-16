@@ -1065,7 +1065,7 @@ Respond with JSON:
 
         prompt = f"""You explored {len(self.visited_urls)} sources and gathered {self.kb_manager.size()} insights.
 
-Key patterns emerged through querying and analyzing gathered insights (with source citations [n]):
+Key patterns emerged through querying and analyzing gathered insights (with source citations):
 {perspectives}
 
 SOURCES:
@@ -1088,7 +1088,7 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
     - Use multiple citations when synthesizing across sources
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
-IMPORTANT: Cite sources [n] to support your claims and insights
+IMPORTANT: Cite sources to support your claims and insights
 IMPORTANT: Use your role as a guide on how to respond{starting_query_role}
 
 Respond with valid JSON only:
