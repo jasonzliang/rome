@@ -4,8 +4,10 @@ MAX_NUM_LINKS = 2000
 MAX_NUM_VISITED_LINKS = 1000
 # Maximum of neighboring nodes to look for related insights
 MAX_NUM_NEIGHBORS = 5
-# Maximum number of sources per query during synthesis (to prevent too many citations)
-MAX_SOURCES_PER_QUERY = 5
+# Maximum number of citation sources per query during synthesis
+MAX_SYNTHESIS_QUERY_SOURCES = 5
+# Max QA pairs to keep in context during iterative synthesis
+MAX_SYNTHESIS_QA_CONTEXT = 50
 # Maximum length (characters) of text to extract from a webpage
 MAX_TEXT_LENGTH = 100000
 # Timeout for fetching webpage html using requests

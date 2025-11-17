@@ -23,7 +23,7 @@ from rome.logger import get_logger
 from rome.kb_client import ChromaClientManager
 
 from .brave_search import BraveSearch
-from .caesar_config import MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS, MAX_NUM_NEIGHBORS, MAX_SOURCES_PER_QUERY, MAX_TEXT_LENGTH, REQUESTS_TIMEOUT, REQUESTS_HEADERS, CAESAR_CONFIG
+from .caesar_config import MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS, MAX_NUM_NEIGHBORS, MAX_TEXT_LENGTH, REQUESTS_TIMEOUT, REQUESTS_HEADERS, CAESAR_CONFIG, MAX_SYNTHESIS_QUERY_SOURCES, MAX_SYNTHESIS_QA_CONTEXT
 
 
 class CaesarAgent(BaseAgent):
@@ -961,9 +961,8 @@ Your response must be valid JSON only, nothing else."""
     def _generate_next_query(self, previous_queries: List[str],
                              previous_responses: List[str]) -> Optional[str]:
         """Generate next synthesis query"""
-        max_context_pairs = 20
-        recent_queries = previous_queries[-max_context_pairs:]
-        recent_responses = previous_responses[-max_context_pairs:]
+        recent_queries = previous_queries[-MAX_SYNTHESIS_QA_CONTEXT:]
+        recent_responses = previous_responses[-MAX_SYNTHESIS_QA_CONTEXT:]
 
         context = "\n\n".join([f"Q: {q}\nA: {r}"
                               for q, r in zip(recent_queries, recent_responses)])
