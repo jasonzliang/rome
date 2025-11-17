@@ -1043,7 +1043,7 @@ Respond with JSON:
 
             # Format with citations (only for URLs in all_sources)
             refs = ", ".join([f"[{all_sources[s['url']]}]"
-                for s in sources[:MAX_SOURCES_PER_QUERY] if s.get('url') and s['url'] in all_sources])
+                for s in sources[:MAX_SYNTHESIS_QUERY_SOURCES] if s.get('url') and s['url'] in all_sources])
             answers.append(f"({i+1}) Question: {q}\n\nAnswer: {a} {refs}")
 
         qa_list = "\n\n\n".join(answers)
