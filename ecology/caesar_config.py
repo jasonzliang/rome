@@ -10,25 +10,20 @@ MAX_TEXT_LENGTH = 100000
 REQUESTS_TIMEOUT = 10
 # Headers to use for requests when fetching html
 REQUESTS_HEADERS = {
-    # UPDATED: Using Chrome 143 (Approximate Stable for Nov 2025)
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-    # OPTIMIZED: Removed images (you are fetching docs) and kept only supported text formats
+    # 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
+    # 'Sec-Ch-Ua': '"Google Chrome";v="143", "Chromium";v="143", "Not_A Brand";v="24"',
+    # 'Sec-Ch-Ua-Mobile': '?0',
+    # 'Sec-Ch-Ua-Platform': '"Windows"',
+    # 'Priority': 'u=0, i'
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
     # SAFETY FIX: Removed 'br' and 'zstd' to prevent binary garbage errors in 'requests'
     'Accept-Encoding': 'gzip, deflate',
     'Accept-Language': 'en-US,en;q=0.9',
-    # UPDATED: Client Hints matching the new User-Agent version
-    'Sec-Ch-Ua': '"Google Chrome";v="143", "Chromium";v="143", "Not_A Brand";v="24"',
-    'Sec-Ch-Ua-Mobile': '?0',
-    'Sec-Ch-Ua-Platform': '"Windows"',
     'Sec-Fetch-Dest': 'document',
     'Sec-Fetch-Mode': 'navigate',
-    # CRITICAL: 'none' mimics a direct visit (bookmark/url bar).
-    # Switch to 'same-origin' if your agent is clicking internal links.
     'Sec-Fetch-Site': 'none',
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
-    'Priority': 'u=0, i'  # Modern header often sent by Chrome
 }
 # Maximum number of citation sources per query during synthesis
 MAX_SYNTHESIS_QUERY_SOURCES = 5

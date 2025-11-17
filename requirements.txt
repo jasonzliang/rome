@@ -9,6 +9,7 @@ pytest
 tinydb
 
 # Library optional packages
+curl_cffi
 evalplus
 graphviz
 llmlingua

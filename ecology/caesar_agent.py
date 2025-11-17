@@ -5,7 +5,8 @@ from datetime import datetime
 import io
 import json
 import os
-import requests
+# import requests
+from curl_cffi import requests
 import sys
 import time
 from typing import Dict, List, Optional, Tuple
@@ -393,8 +394,13 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
                     return f.read()
 
             # Remote URL handling
-            response = requests.get(url, timeout=REQUESTS_TIMEOUT,
-                headers=REQUESTS_HEADERS, allow_redirects=True)
+            response = requests.get(
+                url,
+                impersonate="chrome",  # Matches a modern Chrome browser
+                timeout=REQUESTS_TIMEOUT,
+                headers=REQUESTS_HEADERS,
+                allow_redirects=True
+            )
             response.raise_for_status()
 
             # PDF detection and extraction
