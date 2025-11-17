@@ -22,7 +22,7 @@ CaesarAgent:
   synthesis_iterations: 30
 
   exploration_llm_config:
-    model: gpt-5
+    model: gpt-5.1
 
   # overwrite_role_file: config/role/self_transcend_role.txt
   adapt_role: True
@@ -34,6 +34,7 @@ CaesarAgent:
 OpenAIHandler:
   cost_limit: 300.0
   model: gpt-5
+  reasoning_effort: medium
   temperature: 0.1
   timeout: 300
 
