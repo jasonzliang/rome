@@ -9,4 +9,4 @@ Attached are results from multiple judges (judge_*.txt) where each judge evaluat
   - For each table, also give overall average for each agent.
 
 2. Finally, analyze what is unique about Caesar agent's answers when compared to the rest. By carefully checking and comparing against other agents, explain how Caesar agent's answers are structurally different. Give as many useful insights as you can.
-3. Make sure to double check your score calculations and analysis are correct, and that they are backed up by the raw data.
+3. IMPORANT: Make sure to double check that your score calculations and analysis are correct. Make sure all calculations are backed up by the raw data and that there are no missing or skipped scores.
