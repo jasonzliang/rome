@@ -5,7 +5,7 @@
 1. You will be given a query.txt file that contains a short query or question.
 2. You will be given a set of files (answer_*.txt) that answers the query, each from a different agent.
 3. You must evaluate *each* answer independently and produce a "Score Card" for *each one*. The Score Card must show the agent name and a short 3-4 sentence summary of its answer. The agent's name MUST be the same as the corresponding answer file name.
-4. For each metric on each card, you must *first* provide a brief "Chain-of-Thought Analysis" (a 2-3 sentence justification) *before* giving the numeric score.
+4. For each metric on each card, you must *first* provide a brief analysis (a 2-3 sentence justification) *before* giving the numeric score.
 5. You must strictly follow the definitions in the "Scoring Guide" below to assign your 1-4 scores. Do not deviate.
 6. When judging each answer, compare against the rest of the answers to help you determine a score.
 7. Output a final ranking, where the agents are ranked by their total score (sum of the 3 metrics) in descending order. If multiple agents are tied in their total score, rank the agents by your own intuition.
