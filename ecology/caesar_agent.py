@@ -1011,7 +1011,7 @@ Respond with JSON:
             return self._generate_qa_pairs_classic(queries)
 
         # Iterative mode
-        queries, answers, all_sources = [queries[0]], [], []
+        queries, answers, sources_list = [queries[0]], [], []
 
         for i in range(self.synthesis_iterations):
             answer, sources = self.kb_manager.query(
@@ -1020,7 +1020,7 @@ Respond with JSON:
             if not answer: break
 
             answers.append(answer)
-            all_sources.append(sources)
+            sources_list.append(sources)
 
             self.logger.info(f"[SYNTHESIS {i+1}/{self.synthesis_iterations}]\nQ: {queries[-1]}\nA: {answers[-1]}")
 
@@ -1029,28 +1029,28 @@ Respond with JSON:
                     break
                 queries.append(next_query)
 
-        return list(zip(queries, answers, all_sources))
+        return list(zip(queries, answers, sources_list))
 
     def _build_answers_with_citations(self, qa_pairs):
         """Build formatted answers with citations and source index from Q&A pairs."""
-        all_sources = {}; answers = []
+        source_map = {}; answers = []
 
         for i, (q, a, sources) in enumerate(qa_pairs):
             # Add new sources to index (exclude file:// URLs)
             for src in sources:
-                if (url := src['url']) and not url.startswith('file://') and url not in all_sources:
-                    all_sources[url] = len(all_sources) + 1
+                if (url := src['url']) and not url.startswith('file://') and url not in source_map:
+                    source_map[url] = len(source_map) + 1
 
-            # Format with citations (only for URLs in all_sources)
-            refs = ", ".join([f"[{all_sources[s['url']]}]"
-                for s in sources[:MAX_SYNTHESIS_QUERY_SOURCES] if s.get('url') and s['url'] in all_sources])
+            # Format with citations (only for URLs in source_map)
+            refs = ", ".join([f"[{source_map[s['url']]}]"
+                for s in sources[:MAX_SYNTHESIS_QUERY_SOURCES] if s.get('url') and s['url'] in source_map])
             answers.append(f"({i+1}) Question: {q}\n\nAnswer: {a} {refs}")
 
         qa_list = "\n\n\n".join(answers)
         source_list = "\n".join([f"[{idx}] {url}"
-            for url, idx in sorted(all_sources.items(), key=lambda x: x[1])])
+            for url, idx in sorted(source_map.items(), key=lambda x: x[1])])
 
-        return qa_list, source_list
+        return qa_list, source_list, source_map
 
     def _synthesize_artifact(self) -> Dict[str, str]:
         """Generate final synthesis with citations"""
@@ -1063,7 +1063,7 @@ Respond with JSON:
         qa_pairs = self._generate_qa_pairs(mode)
         if not qa_pairs:
             return {"abstract": "", "artifact": "Unable to generate synthesis questions."}
-        qa_list, source_list = self._build_answers_with_citations(qa_pairs)
+        qa_list, source_list, source_map = self._build_answers_with_citations(qa_pairs)
 
         starting_query_task = f" that creatively answers this query: {self.starting_query}" if self.starting_query else ":"
         starting_query_role = f" and on how to creatively answer the query!" if self.starting_query else "!"
@@ -1111,11 +1111,11 @@ Respond with valid JSON only:
             self.logger.error(f"Synthesis generation failed: {e}")
             return {"abstract": "Synthesis failed.", "artifact": f"Error: {e}"}
 
-        result["sources"] = dict(sorted(all_sources.items(), key=lambda x: x[1]))
+        result["sources"] = dict(sorted(source_map.items(), key=lambda x: x[1]))
         result["metadata"] = {
             "pages_visited": len(self.visited_urls),
             "insights_collected": self.kb_manager.size(),
-            "sources_cited": len(all_sources),
+            "sources_cited": len(source_map),
             "synthesis_mode": mode,
             "synthesis_queries": len(qa_pairs),
             "max_depth": self.current_depth,
