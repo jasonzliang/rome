@@ -1073,7 +1073,7 @@ Respond with JSON:
 Key patterns emerged through querying and analyzing gathered insights (with source citations):
 {qa_list}
 
-SOURCES:
+Sources:
 {source_list}
 
 YOUR TASK:
@@ -1093,7 +1093,7 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
     - Use one or more citations if necessary to support complex arguments
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
-IMPORTANT: Cite sources using [n] notation to support your claims and insights, but do NOT recreate the sources list or provide a "References" section
+IMPORTANT: Cite sources using [n] notation to support your claims and insights, but do NOT recreate the "Sources" list or provide a "References" section
 IMPORTANT: Use your role as a guide on how to respond{starting_query_role}
 
 Respond with valid JSON only:
