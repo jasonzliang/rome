@@ -158,7 +158,7 @@ Respond with valid JSON only:
         # Execute search with all queries
         self.starting_url = search_engine.search_and_save(queries)
         self.web_searches_used += len(queries)
-        self.logger.info(f"Overwriting existing starting_url ({old_starting_url}) with {len(queries)} query search results")
+        self.logger.info(f"Overwriting existing starting_url ({old_starting_url}) with query search results: {self.starting_url}")
 
     def _setup_knowledge_base(self) -> None:
         """Setup knowledge base"""
@@ -1032,6 +1032,27 @@ Respond with JSON:
 
         return list(zip(queries, answers, all_sources))
 
+    def _build_answers_with_citations(self, qa_pairs):
+        """Build formatted answers with citations and source index from Q&A pairs."""
+        all_sources = {}; answers = []
+
+        for i, (q, a, sources) in enumerate(qa_pairs):
+            # Add new sources to index (exclude file:// URLs)
+            for src in sources:
+                if (url := src['url']) and not url.startswith('file://') and url not in all_sources:
+                    all_sources[url] = len(all_sources) + 1
+
+            # Format with citations (only for URLs in all_sources)
+            refs = ", ".join([f"[{all_sources[s['url']]}]"
+                for s in sources[:MAX_SOURCES_PER_QUERY] if s.get('url') and s['url'] in all_sources])
+            answers.append(f"({i+1}) Question: {q}\n\nAnswer: {a} {refs}")
+
+        qa_list = "\n\n\n".join(answers)
+        source_list = "\n".join([f"[{idx}] {url}"
+            for url, idx in sorted(all_sources.items(), key=lambda x: x[1])])
+
+        return qa_list, source_list
+
     def _synthesize_artifact(self) -> Dict[str, str]:
         """Generate final synthesis with citations"""
         mode = "iterative" if self.iterative_synthesis else "classic"
@@ -1043,22 +1064,7 @@ Respond with JSON:
         qa_pairs = self._generate_qa_pairs(mode)
         if not qa_pairs:
             return {"abstract": "", "artifact": "Unable to generate synthesis questions."}
-
-        # Build source index and perspectives
-        all_sources = {}
-        perspectives = []
-        for i, (q, a, sources) in enumerate(qa_pairs):
-            # Add new sources to index
-            for src in sources:
-                if (url := src['url']) and url not in all_sources:
-                    all_sources[url] = len(all_sources) + 1
-
-            # Format with citations
-            refs = ", ".join([f"[{all_sources[s['url']]}]" for s in sources[:MAX_SOURCES_PER_QUERY] if s.get('url')])
-            perspectives.append(f"({i+1}) Question: {q}\n\nAnswer: {a} {refs}")
-
-        perspectives = "\n\n\n".join(perspectives)
-        source_list = "\n".join([f"[{idx}] {url}" for url, idx in sorted(all_sources.items(), key=lambda x: x[1])])
+        qa_list, source_list = self._build_answers_with_citations(qa_pairs)
 
         starting_query_task = f" that creatively answers this query: {self.starting_query}" if self.starting_query else ":"
         starting_query_role = f" and on how to creatively answer the query!" if self.starting_query else "!"
@@ -1066,7 +1072,7 @@ Respond with JSON:
         prompt = f"""You explored {len(self.visited_urls)} sources and gathered {self.kb_manager.size()} insights.
 
 Key patterns emerged through querying and analyzing gathered insights (with source citations):
-{perspectives}
+{qa_list}
 
 SOURCES:
 {source_list}
@@ -1085,10 +1091,10 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
         c. Surprising new directions or perspectives
         d. Interesting tensions, contradictions, or open questions
     - Cite sources using [n] notation after relevant claims (e.g., "This pattern emerged [1,3]")
-    - Use multiple citations when synthesizing across sources
+    - Use one or more citations if necessary to support complex arguments
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
-IMPORTANT: Cite sources to support your claims and insights
+IMPORTANT: Cite sources using [n] notation to support your claims and insights, but do NOT recreate the sources list or provide a "References" section
 IMPORTANT: Use your role as a guide on how to respond{starting_query_role}
 
 Respond with valid JSON only:
