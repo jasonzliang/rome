@@ -94,6 +94,8 @@ CAESAR_CONFIG = {
     },
 
     "AgentMemory": {
+        # Whether to clear memory or not
+        "clear_memory": False,
         # Whether to enable agent memory
         "enabled": True,
         # Whether to use vector DB or graph DB

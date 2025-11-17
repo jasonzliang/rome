@@ -38,9 +38,8 @@ class AgentMemory:
         if self.enabled:
             self._initialize_mem0()
 
-            # Handle automatic or interactive memory clearing
-            if self.clear_memory: self.clear()
-            else: self._prompt_clear_memory()
+            # Handle interactive memory clearing
+            if self.clear_memory: self._prompt_clear_memory()
 
     def _prompt_clear_memory(self) -> None:
         """Interactive prompt to ask user if they want to clear memory"""
