@@ -6,15 +6,15 @@ import io
 import json
 import os
 # import requests
-from curl_cffi import requests
 import sys
 import time
 from typing import Dict, List, Optional, Tuple
 from urllib.parse import urljoin, urlparse
 
-import numpy as np
-import networkx as nx
 from bs4 import BeautifulSoup
+from curl_cffi import requests
+import networkx as nx
+import numpy as np
 from PyPDF2 import PdfReader
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
