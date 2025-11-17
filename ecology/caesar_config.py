@@ -77,6 +77,15 @@ CAESAR_CONFIG = {
             "timeout": 120,
         },
 
+        # Overwrites the default role with new role from file, order is [overwrite] -> [adapt]
+        "overwrite_role_file": None,
+        # Whether to modify agent role based on starting URL and/or insights
+        "adapt_role": False,
+        # Insights file path used to adapt the role and change it
+        "adapt_role_file": None
+    },
+
+    "ArtifactSynthesizer": {
         # Set to False for classic mode (ask all queries at once)
         "iterative_synthesis": True,
         # Number of Q/A iterations
@@ -87,13 +96,6 @@ CAESAR_CONFIG = {
         "synthesis_top_n": 10,
         # Maximum of tokens for generating final synthesis artifact
         "synthesis_max_tokens": "4000 to 5000",
-
-        # Overwrites the default role with new role from file, order is [overwrite] -> [adapt]
-        "overwrite_role_file": None,
-        # Whether to modify agent role based on starting URL and/or insights
-        "adapt_role": False,
-        # Insights file path used to adapt the role and change it
-        "adapt_role_file": None
     },
 
     "AgentMemory": {
