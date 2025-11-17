@@ -1083,7 +1083,7 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
     - Summary of the artifact's core discovery and its significance
     - Include source citations [n] for key claims
 
-2. **Artifact Main Text** (~{self.synthesis_max_tokens} tokens):
+2. **Artifact Main Text** (around {self.synthesis_max_tokens} tokens):
     - Some general suggestions for artifact:
         a. Emergent patterns not visible in individual sources
         b. Novel discoveries, connections, or applications

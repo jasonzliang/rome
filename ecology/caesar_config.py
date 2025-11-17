@@ -83,7 +83,7 @@ CAESAR_CONFIG = {
         # Top_n for synthesis query and retrieval from DB
         "synthesis_top_n": 10,
         # Maximum of tokens for generating final synthesis artifact
-        "synthesis_max_tokens": 4000,
+        "synthesis_max_tokens": "4000 to 5000",
 
         # Overwrites the default role with new role from file, order is [overwrite] -> [adapt]
         "overwrite_role_file": None,
