@@ -226,7 +226,7 @@ Respond with JSON:
 
         prompt = f"""You have explored {len(self.agent.visited_urls)} sources and synthesized insights across {len(all_rounds)} rounds of analysis.
 
-LIST OF ARTIFACTS WITH THEIR SOURCES:
+LIST OF ARTIFACTS WITH SOURCES:
 {artifacts_text}
 --- END OF ARTIFACTS ---
 
