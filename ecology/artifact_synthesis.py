@@ -24,8 +24,10 @@ class ArtifactSynthesizer:
         # Shortcuts to agent resources
         self.kb_manager = self.agent.kb_manager
 
-    def synthesize_artifact(self, num_rounds: int = 1) -> Dict[str, str]:
+    def synthesize_artifact(self, num_rounds: int = None) -> Dict[str, str]:
         """Generate final synthesis with optional multi-round refinement"""
+        if not num_rounds: num_rounds = self.synthesis_rounds
+
         mode = f"iterative (n={self.synthesis_iterations})" if self.iterative_synthesis else "classic"
         self.logger.info(f"[SYNTHESIS] Using {mode} mode with {num_rounds} round(s)")
 
@@ -34,8 +36,7 @@ class ArtifactSynthesizer:
 
         # Multi-round synthesis loop
         current_query = self.agent.starting_query
-        all_rounds = []
-        previous_artifact = None
+        all_rounds = []; previous_artifact = None
 
         for round_num in range(1, num_rounds + 1):
             self.logger.info(f"\n{'='*60}\n[SYNTHESIS ROUND {round_num}/{num_rounds}]\n{'='*60}")

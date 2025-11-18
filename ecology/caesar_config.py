@@ -83,7 +83,9 @@ CAESAR_CONFIG = {
     "ArtifactSynthesizer": {
         # Set to False for classic mode (ask all queries at once)
         "iterative_synthesis": True,
-        # Number of Q/A iterations
+        # Number of rounds of synthesizing artifact
+        "synthesis_rounds": 1,
+        # Number of Q/A iterations per round
         "synthesis_iterations": 10,
         # Top_k for synthesis query and retrieval from DB
         "synthesis_top_k": 50,
