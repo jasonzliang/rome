@@ -87,8 +87,8 @@ class ArtifactSynthesizer:
             return {"abstract": "", "artifact": "Unable to generate synthesis questions."}
         qa_list, source_list, source_map = self._build_answers_with_citations(qa_pairs)
 
-        starting_query_task = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ":"
-        starting_query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
+        query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ":"
+        query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
 
         # Build context from previous artifact if available
         previous_context = ""
@@ -110,11 +110,10 @@ SOURCES:
 --- END OF SOURCES ---
 {previous_context}
 YOUR TASK:
-Drawing heavily upon the patterns that emerged from the key insights{', and building upon the previous artifact,' if previous_artifact else ''} create a novel, exciting, and thought provoking artifact{starting_query_task}
+Drawing heavily upon the patterns that emerged from the key insights{', and building upon the previous artifact,' if previous_artifact else ''} create a novel, exciting, and thought provoking artifact{query_context}
 
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the artifact's core discovery and its significance
-    - Include source citations [n] for key claims
 
 2. **Artifact Main Text** (around {self.synthesis_max_tokens} tokens):
     - Some general suggests for artifact:
@@ -128,7 +127,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
 IMPORTANT: Cite sources to support your claims and insights, but do NOT recreate the "Sources" list or provide a "References" section{', and do NOT mention or reference the previous artifact\n' if previous_artifact else ''}
-IMPORTANT: Use your role as a guide on how to respond{starting_query_role}
+IMPORTANT: Use your role as a guide on how to respond{query_role}
 
 Respond with valid JSON only:
 {{
@@ -180,7 +179,7 @@ Based on the previous query and artifact above, identify the most promising dire
     - Lead to novel perspectives or applications
     - Go deeper rather than broader
 
-The refined query should be concise (1-2 sentences), straightforward, and easy to understand.
+The refined query should be concise (1-2 sentences), straightforward, clear, and understandable.
 
 IMPORTANT: Use your role as a guide on how to respond!
 
@@ -241,7 +240,6 @@ Synthesize all round artifacts into a single, comprehensive, and coherent final 
 
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the final artifact's core discovery and significance
-    - Include source citations [n] for key claims
 
 2. **Artifact Main Text** (around {self.synthesis_max_tokens} tokens):
     - Synthesize insights across all rounds into a coherent whole
