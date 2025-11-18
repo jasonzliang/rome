@@ -64,7 +64,7 @@ class ArtifactSynthesizer:
         else:
             final_result = all_rounds[-1]
 
-        final_result["metadata"]["total_rounds"] = len(all_rounds)
+        # final_result["metadata"]["total_rounds"] = len(all_rounds)
         self._save_synthesis_outputs(final_result)
 
         return final_result
@@ -286,15 +286,15 @@ Respond with valid JSON only:
         # Combine metadata from all rounds
         total_queries = sum(r["metadata"]["synthesis_queries"] for r in all_rounds)
         result["metadata"] = {
-            "pages_visited": len(self.agent.visited_urls),
             "insights_collected": self.kb_manager.size(),
-            "sources_cited": len(result["sources"]),
-            "synthesis_mode": all_rounds[-1]["metadata"]["synthesis_mode"],
-            "synthesis_queries": total_queries,
             "max_depth": self.agent.current_depth,
+            "pages_visited": len(self.agent.visited_urls),
+            "sources_cited": len(result["sources"]),
             "starting_url": self.agent.starting_url,
             "starting_query": self.agent.starting_query,
-            "rounds_merged": len(all_rounds),
+            "synthesis_mode": all_rounds[-1]["metadata"]["synthesis_mode"],
+            "synthesis_queries": total_queries,
+            "synthesis_rounds": len(all_rounds),
         }
         return result
 
