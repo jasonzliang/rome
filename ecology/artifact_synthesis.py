@@ -222,7 +222,7 @@ Respond with JSON:
 
         artifacts_text = "\n\n" + "="*80 + "\n\n".join(artifacts_context)
 
-        query_context = f" that comprehensively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
+        query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
 
         prompt = f"""You have explored {len(self.agent.visited_urls)} sources and synthesized insights across {len(all_rounds)} rounds of analysis.
 
