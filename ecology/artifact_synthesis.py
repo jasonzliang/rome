@@ -27,6 +27,7 @@ class ArtifactSynthesizer:
     def synthesize_artifact(self, num_rounds: int = None) -> Dict[str, str]:
         """Generate final synthesis with optional multi-round refinement"""
         if not num_rounds: num_rounds = self.synthesis_rounds
+        num_rounds = max(num_rounds, 1)
 
         mode = f"iterative (n={self.synthesis_iterations})" if self.iterative_synthesis else "classic"
         self.logger.info(f"[SYNTHESIS] Using {mode} mode with {num_rounds} round(s)")
@@ -39,9 +40,8 @@ class ArtifactSynthesizer:
         all_rounds = []; previous_artifact = None
 
         for round_num in range(1, num_rounds + 1):
-            self.logger.info(f"\n{'='*60}\n[SYNTHESIS ROUND {round_num}/{num_rounds}]\n{'='*60}")
-            if round_num > 1 and current_query:
-                self.logger.info(f"Refined query: {current_query}")
+            self.logger.info(f"\n{'='*80}\n[SYNTHESIS ROUND {round_num}/{num_rounds}]\n{'='*80}")
+            if current_query: self.logger.info(f"Current query: {current_query}")
 
             # Generate synthesis for current round (with previous artifact context)
             result = self._synthesize_single_round(mode, current_query, previous_artifact)
@@ -119,7 +119,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
         d. Interesting tensions, contradictions, or open questions
     - Cite sources using [n] notation after relevant claims (e.g., "This pattern emerged [1,3]")
     - Use one or more citations if necessary to support complex arguments
-    {'- Build upon and extend the previous artifact, avoid repeating the same points - instead, deepen, extend, or challenge the previous artifact.' if previous_artifact else ''}
+    {'- Build upon and extend the previous artifact, avoid repeating the same points - instead, deepen, extend, or challenge the previous artifact.\n' if previous_artifact else ''}
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
 IMPORTANT: Cite sources to support your claims and insights, but do NOT recreate the "Sources" list or provide a "References" section
@@ -195,9 +195,7 @@ Respond with JSON:
                 return refined
         except Exception as e:
             self.logger.error(f"Query refinement failed: {e}")
-
         return None
-
 
     def _generate_qa_pairs(self, mode: str) -> List[Tuple[str, str, List[Dict]]]:
         """Generate Q&A pairs with sources"""
