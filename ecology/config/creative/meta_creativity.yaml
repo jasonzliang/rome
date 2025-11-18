@@ -29,7 +29,7 @@ CaesarAgent:
 
 ArtifactSynthesizer:
   synthesis_iterations: 20
-  synthesis_rounds: 5
+  synthesis_rounds: 3
 
 # ============================================================================
 # LLM CONFIGURATION
