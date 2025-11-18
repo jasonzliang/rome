@@ -57,8 +57,13 @@ class ArtifactSynthesizer:
                     self.logger.error(f"Query refinement failed, stopping at round {round_num}")
                     break
 
-        # Return final round's result with all rounds metadata
-        final_result = all_rounds[-1]
+        # Merge artifacts if requested and multiple rounds exist
+        if self.synthesis_merge_artifacts and len(all_rounds) > 1:
+            self.logger.info(f"\n{'='*80}\n[MERGING {len(all_rounds)} ARTIFACTS]\n{'='*80}")
+            final_result = self._merge_artifacts(all_rounds)
+        else:
+            final_result = all_rounds[-1]
+
         final_result["metadata"]["total_rounds"] = len(all_rounds)
         self._save_synthesis_outputs(final_result)
 
@@ -196,6 +201,90 @@ Respond with JSON:
         except Exception as e:
             self.logger.error(f"Query refinement failed: {e}")
         return None
+
+    def _merge_artifacts(self, all_rounds: List[Dict]) -> Dict[str, str]:
+        """Merge artifacts from all rounds into a single comprehensive artifact"""
+        # Build context from all rounds
+        artifacts_context = []
+        all_sources = {}
+
+        for i, round_result in enumerate(all_rounds, 1):
+            artifacts_context.append(f"ROUND {i} ARTIFACT:\n{round_result['artifact']}")
+            # Collect all sources from all rounds
+            if 'sources' in round_result:
+                all_sources.update(round_result['sources'])
+
+        artifacts_text = "\n\n" + "="*80 + "\n\n".join(artifacts_context)
+
+        # Build sources list
+        source_list = "\n".join([f"[{idx}] {url}"
+            for url, idx in sorted(all_sources.items(), key=lambda x: x[1])])
+
+        query_context = f" that comprehensively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
+
+        prompt = f"""You have explored {len(self.agent.visited_urls)} sources and synthesized insights across {len(all_rounds)} rounds of analysis.
+
+ALL ROUND ARTIFACTS:
+{artifacts_text}
+--- END OF ARTIFACTS ---
+
+SOURCES:
+{source_list}
+--- END OF SOURCES ---
+
+YOUR TASK:
+Synthesize all round artifacts into a single, comprehensive, and coherent final artifact{query_context}. The final artifact should:
+    - Integrate the best insights from all rounds
+    - Resolve any tensions or contradictions across rounds
+    - Present a unified narrative that goes beyond simple concatenation
+    - Build a more complete and nuanced understanding than any single round
+
+1. **Artifact Abstract** (100-150 tokens):
+    - Summary of the final artifact's core discovery and significance
+    - Include source citations [n] for key claims
+
+2. **Artifact Main Text** (around {self.synthesis_max_tokens} tokens):
+    - Synthesize insights across all rounds into a coherent whole
+    - Identify and reconcile any contradictions between rounds
+    - Emphasize emergent patterns that span multiple rounds
+    - Cite sources using [n] notation after relevant claims (e.g., "This pattern emerged [1,3]")
+    - Ensure logical flow and clear organization
+
+IMPORTANT: Create a NEW synthesis that integrates all rounds, not just a summary of them
+IMPORTANT: Cite sources to support claims, but do NOT recreate the "Sources" list or provide a "References" section
+IMPORTANT: Use your role as a guide on how to respond!
+
+Respond with valid JSON only:
+{{
+    "abstract": "<abstract text>",
+    "artifact": "<artifact text>"
+}}"""
+
+        try:
+            response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
+            result = self.agent.parse_json_response(response)
+            if not result or "abstract" not in result or "artifact" not in result:
+                raise ValueError("Missing required keys in response")
+        except Exception as e:
+            self.logger.error(f"Artifact merging failed: {e}")
+            # Fallback to last round on failure
+            return all_rounds[-1]
+
+        # Combine metadata from all rounds
+        total_queries = sum(r["metadata"]["synthesis_queries"] for r in all_rounds)
+        result["sources"] = dict(sorted(all_sources.items(), key=lambda x: x[1]))
+        result["metadata"] = {
+            "pages_visited": len(self.agent.visited_urls),
+            "insights_collected": self.kb_manager.size(),
+            "sources_cited": len(all_sources),
+            "synthesis_mode": mode,
+            "synthesis_queries": total_queries,
+            "max_depth": self.agent.current_depth,
+            "starting_url": self.agent.starting_url,
+            "starting_query": self.agent.starting_query,
+            "rounds_merged": len(all_rounds),
+        }
+        return result
 
     def _generate_qa_pairs(self, mode: str) -> List[Tuple[str, str, List[Dict]]]:
         """Generate Q&A pairs with sources"""

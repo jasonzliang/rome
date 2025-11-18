@@ -95,6 +95,8 @@ CAESAR_CONFIG = {
         "synthesis_prev_artifact": True,
         # Maximum of tokens for generating final synthesis artifact
         "synthesis_max_tokens": "4000 to 5000",
+        # Whether to merge all round artifacts into final artifact
+        "synthesis_merge_artifacts": False,
     },
 
     "AgentMemory": {
