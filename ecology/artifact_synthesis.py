@@ -204,14 +204,15 @@ Respond with JSON:
     def _merge_artifacts(self, all_rounds: List[Dict]) -> Dict[str, str]:
         """Merge artifacts from all rounds into a single comprehensive artifact"""
         # Build context from all rounds
-        artifacts_context = []
-        all_sources = {}
+        artifacts_context = []; all_sources = {}
 
         for i, round_result in enumerate(all_rounds, 1):
             artifacts_context.append(f"ROUND {i} ARTIFACT:\n{round_result['artifact']}")
-            # Collect all sources from all rounds
+            # Collect all sources from all rounds with unique sequential indices
             if 'sources' in round_result:
-                all_sources.update(round_result['sources'])
+                for url in round_result['sources']:
+                    if url not in all_sources:
+                        all_sources[url] = len(all_sources) + 1
 
         artifacts_text = "\n\n" + "="*80 + "\n\n".join(artifacts_context)
 
