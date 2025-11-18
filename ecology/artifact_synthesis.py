@@ -203,34 +203,32 @@ Respond with JSON:
 
     def _merge_artifacts(self, all_rounds: List[Dict]) -> Dict[str, str]:
         """Merge artifacts from all rounds into a single comprehensive artifact"""
-        # Build context from all rounds
-        artifacts_context = []; all_sources = {}
+        # Build context from all rounds with their original sources
+        artifacts_context = []
 
         for i, round_result in enumerate(all_rounds, 1):
-            artifacts_context.append(f"ROUND {i} ARTIFACT:\n{round_result['artifact']}")
-            # Collect all sources from all rounds with unique sequential indices
-            if 'sources' in round_result:
-                for url in round_result['sources']:
-                    if url not in all_sources:
-                        all_sources[url] = len(all_sources) + 1
+            # Use original sources from this round
+            round_sources = round_result.get('sources', {})
+
+            # Build sources list for this specific round using original indices
+            round_source_list = "\n".join([f"[{idx}] {url}"
+                for url, idx in sorted(round_sources.items(), key=lambda x: x[1])])
+
+            # Add artifact with its own sources section
+            artifacts_context.append(
+                f"ROUND {i} ARTIFACT:\n{round_result['artifact']}\n\n"
+                f"ROUND {i} SOURCES:\n{round_source_list}\n--- END OF ROUND {i} ---"
+            )
 
         artifacts_text = "\n\n" + "="*80 + "\n\n".join(artifacts_context)
-
-        # Build sources list
-        source_list = "\n".join([f"[{idx}] {url}"
-            for url, idx in sorted(all_sources.items(), key=lambda x: x[1])])
 
         query_context = f" that comprehensively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
 
         prompt = f"""You have explored {len(self.agent.visited_urls)} sources and synthesized insights across {len(all_rounds)} rounds of analysis.
 
-LIST OF ARTIFACTS:
+LIST OF ARTIFACTS WITH THEIR SOURCES:
 {artifacts_text}
 --- END OF ARTIFACTS ---
-
-SOURCES:
-{source_list}
---- END OF SOURCES ---
 
 YOUR TASK:
 Synthesize all the artifacts into a single, comprehensive, and coherent final artifact{query_context}. The final artifact should:
@@ -238,7 +236,6 @@ Synthesize all the artifacts into a single, comprehensive, and coherent final ar
     - Resolve any tensions or contradictions across rounds
     - Present a unified narrative that goes beyond simple concatenation
     - Build a more complete and nuanced understanding than any single round
-    - Cite from the "SOURCES" list to support relevant insights
 
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the final artifact's core discovery and significance
@@ -249,16 +246,24 @@ Synthesize all the artifacts into a single, comprehensive, and coherent final ar
     - Emphasize emergent patterns that span multiple rounds
     - Ensure logical flow and clear organization
     - Cite sources using [n] notation after relevant claims (e.g., "This pattern emerged [1,3]")
+    - When citing, extract URLs from the round sources and assign them your own NEW sequential numbers
+
+3. **Sources** (dict of url->index for ALL sources cited in your artifact):
+    - Extract the URLs of every source you cited in your merged artifact
+    - Create NEW sequential numbering starting from 1 for these sources
+    - Format: {{"url1": 1, "url2": 2, ...}}
+    - Example: If you cited source [2] from Round 1 (url_a) and source [1] from Round 2 (url_b), return: {{"url_a": 1, "url_b": 2}}
 
 IMPORTANT: Create a NEW synthesis that integrates all rounds, not just a summary of them
 IMPORTANT: Avoid excessive jargon, keep it logical, clear, and convincing to a skeptical reader
-IMPORTANT: Cite sources to support claims, but do NOT create a "Sources" list or "References" section
+IMPORTANT: Cite sources to support claims, but do NOT create a "Sources" list or "References" section in the artifact text
 IMPORTANT: Do NOT reference or mention the previous list of artifacts
 
 Respond with valid JSON only:
 {{
     "abstract": "<abstract text>",
-    "artifact": "<artifact text>"
+    "artifact": "<artifact text>",
+    "sources": {{"<url>": <index>, ...}}
 }}"""
 
         try:
@@ -266,18 +271,24 @@ Respond with valid JSON only:
             result = self.agent.parse_json_response(response)
             if not result or "abstract" not in result or "artifact" not in result:
                 raise ValueError("Missing required keys in response")
+
+            # Extract sources if provided, ensure indices are integers
+            if "sources" in result and isinstance(result["sources"], dict):
+                result["sources"] = {url: int(idx) for url, idx in result["sources"].items()}
+                result["sources"] = dict(sorted(result["sources"].items(), key=lambda x: x[1]))
+            else:
+                result["sources"] = {}
+
         except Exception as e:
             self.logger.error(f"Artifact merging failed: {e}")
-            # Fallback to last round on failure
             return all_rounds[-1]
 
         # Combine metadata from all rounds
         total_queries = sum(r["metadata"]["synthesis_queries"] for r in all_rounds)
-        result["sources"] = dict(sorted(all_sources.items(), key=lambda x: x[1]))
         result["metadata"] = {
             "pages_visited": len(self.agent.visited_urls),
             "insights_collected": self.kb_manager.size(),
-            "sources_cited": len(all_sources),
+            "sources_cited": len(result["sources"]),
             "synthesis_mode": all_rounds[-1]["metadata"]["synthesis_mode"],
             "synthesis_queries": total_queries,
             "max_depth": self.agent.current_depth,
