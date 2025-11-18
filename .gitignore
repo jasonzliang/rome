@@ -187,3 +187,4 @@ query_result.zip
 *.png
 *.avif
 *.heic
+*.test.yaml
