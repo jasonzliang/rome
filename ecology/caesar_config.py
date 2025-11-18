@@ -86,7 +86,7 @@ CAESAR_CONFIG = {
         # Number of rounds of synthesizing artifact
         "synthesis_rounds": 1,
         # Number of Q/A iterations per round
-        "synthesis_iterations": 10,
+        "synthesis_iterations": 20,
         # Top_k for synthesis query and retrieval from DB
         "synthesis_top_k": 50,
         # Top_n for synthesis query and retrieval from DB
