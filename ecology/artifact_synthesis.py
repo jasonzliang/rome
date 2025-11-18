@@ -250,7 +250,7 @@ Synthesize all the artifacts into a single, comprehensive, and coherent final ar
 
 IMPORTANT: Create a NEW synthesis that integrates all rounds, not just a summary of them
 IMPORTANT: Avoid excessive jargon, keep it logical, clear, and convincing to a skeptical reader
-IMPORTANT: Cite sources to support claims, but do NOT recreate the "Sources" list or provide a "References" section
+IMPORTANT: Cite sources to support claims, but do NOT create a "Sources" list or "References" section
 IMPORTANT: Do NOT reference or mention the previous list of artifacts
 
 Respond with valid JSON only:
