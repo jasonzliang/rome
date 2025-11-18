@@ -24,15 +24,61 @@ class ArtifactSynthesizer:
         # Shortcuts to agent resources
         self.kb_manager = self.agent.kb_manager
 
-    def synthesize_artifact(self) -> Dict[str, str]:
-        """Generate final synthesis with citations"""
+    def synthesize_artifact(self, num_rounds: int = 1) -> Dict[str, str]:
+        """Generate final synthesis with optional multi-round refinement"""
         mode = f"iterative (n={self.synthesis_iterations})" if self.iterative_synthesis else "classic"
-        self.logger.info(f"[SYNTHESIS] Using {mode} mode")
+        self.logger.info(f"[SYNTHESIS] Using {mode} mode with {num_rounds} round(s)")
 
         if self.kb_manager.size() == 0:
             return {"abstract": "", "artifact": "No insights collected during exploration."}
 
+        # Multi-round synthesis loop
+        current_query = self.agent.starting_query
+        all_rounds = []
+        previous_artifact = None
+
+        for round_num in range(1, num_rounds + 1):
+            self.logger.info(f"\n{'='*60}\n[SYNTHESIS ROUND {round_num}/{num_rounds}]\n{'='*60}")
+            if round_num > 1 and current_query:
+                self.logger.info(f"Refined query: {current_query}")
+
+            # Generate synthesis for current round (with previous artifact context)
+            result = self._synthesize_single_round(mode, current_query, previous_artifact)
+            result["round"] = round_num
+            all_rounds.append(result)
+
+            # Save current result as previous for next round
+            previous_artifact = result
+
+            # Refine query for next round (if not last round)
+            if round_num < num_rounds:
+                current_query = self._refine_query(current_query, result)
+                if not current_query:
+                    self.logger.warning(f"Query refinement failed, stopping at round {round_num}")
+                    break
+
+        # Return final round's result with all rounds metadata
+        final_result = all_rounds[-1]
+        final_result["all_rounds"] = all_rounds
+        final_result["metadata"]["total_rounds"] = len(all_rounds)
+        self._save_synthesis_outputs(final_result)
+
+        return final_result
+
+    def _synthesize_single_round(self, mode: str, current_query: Optional[str] = None,
+                                 previous_artifact: Optional[Dict] = None) -> Dict[str, str]:
+        """Execute a single synthesis round with optional query and previous artifact"""
+
+        # Temporarily override starting_query for this round
+        original_query = self.agent.starting_query
+        if current_query:
+            self.agent.starting_query = current_query
+
         qa_pairs = self._generate_qa_pairs(mode)
+
+        # Restore original query
+        self.agent.starting_query = original_query
+
         if not qa_pairs:
             return {"abstract": "", "artifact": "Unable to generate synthesis questions."}
         qa_list, source_list, source_map = self._build_answers_with_citations(qa_pairs)
@@ -40,16 +86,24 @@ class ArtifactSynthesizer:
         starting_query_task = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ":"
         starting_query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
 
+        # Build context from previous artifact if available
+        previous_context = ""
+        if previous_artifact and previous_artifact.get("artifact"):
+            previous_context = f"""
+PREVIOUS ARTIFACT:
+{previous_artifact["artifact"]}
+"""
+
         prompt = f"""You explored {len(self.agent.visited_urls)} sources and gathered {self.kb_manager.size()} insights.
 
-Key patterns emerged through querying and analyzing gathered insights (with source citations):
+KEY INSIGHTS (with source citations):
 {qa_list}
 
-Sources:
+SOURCES:
 {source_list}
-
+{previous_context}
 YOUR TASK:
-Drawing heavily upon the key patterns that emerged from the insights, create a novel, exciting, and thought provoking artifact{starting_query_task}
+Drawing heavily upon the patterns that emerged from the key insights{', and building upon the previous artifact,' if previous_artifact else ''} create a novel, exciting, and thought provoking artifact{starting_query_task}
 
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the artifact's core discovery and its significance
@@ -63,9 +117,10 @@ Drawing heavily upon the key patterns that emerged from the insights, create a n
         d. Interesting tensions, contradictions, or open questions
     - Cite sources using [n] notation after relevant claims (e.g., "This pattern emerged [1,3]")
     - Use one or more citations if necessary to support complex arguments
+    {'- Build upon and extend the previous artifact, avoid repeating the same points - instead, deepen, extend, or challenge the previous artifact.' if previous_artifact else ''}
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
-IMPORTANT: Cite sources using [n] notation to support your claims and insights, but do NOT recreate the "Sources" list or provide a "References" section
+IMPORTANT: Cite sources to support your claims and insights, but do NOT recreate the "Sources" list or provide a "References" section
 IMPORTANT: Use your role as a guide on how to respond{starting_query_role}
 
 Respond with valid JSON only:
@@ -95,8 +150,51 @@ Respond with valid JSON only:
             "starting_query": self.agent.starting_query,
         }
 
-        self._save_synthesis_outputs(result)
         return result
+
+    def _refine_query(self, current_query: Optional[str], artifact_result: Dict) -> Optional[str]:
+        """Refine the synthesis query based on previous artifact"""
+        artifact_text = artifact_result.get("artifact", "")
+
+        if not artifact_text:
+            self.logger.error("Cannot refine query: no artifact text")
+            return None
+
+        query_context = f"PREVIOUS QUERY: {current_query}\n\n" if current_query else ""
+
+        prompt = f"""{query_context}PREVIOUS ARTIFACT:
+{artifact_text}
+
+YOUR TASK:
+Based on the previous query and artifact above, identify the most promising direction for deeper exploration. What NEW question or angle would:
+- Build on the insights already discovered
+- Explore gaps, contradictions, or unexplored connections
+- Lead to novel perspectives or applications
+- Go deeper rather than broader
+
+The refined query should be concise (1-2 sentences) and actionable for knowledge base retrieval.
+
+IMPORTANT: Use your role as a guide on how to respond!
+
+Respond with JSON:
+{{
+    "refined_query": "<your refined exploration query>",
+    "reason": "<brief explanation of why this direction is promising>"
+}}"""
+
+        try:
+            response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
+            result = self.agent.parse_json_response(response)
+            if result and "refined_query" in result:
+                refined = result["refined_query"]
+                reason = result.get("reason", "No reason provided")
+                self.logger.info(f"[QUERY REFINEMENT] {refined}\nReason: {reason}")
+                return refined
+        except Exception as e:
+            self.logger.error(f"Query refinement failed: {e}")
+
+        return None
+
 
     def _generate_qa_pairs(self, mode: str) -> List[Tuple[str, str, List[Dict]]]:
         """Generate Q&A pairs with sources"""
@@ -157,7 +255,7 @@ Respond with valid JSON only:
         context = "\n\n".join([f"Q: {q}\nA: {r}"
                               for q, r in zip(recent_queries, recent_responses)])
 
-        prompt = f"""Previous exploration queries and responses:
+        prompt = f"""PREVIOUS INSIGHTS:
 {context}
 
 YOUR TASK:
