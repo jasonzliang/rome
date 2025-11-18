@@ -245,8 +245,8 @@ Synthesize all the artifacts into a single, comprehensive, and coherent final ar
     - Identify and reconcile any contradictions between rounds
     - Emphasize emergent patterns that span multiple rounds
     - Ensure logical flow and clear organization
-    - Cite sources using [n] notation after relevant claims (e.g., "This pattern emerged [1,3]")
-    - When citing, extract URLs from the round sources and assign them your own NEW sequential numbers
+    - Cite sources using [n] notation after relevant claims or statements (e.g., "This pattern emerged [1,3]")
+    - When citing, extract URLs from the round artifact sources and assign them your own NEW sequential numbers
 
 3. **Sources** (dict of url->index for ALL sources cited in your artifact):
     - Extract the URLs of every source you cited in your merged artifact
@@ -256,7 +256,7 @@ Synthesize all the artifacts into a single, comprehensive, and coherent final ar
 
 IMPORTANT: Create a NEW synthesis that integrates all rounds, not just a summary of them
 IMPORTANT: Avoid excessive jargon, keep it logical, clear, and convincing to a skeptical reader
-IMPORTANT: Cite sources to support claims, but do NOT create a "Sources" list or "References" section in the artifact text
+IMPORTANT: Cite sources to support claims, but do NOT create a "Sources" or "References" section in the artifact main text
 IMPORTANT: Do NOT reference or mention the previous list of artifacts
 
 Respond with valid JSON only:
