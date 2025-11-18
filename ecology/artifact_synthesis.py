@@ -87,7 +87,7 @@ class ArtifactSynthesizer:
 
         # Build context from previous artifact if available
         previous_context = ""
-        if previous_artifact and previous_artifact.get("artifact"):
+        if self.synthesis_prev_artifact and previous_artifact and previous_artifact.get("artifact"):
             previous_context = f"""
 PREVIOUS ARTIFACT:
 {previous_artifact["artifact"]}

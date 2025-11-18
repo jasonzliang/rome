@@ -91,6 +91,8 @@ CAESAR_CONFIG = {
         "synthesis_top_k": 50,
         # Top_n for synthesis query and retrieval from DB
         "synthesis_top_n": 10,
+        # When synthesizing artifact, use previous artifact if it exists
+        "synthesis_prev_artifact": True,
         # Maximum of tokens for generating final synthesis artifact
         "synthesis_max_tokens": "4000 to 5000",
     },
