@@ -314,7 +314,7 @@ Respond with valid JSON only:
             answers.append(answer)
             sources_list.append(sources)
 
-            self.logger.info(f"[SYNTHESIS {i+1}/{self.synthesis_iterations}]\nQ: {queries[-1]}\nA: {answers[-1]}")
+            self.logger.info(f"[SYNTHESIS ITERATION {i+1}/{self.synthesis_iterations}]\nQ: {queries[-1]}\nA: {answers[-1]}")
 
             if i < self.synthesis_iterations - 1:
                 if not (next_query := self._generate_next_query(queries, answers)):
