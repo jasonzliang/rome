@@ -119,7 +119,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
         d. Interesting tensions, contradictions, or open questions
     - Cite sources using [n] notation after relevant claims (e.g., "This pattern emerged [1,3]")
     - Use one or more citations if necessary to support complex arguments
-    {'- Build upon, improve, and extend the previous artifact by analyzing it for weaknesses in its organization or content. Use key insights to deepen, extend, or challenge the previous artifact.\n' if previous_artifact else ''}
+    {'- Build upon the previous artifact by analyzing it for weaknesses in its organization or content, and then use key insights to deepen, improve, and extend the previous artifact\n' if previous_artifact else ''}
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
 IMPORTANT: Cite sources to support your claims and insights, but do NOT recreate the "Sources" list or provide a "References" section
@@ -181,7 +181,7 @@ IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with JSON:
 {{
-    "refined_query": "<your refined exploration query>",
+    "refined_query": "<your refined exploration query, posed as a question>",
     "reason": "<brief explanation of why the refined query improves upon the previous query>"
 }}"""
 
