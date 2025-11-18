@@ -45,7 +45,6 @@ class ArtifactSynthesizer:
 
             # Generate synthesis for current round (with previous artifact context)
             result = self._synthesize_single_round(mode, current_query, previous_artifact)
-            result["round"] = round_num
             all_rounds.append(result)
 
             # Save current result as previous for next round
@@ -55,12 +54,11 @@ class ArtifactSynthesizer:
             if round_num < num_rounds:
                 current_query = self._refine_query(current_query, result)
                 if not current_query:
-                    self.logger.warning(f"Query refinement failed, stopping at round {round_num}")
+                    self.logger.error(f"Query refinement failed, stopping at round {round_num}")
                     break
 
         # Return final round's result with all rounds metadata
         final_result = all_rounds[-1]
-        final_result["all_rounds"] = all_rounds
         final_result["metadata"]["total_rounds"] = len(all_rounds)
         self._save_synthesis_outputs(final_result)
 
@@ -93,15 +91,18 @@ class ArtifactSynthesizer:
             previous_context = f"""
 PREVIOUS ARTIFACT:
 {previous_artifact["artifact"]}
+--- END OF ARTIFACT ---
 """
 
         prompt = f"""You explored {len(self.agent.visited_urls)} sources and gathered {self.kb_manager.size()} insights.
 
 KEY INSIGHTS (with source citations):
 {qa_list}
+--- END OF INSIGHTS ---
 
 SOURCES:
 {source_list}
+--- END OF SOURCES ---
 {previous_context}
 YOUR TASK:
 Drawing heavily upon the patterns that emerged from the key insights{', and building upon the previous artifact,' if previous_artifact else ''} create a novel, exciting, and thought provoking artifact{starting_query_task}
@@ -111,7 +112,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
     - Include source citations [n] for key claims
 
 2. **Artifact Main Text** (around {self.synthesis_max_tokens} tokens):
-    - Some general suggestions for artifact:
+    - Some general suggests for artifact:
         a. Emergent patterns not visible in individual sources
         b. Novel discoveries, connections, or applications
         c. Surprising new directions or perspectives
