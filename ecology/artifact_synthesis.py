@@ -237,7 +237,7 @@ Synthesize all the artifacts into a single, comprehensive, and coherent final ar
     - Resolve any tensions or contradictions across rounds
     - Present a unified narrative that goes beyond simple concatenation
     - Build a more complete and nuanced understanding than any single round
-    - Cite (using [n] notation) from the "SOURCES" list to support insights
+    - Cite from the "SOURCES" list to support relevant insights
 
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the final artifact's core discovery and significance
