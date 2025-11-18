@@ -156,7 +156,7 @@ class AgentMemory:
                 }
                 self.logger.info(f"Mem0 initialized: ChromaDB @ {server_manager.server_url} + Neo4j @ {self.graph_url}")
             else:
-                self.logger.info(f"Mem0 initialized: ChromaDB @ {server_manager.server_url}")
+                self.logger.info(f"Mem0 initialized: ChromaDB @ {server_manager.server_url} (No Neo4j)")
 
             # Initialize memory with the complete configuration
             self.memory = Memory.from_config(config_dict=mem0_config)

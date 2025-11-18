@@ -13,6 +13,7 @@ Example:
 import argparse
 import sys
 import os
+import pprint
 from pathlib import Path
 import traceback
 
@@ -139,6 +140,7 @@ def main():
         try:
             config = load_config(args.config)
             logger.info(f"Configuration loaded: {args.config}")
+            logger.info(pprint.pformat(config))
         except Exception as e:
             logger.error(f"Failed to load config: {e}")
             sys.exit(1)

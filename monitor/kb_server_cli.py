@@ -847,7 +847,7 @@ def handle_export(args):
             return 1
 
         target_collections = [col for col in all_collections if col.name in matched]
-        suffix = args.collection.replace(',', '_').replace('*', 'wildcard')
+        suffix = args.collection.replace(',', '_').replace('*', '_w')
     else:
         target_collections = all_collections
         suffix = "all"
