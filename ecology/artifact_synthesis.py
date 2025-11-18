@@ -52,7 +52,7 @@ class ArtifactSynthesizer:
 
             # Refine query for next round (if not last round)
             if round_num < num_rounds:
-                current_query = self._refine_query(current_query, result)
+                current_query = self._refine_query(self.agent.starting_query, result)
                 if not current_query:
                     self.logger.error(f"Query refinement failed, stopping at round {round_num}")
                     break
@@ -69,14 +69,14 @@ class ArtifactSynthesizer:
         """Execute a single synthesis round with optional query and previous artifact"""
 
         # Temporarily override starting_query for this round
-        original_query = self.agent.starting_query
         if current_query:
+            original_query = self.agent.starting_query
             self.agent.starting_query = current_query
 
         qa_pairs = self._generate_qa_pairs(mode)
 
         # Restore original query
-        self.agent.starting_query = original_query
+        if current_query: self.agent.starting_query = original_query
 
         if not qa_pairs:
             return {"abstract": "", "artifact": "Unable to generate synthesis questions."}
@@ -166,22 +166,23 @@ Respond with valid JSON only:
 
         prompt = f"""{query_context}PREVIOUS ARTIFACT:
 {artifact_text}
+--- END OF ARTIFACT ---
 
 YOUR TASK:
 Based on the previous query and artifact above, identify the most promising direction for deeper exploration. What NEW question or angle would:
-- Build on the insights already discovered
-- Explore gaps, contradictions, or unexplored connections
-- Lead to novel perspectives or applications
-- Go deeper rather than broader
+    - Build on the insights already discovered
+    - Explore gaps, contradictions, or unexplored connections
+    - Lead to novel perspectives or applications
+    - Go deeper rather than broader
 
-The refined query should be concise (1-2 sentences) and actionable for knowledge base retrieval.
+The refined query should be concise (1-2 sentences), straightforward, and easy to understand.
 
 IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with JSON:
 {{
     "refined_query": "<your refined exploration query>",
-    "reason": "<brief explanation of why this direction is promising>"
+    "reason": "<brief explanation of why the refined query improves upon the previous query>"
 }}"""
 
         try:
