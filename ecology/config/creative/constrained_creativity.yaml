@@ -28,7 +28,7 @@ CaesarAgent:
   adapt_role_file: config/role/self_transcend_insights_v1.txt
 
 ArtifactSynthesizer:
-  synthesis_iterations: 10
+  synthesis_iterations: 20
   synthesis_rounds: 5
 
 # ============================================================================
@@ -46,11 +46,11 @@ OpenAIHandler:
 # ============================================================================
 AgentMemory:
   enabled: true
-  use_graph: false
+  use_graph: true
 
 # ============================================================================
 # LOGGING CONFIGURATION
 # ============================================================================
 Logger:
   include_caller_info: "rome"
-  level: "debug"
+  level: "info"
