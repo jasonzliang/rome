@@ -276,7 +276,7 @@ Respond with valid JSON only:
             "pages_visited": len(self.agent.visited_urls),
             "insights_collected": self.kb_manager.size(),
             "sources_cited": len(all_sources),
-            "synthesis_mode": mode,
+            "synthesis_mode": all_rounds[0]["metadata"]["synthesis_mode"],
             "synthesis_queries": total_queries,
             "max_depth": self.agent.current_depth,
             "starting_url": self.agent.starting_url,
