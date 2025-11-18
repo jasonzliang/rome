@@ -223,7 +223,7 @@ Respond with JSON:
 
         prompt = f"""You have explored {len(self.agent.visited_urls)} sources and synthesized insights across {len(all_rounds)} rounds of analysis.
 
-ALL ROUND ARTIFACTS:
+LIST OF ARTIFACTS:
 {artifacts_text}
 --- END OF ARTIFACTS ---
 
@@ -232,7 +232,7 @@ SOURCES:
 --- END OF SOURCES ---
 
 YOUR TASK:
-Synthesize all round artifacts into a single, comprehensive, and coherent final artifact{query_context}. The final artifact should:
+Synthesize all the artifacts into a single, comprehensive, and coherent final artifact{query_context}. The final artifact should:
     - Integrate the best insights from all rounds
     - Resolve any tensions or contradictions across rounds
     - Present a unified narrative that goes beyond simple concatenation
@@ -245,12 +245,13 @@ Synthesize all round artifacts into a single, comprehensive, and coherent final 
     - Synthesize insights across all rounds into a coherent whole
     - Identify and reconcile any contradictions between rounds
     - Emphasize emergent patterns that span multiple rounds
-    - Cite sources using [n] notation after relevant claims (e.g., "This pattern emerged [1,3]")
     - Ensure logical flow and clear organization
+    - Cite sources using [n] notation after relevant claims (e.g., "This pattern emerged [1,3]")
 
 IMPORTANT: Create a NEW synthesis that integrates all rounds, not just a summary of them
+IMPORTANT: Avoid excessive jargon, keep it logical, clear, and convincing to a skeptical reader
 IMPORTANT: Cite sources to support claims, but do NOT recreate the "Sources" list or provide a "References" section
-IMPORTANT: Use your role as a guide on how to respond!
+IMPORTANT: Do NOT reference or mention the previous list of artifacts
 
 Respond with valid JSON only:
 {{
