@@ -28,8 +28,8 @@ CaesarAgent:
   adapt_role_file: config/role/self_transcend_insights_v1.txt
 
 ArtifactSynthesizer:
-  synthesis_iterations: 20
-  synthesis_rounds: 4
+  synthesis_iterations: 30
+  synthesis_rounds: 3
   synthesis_merge_artifacts: true
 
 # ============================================================================
