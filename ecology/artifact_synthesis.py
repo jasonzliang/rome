@@ -226,12 +226,11 @@ Respond with JSON:
 {artifacts_text}
 === END OF RESEARCH ARTIFACTS ===
 
-TASK: Create a comprehensive synthesis by:
+TASK: Create a comprehensive merged artifact by:
     - Integrating insights across all rounds
-    - Resolving contradictions
+    - Resolving contradictions between rounds
     - Identifying emergent patterns
     - Building deeper understanding
-    - Each round has its own [n] citations, but create NEW numbering for your merged artifact.
 
 EXAMPLE OUTPUT:
 {{
@@ -240,10 +239,15 @@ EXAMPLE OUTPUT:
     "sources": {{"https://example.com": 1, "https://another.com": 2}}
 }}
 
-IMPORTANT INSTRUCTIONS:
+ARTIFACT REQUIREMENTS:
     - Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
     - Cite sources to support your claims and insights, but do NOT recreate the "SOURCES" list or provide a "References" section
     - Use your role as a guide on how to respond{query_role}
+
+CITATION HANDLING:
+    - Each round has its own [n] citations (Round 1's [1] and Round 2's [1] are DIFFERENT URLs)
+    - In your merged artifact, create NEW sequential numbering: [1], [2], [3]...
+    - Map each cited URL to its new number in the "sources" field
 
 CRITICAL INSTRUCTIONS:
     - Output ONLY valid JSON (no markdown, no code blocks, no explanations)
