@@ -222,7 +222,9 @@ Respond with JSON:
 
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified synthesis{query_context}.
 
+=== RESEARCH ARTIFACTS ===
 {artifacts_text}
+=== END OF RESEARCH ARTIFACTS ===
 
 TASK: Create a comprehensive synthesis by:
     - Integrating insights across all rounds
