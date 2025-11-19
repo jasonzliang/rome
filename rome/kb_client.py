@@ -316,7 +316,7 @@ class ChromaClientManager:
         self.logger.debug(f"Using retriever (n={retrieval_k}) for query")
         return retriever.retrieve(question)
 
-    def _rerank_and_respond(self, question: str, nodes: list, top_n=None) -> str:
+    def _rerank_and_respond(self, question: str, nodes: list, top_n=None):
         """Handle reranking with LLMRerank and response generation"""
         top_n = max([top_n or self.rerank_top_n, self.rerank_top_n, 1])
         if top_n != self.rerank_top_n: self.reranker = LLMRerank(top_n=top_n, llm=self.llm)
@@ -333,7 +333,7 @@ class ChromaClientManager:
         self.logger.debug(f"Using reranker (n={top_n}) for query")
         return str(response), reranked_nodes
 
-    def _standard_query(self, question: str, top_k: int) -> str:
+    def _standard_query(self, question: str, top_k: int):
         """Standard query with optional system prompt prepended"""
 
         # Simply prepend system prompt to the question
