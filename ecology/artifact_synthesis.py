@@ -147,7 +147,6 @@ Respond with valid JSON only:
             "sources_cited": len(source_map),
             "synthesis_mode": mode,
             "synthesis_queries": len(qa_pairs),
-            "max_depth": self.agent.current_depth,
             "starting_url": self.agent.starting_url,
             "starting_query": self.agent.starting_query,
         }
@@ -297,7 +296,6 @@ Begin your response with the opening brace: {{"""
         total_queries = sum(r["metadata"]["synthesis_queries"] for r in all_rounds)
         result["metadata"] = {
             "insights_collected": self.kb_manager.size(),
-            "max_depth": self.agent.current_depth,
             "pages_visited": len(self.agent.visited_urls),
             "sources_cited": len(result["sources"]),
             "starting_url": self.agent.starting_url,
