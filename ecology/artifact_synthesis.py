@@ -52,7 +52,7 @@ class ArtifactSynthesizer:
 
             # Refine query for next round (if not last round)
             if round_num < num_rounds:
-                current_query = self._refine_query(self.agent.starting_query, result)
+                current_query = self._refine_query(result)
                 if not current_query:
                     self.logger.error(f"Query refinement failed, stopping at round {round_num}")
                     break
@@ -74,14 +74,7 @@ class ArtifactSynthesizer:
         """Execute a single synthesis round with optional query and previous artifact"""
 
         # Temporarily override starting_query for this round
-        if current_query:
-            original_query = self.agent.starting_query
-            self.agent.starting_query = current_query
-
-        qa_pairs = self._generate_qa_pairs(mode)
-
-        # Restore original query
-        if current_query: self.agent.starting_query = original_query
+        qa_pairs = self._generate_qa_pairs(mode, current_query)
 
         if not qa_pairs:
             return {"abstract": "", "artifact": "Unable to generate synthesis questions."}
@@ -158,14 +151,15 @@ Respond with valid JSON only:
 
         return result
 
-    def _refine_query(self, current_query: Optional[str], artifact_result: Dict) -> Optional[str]:
+    def _refine_query(self, artifact_result: Dict, current_query: Optional[str] = None) -> Optional[str]:
         """Refine the synthesis query based on previous artifact"""
-        artifact_text = artifact_result.get("artifact", "")
 
+        artifact_text = artifact_result.get("artifact", "")
         if not artifact_text:
             self.logger.error("Cannot refine query: no artifact text")
             return None
 
+        if not current_query: current_query = self.agent.starting_query
         query_context = f"PREVIOUS QUERY: {current_query}\n\n" if current_query else ""
 
         prompt = f"""{query_context}PREVIOUS ARTIFACT:
@@ -298,7 +292,7 @@ Respond with valid JSON only:
         }
         return result
 
-    def _generate_qa_pairs(self, mode: str) -> List[Tuple[str, str, List[Dict]]]:
+    def _generate_qa_pairs(self, mode: str, starting_query: str = None) -> List[Tuple[str, str, List[Dict]]]:
         """Generate Q&A pairs with sources"""
         queries = [
             "What are the central themes and patterns discovered?",
@@ -307,11 +301,8 @@ Respond with valid JSON only:
             "What questions remain open or were raised?",
             "What novel perspective emerged from this exploration?"
         ]
-        if self.agent.starting_query:
-            queries = [self.agent.starting_query] + queries
-
-        if mode == "classic":
-            return self._generate_qa_pairs_classic(queries)
+        if starting_query: queries = [starting_query] + queries
+        if mode == "classic": return self._generate_qa_pairs_classic(queries)
 
         # Iterative mode
         queries, answers, sources_list = [queries[0]], [], []
