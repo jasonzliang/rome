@@ -40,6 +40,7 @@ class ArtifactSynthesizer:
         all_rounds = []; previous_artifact = None
         base_dir = os.path.join(self.agent.get_repo(),
             f"{self.agent.get_id()}.synthesis.{datetime.now().strftime("%m%d%H%M")}")
+        os.makedirs(base_dir, exist_ok=True)
 
         for round_num in range(1, num_rounds + 1):
             self.logger.info(f"\n{'='*80}\n[SYNTHESIS ROUND {round_num}/{num_rounds}]\n{'='*80}")
@@ -405,7 +406,6 @@ Respond with JSON:
         if not base_dir: base_dir = self.agent.get_repo()
         if not timestamp: timestamp = datetime.now().strftime("%m%d%H%M")
         base_path = os.path.join(base_dir, f"{self.agent.get_id()}.synthesis.{timestamp}")
-        os.makedirs(base_dir, exist_ok=True)
 
         try:
             with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
