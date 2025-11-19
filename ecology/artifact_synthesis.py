@@ -121,9 +121,9 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
     - Use one or more citations if necessary to support complex arguments
     {'- Build upon the previous artifact by analyzing it for weaknesses in organization, arguments, or content, and then use key insights to deepen, improve, and extend the previous artifact' if previous_artifact else ''}
 
-{'IMPORTANT: do NOT mention or reference the previous artifact, the created artifact should make sense by itself as a standalone text' if previous_artifact else ''}
-IMPORTANT: Avoid excessive jargon, keep it logical, clear, and convincing to a skeptical reader
-IMPORTANT: Cite sources to support your claims and insights, but do NOT recreate the "SOURCES" list or provide a "References" section
+{'IMPORTANT: do NOT mention or reference the previous artifact, the new artifact should make sense by itself as a standalone text' if previous_artifact else ''}
+IMPORTANT: AVOID excessive jargon, keep it logical, clear, and convincing to a skeptical reader
+IMPORTANT: Cite sources to support your claims and insights, but do NOT create a "SOURCES" or "References" section
 IMPORTANT: Use your role as a guide on how to respond{query_role}
 
 Respond with valid JSON only:
