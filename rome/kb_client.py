@@ -294,9 +294,10 @@ class ChromaClientManager:
 
             if return_sources:
                 sources = [
-                    {'url': m.get('url'), 'depth': m.get('depth'), 'iteration': m.get('iteration')}
+                    {'url': m['url'], 'depth': m.get('depth'), 'iteration': m.get('iteration')}
                     for node in nodes
-                    if (m := (node.node if hasattr(node, 'node') else node).metadata) and m.get('url')
+                    if (m := getattr(node.node if hasattr(node, 'node') else node, 'metadata', {}))
+                    and 'url' in m
                 ]
                 return response, sources
 
