@@ -24,7 +24,7 @@ class ArtifactSynthesizer:
         # Shortcuts to agent resources
         self.kb_manager = self.agent.kb_manager
 
-    def synthesize_artifact(self, num_rounds: int = None) -> Dict[str, str]:
+    def synthesize_artifact(self, num_rounds: int = None) -> None:
         """Generate final synthesis with optional multi-round refinement"""
         if not num_rounds: num_rounds = self.synthesis_rounds
         num_rounds = max(num_rounds, 1)
@@ -66,7 +66,8 @@ class ArtifactSynthesizer:
         if self.synthesis_merge_artifacts and len(all_rounds) > 1:
             self.logger.info(f"\n{'='*80}\n[MERGING {len(all_rounds)} ARTIFACTS]\n{'='*80}")
             final_result = self._merge_artifacts(all_rounds)
-            self._save_synthesis(final_result, base_dir=base_dir)
+            if final_result: self._save_synthesis(final_result, base_dir=base_dir)
+            else: final_result = all_rounds[-1]
         else:
             final_result = all_rounds[-1]
 
