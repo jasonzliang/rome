@@ -282,8 +282,7 @@ class ChromaClientManager:
                 top_n = max([top_n or self.rerank_top_n, self.rerank_top_n, 1])
                 if top_n != self.rerank_top_n:
                     self.reranker = LLMRerank(top_n=top_n, llm=self.llm)
-                nodes = self.reranker.postprocess_nodes(nodes, query_str=question)
-                response = self._rerank_and_respond(question, nodes, top_n)
+                response, nodes = self._rerank_and_respond(question, nodes, top_n)
             else:
                 response = self._standard_query(question, top_k)
 
@@ -331,7 +330,7 @@ class ChromaClientManager:
         response = self.response_synthesizer.synthesize(question, nodes=reranked_nodes)
 
         self.logger.debug(f"Using reranker (n={top_n}) for query")
-        return str(response)
+        return str(response), reranked_nodes
 
     def _standard_query(self, question: str, top_k: int) -> str:
         """Standard query with optional system prompt prepended"""
