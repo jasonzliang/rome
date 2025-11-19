@@ -63,14 +63,13 @@ class ArtifactSynthesizer:
                     break
 
         # Merge artifacts if requested and multiple rounds exist
+        final_result = all_rounds[-1]
         if self.synthesis_merge_artifacts and len(all_rounds) > 1:
             self.logger.info(f"\n{'='*80}\n[MERGING {len(all_rounds)} ARTIFACTS]\n{'='*80}")
-            final_result = self._merge_artifacts(all_rounds)
-            if final_result: self._save_synthesis(final_result, base_dir=base_dir)
-            else: final_result = all_rounds[-1]
-        else:
-            final_result = all_rounds[-1]
-
+            merged_result = self._merge_artifacts(all_rounds)
+            if merged_result:
+                self._save_synthesis(merged_result, base_dir=base_dir)
+                return merged_result
         return final_result
 
     def _synthesize_single_round(self, mode: str, current_query: Optional[str] = None,
