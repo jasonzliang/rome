@@ -37,10 +37,11 @@ class ArtifactSynthesizer:
 
         # Multi-round synthesis loop
         current_query = self.agent.starting_query
-        all_rounds = []; previous_artifact = None
-        base_dir = os.path.join(self.agent.get_repo(),
-            f"{self.agent.get_id()}.synthesis.{datetime.now().strftime("%m%d%H%M")}")
-        os.makedirs(base_dir, exist_ok=True)
+        all_rounds = []; previous_artifact = None; base_dir = None
+        if num_rounds > 1:
+            base_dir = os.path.join(self.agent.get_repo(),
+                f"{self.agent.get_id()}.synthesis.{datetime.now().strftime("%m%d%H%M")}")
+            os.makedirs(base_dir, exist_ok=True)
 
         for round_num in range(1, num_rounds + 1):
             self.logger.info(f"\n{'='*80}\n[SYNTHESIS ROUND {round_num}/{num_rounds}]\n{'='*80}")
