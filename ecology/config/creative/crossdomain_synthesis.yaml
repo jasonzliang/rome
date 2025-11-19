@@ -41,7 +41,7 @@ OpenAIHandler:
   model: gpt-5
   reasoning_effort: medium
   temperature: 0.1
-  timeout: 600
+  timeout: 1000
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
