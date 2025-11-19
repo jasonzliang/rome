@@ -260,7 +260,7 @@ Respond with valid JSON only (exactly 3 fields):
             if not result:
                 self.logger.error("[MERGE] parse_json_response returned None/empty")
                 self.logger.debug(f"[MERGE] Raw response: {response if response else 'None'}")
-                return all_rounds[-1]
+                raise ValueError(f"Invalid JSON response")
 
             # Check for required fields
             missing = [k for k in ["abstract", "artifact"] if k not in result]
