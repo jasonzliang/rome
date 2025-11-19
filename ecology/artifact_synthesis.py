@@ -38,6 +38,8 @@ class ArtifactSynthesizer:
         # Multi-round synthesis loop
         current_query = self.agent.starting_query
         all_rounds = []; previous_artifact = None
+        base_dir = os.path.join(self.agent.get_repo(),
+            f"{self.agent.get_id()}.synthesis.{datetime.now().strftime("%m%d%H%M")}")
 
         for round_num in range(1, num_rounds + 1):
             self.logger.info(f"\n{'='*80}\n[SYNTHESIS ROUND {round_num}/{num_rounds}]\n{'='*80}")
@@ -45,6 +47,7 @@ class ArtifactSynthesizer:
 
             # Generate synthesis for current round (with previous artifact context)
             result = self._synthesize_single_round(mode, current_query, previous_artifact)
+            self._save_synthesis_outputs(result, base_dir=base_dir)
             all_rounds.append(result)
 
             # Save current result as previous for next round
@@ -65,7 +68,7 @@ class ArtifactSynthesizer:
             final_result = all_rounds[-1]
 
         # final_result["metadata"]["total_rounds"] = len(all_rounds)
-        self._save_synthesis_outputs(final_result)
+        self._save_synthesis_outputs(final_result, base_dir=base_dir)
 
         return final_result
 
@@ -288,7 +291,7 @@ Respond with valid JSON only:
             "starting_query": self.agent.starting_query,
             "synthesis_mode": all_rounds[-1]["metadata"]["synthesis_mode"],
             "synthesis_queries": total_queries,
-            "synthesis_rounds": len(all_rounds),
+            "merged_artifacts": len(all_rounds),
         }
         return result
 
@@ -397,10 +400,12 @@ Respond with JSON:
 
         return qa_list, source_list, source_map
 
-    def _save_synthesis_outputs(self, result: Dict) -> None:
+    def _save_synthesis_outputs(self, result: Dict, base_dir: str = None, timestamp: str = None) -> None:
         """Save synthesis with sources in JSON and text formats"""
-        timestamp = datetime.now().strftime("%m%d%H%M")
-        base_path = os.path.join(self.agent.get_repo(), f"{self.agent.get_id()}.synthesis.{timestamp}")
+        if not base_dir: base_dir = self.agent.get_repo()
+        if not timestamp: timestamp = datetime.now().strftime("%m%d%H%M")
+        base_path = os.path.join(base_dir, f"{self.agent.get_id()}.synthesis.{timestamp}")
+        os.makedirs(base_dir, exist_ok=True)
 
         try:
             with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
