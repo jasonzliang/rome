@@ -49,7 +49,7 @@ class ArtifactSynthesizer:
 
             # Generate synthesis for current round (with previous artifact context)
             result = self._synthesize_single_round(mode, current_query, previous_artifact)
-            self._save_synthesis(result, base_dir=base_dir)
+            self._save_synthesis(result, base_dir=base_dir, suffix=f'synthesis-{round_num}')
             all_rounds.append(result)
 
             # Save current result as previous for next round
@@ -68,7 +68,7 @@ class ArtifactSynthesizer:
             self.logger.info(f"\n{'='*80}\n[MERGING {len(all_rounds)} ARTIFACTS]\n{'='*80}")
             merged_result = self._merge_artifacts(all_rounds)
             if merged_result:
-                self._save_synthesis(merged_result, base_dir=base_dir)
+                self._save_synthesis(merged_result, base_dir=base_dir, suffix=f'merged-{len(all_rounds)}')
                 return merged_result
         return final_result
 
@@ -411,11 +411,15 @@ Respond with JSON:
 
         return qa_list, source_list, source_map
 
-    def _save_synthesis(self, result: Dict, base_dir: str = None, timestamp: str = None) -> None:
+    def _save_synthesis(self, result: Dict,
+        base_dir: str = None,
+        suffix: str = None,
+        timestamp: str = None) -> None:
         """Save synthesis with sources in JSON and text formats"""
         if not base_dir: base_dir = self.agent.get_repo()
+        if not suffix: suffix = "synthesis"
         if not timestamp: timestamp = datetime.now().strftime("%m%d%H%M")
-        base_path = os.path.join(base_dir, f"{self.agent.get_id()}.synthesis.{timestamp}")
+        base_path = os.path.join(base_dir, f"{self.agent.get_id()}.{suffix}.{timestamp}")
 
         try:
             with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
