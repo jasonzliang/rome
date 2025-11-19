@@ -198,87 +198,100 @@ Respond with JSON:
             self.logger.error(f"Query refinement failed: {e}")
         return None
 
-    def _merge_artifacts(self, all_rounds: List[Dict]) -> Dict[str, str]:
+    def _merge_artifacts(self, all_rounds: List[Dict]) -> Optional[Dict[str, str]]:
         """Merge artifacts from all rounds into a single comprehensive artifact"""
-        # Build context from all rounds with their original sources
+
+        # Build context with per-round sources clearly labeled
         artifacts_context = []
-
         for i, round_result in enumerate(all_rounds, 1):
-            # Use original sources from this round
             round_sources = round_result.get('sources', {})
-
-            # Build sources list for this specific round using original indices
-            round_source_list = "\n".join([f"[{idx}] {url}"
+            source_list = "\n".join([f"  [{idx}] = {url}"
                 for url, idx in sorted(round_sources.items(), key=lambda x: x[1])])
 
-            # Add artifact with its own sources section
             artifacts_context.append(
-                f"ROUND {i} ARTIFACT:\n{round_result['artifact']}\n\n"
-                f"ROUND {i} SOURCES:\n{round_source_list}\n--- END OF ROUND {i} ---"
+                f"=== ROUND {i} ===\n\n"
+                f"ARTIFACT:\n{round_result['artifact']}\n\n"
+                f"SOURCES (for citations in Round {i}):\n{source_list}\n\n"
+                f"=== END OF ROUND {i} ==="
             )
 
-        artifacts_text = "\n\n" + "="*80 + "\n\n".join(artifacts_context)
+        artifacts_text = "\n\n".join(artifacts_context)
+        query_context = f" that creatively answers: {self.agent.starting_query}" if self.agent.starting_query else ""
 
-        query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
+        prompt = f"""Merge {len(all_rounds)} synthesis artifacts into one comprehensive synthesis.
 
-        prompt = f"""You have explored {len(self.agent.visited_urls)} sources and synthesized insights across {len(all_rounds)} rounds of analysis.
-
-LIST OF ARTIFACTS WITH SOURCES:
-{artifacts_text}
---- END OF ARTIFACTS ---
-
-YOUR TASK:
-Synthesize all the artifacts into a single, comprehensive, and coherent final artifact{query_context}. The final artifact should:
-    - Integrate the best insights from all rounds
-    - Resolve any tensions or contradictions across rounds
-    - Present a unified narrative that goes beyond simple concatenation
-    - Build a more complete and nuanced understanding than any single round
-
-1. **Artifact Abstract** (100-150 tokens):
-    - Summary of the final artifact's core discovery and significance
-
-2. **Artifact Main Text** (around {self.synthesis_max_tokens} tokens):
-    - Synthesize insights across all rounds into a coherent whole
-    - Identify and reconcile any contradictions between rounds
-    - Emphasize emergent patterns that span multiple rounds
-    - Ensure logical flow and clear organization
-    - Cite sources using [n] notation after relevant claims or statements (e.g., "This pattern emerged [1,3]")
-    - When citing, extract URLs from the round artifact sources and assign them your own NEW sequential numbers
-
-3. **Sources** (dict of url->index for ALL sources cited in your artifact):
-    - Extract the URLs of every source you cited in your merged artifact
-    - Create NEW sequential numbering starting from 1 for these sources
-    - Format: {{"url1": 1, "url2": 2, ...}}
-    - Example: If you cited source [2] from Round 1 (url_a) and source [1] from Round 2 (url_b), return: {{"url_a": 1, "url_b": 2}}
-
-IMPORTANT: Create a NEW synthesis that integrates all rounds, not just a summary of them
-IMPORTANT: Avoid excessive jargon, keep it logical, clear, and convincing to a skeptical reader
-IMPORTANT: Cite sources to support claims, but do NOT create a "Sources" or "References" section in the artifact main text
-IMPORTANT: Do NOT reference or mention the previous list of artifacts
-
-Respond with valid JSON only:
+OUTPUT FORMAT (JSON with exactly 3 fields):
 {{
-    "abstract": "<abstract text>",
-    "artifact": "<artifact text>",
-    "sources": {{"<url>": <index>, ...}}
-}}"""
+    "abstract": "string (100-150 tokens)",
+    "artifact": "string (around {self.synthesis_max_tokens} tokens)",
+    "sources": {{"url1": 1, "url2": 2}}
+}}
+
+INPUT ARTIFACTS:
+{artifacts_text}
+
+=== YOUR TASK ===
+Create a unified synthesis{query_context} by:
+1. Integrating insights across all rounds
+2. Resolving contradictions between rounds
+3. Identifying emergent patterns
+4. Building deeper understanding than any single round
+
+CITATION INSTRUCTIONS:
+- Each round has its own [n] citations referring to that round's sources
+- Example: Round 1's [2] and Round 2's [2] are different URLs
+- In your merged artifact, create NEW citations with YOUR OWN numbering
+- In the "sources" field, map each URL you cite to its new number
+- Format: {{"https://example.com": 1, "https://other.com": 2}}
+
+RESPONSE REQUIREMENTS:
+- Return ONLY valid JSON (no markdown, no explanations outside JSON)
+- Include all 3 required fields: abstract, artifact, sources
+- Use [n] citations in your artifact text
+- Do NOT include a "References" section in the artifact
+- Do NOT mention "Round 1", "Round 2", etc. in your synthesis
+- Keep it clear, logical, and convincing to a skeptical reader
+
+Begin your response with the opening brace: {{"""
 
         try:
             response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
             result = self.agent.parse_json_response(response)
-            if not result or "abstract" not in result or "artifact" not in result:
-                raise ValueError("Missing required keys in response")
 
-            # Extract sources if provided, ensure indices are integers
-            if "sources" in result and isinstance(result["sources"], dict):
-                result["sources"] = {url: int(idx) for url, idx in result["sources"].items()}
-                result["sources"] = dict(sorted(result["sources"].items(), key=lambda x: x[1]))
-            else:
+            # Validate response
+            if not result:
+                self.logger.error("[MERGE] parse_json_response returned None/empty")
+                self.logger.debug(f"[MERGE] Raw response: {response if response else 'None'}")
+                return all_rounds[-1]
+
+            # Check for required fields
+            missing = [k for k in ["abstract", "artifact"] if k not in result]
+            if missing:
+                self.logger.error(f"[MERGE] Missing required keys: {missing}")
+                self.logger.error(f"[MERGE] Present keys: {list(result.keys())}")
+                self.logger.debug(f"[MERGE] Raw result: {str(result)}")
+                raise ValueError(f"Missing required keys: {missing}")
+
+            # Process sources with validation
+            if "sources" not in result:
+                self.logger.error("[MERGE] No 'sources' field in response, creating empty dict")
                 result["sources"] = {}
+            elif not isinstance(result["sources"], dict):
+                self.logger.error(f"[MERGE] Invalid sources type: {type(result['sources'])}, creating empty dict")
+                result["sources"] = {}
+            else:
+                # Ensure indices are integers and sort
+                try:
+                    result["sources"] = {url: int(idx) for url, idx in result["sources"].items()}
+                    result["sources"] = dict(sorted(result["sources"].items(), key=lambda x: x[1]))
+                except (ValueError, AttributeError) as e:
+                    self.logger.error(f"[MERGE] Error processing sources: {e}")
+                    self.logger.debug(f"[MERGE] Raw sources: {str(result['sources'])}")
+                    result["sources"] = {}
 
         except Exception as e:
-            self.logger.error(f"Artifact merging failed: {e}")
-            return all_rounds[-1]
+            self.logger.error(f"[MERGE] Artifact merging failed: {e}")
+            return None
 
         # Combine metadata from all rounds
         total_queries = sum(r["metadata"]["synthesis_queries"] for r in all_rounds)
