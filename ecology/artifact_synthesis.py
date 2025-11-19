@@ -49,7 +49,7 @@ class ArtifactSynthesizer:
 
             # Generate synthesis for current round (with previous artifact context)
             result = self._synthesize_single_round(mode, current_query, previous_artifact)
-            self._save_synthesis_outputs(result, base_dir=base_dir)
+            self._save_synthesis(result, base_dir=base_dir)
             all_rounds.append(result)
 
             # Save current result as previous for next round
@@ -66,7 +66,7 @@ class ArtifactSynthesizer:
         if self.synthesis_merge_artifacts and len(all_rounds) > 1:
             self.logger.info(f"\n{'='*80}\n[MERGING {len(all_rounds)} ARTIFACTS]\n{'='*80}")
             final_result = self._merge_artifacts(all_rounds)
-            self._save_synthesis_outputs(final_result, base_dir=base_dir)
+            self._save_synthesis(final_result, base_dir=base_dir)
         else:
             final_result = all_rounds[-1]
 
@@ -400,7 +400,7 @@ Respond with JSON:
 
         return qa_list, source_list, source_map
 
-    def _save_synthesis_outputs(self, result: Dict, base_dir: str = None, timestamp: str = None) -> None:
+    def _save_synthesis(self, result: Dict, base_dir: str = None, timestamp: str = None) -> None:
         """Save synthesis with sources in JSON and text formats"""
         if not base_dir: base_dir = self.agent.get_repo()
         if not timestamp: timestamp = datetime.now().strftime("%m%d%H%M")
