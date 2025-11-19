@@ -240,8 +240,8 @@ CITATION INSTRUCTIONS:
 - Format: {{"https://example.com": 1, "https://other.com": 2}}
 
 RESPONSE REQUIREMENTS:
-- Return ONLY valid JSON (no markdown, no explanations outside JSON)
-- Include all 3 required fields: abstract, artifact, sources
+- IMPORTANT: Return ONLY valid JSON (no markdown, no explanations outside JSON)
+- IMPORTANT: Include all 3 required fields: abstract, artifact, sources
 - Use [n] citations in your artifact text
 - Do NOT include a "References" section in the artifact
 - Do NOT mention "Round 1", "Round 2", etc. in your synthesis
