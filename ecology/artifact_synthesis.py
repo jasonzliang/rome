@@ -66,11 +66,9 @@ class ArtifactSynthesizer:
         if self.synthesis_merge_artifacts and len(all_rounds) > 1:
             self.logger.info(f"\n{'='*80}\n[MERGING {len(all_rounds)} ARTIFACTS]\n{'='*80}")
             final_result = self._merge_artifacts(all_rounds)
+            self._save_synthesis_outputs(final_result, base_dir=base_dir)
         else:
             final_result = all_rounds[-1]
-
-        # final_result["metadata"]["total_rounds"] = len(all_rounds)
-        self._save_synthesis_outputs(final_result, base_dir=base_dir)
 
         return final_result
 
