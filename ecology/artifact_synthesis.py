@@ -239,7 +239,7 @@ Compared to the round artifacts, the merged artifact should have:
 EXAMPLE OUTPUT:
 {{
     "abstract": "A 100-150 token summary of the merged artifact",
-    "artifact": "Full merged text (~{self.synthesis_max_tokens} tokens) with citations [1,2]...",
+    "artifact": "Full merged text (around {self.synthesis_max_tokens} tokens) with citations [1,2]...",
     "sources": {{"https://example.com": 1, "https://another.com": 2}}
 }}
 
