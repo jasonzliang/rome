@@ -71,3 +71,5 @@
 #### Final Ranking
 [Numbered list of the all agents in descending order, ranked by the sum of the 3 metrics]
 ```
+
+IMPORTANT: You MUST double check each agent's final ranking and scores are accurate and correct!

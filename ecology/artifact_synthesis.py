@@ -220,22 +220,25 @@ Respond with JSON:
         query_context = f" that creatively answers the query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
 
-        prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified synthesis{query_context}.
+        prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}.
 
 === RESEARCH ARTIFACTS ===
 {artifacts_text}
 === END OF RESEARCH ARTIFACTS ===
 
-TASK: Create a comprehensive merged artifact by:
-    - Integrating insights across all rounds
-    - Resolving contradictions between rounds
-    - Identifying emergent patterns
-    - Building deeper understanding
+YOUR TASK:
+Create a comprehensive merged artifact that:
+    - Integrate most interesting insights across all round artifacts
+    - Discover emergent patterns not visible in individual artifacts
+Compared to the round artifacts, the merged artifact should have:
+    - Most novel discoveries, connections, or applications
+    - Most surprising new directions or perspectives
+    - Most interesting tensions, contradictions, or open questions
 
 EXAMPLE OUTPUT:
 {{
     "abstract": "A 100-150 token summary of the core discovery...",
-    "artifact": "The full synthesis text with citations like [1] and [2]...",
+    "artifact": "The full merged text with citations like [1] and [2]...",
     "sources": {{"https://example.com": 1, "https://another.com": 2}}
 }}
 
@@ -253,7 +256,7 @@ CRITICAL INSTRUCTIONS:
     - Output ONLY valid JSON (no markdown, no code blocks, no explanations)
     - All 3 fields required: abstract, artifact, sources
     - Do NOT mention "Round 1", "Round 2", etc, in text
-    - Target length: ~{self.synthesis_max_tokens} tokens for artifact
+    - Target length: Around {self.synthesis_max_tokens} tokens for artifact
 
 Your response must be valid JSON starting with {{ and ending with }}:"""
 
