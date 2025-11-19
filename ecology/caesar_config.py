@@ -29,6 +29,8 @@ REQUESTS_HEADERS = {
 MAX_SYNTHESIS_QUERY_SOURCES = 5
 # Max QA pairs to keep in context during iterative synthesis
 MAX_SYNTHESIS_QA_CONTEXT = 50
+# Number of retries for artifact synthesis before failing
+NUM_SYNTHESIS_RETRIES = 5
 
 CAESAR_CONFIG = {
     "CaesarAgent": {

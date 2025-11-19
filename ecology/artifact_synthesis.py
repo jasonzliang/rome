@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple
 from rome.config import set_attributes_from_config
 from rome.logger import get_logger
 from .caesar_config import (CAESAR_CONFIG, MAX_SYNTHESIS_QUERY_SOURCES,
-                            MAX_SYNTHESIS_QA_CONTEXT)
+                            MAX_SYNTHESIS_QA_CONTEXT, NUM_SYNTHESIS_RETRIES)
 
 class ArtifactSynthesizer:
     """Handles the synthesis of insights into final artifacts"""
@@ -37,7 +37,7 @@ class ArtifactSynthesizer:
 
         # Multi-round synthesis loop
         current_query = self.agent.starting_query
-        all_rounds = []; previous_artifact = None; base_dir = None
+        all_rounds = []; previous_result = None; base_dir = None
         if num_rounds > 1:
             base_dir = os.path.join(self.agent.get_repo(),
                 f"{self.agent.get_id()}.synthesis.{datetime.now().strftime("%m%d%H%M")}")
@@ -47,29 +47,29 @@ class ArtifactSynthesizer:
             if current_query: self.logger.info(f"Current query: {current_query}")
 
             # Generate synthesis for current round (with previous artifact context)
-            result = self._synthesize_single_round(mode, current_query, previous_artifact)
+            result = self._synthesize_single_round(mode, current_query, previous_result)
+            if not result: break
             self._save_synthesis(result, base_dir=base_dir, suffix=f'synthesis-{round_num}')
-            all_rounds.append(result)
-
-            # Save current result as previous for next round
-            previous_artifact = result
+            all_rounds.append(result); previous_result = result
 
             # Refine query for next round (if not last round)
             if round_num < num_rounds:
                 current_query = self._refine_query(result)
-                if not current_query:
-                    self.logger.error(f"Query refinement failed, stopping at round {round_num}")
-                    break
+                if not current_query: break
+
+        if len(all_rounds) < 1:
+            raise ValueError("No synthesis artifacts created!")
+        elif len(all_rounds) < num_rounds:
+            self.logger.error(f"Artifact synthesis ended early at round: {len(all_rounds)}/{num_rounds}")
 
         # Merge artifacts if requested and multiple rounds exist
-        final_result = all_rounds[-1]
         if self.synthesis_merge_artifacts and len(all_rounds) > 1:
             self.logger.info(f"\n{'='*80}\n[MERGING {len(all_rounds)} ARTIFACTS]\n{'='*80}")
             merged_result = self._merge_artifacts(all_rounds)
             if merged_result:
                 self._save_synthesis(merged_result, base_dir=base_dir, suffix=f'merged-{len(all_rounds)}')
                 return merged_result
-        return final_result
+        return all_rounds[-1]
 
     def _synthesize_single_round(self, mode: str, current_query: Optional[str] = None,
                                  previous_artifact: Optional[Dict] = None) -> Dict[str, str]:
@@ -79,7 +79,8 @@ class ArtifactSynthesizer:
         qa_pairs = self._generate_qa_pairs(mode, current_query)
 
         if not qa_pairs:
-            return {"abstract": "", "artifact": "Unable to generate synthesis questions."}
+            self.logger.error("[SYNTHESIS] Unable to generate Q/A pairs")
+            return None
         qa_list, source_list, source_map = self._build_answers_with_citations(qa_pairs)
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ":"
@@ -129,15 +130,17 @@ Respond with valid JSON only:
     "abstract": "<abstract text>",
     "artifact": "<artifact text>"
 }}"""
-
-        try:
-            response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
-            result = self.agent.parse_json_response(response)
-            if not result or "abstract" not in result or "artifact" not in result:
-                raise ValueError("Missing required keys in response")
-        except Exception as e:
-            self.logger.error(f"Synthesis generation failed: {e}")
-            return {"abstract": "Synthesis failed.", "artifact": f"Error: {e}"}
+        result = None
+        for i in range(NUM_SYNTHESIS_RETRIES):
+            try:
+                response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
+                result = self.agent.parse_json_response(response)
+                if not result or "abstract" not in result or "artifact" not in result:
+                    raise ValueError("Missing required keys in response")
+                break
+            except Exception as e:
+                self.logger.error(f"[SYNTHESIS] Artifact generation ({i+1}) failed: {e}")
+        if not result: return None
 
         result["sources"] = dict(sorted(source_map.items(), key=lambda x: x[1]))
         result["metadata"] = {
@@ -157,7 +160,7 @@ Respond with valid JSON only:
 
         artifact_text = artifact_result.get("artifact", "")
         if not artifact_text:
-            self.logger.error("Cannot refine query: no artifact text")
+            self.logger.error("[REFINE] Cannot refine query: no artifact text")
             return None
 
         if not current_query: current_query = self.agent.starting_query
@@ -190,10 +193,10 @@ Respond with JSON:
             if result and "refined_query" in result:
                 refined = result["refined_query"]
                 reason = result.get("reason", "No reason provided")
-                self.logger.info(f"[QUERY REFINEMENT] {refined}\nReason: {reason}")
+                self.logger.info(f"[REFINE] Query: {refined}\nReason: {reason}")
                 return refined
         except Exception as e:
-            self.logger.error(f"Query refinement failed: {e}")
+            self.logger.error(f"[REFINE] Query refinement failed: {e}")
         return None
 
     def _merge_artifacts(self, all_rounds: List[Dict]) -> Optional[Dict[str, str]]:
@@ -251,44 +254,46 @@ Respond with valid JSON only (exactly 3 fields):
     "sources": {{"url1": 1, "url2": 2}}
 }}"""
 
-        try:
-            response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
-            result = self.agent.parse_json_response(response)
+        result = None
+        for i in range(NUM_SYNTHESIS_RETRIES):
+            try:
+                response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
+                result = self.agent.parse_json_response(response)
 
-            # Validate response
-            if not result:
-                self.logger.error("[MERGE] parse_json_response returned None/empty")
-                self.logger.debug(f"[MERGE] Raw response: {response if response else 'None'}")
-                raise ValueError(f"Invalid JSON response")
+                # Validate response
+                if not result:
+                    self.logger.error("[MERGE] parse_json_response returned None/empty")
+                    self.logger.debug(f"[MERGE] Raw response: {response if response else 'None'}")
+                    raise ValueError(f"Invalid JSON response")
 
-            # Check for required fields
-            missing = [k for k in ["abstract", "artifact"] if k not in result]
-            if missing:
-                self.logger.error(f"[MERGE] Missing required keys: {missing}")
-                self.logger.error(f"[MERGE] Present keys: {list(result.keys())}")
-                self.logger.debug(f"[MERGE] Raw result: {str(result)}")
-                raise ValueError(f"Missing required keys: {missing}")
+                # Check for required fields
+                missing = [k for k in ["abstract", "artifact"] if k not in result]
+                if missing:
+                    self.logger.error(f"[MERGE] Missing required keys: {missing}")
+                    self.logger.error(f"[MERGE] Present keys: {list(result.keys())}")
+                    self.logger.debug(f"[MERGE] Raw result: {str(result)}")
+                    raise ValueError(f"Missing required keys: {missing}")
 
-            # Process sources with validation
-            if "sources" not in result:
-                self.logger.error("[MERGE] No 'sources' field in response, creating empty dict")
-                result["sources"] = {}
-            elif not isinstance(result["sources"], dict):
-                self.logger.error(f"[MERGE] Invalid sources type: {type(result['sources'])}, creating empty dict")
-                result["sources"] = {}
-            else:
-                # Ensure indices are integers and sort
-                try:
-                    result["sources"] = {url: int(idx) for url, idx in result["sources"].items()}
-                    result["sources"] = dict(sorted(result["sources"].items(), key=lambda x: x[1]))
-                except (ValueError, AttributeError) as e:
-                    self.logger.error(f"[MERGE] Error processing sources: {e}")
-                    self.logger.debug(f"[MERGE] Raw sources: {str(result['sources'])}")
+                # Process sources with validation
+                if "sources" not in result:
+                    self.logger.error("[MERGE] No 'sources' field in response, creating empty dict")
                     result["sources"] = {}
-
-        except Exception as e:
-            self.logger.error(f"[MERGE] Artifact merging failed: {e}")
-            return None
+                elif not isinstance(result["sources"], dict):
+                    self.logger.error(f"[MERGE] Invalid sources type: {type(result['sources'])}, creating empty dict")
+                    result["sources"] = {}
+                else:
+                    # Ensure indices are integers and sort
+                    try:
+                        result["sources"] = {url: int(idx) for url, idx in result["sources"].items()}
+                        result["sources"] = dict(sorted(result["sources"].items(), key=lambda x: x[1]))
+                    except (ValueError, AttributeError) as e:
+                        self.logger.error(f"[MERGE] Error processing sources: {e}")
+                        self.logger.debug(f"[MERGE] Raw sources: {str(result['sources'])}")
+                        result["sources"] = {}
+                break
+            except Exception as e:
+                self.logger.error(f"[MERGE] Artifact merging ({i+1}) failed: {e}")
+        if not result: return None
 
         # Combine metadata from all rounds
         total_queries = sum(r["metadata"]["synthesis_queries"] for r in all_rounds)
