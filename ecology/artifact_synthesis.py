@@ -217,17 +217,11 @@ Respond with JSON:
         artifacts_text = "\n\n".join(artifacts_context)
         query_context = f" that creatively answers: {self.agent.starting_query}" if self.agent.starting_query else ""
 
-        prompt = f"""Merge {len(all_rounds)} synthesis artifacts into one comprehensive synthesis.
+        prompt = f"""Merge {len(all_rounds)} rounds of artifacts into one comprehensive synthesis.
 
-OUTPUT FORMAT (JSON with exactly 3 fields):
-{{
-    "abstract": "string (100-150 tokens)",
-    "artifact": "string (around {self.synthesis_max_tokens} tokens)",
-    "sources": {{"url1": 1, "url2": 2}}
-}}
-
-INPUT ARTIFACTS:
+LIST OF ARTIFACTS:
 {artifacts_text}
+=== END OF ARTIFACTS ===
 
 === YOUR TASK ===
 Create a unified synthesis{query_context} by:
@@ -251,7 +245,12 @@ RESPONSE REQUIREMENTS:
 - Do NOT mention "Round 1", "Round 2", etc. in your synthesis
 - Keep it clear, logical, and convincing to a skeptical reader
 
-Begin your response with the opening brace: {{"""
+Respond with valid JSON only (exactly 3 fields):
+{{
+    "abstract": "string (100-150 tokens)",
+    "artifact": "string (around {self.synthesis_max_tokens} tokens)",
+    "sources": {{"url1": 1, "url2": 2}}
+}}"""
 
         try:
             response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
