@@ -122,7 +122,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
     {'- Build upon the previous artifact by analyzing it for weaknesses in organization, arguments, or content, and then use key insights to deepen, improve, and extend the previous artifact' if previous_artifact else ''}
 
 {'IMPORTANT: do NOT mention or reference the previous artifact, the new artifact should make sense by itself as a standalone text' if previous_artifact else ''}
-IMPORTANT: AVOID excessive jargon, keep it logical, clear, and convincing to a skeptical reader
+IMPORTANT: AVOID excessive jargon, keep it logical, easy to understand, and convincing to a skeptical reader
 IMPORTANT: Cite sources to support your claims and insights, but do NOT create a "SOURCES" or "References" section
 IMPORTANT: Use your role as a guide on how to respond{query_role}
 
@@ -238,13 +238,13 @@ Compared to the round artifacts, the merged artifact should have:
 
 EXAMPLE OUTPUT:
 {{
-    "abstract": "A 100-150 token summary of the merged artifact",
+    "abstract": "A 100-150 token summary of the artifact's core discovery and its significance",
     "artifact": "Full merged text (around {self.synthesis_max_tokens} tokens) with citations [1,2]...",
     "sources": {{"https://example.com": 1, "https://another.com": 2}}
 }}
 
-ARTIFACT REQUIREMENTS:
-    - Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
+ARTIFACT GUIDELINES:
+    - **IMPORTANT:** Avoid excessive jargon, keep it logical, easy to understand, and convincing to a skeptical reader
     - Cite sources to support your claims and insights, but do NOT recreate the "SOURCES" list or provide a "References" section
     - Use your role as a guide on how to respond{query_role}
 
@@ -253,7 +253,7 @@ CITATION HANDLING:
     - In your merged artifact, create NEW sequential numbering: [1], [2], [3]...
     - Map each cited URL to its new number in the "sources" field
 
-CRITICAL INSTRUCTIONS:
+RESPONSE INSTRUCTIONS:
     - Output ONLY valid JSON (no markdown, no code blocks, no explanations)
     - All 3 fields required: abstract, artifact, sources
     - Do NOT mention "Round 1", "Round 2", etc, in text
