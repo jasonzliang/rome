@@ -218,7 +218,7 @@ Respond with JSON:
             )
 
         artifacts_text = "\n\n".join(artifacts_context)
-        query_context = f" that creatively answers the query: {self.agent.starting_query}" if self.agent.starting_query else ""
+        query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
 
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}.
