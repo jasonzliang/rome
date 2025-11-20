@@ -229,8 +229,9 @@ Respond with JSON:
 
 YOUR TASK:
 Create a comprehensive merged artifact that:
-    - Integrate most interesting insights across all round artifacts
-    - Discover emergent patterns not visible in individual artifacts
+    - Integrates most interesting insights across all round artifacts
+    - Discovers emergent patterns not visible in individual artifacts
+    - Is easy to follow and organized in a logical, coherent style
 Compared to the round artifacts, the merged artifact should have:
     - Most novel discoveries, connections, or applications
     - Most surprising new directions or perspectives
