@@ -7,4 +7,4 @@ Using deep research, create a novel, exciting, and thought-provoking response th
 
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
 IMPORTANT: Do not ask the user any additional questions before proceeding with deep research
-IMPORTANT: The answer to the query MUST be around 600 tokens in length
+IMPORTANT: The answer to the query MUST be at most 600 tokens in length
