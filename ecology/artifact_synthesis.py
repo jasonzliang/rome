@@ -219,6 +219,10 @@ Respond with JSON:
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
 
+# Compared to the round artifacts, the merged artifact should have:
+#     - Most novel discoveries, connections, or applications
+#     - Most surprising new directions or perspectives
+#     - Most interesting tensions, contradictions, or open questions
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}.
 
 === RESEARCH ARTIFACTS ===
@@ -229,11 +233,9 @@ YOUR TASK:
 Create a comprehensive merged artifact that:
     - Integrates most interesting insights across all round artifacts
     - Discovers emergent patterns not visible in individual artifacts
+    - Improves upon the weaknesses and flaws of the round artifacts
+    - Further develops the core ideas and strengths of the round artifacts
     - Is easy to follow and organized in a logical, coherent style
-Compared to the round artifacts, the merged artifact should have:
-    - Most novel discoveries, connections, or applications
-    - Most surprising new directions or perspectives
-    - Most interesting tensions, contradictions, or open questions
 
 EXAMPLE OUTPUT:
 {{
