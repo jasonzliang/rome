@@ -122,7 +122,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
     {'- Build upon the previous artifact by analyzing it for weaknesses in organization, arguments, or content, and then use key insights to deepen, improve, and extend the previous artifact' if previous_artifact else ''}
 
 {'IMPORTANT: do NOT mention or reference the previous artifact, the new artifact should make sense by itself as a standalone text' if previous_artifact else ''}
-IMPORTANT: AVOID excessive jargon, keep it logical, easy to understand, and convincing to a skeptical reader
+IMPORTANT: AVOID excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
 IMPORTANT: Cite sources to support your claims and insights, but do NOT create a "SOURCES" or "References" section
 IMPORTANT: Use your role as a guide on how to respond{query_role}
 
@@ -244,15 +244,15 @@ EXAMPLE OUTPUT:
     "sources": {{"https://example.com": 1, "https://another.com": 2}}
 }}
 
-ARTIFACT GUIDELINES:
-    - **IMPORTANT:** Avoid excessive jargon, keep it logical, easy to understand, and convincing to a skeptical reader
-    - Cite sources to support your claims and insights, but do NOT recreate the "SOURCES" list or provide a "References" section
-    - Use your role as a guide on how to respond{query_role}
-
-CITATION HANDLING:
+ARTIFACT CITATION GUIDELINES:
     - Each round has its own [n] citations (Round 1's [1] and Round 2's [1] are DIFFERENT URLs)
     - In your merged artifact, create NEW sequential numbering: [1], [2], [3]...
     - Map each cited URL to its new number in the "sources" field
+    - Cite sources to support your claims and insights, but do NOT recreate the "SOURCES" list or provide a "References" section
+
+ARTIFACT STYLE GUIDELINES:
+    - IMPORTANT: AVOID excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
+    - Use your role as a guide on how to respond{query_role}
 
 RESPONSE INSTRUCTIONS:
     - Output ONLY valid JSON (no markdown, no code blocks, no explanations)
