@@ -44,8 +44,8 @@
 
   - Do NOT ask any clarifying questions, just carefully follow the rules and scoring guide.
   - You MUST make sure the name of the agent matches exactly with the attached file's name
-  - CRITICAL: You MUST double check the final ranking for each agent is accurate and correct.
-  - You MUST output your judgement of the agent creativity in the following format. Output nothing else aside from what is below:
+  - CRITICAL: You MUST double check the final ranking for each agent is accurate and correct. You MUST double check you are not missing any agent score cards.
+  - CRITICAL: You MUST output your judgement of the agent creativity in the following format. Output NOTHING else aside from what is below:
 
 ```
 #### Query: [Query text]
