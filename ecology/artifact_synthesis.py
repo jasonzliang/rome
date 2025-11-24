@@ -111,7 +111,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the artifact's core discovery and its significance
 
-2. **Artifact Main Text** (around {self.synthesis_max_tokens} tokens):
+2. **Artifact Main Text** ({self.synthesis_max_tokens} tokens):
     - Some general suggests for artifact:
         a. Emergent patterns not visible in individual sources
         b. Novel discoveries, connections, or applications
@@ -240,7 +240,7 @@ Compared to the round artifacts, the merged artifact should have:
 EXAMPLE OUTPUT:
 {{
     "abstract": "A 100-150 token summary of the artifact's core discovery and its significance",
-    "artifact": "Full merged text (around {self.synthesis_max_tokens} tokens) with citations [1,2]...",
+    "artifact": "Full merged text ({self.synthesis_max_tokens} tokens) with citations [1,2]...",
     "sources": {{"https://example.com": 1, "https://another.com": 2}}
 }}
 
@@ -258,7 +258,7 @@ RESPONSE INSTRUCTIONS:
     - Output ONLY valid JSON (no markdown, no code blocks, no explanations)
     - All 3 fields required: abstract, artifact, sources
     - Do NOT mention "Round 1", "Round 2", etc, in text
-    - Target length: Around {self.synthesis_max_tokens} tokens for artifact
+    - Target length: {self.synthesis_max_tokens} tokens for artifact
 
 Your response must be valid JSON starting with {{ and ending with }}:"""
 
