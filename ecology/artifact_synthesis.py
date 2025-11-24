@@ -117,13 +117,11 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
         b. Novel discoveries, connections, or applications
         c. Surprising new directions or perspectives
         d. Interesting tensions, contradictions, or open questions
-    - Cite from "SOURCES" using [n] notation after relevant claims (e.g., "This pattern emerged... [1,3]")
-    - Use one or more citations if necessary to support complex arguments
+    - Cite from "SOURCES" using [n] notation to support relevant claims/statements (e.g., "This pattern emerged... [1,3]"), but do NOT create a "SOURCES" or "References" section in artifact
     {'- Build upon the previous artifact by analyzing it for weaknesses in organization, arguments, or content, and then use key insights to deepen, improve, and extend the previous artifact' if previous_artifact else ''}
 
 {'IMPORTANT: do NOT mention or reference the previous artifact, the new artifact should make sense by itself as a standalone text' if previous_artifact else ''}
 IMPORTANT: AVOID excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
-IMPORTANT: Cite sources to support your claims and insights, but do NOT create a "SOURCES" or "References" section
 IMPORTANT: Use your role as a guide on how to respond{query_role}
 
 Respond with valid JSON only:
@@ -248,7 +246,7 @@ ARTIFACT CITATION GUIDELINES:
     - Each round has its own [n] citations (Round 1's [1] and Round 2's [1] are DIFFERENT URLs)
     - In your merged artifact, create NEW sequential numbering: [1], [2], [3]...
     - Map each cited URL to its new number in the "sources" field
-    - Cite sources to support your claims and insights, but do NOT recreate the "SOURCES" list or provide a "References" section
+    - Use citations to support relevant claims and statements, but do NOT create a "SOURCES" or "References" section in artifact
 
 ARTIFACT STYLE GUIDELINES:
     - IMPORTANT: AVOID excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
