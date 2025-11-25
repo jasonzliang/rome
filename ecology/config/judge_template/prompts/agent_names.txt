@@ -1,0 +1,9 @@
+Bat: Caesar Synthesis-1
+Bear: Caesar Synthesis-3
+Cat: Caesar Merged
+Cow: Claude Deep
+Dog: Claude Shallow
+Fox: Gemini Deep
+Lion: Gemini Shallow
+Owl: ChatGPT Deep
+Pig: ChatGPT Shallow

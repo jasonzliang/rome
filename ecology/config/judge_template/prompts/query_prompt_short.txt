@@ -1,9 +1,11 @@
 ### YOUR TASK
+
 Create a novel, exciting, and thought-provoking response that creatively answers each of the queries above. Focus on the following:
 - Emergent patterns not visible in individual sources
 - Novel discoveries, connections, or applications
 - Surprising new directions or perspectives
 - Interesting tensions, contradictions, or open questions
+
 IMPORTANT: Avoid excessive jargon while keeping it logical, easy to understand, and convincing to a skeptical reader
-IMPORTANT: You may search online for more information to help answer the queries. Create a document showing your answer for each query
+IMPORTANT: Do not ask the user any additional questions and search online for more information to help answer the queries
 IMPORTANT: The answer to the query MUST be at most 600 tokens in length

@@ -3,11 +3,11 @@ Attached are results from multiple judges (judge_*.txt) where each judge scored 
 1. Generate a CSV showing all the scoring results (use example below as an template, but do NOT copy the scores from example):
 
 Query_Category,Agent,Judge,New,Useful,Surprising,Total
-constrained_creativity,Caesar,Gemini,5,5,5,15
-counterfactual_reasoning,Gemini Short,Claude,1,2,3,6
-crossdomain_synthesis,Claude,Claude,9,9,8,26
-meta_creativity,Caesar,Claude,8,8,7,23
-openended_creativity,GPT Short,GPT,8,8,7,23
+constrained_creativity,Cow,Gemini,5,5,5,15
+counterfactual_reasoning,Cat,Claude,1,2,3,6
+crossdomain_synthesis,Owl,Claude,9,9,8,26
+meta_creativity,Dog,Claude,8,8,7,23
+openended_creativity,Lion,GPT,8,8,7,23
 
 2. Using easy to read and well formatted tables:
   - Show all of the raw metrics (in a compact table) for all agents on each query
