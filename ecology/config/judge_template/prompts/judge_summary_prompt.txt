@@ -13,7 +13,6 @@ crossdomain_synthesis,Gemini Shallow,Claude,9,9,8,26
 meta_creativity,ChatGPT Deep,Claude,8,8,7,23
 openended_creativity,Caesar Synthesis-3,GPT,8,8,7,23
 
-
 2. Using easy to read and well formatted tables:
   - Show all of the raw metrics (in a compact table) for all agents on each query
   - Give average score for each of the query answers from each agent.
