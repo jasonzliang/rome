@@ -50,6 +50,7 @@ class ArtifactSynthesizer:
             result = self._synthesize_single_round(mode, current_query, previous_result)
             if not result: break
             self._save_synthesis(result, base_dir=base_dir, suffix=f'synthesis-{round_num}')
+            self._post_process(result, base_dir=base_dir, suffix=f'synth-eli5-{round_num}')
             all_rounds.append(result); previous_result = result
 
             # Refine query for next round (if not last round)
@@ -68,6 +69,7 @@ class ArtifactSynthesizer:
             merged_result = self._merge_artifacts(all_rounds)
             if merged_result:
                 self._save_synthesis(merged_result, base_dir=base_dir, suffix=f'merged-{len(all_rounds)}')
+                self._post_process(merged_result, base_dir, suffix=f'merged-eli5-{len(all_rounds)}')
                 return merged_result
         return all_rounds[-1]
 
@@ -139,7 +141,8 @@ Respond with valid JSON only:
                 break
             except Exception as e:
                 self.logger.error(f"[SYNTHESIS] Artifact generation ({i+1}) failed: {e}")
-        if not result: return None
+        if not result:
+            self.logger.error(f"[SYNTHESIS] All attempts exhausted"); return None
 
         result["sources"] = dict(sorted(source_map.items(), key=lambda x: x[1]))
         result["metadata"] = {
@@ -303,9 +306,8 @@ Your response must be valid JSON starting with {{ and ending with }}:"""
 
             except Exception as e:
                 self.logger.error(f"[MERGE] Attempt {attempt}/{NUM_SYNTHESIS_RETRIES} failed: {e}")
-                if attempt == NUM_SYNTHESIS_RETRIES:
-                    self.logger.error(f"[MERGE] All attempts exhausted")
-        return None
+
+        self.logger.error(f"[MERGE] All attempts exhausted"); return None
 
     def _generate_qa_pairs(self, mode: str, starting_query: str = None) -> List[Tuple[str, str, List[Dict]]]:
         """Generate Q&A pairs with sources"""
@@ -413,12 +415,11 @@ Respond with JSON:
         return qa_list, source_list, source_map
 
     def _save_synthesis(self, result: Dict,
-        base_dir: str = None,
-        suffix: str = None,
-        timestamp: str = None) -> None:
+            base_dir: str = None,
+            suffix: str = "synthesis",
+            timestamp: str = None) -> None:
         """Save synthesis with sources in JSON and text formats"""
         if not base_dir: base_dir = self.agent.get_repo()
-        if not suffix: suffix = "synthesis"
         if not timestamp: timestamp = datetime.now().strftime("%m%d%H%M")
         os.makedirs(base_dir, exist_ok=True)
         base_path = os.path.join(base_dir, f"{self.agent.get_id()}.{suffix}.{timestamp}")
@@ -428,13 +429,79 @@ Respond with JSON:
                 json.dump(result, f, indent=4, ensure_ascii=False)
 
             with open(f"{base_path}.txt", 'w', encoding='utf-8') as f:
-                f.write(f"ABSTRACT:\n{result['abstract']}\n\n")
+                if abstract := result.get('abstract'):
+                    f.write(f"ABSTRACT:\n{abstract}\n\n")
+
                 f.write(f"ARTIFACT:\n{result['artifact']}\n\n")
+
                 if sources := result.get('sources'):
                     f.write("SOURCES:\n")
                     for url, idx in sorted(sources.items(), key=lambda x: x[1]):
                         f.write(f"[{idx}] {url}\n")
                     f.write("\n")
-                f.write(f"METADATA:\n{json.dumps(result['metadata'], indent=4)}")
+
+                if metadata := result.get('metadata'):
+                    f.write(f"METADATA:\n{json.dumps(metadata, indent=4)}")
         except Exception as e:
             self.logger.error(f"Failed to save synthesis: {e}")
+
+    def _post_process(self, result: Dict,
+        base_dir: str = None,
+        suffix: str = "eli5",
+        timestamp: str = None) -> Optional[Dict]:
+        """Generate ELI5 explanation of artifact and save it"""
+        if not self.synthesis_eli5: return None
+        artifact_text = result.get("artifact", "")
+        if not artifact_text:
+            self.logger.error("[POST-PROCESS] No artifact text to process")
+            return None
+
+        # Determine target token count
+        if self.synthesis_eli5_tokens is None:
+            # Rough estimate: 1 token ≈ 4 characters
+            token_constraint = f"around the same length as the original artifact (~{len(artifact_text) // 4} tokens)"
+        else:
+            token_constraint = f"STRICTLY UNDER {self.synthesis_eli5_tokens} tokens"
+        self.logger.info(f"[POST-PROCESS] Generating ELI5 explanation")
+
+# The explanation should:
+#     - Use simple, everyday language that a 5-year-old could understand
+#     - Avoid jargon and technical terms
+#     - Use concrete examples and analogies
+#     - Be engaging and easy to follow
+#     - Capture the main ideas without oversimplifying
+        prompt = f"""ARTIFACT TEXT:
+{artifact_text}
+--- END OF ARTIFACT ---
+
+YOUR TASK:
+Create an "Explain Like I'm 5" (ELI5) version of the artifact above
+
+IMPORTANT: Your explanation must be {token_constraint}.
+IMPORTANT: Use your role as a guide on how to respond!
+
+Respond with valid JSON only:
+{{
+    "eli5": "<your ELI5 explanation>"
+}}"""
+
+        for attempt in range(1, NUM_SYNTHESIS_RETRIES + 1):
+            try:
+                response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
+                eli5_result = self.agent.parse_json_response(response)
+                if not eli5_result or "eli5" not in eli5_result:
+                    raise ValueError("Missing 'eli5' key in response")
+
+                # Build result dict without abstract or sources for ELI5
+                processed_result = {
+                    "artifact": eli5_result["eli5"],
+                    "metadata": {**result.get("metadata", {}), "eli5": True}
+                }
+                self._save_synthesis(processed_result,
+                    base_dir=base_dir, suffix=suffix, timestamp=timestamp)
+
+                return processed_result
+            except Exception as e:
+                self.logger.error(f"[POST-PROCESS] Attempt {attempt}/{NUM_SYNTHESIS_RETRIES} failed: {e}")
+
+        self.logger.error("[POST-PROCESS] All attempts exhausted"); return None
