@@ -478,7 +478,6 @@ YOUR TASK:
 Create an "Explain Like I'm 5" (ELI5) version of the artifact above
 
 IMPORTANT: Your explanation must be {token_constraint}.
-IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with valid JSON only:
 {{
