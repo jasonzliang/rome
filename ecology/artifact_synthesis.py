@@ -141,8 +141,8 @@ Respond with valid JSON only:
                 break
             except Exception as e:
                 self.logger.error(f"[SYNTHESIS] Artifact generation ({i+1}) failed: {e}")
-        if not result:
-            self.logger.error(f"[SYNTHESIS] All attempts exhausted"); return None
+
+        if not result: self.logger.error(f"[SYNTHESIS] All attempts exhausted"); return None
 
         result["sources"] = dict(sorted(source_map.items(), key=lambda x: x[1]))
         result["metadata"] = {
