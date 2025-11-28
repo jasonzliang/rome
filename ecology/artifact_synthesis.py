@@ -470,12 +470,12 @@ Respond with JSON:
 #     - Use concrete examples and analogies
 #     - Be engaging and easy to follow
 #     - Capture the main ideas without oversimplifying
-        prompt = f"""ARTIFACT TEXT:
+        prompt = f"""ARTIFACT:
 {artifact_text}
 --- END OF ARTIFACT ---
 
 YOUR TASK:
-Create an "Explain Like I'm 5" (ELI5) version of the artifact above
+Please "Explain Like I'm 5" (ELI5) the artifact above
 
 IMPORTANT: Your explanation must be {token_constraint}.
 
