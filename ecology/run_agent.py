@@ -66,7 +66,7 @@ Examples:
 
 def print_config_summary(agent, logger):
     """Print configuration summary before starting"""
-    memory = agent.memory
+    memory = agent.agent_memory
     synth = agent.synthesizer
 
     summary = {
