@@ -458,11 +458,12 @@ Respond with JSON:
             return None
 
         # Determine target token count
-        if self.synthesis_eli5_tokens is None:
-            # Rough estimate: 1 token ≈ 4 characters
-            token_constraint = f"around the same length as the original artifact (~{len(artifact_text) // 4} tokens)"
+        if self.synthesis_eli5_tokens is not None:
+            token_constraint = f"IMPORTANT: Your explanation must be STRICTLY UNDER {self.synthesis_eli5_tokens} tokens long"
         else:
-            token_constraint = f"STRICTLY UNDER {self.synthesis_eli5_tokens} tokens"
+            token_constraint = ""
+        # # Rough estimate: 1 token ≈ 4 characters
+        # token_constraint = f"around the same length as the original artifact (~{len(artifact_text) // 4} tokens)"
         self.logger.info(f"[POST-PROCESS] Generating ELI5 explanation")
 
 # The explanation should:
@@ -482,7 +483,7 @@ YOUR TASK:
  - Capture the main ideas without oversimplifying
  - Clarify any confusing or convoluted parts of the artifact
 
-IMPORTANT: Your explanation must be {token_constraint}.
+{token_constraint}
 
 Respond with valid JSON only:
 {{
