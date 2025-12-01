@@ -31,7 +31,7 @@ MAX_SYNTHESIS_QUERY_SOURCES = 5
 MAX_SYNTHESIS_QA_CONTEXT = 50
 # Number of retries for artifact synthesis before failing
 NUM_SYNTHESIS_RETRIES = 5
-# Whether to save JSON for synthesis results as well
+# Whether to save JSON for synthesis artifact as well
 SYNTHESIS_SAVE_JSON = False
 
 CAESAR_CONFIG = {
