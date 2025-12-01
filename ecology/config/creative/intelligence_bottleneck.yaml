@@ -24,7 +24,7 @@ CaesarAgent:
     model: gpt-5.1
 
   # overwrite_role_file: config/role/self_transcend_role.txt
-  # adapt_role_file: config/role/self_transcend_insights_v1.txt
+  adapt_role_file: config/role/self_transcend_insights_v1.txt
   adapt_role: True
 
 ArtifactSynthesizer:
