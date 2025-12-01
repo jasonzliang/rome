@@ -33,7 +33,7 @@ ArtifactSynthesizer:
   synthesis_merge_artifacts: true
   synthesis_eli5: true
   # synthesis_eli5_tokens: 600
-  # synthesis_max_tokens: "at most 600"
+
 # ============================================================================
 # LLM CONFIGURATION
 # ============================================================================
