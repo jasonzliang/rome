@@ -479,7 +479,7 @@ YOUR TASK:
 "Explain Like I'm 5" (ELI5) the artifact above:
  - Your target audience is a non-expert but college educated reader
  - Capture the main ideas without oversimplifying
- - Do NOT mention or reference the artifact above, your "ELI5" answer should stand by itself
+ - Do NOT mention or reference the artifact above, your explanation should be a standalone text
 
 IMPORTANT: Your explanation must be {token_constraint}.
 
