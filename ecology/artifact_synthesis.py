@@ -475,7 +475,10 @@ Respond with JSON:
 --- END OF ARTIFACT ---
 
 YOUR TASK:
-"Explain Like I'm 5" (ELI5) the artifact above, the explanation should capture main ideas without oversimplifying.
+"Explain Like I'm 5" (ELI5) the artifact above:
+ - Be engaging and easy to follow
+ - Capture the main ideas without oversimplifying
+ - Do NOT mention or reference the artifact above
 
 IMPORTANT: Your explanation must be {token_constraint}.
 
