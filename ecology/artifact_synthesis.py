@@ -477,9 +477,10 @@ Respond with JSON:
 
 YOUR TASK:
 "Explain Like I'm 5" (ELI5) the artifact above:
+ - Do NOT mention or reference the artifact, your explanation should be a standalone text
  - Your target audience is a non-expert but college educated reader
  - Capture the main ideas without oversimplifying
- - Do NOT mention or reference the artifact above, your explanation should be a standalone text
+ - Clarify any confusing or convoluted parts of the artifact
 
 IMPORTANT: Your explanation must be {token_constraint}.
 
