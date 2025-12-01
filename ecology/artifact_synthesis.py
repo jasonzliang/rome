@@ -417,7 +417,8 @@ Respond with JSON:
     def _save_synthesis(self, result: Dict,
             base_dir: str = None,
             suffix: str = "synthesis",
-            timestamp: str = None) -> None:
+            timestamp: str = None,
+            save_json: bool = False) -> None:
         """Save synthesis with sources in JSON and text formats"""
         if not base_dir: base_dir = self.agent.get_repo()
         if not timestamp: timestamp = datetime.now().strftime("%m%d%H%M")
@@ -425,8 +426,9 @@ Respond with JSON:
         base_path = os.path.join(base_dir, f"{self.agent.get_id()}.{suffix}.{timestamp}")
 
         try:
-            with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
-                json.dump(result, f, indent=4, ensure_ascii=False)
+            if save_json:
+                with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
+                    json.dump(result, f, indent=4, ensure_ascii=False)
 
             with open(f"{base_path}.txt", 'w', encoding='utf-8') as f:
                 if abstract := result.get('abstract'):
