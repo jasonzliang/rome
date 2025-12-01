@@ -479,7 +479,7 @@ YOUR TASK:
 "Explain Like I'm 5" (ELI5) the artifact above:
  - Be engaging and easy to follow
  - Capture the main ideas without oversimplifying
- - Do NOT mention or reference the artifact above
+ - Do NOT mention or reference the artifact above, your "ELI5" answer should stand by itself
 
 IMPORTANT: Your explanation must be {token_constraint}.
 
