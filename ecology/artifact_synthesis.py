@@ -475,7 +475,7 @@ Respond with JSON:
 --- END OF ARTIFACT ---
 
 YOUR TASK:
-Please "Explain Like I'm 5" (ELI5) the artifact above
+"Explain Like I'm 5" (ELI5) the artifact above, the explanation should capture main ideas without oversimplifying.
 
 IMPORTANT: Your explanation must be {token_constraint}.
 
