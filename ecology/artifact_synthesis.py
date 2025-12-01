@@ -234,10 +234,10 @@ Respond with JSON:
 
 YOUR TASK:
 Create a comprehensive merged artifact that:
+    - Combines the round artifacts into a single cohesive whole
     - Integrates most interesting insights across all round artifacts
     - Discovers emergent patterns not visible in individual artifacts
-    - Improves upon the weaknesses and flaws of the round artifacts
-    - Further develops the core ideas and strengths of the round artifacts
+    - Further develops the core strengths and improves upon the weaknesses of the round artifacts
     - Is easy to follow and organized in a logical, coherent style
 
 EXAMPLE OUTPUT:
