@@ -459,7 +459,7 @@ Respond with JSON:
 
         # Determine target token count
         if self.synthesis_eli5_tokens is not None:
-            token_constraint = f"IMPORTANT: Your explanation must be STRICTLY UNDER {self.synthesis_eli5_tokens} tokens long"
+            token_constraint = f"\nIMPORTANT: Your explanation must be STRICTLY UNDER {self.synthesis_eli5_tokens} tokens long\n"
         else:
             token_constraint = ""
         # # Rough estimate: 1 token ≈ 4 characters
@@ -482,9 +482,7 @@ YOUR TASK:
  - Your target audience is a non-expert but college educated reader
  - Capture the main ideas without oversimplifying
  - Clarify any confusing or convoluted parts of the artifact
-
 {token_constraint}
-
 Respond with valid JSON only:
 {{
     "eli5": "<your ELI5 explanation>"
