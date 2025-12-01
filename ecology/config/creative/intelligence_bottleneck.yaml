@@ -14,7 +14,7 @@ Agent:
 CaesarAgent:
   # starting_url: "https://arcprize.org/arc-agi"
   # allowed_domains: ["*"]
-  starting_query: "Come up with a novel yet efficient and effective solver for ARC-AGI-1 benchmark that makes use of LLMs like GPT-5."
+  starting_query: "What is the current largest bottleneck that is preventing us from achieving AGI and how to overcome it?"
   additional_starting_queries: 5
   max_web_searches: 30
   max_iterations: 1000
