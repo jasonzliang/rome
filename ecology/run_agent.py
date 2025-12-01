@@ -66,6 +66,9 @@ Examples:
 
 def print_config_summary(agent, logger):
     """Print configuration summary before starting"""
+    memory = agent.memory
+    synth = agent.synthesizer
+
     summary = {
         "Agent Configuration": {
             "Name": agent.name,
@@ -75,14 +78,25 @@ def print_config_summary(agent, logger):
         "Caesar Settings": {
             "Starting URL": agent.starting_url,
             "Starting Query": agent.starting_query,
+            "Additional Queries": agent.additional_starting_queries,
             "Allowed Domains": ', '.join(agent.allowed_domains) if not agent.allow_all_domains else "* (ALL DOMAINS)",
+            "Max Web Searches": agent.max_web_searches,
             "Max Depth": agent.max_depth,
-            "Save Interval": agent.save_graph_interval,
-            "Draw Graph": agent.draw_graph,
-            "Exploration LLM Config": agent.exploration_llm_config,
+            "Role Customized": agent.adapt_role or bool(agent.overwrite_role_file),
             "Checkpoint Interval": agent.checkpoint_interval,
+            "Exploration LLM": f"{agent.exploration_llm_config['model']} (temp={agent.exploration_llm_config['temperature']})",
         },
-        "OpenAI Settings": {
+        "Memory": {
+            "Enabled": memory.enabled,
+            "Type": "Vector & Graph DB" if memory.use_graph else "Vector DB",
+        },
+        "Synthesis": {
+            "Mode": "Iterative" if synth.iterative_synthesis else "Classic",
+            "Rounds": synth.synthesis_rounds,
+            "Iterations/Round": synth.synthesis_iterations,
+            "Max Tokens": synth.synthesis_max_tokens,
+        },
+        "OpenAI": {
             "Model": agent.openai_handler.model,
             "Cost Limit": f"${agent.openai_handler.cost_limit:.2f}" if agent.openai_handler.cost_limit else "None",
         }
