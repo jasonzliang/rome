@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple
 from rome.config import set_attributes_from_config
 from rome.logger import get_logger
 from .caesar_config import (CAESAR_CONFIG, MAX_SYNTHESIS_QUERY_SOURCES,
-                            MAX_SYNTHESIS_QA_CONTEXT, NUM_SYNTHESIS_RETRIES)
+    MAX_SYNTHESIS_QA_CONTEXT, NUM_SYNTHESIS_RETRIES, SYNTHESIS_SAVE_JSON)
 
 class ArtifactSynthesizer:
     """Handles the synthesis of insights into final artifacts"""
@@ -417,8 +417,7 @@ Respond with JSON:
     def _save_synthesis(self, result: Dict,
             base_dir: str = None,
             suffix: str = "synthesis",
-            timestamp: str = None,
-            save_json: bool = False) -> None:
+            timestamp: str = None) -> None:
         """Save synthesis with sources in JSON and text formats"""
         if not base_dir: base_dir = self.agent.get_repo()
         if not timestamp: timestamp = datetime.now().strftime("%m%d%H%M")
@@ -426,7 +425,7 @@ Respond with JSON:
         base_path = os.path.join(base_dir, f"{self.agent.get_id()}.{suffix}.{timestamp}")
 
         try:
-            if save_json:
+            if SYNTHESIS_SAVE_JSON:
                 with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
                     json.dump(result, f, indent=4, ensure_ascii=False)
 
