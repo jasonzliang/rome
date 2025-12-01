@@ -458,7 +458,7 @@ Respond with JSON:
             return None
 
         # Determine target token count
-        if self.synthesis_eli5_tokens is not None and self.synthesis_eli5_tokens > 0:
+        if self.synthesis_eli5_tokens is not None:
             token_constraint = f"IMPORTANT: Your explanation must be STRICTLY UNDER {self.synthesis_eli5_tokens} tokens long"
         else:
             token_constraint = ""
