@@ -14,7 +14,7 @@ Agent:
 CaesarAgent:
   # starting_url: "https://arcprize.org/arc-agi"
   # allowed_domains: ["*"]
-  starting_query: "Apply the mathematical structure of calculus (not the concepts, but the formal relationships) to cooking. What would a 'derivative' of a recipe mean? An 'integral'? Show the parallel structure."
+  starting_query: "Using transformer architecture as a starting point, come up with a novel and better architecture that improves upon transformers"
   additional_starting_queries: 5
   max_web_searches: 30
   max_iterations: 1000
@@ -38,10 +38,10 @@ ArtifactSynthesizer:
 # ============================================================================
 OpenAIHandler:
   cost_limit: 300.0
-  model: gpt-5
+  model: gpt-5.1
   reasoning_effort: medium
   temperature: 0.1
-  timeout: 1000
+  timeout: 10000
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
