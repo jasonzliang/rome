@@ -232,20 +232,13 @@ Respond with JSON:
 {artifacts_text}
 === END OF RESEARCH ARTIFACTS ===
 
-YOUR TASK:
+### YOUR TASK ###
 Create a comprehensive merged artifact that:
     - Combines the round artifacts into a single cohesive whole
     - Integrates most interesting insights across all round artifacts
     - Discovers emergent patterns not visible in individual artifacts
     - Further develops the core strengths and improves upon the weaknesses of the round artifacts
     - Is easy to follow and organized in a logical, coherent style
-
-EXAMPLE OUTPUT:
-{{
-    "abstract": "A 100-150 token summary of the artifact's core discovery and its significance",
-    "artifact": "Full merged text ({self.synthesis_max_tokens} tokens) with citations [1,2]...",
-    "sources": {{"https://example.com": 1, "https://another.com": 2}}
-}}
 
 ARTIFACT CITATION GUIDELINES:
     - Each round has its own [n] citations (Round 1's [1] and Round 2's [1] are DIFFERENT URLs)
@@ -258,12 +251,19 @@ ARTIFACT STYLE GUIDELINES:
     - Use your role as a guide on how to respond{query_role}
 
 RESPONSE INSTRUCTIONS:
+    - Your response must be valid JSON starting with {{ and ending with }}
     - Output ONLY valid JSON (no markdown, no code blocks, no explanations)
-    - All 3 fields required: abstract, artifact, sources
+    - Following 3 fields required: abstract, artifact, sources
     - Do NOT mention "Round 1", "Round 2", etc, in text
     - Target length: {self.synthesis_max_tokens} tokens for artifact
 
-Your response must be valid JSON starting with {{ and ending with }}:"""
+EXAMPLE OUTPUT:
+{{
+    "abstract": "A 100-150 token summary of the artifact's core discovery and its significance",
+    "artifact": "Full merged text ({self.synthesis_max_tokens} tokens) with citations [1,2]...",
+    "sources": {{"https://example.com": 1, "https://another.com": 2}}
+}}
+"""
 
         for attempt in range(1, NUM_SYNTHESIS_RETRIES + 1):
             try:
