@@ -255,7 +255,7 @@ RESPONSE INSTRUCTIONS:
     - Output ONLY valid JSON (no markdown, no code blocks, no explanations)
     - Following 3 fields required: abstract, artifact, sources
     - Do NOT mention "Round 1", "Round 2", etc, in text
-    - Target length: {self.synthesis_max_tokens} tokens for artifact
+    - Merged artifact length: {self.synthesis_max_tokens} tokens
 
 EXAMPLE OUTPUT:
 {{
