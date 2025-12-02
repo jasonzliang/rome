@@ -484,9 +484,9 @@ Respond with JSON:
 #     - Avoid jargon and technical terms
 #     - Use concrete examples and analogies
 #     - Be engaging and easy to follow
-        prompt = f"""=== ARTIFACT ===
+        prompt = f"""--- ARTIFACT ---
 {artifact_text}
-=== END OF ARTIFACT ===
+--- END OF ARTIFACT ---
 
 YOUR TASK:
 "Explain Like I'm 5" (ELI5) the artifact above:
