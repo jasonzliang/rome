@@ -239,20 +239,20 @@ Respond with JSON:
 {artifacts_text}
 === END OF RESEARCH ARTIFACTS ===
 
-### YOUR TASK ###
+YOUR TASK:
 Create a comprehensive merged artifact that:
     - Combines the round artifacts into a single cohesive whole
     - Integrates most interesting insights across all round artifacts
     - Discovers emergent patterns not visible in individual artifacts
     - Further develops the core strengths and improves upon the weaknesses of the round artifacts
 
-ARTIFACT CITATION GUIDELINES:
+MERGED ARTIFACT CITATIONS:
     - Each round has its own [n] citations (Round 1's [1] and Round 2's [1] are DIFFERENT URLs)
     - In your merged artifact, create NEW sequential numbering: [1], [2], [3]...
     - Map each cited URL to its new number in the "sources" field
     - Use citations to support relevant claims and statements, but do NOT create a "Sources" or "References" section in artifact
 
-ARTIFACT STYLE GUIDELINES:
+MERGED ARTIFACT TEXT:
     - IMPORTANT: Avoid excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
     - Use your role as a guide on how to respond{query_role}
 
