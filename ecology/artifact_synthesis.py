@@ -212,10 +212,10 @@ Respond with JSON:
                 for url, idx in sorted(sources.items(), key=lambda x: x[1]))
 
             artifacts_context.append(
-                f"=== ROUND {i} ===\n\n"
+                f"--- ROUND {i} ---\n\n"
                 f"ARTIFACT:\n{r['artifact']}\n\n"
                 f"SOURCES (for citations in Round {i}):\n{source_list}\n\n"
-                f"=== END OF ROUND {i} ==="
+                f"--- END OF ROUND {i} ---\n\n"
             )
 
         artifacts_text = "\n\n".join(artifacts_context)
