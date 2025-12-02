@@ -205,30 +205,30 @@ Respond with JSON:
         """Merge artifacts from all rounds into a single comprehensive artifact"""
 
         # Build context with per-round sources (optimized string building)
-        # artifacts_context = []
-        # for i, r in enumerate(all_rounds, 1):
-        #     sources = r.get('sources', {})
-        #     source_list = "\n".join(f"  [{idx}] = {url}"
-        #         for url, idx in sorted(sources.items(), key=lambda x: x[1]))
+        artifacts_context = []
+        for i, r in enumerate(all_rounds, 1):
+            sources = r.get('sources', {})
+            source_list = "\n".join(f"  [{idx}] = {url}"
+                for url, idx in sorted(sources.items(), key=lambda x: x[1]))
 
-        #     artifacts_context.append(
-        #         f"--- ROUND {i} ---\n\n"
-        #         f"ARTIFACT:\n{r['artifact']}\n\n"
-        #         f"SOURCES (for citations in Round {i}):\n{source_list}\n\n"
-        #         f"--- END OF ROUND {i} ---\n\n"
-        #     )
-        # artifacts_text = "\n\n".join(artifacts_context)
+            artifacts_context.append(
+                f"--- ROUND {i} ---\n\n"
+                f"ARTIFACT:\n{r['artifact']}\n\n"
+                f"SOURCES (for citations in Round {i}):\n{source_list}\n\n"
+                f"--- END OF ROUND {i} ---\n\n"
+            )
+        artifacts_text = "\n\n".join(artifacts_context)
 
         # Build context with per-round sources as prettified JSON
-        artifacts_text = json.dumps([
-            {
-                "Round": i,
-                "Artifact": r['artifact'],
-                "Sources": {idx: url for url, idx in sorted(
-                    r.get('sources', {}).items(), key=lambda x: x[1])}
-            }
-            for i, r in enumerate(all_rounds, 1)
-        ], indent=4, ensure_ascii=False)
+        # artifacts_text = json.dumps([
+        #     {
+        #         "Round": i,
+        #         "Artifact": r['artifact'],
+        #         "Sources": {idx: url for url, idx in sorted(
+        #             r.get('sources', {}).items(), key=lambda x: x[1])}
+        #     }
+        #     for i, r in enumerate(all_rounds, 1)
+        # ], indent=4, ensure_ascii=False)
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
