@@ -464,6 +464,9 @@ Respond with JSON:
         if not artifact_text:
             self.logger.error("[POST-PROCESS] No artifact text to process")
             return None
+        abstract_text = result.get("abstract", "")
+        if abstract_text:
+            artifact_text = f"Artifact Abstract:\n{abstract_text}\n\nArtifact Text:\n{artifact_text}"
 
         # Determine target token count
         if self.synthesis_eli5_tokens is not None:
@@ -477,9 +480,9 @@ Respond with JSON:
 #     - Avoid jargon and technical terms
 #     - Use concrete examples and analogies
 #     - Be engaging and easy to follow
-        prompt = f"""ARTIFACT:
+        prompt = f"""=== ARTIFACT ===
 {artifact_text}
---- END OF ARTIFACT ---
+=== END OF ARTIFACT ===
 
 YOUR TASK:
 "Explain Like I'm 5" (ELI5) the artifact above:
