@@ -205,27 +205,34 @@ Respond with JSON:
         """Merge artifacts from all rounds into a single comprehensive artifact"""
 
         # Build context with per-round sources (optimized string building)
-        artifacts_context = []
-        for i, r in enumerate(all_rounds, 1):
-            sources = r.get('sources', {})
-            source_list = "\n".join(f"  [{idx}] = {url}"
-                for url, idx in sorted(sources.items(), key=lambda x: x[1]))
+        # artifacts_context = []
+        # for i, r in enumerate(all_rounds, 1):
+        #     sources = r.get('sources', {})
+        #     source_list = "\n".join(f"  [{idx}] = {url}"
+        #         for url, idx in sorted(sources.items(), key=lambda x: x[1]))
 
-            artifacts_context.append(
-                f"--- ROUND {i} ---\n\n"
-                f"ARTIFACT:\n{r['artifact']}\n\n"
-                f"SOURCES (for citations in Round {i}):\n{source_list}\n\n"
-                f"--- END OF ROUND {i} ---\n\n"
-            )
+        #     artifacts_context.append(
+        #         f"--- ROUND {i} ---\n\n"
+        #         f"ARTIFACT:\n{r['artifact']}\n\n"
+        #         f"SOURCES (for citations in Round {i}):\n{source_list}\n\n"
+        #         f"--- END OF ROUND {i} ---\n\n"
+        #     )
+        # artifacts_text = "\n\n".join(artifacts_context)
 
-        artifacts_text = "\n\n".join(artifacts_context)
+        # Build context with per-round sources as prettified JSON
+        artifacts_text = json.dumps([
+            {
+                "Round": i,
+                "Artifact": r['artifact'],
+                "Sources": {idx: url for url, idx in sorted(
+                    r.get('sources', {}).items(), key=lambda x: x[1])}
+            }
+            for i, r in enumerate(all_rounds, 1)
+        ], indent=4, ensure_ascii=False)
+
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
 
-# Compared to the round artifacts, the merged artifact should have:
-#     - Most novel discoveries, connections, or applications
-#     - Most surprising new directions or perspectives
-#     - Most interesting tensions, contradictions, or open questions
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}.
 
 === RESEARCH ARTIFACTS ===
@@ -244,7 +251,7 @@ ARTIFACT CITATION GUIDELINES:
     - Each round has its own [n] citations (Round 1's [1] and Round 2's [1] are DIFFERENT URLs)
     - In your merged artifact, create NEW sequential numbering: [1], [2], [3]...
     - Map each cited URL to its new number in the "sources" field
-    - Use citations to support relevant claims and statements, but do NOT create a "SOURCES" or "References" section in artifact
+    - Use citations to support relevant claims and statements, but do NOT create a "Sources" or "References" section in artifact
 
 ARTIFACT STYLE GUIDELINES:
     - IMPORTANT: AVOID excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
@@ -471,7 +478,6 @@ Respond with JSON:
 #     - Avoid jargon and technical terms
 #     - Use concrete examples and analogies
 #     - Be engaging and easy to follow
-#     - Capture the main ideas without oversimplifying
         prompt = f"""ARTIFACT:
 {artifact_text}
 --- END OF ARTIFACT ---
