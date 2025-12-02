@@ -138,6 +138,6 @@ CAESAR_CONFIG = {
         # Maximum tokens per LLM response
         "max_completion_tokens": 50000,
         # API timeout in seconds
-        "timeout": 240,
+        "timeout": 300,
     }
 }
