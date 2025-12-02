@@ -474,7 +474,7 @@ Respond with JSON:
 
         # Determine target token count
         if self.synthesis_eli5_tokens is not None:
-            token_constraint = f"\nIMPORTANT: Your explanation must be STRICTLY {self.synthesis_eli5_tokens} tokens or less\n"
+            token_constraint = f"\nIMPORTANT: Your explanation must NOT exceed {self.synthesis_eli5_tokens} tokens\n"
         else:
             token_constraint = ""
             # token_constraint = f"\nIMPORTANT: Your explanation must be around the same length as the original artifact (~{len(artifact_text) // 4} tokens)\n"
