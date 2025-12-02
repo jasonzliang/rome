@@ -136,7 +136,7 @@ CAESAR_CONFIG = {
         # Base temperature for LLM (overridden by exploration_llm_config for ACT/THINK)
         "temperature": 0.1,
         # Maximum tokens per LLM response
-        "max_completion_tokens": 10000,
+        "max_completion_tokens": 50000,
         # API timeout in seconds
         "timeout": 240,
     }
