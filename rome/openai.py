@@ -376,13 +376,13 @@ class OpenAIHandler:
             kwargs["seed"] = self.seed
         if response_format:
             kwargs["response_format"] = response_format
-        if self.reasoning_effort and self._is_reasoning_model(kwargs['model']):
+        if self.reasoning_effort and "reasoning_effort" not in kwargs \
+            and self._is_reasoning_model(kwargs['model']):
             if self.model.startswith("o") and self.reasoning_effort == "minimal":
                 self.reasoning_effort = "low"
             kwargs["reasoning_effort"] = self.reasoning_effort
-        if not self._is_reasoning_model(kwargs['model']):
-            if 'reasoning_effort' in kwargs:
-                del kwargs['reasoning_effort']
+        if "reasoning_effort" in kwargs and not self._is_reasoning_model(kwargs['model']):
+            del kwargs["reasoning_effort"]
         if self._is_reasoning_model(kwargs["model"]):
             if "temperature" in kwargs:
                 del kwargs["temperature"]

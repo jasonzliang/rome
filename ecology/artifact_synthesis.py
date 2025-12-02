@@ -133,7 +133,9 @@ Respond with valid JSON only:
         result = None
         for i in range(NUM_SYNTHESIS_RETRIES):
             try:
-                response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
+                response = self.agent.chat_completion(prompt,
+                    override_config={"reasoning_effort": "high"},
+                    response_format={"type": "json_object"})
                 result = self.agent.parse_json_response(response)
                 if not result or "abstract" not in result or "artifact" not in result:
                     raise ValueError("Missing required keys in response")
@@ -273,7 +275,9 @@ EXAMPLE OUTPUT:
 
         for attempt in range(1, NUM_SYNTHESIS_RETRIES + 1):
             try:
-                response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
+                response = self.agent.chat_completion(prompt,
+                    override_config={"reasoning_effort": "high"},
+                    response_format={"type": "json_object"})
                 result = self.agent.parse_json_response(response)
 
                 if not result:
@@ -498,7 +502,9 @@ Respond with valid JSON only:
 
         for attempt in range(1, NUM_SYNTHESIS_RETRIES + 1):
             try:
-                response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
+                response = self.agent.chat_completion(prompt,
+                    override_config={"reasoning_effort": "high"},
+                    response_format={"type": "json_object"})
                 eli5_result = self.agent.parse_json_response(response)
                 if not eli5_result or "eli5" not in eli5_result:
                     raise ValueError("Missing 'eli5' key in response")
