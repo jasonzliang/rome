@@ -468,8 +468,7 @@ Respond with JSON:
             token_constraint = f"\nIMPORTANT: Your explanation must be STRICTLY UNDER {self.synthesis_eli5_tokens} tokens long\n"
         else:
             token_constraint = ""
-        # # Rough estimate: 1 token ≈ 4 characters
-        # token_constraint = f"around the same length as the original artifact (~{len(artifact_text) // 4} tokens)"
+            # token_constraint = f"IMPORTANT: Your explanation must be around the same length as the original artifact (~{len(artifact_text) // 4} tokens)"
         self.logger.info(f"[POST-PROCESS] Generating ELI5 explanation")
 
 # The explanation should:
