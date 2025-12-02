@@ -76,10 +76,9 @@ class ArtifactSynthesizer:
     def _synthesize_single_round(self, mode: str, current_query: Optional[str] = None,
                                  previous_artifact: Optional[Dict] = None) -> Dict[str, str]:
         """Execute a single synthesis round with optional query and previous artifact"""
+        self.logger.info("[SYNTHESIS] Generating synthesis artifact")
 
-        # Temporarily override starting_query for this round
         qa_pairs = self._generate_qa_pairs(mode, current_query)
-
         if not qa_pairs:
             self.logger.error("[SYNTHESIS] Unable to generate Q/A pairs")
             return None
@@ -203,6 +202,7 @@ Respond with JSON:
 
     def _merge_artifacts(self, all_rounds: List[Dict]) -> Optional[Dict[str, str]]:
         """Merge artifacts from all rounds into a single comprehensive artifact"""
+        self.logger.info(f"[MERGE] Generating merged artifact")
 
         # Build context with per-round sources (optimized string building)
         artifacts_context = []
@@ -458,6 +458,8 @@ Respond with JSON:
         timestamp: str = None) -> Optional[Dict]:
         """Generate ELI5 explanation of artifact and save it"""
         if not self.synthesis_eli5: return None
+        self.logger.info(f"[POST-PROCESS] Generating ELI5 explanation")
+
         artifact_text = result.get("artifact", "")
         if not artifact_text:
             self.logger.error("[POST-PROCESS] No artifact text to process")
@@ -469,7 +471,6 @@ Respond with JSON:
         else:
             token_constraint = ""
             # token_constraint = f"\nIMPORTANT: Your explanation must be around the same length as the original artifact (~{len(artifact_text) // 4} tokens)\n"
-        self.logger.info(f"[POST-PROCESS] Generating ELI5 explanation")
 
 # The explanation should:
 #     - Use simple, everyday language that a 5-year-old could understand
