@@ -245,7 +245,6 @@ Create a comprehensive merged artifact that:
     - Integrates most interesting insights across all round artifacts
     - Discovers emergent patterns not visible in individual artifacts
     - Further develops the core strengths and improves upon the weaknesses of the round artifacts
-    - Is easy to follow and organized in a logical, coherent style
 
 ARTIFACT CITATION GUIDELINES:
     - Each round has its own [n] citations (Round 1's [1] and Round 2's [1] are DIFFERENT URLs)
@@ -254,13 +253,13 @@ ARTIFACT CITATION GUIDELINES:
     - Use citations to support relevant claims and statements, but do NOT create a "Sources" or "References" section in artifact
 
 ARTIFACT STYLE GUIDELINES:
-    - IMPORTANT: AVOID excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
+    - IMPORTANT: Avoid excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
     - Use your role as a guide on how to respond{query_role}
 
 RESPONSE INSTRUCTIONS:
-    - Your response must be valid JSON starting with {{ and ending with }}
-    - Output ONLY valid JSON (no markdown, no code blocks, no explanations)
-    - Following 3 fields required: abstract, artifact, sources
+    - CRITICAL: Your response must be valid JSON starting with {{ and ending with }}
+    - CRITICAL: Output ONLY valid JSON (no markdown, no code blocks, no explanations)
+    - CRITICAL: Following 3 fields required: abstract, artifact, sources
     - Do NOT mention "Round 1", "Round 2", etc, in text
     - Merged artifact length: {self.synthesis_max_tokens} tokens
 
