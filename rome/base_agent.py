@@ -128,14 +128,14 @@ class BaseAgent:
         """Parse JSON response"""
         result = parse_json_response(response)
         if result is None:
-            self.logger.error(f"Failed to parse JSON from response:\n{response}")
+            self.logger.error(f"Failed to parse JSON from response: {response}")
         return result
 
     def parse_python_response(self, response: str) -> str:
         """Parse Python code from response"""
         result = parse_python_response(response)
         if result is None:
-            self.logger.error(f"Failed to parse Python code from response:\n{response}")
+            self.logger.error(f"Failed to parse Python code from response: {response}")
         return result
 
     def shutdown(self) -> None:
