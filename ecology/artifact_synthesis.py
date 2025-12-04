@@ -119,7 +119,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
         c. Surprising new directions or perspectives
         d. Interesting tensions, contradictions, or open questions
     - Cite from "SOURCES" using [n] notation to support relevant claims/statements (e.g., "This pattern emerged... [1,3]"), but do NOT create a "SOURCES" or "References" section in artifact
-    - The number of citations after each claim/statement should not exceed 5
+    - The number of citations after each claim/statement should not exceed {MAX_SYNTHESIS_QUERY_SOURCES}
     {'- Build upon the previous artifact by analyzing it for weaknesses in organization, arguments, or content, and then use key insights to deepen, improve, and extend the previous artifact' if previous_artifact else ''}
 
 {'IMPORTANT: do NOT mention or reference the previous artifact, the new artifact should make sense by itself as a standalone text' if previous_artifact else ''}
@@ -254,7 +254,7 @@ MERGED ARTIFACT CITATIONS:
     - In your merged artifact, create NEW sequential numbering: [1], [2], [3]...
     - Map each cited URL to its new number in the "sources" field
     - Use citations to support relevant claims and statements, but do NOT create a "Sources" or "References" section in artifact
-    - The number of citations after each claim/statement should not exceed 5
+    - The number of citations after each claim/statement should not exceed {MAX_SYNTHESIS_QUERY_SOURCES}
 
 MERGED ARTIFACT TEXT:
     - IMPORTANT: Avoid excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
