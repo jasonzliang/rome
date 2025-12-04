@@ -84,7 +84,7 @@ class ArtifactSynthesizer:
             return None
         qa_list, source_list, source_map = self._build_answers_with_citations(qa_pairs)
 
-        query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ":"
+        query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
         token_context = f" ({self.synthesis_max_tokens} tokens)" if self.synthesis_max_tokens else ""
 
@@ -239,7 +239,7 @@ Respond with JSON:
         token_context1 = f"\n    - Merged artifact length: {self.synthesis_max_tokens} tokens" if self.synthesis_max_tokens else ""
         token_context2 = f" ({self.synthesis_max_tokens} tokens)" if self.synthesis_max_tokens else ""
 
-        prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}.
+        prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}
 
 === RESEARCH ARTIFACTS ===
 {artifacts_text}
