@@ -114,7 +114,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
     - Summary of the artifact's core discovery and its significance
 
 2. **Artifact Main Text**{token_context}:
-    - Use key insights to generate an original and detailed response, for example:
+    - Carefully analyze the key insights to generate an original, detailed response, for example:
         a. Emergent patterns not visible in individual insights
         b. Novel discoveries, connections, or applications
         c. Surprising new directions or perspectives
