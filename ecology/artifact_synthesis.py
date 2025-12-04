@@ -84,8 +84,8 @@ class ArtifactSynthesizer:
             return None
         qa_list, source_list, source_map = self._build_answers_with_citations(qa_pairs)
 
-        query_context = f" that gives a creative yet detailed answer to the query: {self.agent.starting_query}" if self.agent.starting_query else ":"
-        query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
+        query_context = f" that creatively answers the following query: {self.agent.starting_query}" if self.agent.starting_query else ":"
+        query_role = f" to the query in a creative manner!" if self.agent.starting_query else "!"
         token_context = f" ({self.synthesis_max_tokens} tokens)" if self.synthesis_max_tokens else ""
 
         # Build context from previous artifact if available
@@ -108,14 +108,14 @@ SOURCES:
 --- END OF SOURCES ---
 {previous_context}
 YOUR TASK:
-Drawing heavily upon the patterns and details that emerged from the key insights{', and building upon the previous artifact,' if previous_artifact else ''} create a novel, exciting, and thought provoking artifact{query_context}
+Drawing heavily upon the patterns that emerged from the key insights{', and building upon the previous artifact,' if previous_artifact else ''} create a novel, exciting, and thought provoking artifact{query_context}
 
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the artifact's core discovery and its significance
 
 2. **Artifact Main Text**{token_context}:
-    - Some general suggests for artifact:
-        a. Emergent patterns not visible in individual sources
+    - Use key insights to generate an original and detailed response, for example:
+        a. Emergent patterns not visible in individual insights
         b. Novel discoveries, connections, or applications
         c. Surprising new directions or perspectives
         d. Interesting tensions, contradictions, or open questions
@@ -235,7 +235,7 @@ Respond with JSON:
         # ], indent=4, ensure_ascii=False)
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
-        query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
+        query_role = f" to the query in a creative manner!" if self.agent.starting_query else "!"
         token_context1 = f"\n    - Merged artifact length: {self.synthesis_max_tokens} tokens" if self.synthesis_max_tokens else ""
         token_context2 = f" ({self.synthesis_max_tokens} tokens)" if self.synthesis_max_tokens else ""
 
