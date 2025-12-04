@@ -84,8 +84,8 @@ class ArtifactSynthesizer:
             return None
         qa_list, source_list, source_map = self._build_answers_with_citations(qa_pairs)
 
-        query_context = f" that creatively answers the following query: {self.agent.starting_query}" if self.agent.starting_query else ":"
-        query_role = f" to the query in a creative manner!" if self.agent.starting_query else "!"
+        query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ":"
+        query_role = f" to the query creatively!" if self.agent.starting_query else "!"
         token_context = f" ({self.synthesis_max_tokens} tokens)" if self.synthesis_max_tokens else ""
 
         # Build context from previous artifact if available
@@ -125,7 +125,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
 
 {'IMPORTANT: do NOT mention or reference the previous artifact, the new artifact should make sense by itself as a standalone text' if previous_artifact else ''}
 IMPORTANT: AVOID excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
-IMPORTANT: Use your role as a guide on how to respond{query_role}
+IMPORTANT: Use your role as a guide on how to respond {query_role}
 
 Respond with valid JSON only:
 {{
@@ -235,7 +235,7 @@ Respond with JSON:
         # ], indent=4, ensure_ascii=False)
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
-        query_role = f" to the query in a creative manner!" if self.agent.starting_query else "!"
+        query_role = f" to the query creatively!" if self.agent.starting_query else "!"
         token_context1 = f"\n    - Merged artifact length: {self.synthesis_max_tokens} tokens" if self.synthesis_max_tokens else ""
         token_context2 = f" ({self.synthesis_max_tokens} tokens)" if self.synthesis_max_tokens else ""
 
