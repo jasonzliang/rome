@@ -86,6 +86,7 @@ class ArtifactSynthesizer:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ":"
         query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
+        token_context = f" ({self.synthesis_max_tokens} tokens)" if self.synthesis_max_tokens else ""
 
         # Build context from previous artifact if available
         previous_context = ""
@@ -112,7 +113,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the artifact's core discovery and its significance
 
-2. **Artifact Main Text** ({self.synthesis_max_tokens} tokens):
+2. **Artifact Main Text**{token_context}:
     - Some general suggests for artifact:
         a. Emergent patterns not visible in individual sources
         b. Novel discoveries, connections, or applications
@@ -235,6 +236,8 @@ Respond with JSON:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
+        token_context1 = f"\n    - Merged artifact length: {self.synthesis_max_tokens} tokens" if self.synthesis_max_tokens else ""
+        token_context2 = f" ({self.synthesis_max_tokens} tokens)" if self.synthesis_max_tokens else ""
 
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}.
 
@@ -263,13 +266,12 @@ MERGED ARTIFACT TEXT:
 RESPONSE INSTRUCTIONS:
     - CRITICAL: Your response must ONLY be valid JSON starting with {{ and ending with }}
     - CRITICAL: Following 3 fields required: abstract, artifact, sources
-    - Do NOT mention "Round 1", "Round 2", etc, in text
-    - Merged artifact length: {self.synthesis_max_tokens} tokens
+    - Do NOT mention "Round 1", "Round 2", etc, in text{token_context1}
 
 EXAMPLE OUTPUT:
 {{
     "abstract": "A 100-150 token summary of the artifact's core discovery and its significance",
-    "artifact": "Full merged text ({self.synthesis_max_tokens} tokens) with citations [1,2]...",
+    "artifact": "Full merged text{token_context2} with citations [1,2]...",
     "sources": {{"https://example.com": 1, "https://another.com": 2}}
 }}
 """
@@ -474,11 +476,8 @@ Respond with JSON:
             artifact_text = f"Artifact Abstract:\n{abstract_text}\n\nArtifact Text:\n{artifact_text}"
 
         # Determine target token count
-        if self.synthesis_eli5_tokens is not None:
-            token_constraint = f"\nIMPORTANT: Your explanation MUST be {self.synthesis_eli5_tokens} tokens or less\n"
-        else:
-            token_constraint = ""
-            # token_constraint = f"\nIMPORTANT: Your explanation must be around the same length as the original artifact (~{len(artifact_text) // 4} tokens)\n"
+        token_context = f"\nIMPORTANT: Your explanation MUST be {self.synthesis_eli5_tokens} tokens or less\n" if self.synthesis_eli5_tokens else ""
+        # token_constraint = f"\nIMPORTANT: Your explanation must be around the same length as the original artifact (~{len(artifact_text) // 4} tokens)\n"
 
 # The explanation should:
 #     - Use simple, everyday language that a 5-year-old could understand
@@ -495,7 +494,7 @@ YOUR TASK:
  - Your target audience is a non-expert but college educated reader
  - Capture the main ideas without oversimplifying
  - Clarify any confusing or convoluted parts of the artifact
-{token_constraint}
+{token_context}
 Respond with valid JSON only:
 {{
     "eli5": "<your ELI5 explanation>"
