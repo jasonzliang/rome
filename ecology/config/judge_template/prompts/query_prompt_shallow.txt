@@ -10,7 +10,7 @@ Invent a completely original business idea that doesn't exist yet.
 
 ### YOUR TASK
 
-Create a novel, exciting, and thought-provoking response that creatively answers each of the queries above. Focus on the following:
+Create a novel, exciting, and thought-provoking response that gives a creative answer to each query above. Focus on the following:
 - Emergent patterns not visible in individual sources
 - Novel discoveries, connections, or applications
 - Surprising new directions or perspectives
@@ -18,4 +18,3 @@ Create a novel, exciting, and thought-provoking response that creatively answers
 
 IMPORTANT: Avoid excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
 IMPORTANT: Do not ask the user any additional questions, but search online for more information to help answer the queries
-IMPORTANT: Each answer cannot exceed 5000 tokens

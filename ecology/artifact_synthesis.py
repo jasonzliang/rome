@@ -84,7 +84,7 @@ class ArtifactSynthesizer:
             return None
         qa_list, source_list, source_map = self._build_answers_with_citations(qa_pairs)
 
-        query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ":"
+        query_context = f" that gives a creative yet detailed answer to the query: {self.agent.starting_query}" if self.agent.starting_query else ":"
         query_role = f" and on how to creatively answer the query!" if self.agent.starting_query else "!"
         token_context = f" ({self.synthesis_max_tokens} tokens)" if self.synthesis_max_tokens else ""
 
@@ -108,7 +108,7 @@ SOURCES:
 --- END OF SOURCES ---
 {previous_context}
 YOUR TASK:
-Drawing heavily upon the patterns that emerged from the key insights{', and building upon the previous artifact,' if previous_artifact else ''} create a novel, exciting, and thought provoking artifact{query_context}
+Drawing heavily upon the patterns and details that emerged from the key insights{', and building upon the previous artifact,' if previous_artifact else ''} create a novel, exciting, and thought provoking artifact{query_context}
 
 1. **Artifact Abstract** (100-150 tokens):
     - Summary of the artifact's core discovery and its significance
