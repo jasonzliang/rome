@@ -210,13 +210,13 @@ Respond with JSON:
         artifacts_context = []
         for i, r in enumerate(all_rounds, 1):
             sources = r.get('sources', {})
-            source_list = "\n".join(f"  [{idx}] = {url}"
+            source_list = "\n".join(f"  [{idx}] {url}"
                 for url, idx in sorted(sources.items(), key=lambda x: x[1]))
 
             artifacts_context.append(
                 f"--- ROUND {i} ---\n\n"
                 f"ARTIFACT:\n{r['artifact']}\n\n"
-                f"SOURCES (for citations in Round {i}):\n{source_list}\n\n"
+                f"SOURCES (for citations in round {i} artifact):\n{source_list}\n\n"
                 f"--- END OF ROUND {i} ---\n\n"
             )
         artifacts_text = "\n\n".join(artifacts_context)
