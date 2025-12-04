@@ -261,7 +261,7 @@ MERGED ARTIFACT TEXT:
     - Use your role as a guide on how to respond{query_role}
 
 RESPONSE INSTRUCTIONS:
-    - CRITICAL: Output ONLY valid JSON starting with {{ and ending with }} (no markdown, no code blocks, no explanations)
+    - CRITICAL: Your response must ONLY be valid JSON starting with {{ and ending with }}
     - CRITICAL: Following 3 fields required: abstract, artifact, sources
     - Do NOT mention "Round 1", "Round 2", etc, in text
     - Merged artifact length: {self.synthesis_max_tokens} tokens
