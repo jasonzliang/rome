@@ -178,7 +178,9 @@ class ChromaClientManager:
             self.llm = OpenAI(
                 model=self.llm_model,
                 temperature=self.llm_temperature,
-                max_tokens=DEFAULT_CONFIG['OpenAIHandler']['max_completion_tokens']
+                max_tokens=DEFAULT_CONFIG['OpenAIHandler']['max_completion_tokens'],
+                additional_kwargs={"reasoning_effort": self.llm_reasoning_effort} \
+                    if self.llm_reasoning_effort else None
             )
             self.embed_model = OpenAIEmbedding(model=self.embedding_model)
 

@@ -247,6 +247,7 @@ DEFAULT_CONFIG = {
         "embedding_model": "text-embedding-3-small",  # OpenAI embedding model
         "llm_model": "gpt-4o",  # OpenAI llm model (for query/reranking)
         "llm_temperature": 0.1,  # OpenAI llm model (for query/reranking)
+        "llm_reasoning_effort": None,  # Reasoning effort for reasoning models (None to disable)
 
         "chunk_size": 400,  # Chunk size for text splitting
         "chunk_overlap": 80,  # Overlap between chunks
