@@ -139,7 +139,7 @@ CAESAR_CONFIG = {
         "max_completion_tokens": 50000,
         # API timeout in seconds
         "timeout": 300,
-    }
+    },
 
     # Default config for vector store knowledge base
     "ChromaClientManager": {
