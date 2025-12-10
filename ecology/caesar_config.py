@@ -147,5 +147,7 @@ CAESAR_CONFIG = {
         "llm_model": "gpt-4o",
         # Reasoning effort for GPT-5/O models
         "llm_reasoning_effort": None,
+        # Response length for queries
+        "response_max_tokens": None,
     }
 }

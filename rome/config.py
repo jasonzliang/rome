@@ -252,6 +252,7 @@ DEFAULT_CONFIG = {
         "chunk_size": 400,  # Chunk size for text splitting
         "chunk_overlap": 80,  # Overlap between chunks
         "top_k": 10,  # Number of docs to retrieve (without reranking)
+        "response_max_tokens": None,  # Maximum number of tokens for query response
 
         # Reranking configuration
         # "rerank_batch_size": 10,  # Batch size for reranking choices
