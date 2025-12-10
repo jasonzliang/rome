@@ -146,6 +146,6 @@ CAESAR_CONFIG = {
         # Model name for LLM
         "llm_model": "gpt-4o",
         # Reasoning effort for GPT-5/O models
-        "llm_reasoning_effort": "medium",
+        "llm_reasoning_effort": None,
     }
 }
