@@ -148,6 +148,6 @@ CAESAR_CONFIG = {
         # Reasoning effort for GPT-5/O models
         "llm_reasoning_effort": "medium",
         # Maximum number of tokens for query response
-        "response_max_tokens": 600,
+        "response_max_tokens": 500,
     }
 }
