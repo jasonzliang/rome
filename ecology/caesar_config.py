@@ -103,7 +103,7 @@ CAESAR_CONFIG = {
         "synthesis_merge_artifacts": False,
         # Whether to generate ELI5 explanation for artifact text
         "synthesis_eli5": False,
-        # Maximum tokens for ELI5 explanation (None = same length as artifact, or specify token limit)
+        # Maximum tokens for ELI5 explanation (None = unspecified token limit)
         "synthesis_eli5_tokens": None,
     },
 
