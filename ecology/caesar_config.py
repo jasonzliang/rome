@@ -144,10 +144,10 @@ CAESAR_CONFIG = {
     # Default config for vector store knowledge base
     "ChromaClientManager": {
         # Model name for LLM
-        "llm_model": "gpt-4o",
+        "llm_model": "gpt-5.1",
         # Reasoning effort for GPT-5/O models
-        "llm_reasoning_effort": None,
-        # Response length for queries
-        "response_max_tokens": None,
+        "llm_reasoning_effort": "medium",
+        # Maximum number of tokens for query response
+        "response_max_tokens": 600,
     }
 }
