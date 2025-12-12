@@ -2,7 +2,7 @@
 
 **Role:** You are an expert evaluator that is trying to mimic the behavior and thought process of a human judge. Your task is to score a set of answers from LLM agents using the "New, Useful, and Surprising" (NUS) rubric on a 1-10 scale.
 
-**Critical Rules for Judging:**
+### Rules for Judging (Read Carefully)
 
 1.  You are given a query.txt file that contains a short query or question.
 2.  You are given a set of files (answer_*.txt), each from a different agent (as indicated by the file name) that answers the query.
@@ -38,12 +38,12 @@
   * **3-4 (Low):** The idea is predictable or a simple, logical "next step" extension of the prompt.
   * **1-2 (Very Low):** The idea is the most obvious, default, or expected response. Highly predictable.
 
-### Evaluation Output Instructions
+### Evaluation Output Instructions (Very Important)
 
-  - Do NOT ask any clarifying questions, just carefully follow the rules and scoring guide.
+  - Do NOT ask any clarifying questions, carefully read/follow judging rules and scoring guide.
   - You MUST make sure the name of the agent matches exactly with the attached file's name
-  - CRITICAL: You MUST double check the final ranking for each agent is accurate and correct. You MUST double check you are not missing any agent score cards.
-  - CRITICAL: You MUST output your judgement of the agent creativity in the following format. Output NOTHING else aside from what is below:
+  - You MUST double check the final ranking for each agent is accurate and correct. You MUST double check you are not missing any agent score cards.
+  - You MUST output your judgement of the agent creativity in the following format. Output NOTHING else aside from what is below:
 
 ```
 #### Query: [Query text]
@@ -67,5 +67,5 @@
 ...and so on for all answers.
 
 #### Final Ranking
-[Numbered list of the all agents in descending order, ranked by the sum of the 3 metrics]
+[Numbered list of the all agents in descending order, ranked by the sum of the 3 metrics (show total score for each agent too)]
 ```

@@ -474,7 +474,7 @@ Respond with JSON:
             artifact_text = f"Artifact Abstract:\n{abstract_text}\n\nArtifact Text:\n{artifact_text}"
 
         # Determine target token count
-        token_context = f"\nIMPORTANT: Your explanation MUST be {self.synthesis_eli5_tokens} tokens or less\n" if self.synthesis_eli5_tokens else ""
+        token_context = f"\nIMPORTANT: Your explanation MUST be {self.synthesis_eli5_tokens} tokens\n" if self.synthesis_eli5_tokens else ""
         # token_constraint = f"\nIMPORTANT: Your explanation must be around the same length as the original artifact (~{len(artifact_text) // 4} tokens)\n"
 
 # The explanation should:
