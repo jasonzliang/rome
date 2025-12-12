@@ -98,7 +98,7 @@ CAESAR_CONFIG = {
         # When synthesizing artifact, use previous artifact if it exists
         "synthesis_prev_artifact": True,
         # Maximum of tokens for generating final synthesis artifact
-        "synthesis_max_tokens": "5000 or less",
+        "synthesis_max_tokens": "roughly 5000 or less",
         # Whether to merge all round artifacts into final artifact
         "synthesis_merge_artifacts": False,
         # Whether to generate ELI5 explanation for artifact text
