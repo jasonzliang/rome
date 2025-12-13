@@ -148,13 +148,14 @@ Respond with valid JSON only:
 
         result["sources"] = dict(sorted(source_map.items(), key=lambda x: x[1]))
         result["metadata"] = {
-            "pages_visited": len(self.agent.visited_urls),
             "insights_collected": self.kb_manager.size(),
+            "pages_visited": len(self.agent.visited_urls),
             "sources_cited": len(source_map),
-            "synthesis_mode": mode,
-            "synthesis_queries": len(qa_pairs),
             "starting_url": self.agent.starting_url,
             "starting_query": self.agent.starting_query,
+            "synthesis_mode": mode,
+            "synthesis_queries": len(qa_pairs),
+            # "synthesis_rounds": self.synthesis_rounds,
         }
 
         return result
@@ -303,17 +304,7 @@ EXAMPLE OUTPUT:
                         result["sources"] = {}
 
                 # Success - add metadata and return
-                result["metadata"] = {
-                    "insights_collected": self.kb_manager.size(),
-                    "pages_visited": len(self.agent.visited_urls),
-                    "sources_cited": len(result["sources"]),
-                    "starting_url": self.agent.starting_url,
-                    "starting_query": self.agent.starting_query,
-                    "synthesis_mode": all_rounds[-1]["metadata"]["synthesis_mode"],
-                    "synthesis_queries": [r["metadata"]["synthesis_queries"] for r in all_rounds],
-                    "synthesis_max_tokens": self.synthesis_max_tokens,
-                    "synthesis_eli5_tokens": self.synthesis_eli5_tokens,
-                }
+                result["metadata"] = all_rounds[-1].get("metadata", {})
                 return result
 
             except Exception as e:
@@ -435,11 +426,12 @@ Respond with JSON:
         if not timestamp: timestamp = datetime.now().strftime("%m%d%H%M")
         os.makedirs(base_dir, exist_ok=True)
         base_path = os.path.join(base_dir, f"{self.agent.get_id()}.{suffix}.{timestamp}")
+        meta_path = os.path.join(base_dir, "metadata.txt")
 
         try:
             if SYNTHESIS_SAVE_JSON:
                 with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
-                    json.dump(result, f, indent=4, ensure_ascii=False)
+                    json.dump(result, f, ensure_ascii=False, indent=4, sort_keys=True)
 
             with open(f"{base_path}.txt", 'w', encoding='utf-8') as f:
                 if abstract := result.get('abstract'):
@@ -453,8 +445,10 @@ Respond with JSON:
                         f.write(f"[{idx}] {url}\n")
                     f.write("\n")
 
+            with open(meta_path, 'a', encoding='utf-8') as f:
                 if metadata := result.get('metadata'):
-                    f.write(f"METADATA:\n{json.dumps(metadata, indent=4)}")
+                    f.write(f"{base_path}\n{json.dumps(metadata, indent=4, sort_keys=True)}\n")
+
         except Exception as e:
             self.logger.error(f"Failed to save synthesis: {e}")
 
@@ -511,7 +505,7 @@ Respond with valid JSON only:
                 # Build result dict without abstract or sources for ELI5
                 processed_result = {
                     "artifact": eli5_result["eli5"],
-                    "metadata": {**result.get("metadata", {}), "eli5": True}
+                    "metadata": result.get("metadata", {}),
                 }
                 self._save_synthesis(processed_result,
                     base_dir=base_dir, suffix=suffix, timestamp=timestamp)
