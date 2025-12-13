@@ -23,7 +23,7 @@ META_CATEGORY_NEW_FILES = ['judge_summary.txt', 'judge_csv.txt']
 
 def setup_transfer_dict():
     full = {
-        'caesar_sources': '11_17_*/*12130327/*merged-3*',
+        'caesar_sources': '11_17_*/*12130155/*merged-3*',
         'other_sources': '12_4_answers/*/',
     }
 
