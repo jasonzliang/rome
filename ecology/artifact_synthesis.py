@@ -209,6 +209,8 @@ Respond with JSON:
     def _merge_artifacts(self, all_rounds: List[Dict]) -> Optional[Dict[str, str]]:
         """Merge artifacts from all rounds into a single comprehensive artifact"""
         self.logger.info(f"[MERGE] Generating merged artifact")
+        if len(all_rounds) == 0:
+            self.logger.error("[MERGE] No artifacts to merge"); return None
 
         # Build context with per-round sources (optimized string building)
         artifacts_context = []
