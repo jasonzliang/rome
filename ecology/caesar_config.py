@@ -120,7 +120,7 @@ CAESAR_CONFIG = {
         "synthesis_eli5": False,
         # Maximum tokens for ELI5 explanation (None = unspecified token limit)
         "synthesis_eli5_tokens": None,
-        # Maximum iterations to filter knowledge base documents for queries
+        # Maximum exploration iterations to filter knowledge base for queries
         "synthesis_iteration_filter": None,
     },
 
