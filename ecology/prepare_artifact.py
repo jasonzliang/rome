@@ -1,4 +1,4 @@
-"""Artifact Preparation - Copy Caesar artifacts to query results for judging and evaluation"""
+"""Artifact Preparation - Copy Caesar artifacts to query results directory for LLM judging"""
 import glob
 import os
 import random
