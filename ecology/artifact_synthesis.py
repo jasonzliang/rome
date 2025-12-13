@@ -441,7 +441,7 @@ Respond with JSON:
                 if abstract := result.get('abstract'):
                     f.write(f"ABSTRACT:\n{abstract}\n\n")
 
-                f.write(f"ARTIFACT:\n{result['artifact']}\n\n")
+                f.write(f"ARTIFACT:\n{result['artifact']}")
 
                 if sources := result.get('sources'):
                     f.write("SOURCES:\n")
@@ -451,7 +451,7 @@ Respond with JSON:
 
             if metadata := result.get('metadata'):
                 with open(meta_path, 'a', encoding='utf-8') as f:
-                    f.write(f"{base_path}\n{json.dumps(metadata, indent=4, sort_keys=True)}\n")
+                    f.write(f"{base_path}\n{json.dumps(metadata, indent=4, sort_keys=True)}\n\n")
 
         except Exception as e:
             self.logger.error(f"Failed to save synthesis: {e}")
