@@ -310,8 +310,9 @@ EXAMPLE OUTPUT:
                     "starting_url": self.agent.starting_url,
                     "starting_query": self.agent.starting_query,
                     "synthesis_mode": all_rounds[-1]["metadata"]["synthesis_mode"],
-                    "synthesis_queries": sum(r["metadata"]["synthesis_queries"] for r in all_rounds),
-                    "merged_artifacts": len(all_rounds),
+                    "synthesis_queries": [r["metadata"]["synthesis_queries"] for r in all_rounds],
+                    "synthesis_max_tokens": self.synthesis_max_tokens,
+                    "synthesis_eli5_tokens": self.synthesis_eli5_tokens,
                 }
                 return result
 
