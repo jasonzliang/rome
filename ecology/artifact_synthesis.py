@@ -10,6 +10,8 @@ from rome.logger import get_logger
 from .caesar_config import (CAESAR_CONFIG, MAX_SYNTHESIS_QUERY_SOURCES,
     MAX_SYNTHESIS_QA_CONTEXT, NUM_SYNTHESIS_RETRIES, SYNTHESIS_SAVE_JSON)
 
+from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
+
 class ArtifactSynthesizer:
     """Handles the synthesis of insights into final artifacts"""
 
@@ -22,15 +24,23 @@ class ArtifactSynthesizer:
         # We allow attributes to be set on 'self' from the config provided
         set_attributes_from_config(self, self.config, CAESAR_CONFIG['ArtifactSynthesizer'].keys())
 
-        # Shortcuts to agent resources
-        self.kb_manager = self.agent.kb_manager
+        # Shortcuts to KB resources
+        self.kb_manager = self.agent.kb_manager; self.filters = None
+
+        if self.synthesis_iteration_filter:
+            self.filters = MetadataFilters(
+                filters=[MetadataFilter(
+                    key="iteration",
+                    value=int(self.synthesis_iteration_filter),
+                    operator=FilterOperator.LT)]
+                )
 
     def synthesize_artifact(self, num_rounds: int = None) -> None:
         """Generate final synthesis with optional multi-round refinement"""
         if not num_rounds: num_rounds = self.synthesis_rounds
         num_rounds = max(num_rounds, 1)
 
-        mode = f"iterative (n={self.synthesis_iterations})" if self.iterative_synthesis else "classic"
+        mode = f"iterative (n={self.synthesis_iterations})" if not self.synthesis_classic_mode else "classic"
         self.logger.info(f"[SYNTHESIS] Using {mode} mode with {num_rounds} round(s)")
 
         if self.kb_manager.size() == 0:
@@ -333,8 +343,11 @@ EXAMPLE OUTPUT:
 
         for i in range(self.synthesis_iterations):
             answer, sources = self.kb_manager.query(
-                queries[-1], top_k=self.synthesis_top_k, top_n=self.synthesis_top_n,
-                return_sources=True)
+                queries[-1],
+                top_k=self.synthesis_top_k,
+                top_n=self.synthesis_top_n,
+                return_sources=True,
+                filters=self.filters)
             if not answer: break
 
             answers.append(answer)
@@ -355,8 +368,11 @@ EXAMPLE OUTPUT:
         for query in queries:
             try:
                 answer, sources = self.kb_manager.query(
-                    query, top_k=self.synthesis_top_k, top_n=self.synthesis_top_n,
-                    return_sources=True)
+                    query,
+                    top_k=self.synthesis_top_k,
+                    top_n=self.synthesis_top_n,
+                    return_sources=True,
+                    filters=self.filters)
                 if answer:
                     qa_pairs.append((query, answer, sources))
             except Exception as e:

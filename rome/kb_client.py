@@ -15,12 +15,13 @@ try:
     from chromadb.utils.embedding_functions import (
        SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
     from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
-    from llama_index.vector_stores.chroma import ChromaVectorStore
-    from llama_index.embeddings.openai import OpenAIEmbedding
-    from llama_index.llms.openai import OpenAI
     from llama_index.core.node_parser import SentenceSplitter
     from llama_index.core.postprocessor.llm_rerank import LLMRerank
     from llama_index.core.response_synthesizers import get_response_synthesizer
+    from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
+    from llama_index.embeddings.openai import OpenAIEmbedding
+    from llama_index.llms.openai import OpenAI
+    from llama_index.vector_stores.chroma import ChromaVectorStore
     # Needed for OpenAIEmbeddingFunction
     os.environ['CHROMA_OPENAI_API_KEY'] = os.environ['OPENAI_API_KEY']
 except ImportError as e:
@@ -269,7 +270,7 @@ class ChromaClientManager:
 
         return True
 
-    def query(self, question, top_k=None, top_n=None, return_sources=False):
+    def query(self, question, top_k=None, top_n=None, return_sources=False, filters=None):
         """Enhanced query with optional source URLs"""
         try:
             if self.size() == 0:
@@ -278,7 +279,7 @@ class ChromaClientManager:
             should_rerank = self.reranker is not None
             top_k = max([top_k or self.rerank_top_k, self.rerank_top_n, 1]) if should_rerank else max(top_k or self.top_k, 1)
 
-            nodes = self._retrieve_nodes(question, top_k)
+            nodes = self._retrieve_nodes(question, top_k, filters)
 
             if should_rerank:
                 top_n = max([top_n or self.rerank_top_n, self.rerank_top_n, 1])
@@ -286,7 +287,7 @@ class ChromaClientManager:
                     self.reranker = LLMRerank(top_n=top_n, llm=self.llm)
                 response, nodes = self._rerank_and_respond(question, nodes, top_n)
             else:
-                response = self._standard_query(question, top_k)
+                response = self._standard_query(question, top_k, filters)
 
             if self.log_db:
                 with open(os.path.join(self.agent.get_log_dir(),
@@ -309,11 +310,12 @@ class ChromaClientManager:
             self.logger.error(f"KB query timed out (OpenAI API): {e}")
             return ("", []) if return_sources else ""
 
-    def _retrieve_nodes(self, question: str, retrieval_k: int):
+    def _retrieve_nodes(self, question: str, retrieval_k: int, filters: MetadataFilters):
         """Retrieve nodes with instance-specific embed model"""
         retriever = self.index.as_retriever(
             similarity_top_k=retrieval_k,
-            embed_model=self.embed_model)
+            embed_model=self.embed_model,
+            filters=filters)
 
         self.logger.debug(f"Using retriever (n={retrieval_k}) for query")
         return retriever.retrieve(question)
@@ -336,7 +338,7 @@ class ChromaClientManager:
         self.logger.debug(f"Using reranker (n={top_n}) for query")
         return str(response), reranked_nodes
 
-    def _standard_query(self, question: str, top_k: int):
+    def _standard_query(self, question: str, top_k: int, filters: MetadataFilters):
         """Standard query with optional system prompt prepended"""
 
         # Simply prepend system prompt to the question
@@ -347,8 +349,8 @@ class ChromaClientManager:
             similarity_top_k=top_k,
             response_mode="compact",
             llm=self.llm,
-            embed_model=self.embed_model
-        )
+            embed_model=self.embed_model,
+            filters=filters)
         question = f"{question}\n\nIMPORTANT: Keep your response under {self.response_max_tokens} tokens!" if self.response_max_tokens else question
         return str(engine.query(question))
 

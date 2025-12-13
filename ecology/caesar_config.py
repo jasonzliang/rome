@@ -100,8 +100,8 @@ CAESAR_CONFIG = {
     },
 
     "ArtifactSynthesizer": {
-        # Set to False for classic mode (ask all queries at once)
-        "iterative_synthesis": True,
+        # Set to True for classic mode (ask all queries at once)
+        "synthesis_classic_mode": False,
         # Number of rounds of synthesizing artifact
         "synthesis_rounds": 1,
         # Number of Q/A iterations per round
@@ -120,6 +120,8 @@ CAESAR_CONFIG = {
         "synthesis_eli5": False,
         # Maximum tokens for ELI5 explanation (None = unspecified token limit)
         "synthesis_eli5_tokens": None,
+        # Maximum iterations to filter knowledge base documents for queries
+        "synthesis_iteration_filter": None,
     },
 
     "AgentMemory": {

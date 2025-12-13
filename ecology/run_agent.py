@@ -91,7 +91,7 @@ def print_config_summary(agent, logger):
             "Type": "Vector & Graph DB" if memory.use_graph else "Vector DB",
         },
         "Synthesis": {
-            "Mode": "Iterative" if synth.iterative_synthesis else "Classic",
+            "Mode": "Classic" if synth.synthesis_classic_mode else "Iterative",
             "Rounds": synth.synthesis_rounds,
             "Iterations/Round": synth.synthesis_iterations,
             "Max Tokens": synth.synthesis_max_tokens,
