@@ -153,6 +153,8 @@ Respond with valid JSON only:
             "sources_cited": len(source_map),
             "starting_url": self.agent.starting_url,
             "starting_query": self.agent.starting_query,
+            "synthesis_eli5_tokens": self.synthesis_eli5_tokens,
+            "synthesis_max_tokens": self.synthesis_max_tokens,
             "synthesis_mode": mode,
             "synthesis_queries": len(qa_pairs),
             # "synthesis_rounds": self.synthesis_rounds,
@@ -445,8 +447,8 @@ Respond with JSON:
                         f.write(f"[{idx}] {url}\n")
                     f.write("\n")
 
-            with open(meta_path, 'a', encoding='utf-8') as f:
-                if metadata := result.get('metadata'):
+            if metadata := result.get('metadata'):
+                with open(meta_path, 'a', encoding='utf-8') as f:
                     f.write(f"{base_path}\n{json.dumps(metadata, indent=4, sort_keys=True)}\n")
 
         except Exception as e:
