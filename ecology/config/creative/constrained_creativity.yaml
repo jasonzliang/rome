@@ -32,7 +32,7 @@ ArtifactSynthesizer:
   synthesis_rounds: 3
   synthesis_merge_artifacts: true
   synthesis_eli5: true
-  synthesis_eli5_tokens: 600 or less
+  # synthesis_eli5_tokens: 600 or less
   synthesis_max_tokens: None
 
 # ============================================================================
