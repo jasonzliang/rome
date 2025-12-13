@@ -10,18 +10,33 @@ MAX_TEXT_LENGTH = 100000
 REQUESTS_TIMEOUT = 10
 # Headers to use for requests when fetching html
 REQUESTS_HEADERS = {
-    # 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36',
-    # 'Sec-Ch-Ua': '"Google Chrome";v="143", "Chromium";v="143", "Not_A Brand";v="24"',
-    # 'Sec-Ch-Ua-Mobile': '?0',
-    # 'Sec-Ch-Ua-Platform': '"Windows"',
-    # 'Priority': 'u=0, i'
-    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-    # SAFETY FIX: Removed 'br' and 'zstd' to prevent binary garbage errors in 'requests'
-    'Accept-Encoding': 'gzip, deflate',
+    # 1. Standard Chrome Accept Header
+    # Must include image formats (avif, webp, apng) because real Chrome always requests them.
+    # Missing these is a high-confidence bot signal when impersonating a browser.
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+
+    # 2. Accept-Encoding (CRITICAL FIX)
+    # You MUST include 'br' (Brotli) and 'zstd'.
+    # Because you use impersonate="chrome", your TLS fingerprint claims you support these.
+    # If you remove them here, the server sees a "TLS vs Header Mismatch" and blocks you instantly.
+    # curl_cffi handles the decompression automatically, so this is safe to include.
+    'Accept-Encoding': 'gzip, deflate, br, zstd',
+
+    # 3. Standard Language & Cache
     'Accept-Language': 'en-US,en;q=0.9',
+    'Cache-Control': 'max-age=0',
+
+    # 4. Referer Strategy
+    # Sets the "Previous Page" to Google. This bypasses simple "direct traffic" blocks.
+    'Referer': 'https://www.google.com/',
+
+    # 5. Fetch Metadata (CRITICAL FIX)
     'Sec-Fetch-Dest': 'document',
     'Sec-Fetch-Mode': 'navigate',
-    'Sec-Fetch-Site': 'none',
+    # Changed from 'none' to 'cross-site'.
+    # 'none' implies direct entry (typing URL). You cannot use 'none' if you send a Referer.
+    # 'cross-site' correctly tells the server "I clicked a link from Google to get here."
+    'Sec-Fetch-Site': 'cross-site',
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
 }
