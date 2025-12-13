@@ -5,12 +5,13 @@ import re
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
+from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
+
 from rome.config import set_attributes_from_config
 from rome.logger import get_logger
 from .caesar_config import (CAESAR_CONFIG, MAX_SYNTHESIS_QUERY_SOURCES,
     MAX_SYNTHESIS_QA_CONTEXT, NUM_SYNTHESIS_RETRIES, SYNTHESIS_SAVE_JSON)
 
-from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
 
 class ArtifactSynthesizer:
     """Handles the synthesis of insights into final artifacts"""
