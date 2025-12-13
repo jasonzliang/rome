@@ -1,6 +1,7 @@
 """Caesar Synthesizer - Logic for synthesizing exploration artifacts"""
 import json
 import os
+import re
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
@@ -460,28 +461,32 @@ Respond with JSON:
         base_dir: str = None,
         suffix: str = "eli5",
         timestamp: str = None) -> Optional[Dict]:
-        """Generate ELI5 explanation of artifact and save it"""
+        """Generate ELI5 explanation(s) of artifact and save them"""
         if not self.synthesis_eli5: return None
-        self.logger.info(f"[POST-PROCESS] Generating ELI5 explanation")
 
         artifact_text = result.get("artifact", "")
         if not artifact_text:
             self.logger.error("[POST-PROCESS] No artifact text to process")
             return None
+
         abstract_text = result.get("abstract", "")
         if abstract_text:
             artifact_text = f"Artifact Abstract:\n{abstract_text}\n\nArtifact Text:\n{artifact_text}"
 
-        # Determine target token count
-        token_context = f"\nIMPORTANT: Your explanation MUST be {self.synthesis_eli5_tokens} tokens (according to OpenAI's GPT-4o tokenizer).\n" if self.synthesis_eli5_tokens else ""
-        # token_constraint = f"\nIMPORTANT: Your explanation must be around the same length as the original artifact (~{len(artifact_text) // 4} tokens)\n"
+        # Support single int, list of ints, or None
+        token_lengths = ([self.synthesis_eli5_tokens] if isinstance(self.synthesis_eli5_tokens, int)
+                        else self.synthesis_eli5_tokens if isinstance(self.synthesis_eli5_tokens, list)
+                        else [None])
 
-# The explanation should:
-#     - Use simple, everyday language that a 5-year-old could understand
-#     - Avoid jargon and technical terms
-#     - Use concrete examples and analogies
-#     - Be engaging and easy to follow
-        prompt = f"""--- ARTIFACT ---
+        results = []
+        for tokens in token_lengths:
+            self.logger.info(f"[POST-PROCESS] Generating {tokens or 'unconstrained'} token ELI5")
+
+            # Sanitize tokens for valid path and setup prompt context
+            current_suffix = f"{suffix}-{re.sub(r'[<>:\"/\\|?*\s]', '-', str(tokens))}tok" if tokens else suffix
+            token_context = f"\nIMPORTANT: Your explanation MUST be {tokens} tokens when counted using OpenAI's GPT-4o tokenizer.\n" if tokens else ""
+
+            prompt = f"""--- ARTIFACT ---
 {artifact_text}
 --- END OF ARTIFACT ---
 
@@ -497,25 +502,33 @@ Respond with valid JSON only:
     "eli5": "<your ELI5 explanation>"
 }}"""
 
-        for attempt in range(1, NUM_SYNTHESIS_RETRIES + 1):
-            try:
-                response = self.agent.chat_completion(prompt,
-                    override_config={"reasoning_effort": "high"},
-                    response_format={"type": "json_object"})
-                eli5_result = self.agent.parse_json_response(response)
-                if not eli5_result or "eli5" not in eli5_result:
-                    raise ValueError("Missing 'eli5' key in response")
+            success = False
+            for attempt in range(1, NUM_SYNTHESIS_RETRIES + 1):
+                try:
+                    response = self.agent.chat_completion(prompt,
+                        override_config={"reasoning_effort": "high"},
+                        response_format={"type": "json_object"})
+                    eli5_result = self.agent.parse_json_response(response)
+                    if not eli5_result or "eli5" not in eli5_result:
+                        raise ValueError("Missing 'eli5' key in response")
 
-                # Build result dict without abstract or sources for ELI5
-                processed_result = {
-                    "artifact": eli5_result["eli5"],
-                    "metadata": result.get("metadata", {}),
-                }
-                self._save_synthesis(processed_result,
-                    base_dir=base_dir, suffix=suffix, timestamp=timestamp)
+                    processed_result = {
+                        "artifact": eli5_result["eli5"],
+                        "metadata": result.get("metadata", {}),
+                    }
 
-                return processed_result
-            except Exception as e:
-                self.logger.error(f"[POST-PROCESS] Attempt {attempt}/{NUM_SYNTHESIS_RETRIES} failed: {e}")
+                    self._save_synthesis(processed_result,
+                        base_dir=base_dir,
+                        suffix=current_suffix,
+                        timestamp=timestamp)
 
-        self.logger.error("[POST-PROCESS] All attempts exhausted"); return None
+                    results.append(processed_result)
+                    success = True
+                    break
+                except Exception as e:
+                    self.logger.error(f"[POST-PROCESS] Attempt {attempt}/{NUM_SYNTHESIS_RETRIES} failed: {e}")
+
+            if not success:
+                self.logger.error(f"[POST-PROCESS] Failed to generate {tokens or 'unconstrained'} token version")
+
+        return results[-1] if results else None
