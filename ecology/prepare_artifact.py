@@ -12,8 +12,13 @@ CAESAR_AGENT_BASE_DIR = os.path.abspath("result")
 CAESAR_AGENT_FILENAME = "answer_cat_cam.txt"
 # Base directory filled with answers from other agents
 OTHER_AGENT_BASE_DIR = os.path.abspath("query_result/other_agent_answers")
+
 # Base directory to output all agent answers
 ALL_AGENT_BASE_DIR = os.path.abspath("query_result/all_agent_answers")
+# Empty files to create in the category level output directory
+CATEGORY_NEW_FILES = ['judge_claude.txt', 'judge_gemini.txt', 'judge_gpt.txt']
+# Empty files to create in the meta-category level output directory
+META_CATEGORY_NEW_FILES = ['judge_summary.txt', 'judge_csv.txt']
 
 
 def setup_transfer_dict():
@@ -57,11 +62,21 @@ def prepare_artifact():
             os.makedirs(ALL_AGENT_BASE_DIR, exist_ok=True)
             output_dir = os.path.join(ALL_AGENT_BASE_DIR,
                 os.path.join(*os.path.normpath(other_source_dir).split(os.sep)[-2:]))
-            # print(output_dir); exit()
-            if not os.path.exists(output_dir):
-                shutil.copytree(other_source_dir, output_dir)
-            cmd = f"cp {caesar_file} {os.path.join(output_dir, CAESAR_AGENT_FILENAME)}"
+            meta_output_dir = os.path.dirname(os.path.normpath(output_dir))
+
+            if os.path.exists(output_dir):
+                os.system(f"rm -rf {output_dir}")
+            shutil.copytree(other_source_dir, output_dir)
+            # os.system(f'find {output_dir} -type f -name "judge_*" -exec truncate -s 0 {{}} +')
+            for new_file in CATEGORY_NEW_FILES:
+                os.system(f"touch {os.path.join(output_dir, new_file)}")
+            for new_file in META_CATEGORY_NEW_FILES:
+                os.system(f"touch {os.path.join(meta_output_dir, new_file)}")
+
+            caesar_filename = td.get("caesar_filename") or CAESAR_AGENT_FILENAME
+            cmd = f"cp {caesar_file} {os.path.join(output_dir, caesar_filename)}"
             print(f'{cmd}\n'); os.system(cmd)
+
 
 if __name__ == '__main__':
     prepare_artifact()
