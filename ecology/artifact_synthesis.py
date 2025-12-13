@@ -158,7 +158,6 @@ Respond with valid JSON only:
             "synthesis_max_tokens": self.synthesis_max_tokens,
             "synthesis_mode": mode,
             "synthesis_queries": len(qa_pairs),
-            # "synthesis_rounds": self.synthesis_rounds,
         }
 
         return result
@@ -523,8 +522,7 @@ Respond with valid JSON only:
                         timestamp=timestamp)
 
                     results.append(processed_result)
-                    success = True
-                    break
+                    success = True; break
                 except Exception as e:
                     self.logger.error(f"[POST-PROCESS] Attempt {attempt}/{NUM_SYNTHESIS_RETRIES} failed: {e}")
 
