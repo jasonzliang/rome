@@ -95,6 +95,7 @@ def print_config_summary(agent, logger):
             "Rounds": synth.synthesis_rounds,
             "Iterations/Round": synth.synthesis_iterations,
             "Max Tokens": synth.synthesis_max_tokens,
+            "Max ELI5 Tokens": synth.synthesis_eli5_tokens,
         },
         "OpenAI": {
             "Model": agent.openai_handler.model,
