@@ -98,7 +98,7 @@ class ArtifactSynthesizer:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
-        token_context = f" ({self.synthesis_max_tokens} tokens)" if self.synthesis_max_tokens else ""
+        token_context = f" ({self.synthesis_max_tokens})" if self.synthesis_max_tokens else ""
 
         # Build context from previous artifact if available
         previous_context = ""
@@ -122,7 +122,7 @@ SOURCES:
 YOUR TASK:
 Drawing heavily upon the patterns that emerged from the key insights{', and building upon the previous artifact,' if previous_artifact else ''} create a novel, exciting, and thought provoking artifact{query_context}
 
-1. **Artifact Abstract** (100-150 tokens):
+1. **Artifact Abstract** (80-120 words):
     - Summary of the artifact's core discovery and its significance
 
 2. **Artifact Main Text**{token_context}:
@@ -251,8 +251,8 @@ Respond with JSON:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
-        token_context1 = f"\n    - Merged artifact length: {self.synthesis_max_tokens} tokens" if self.synthesis_max_tokens else ""
-        token_context2 = f" ({self.synthesis_max_tokens} tokens)" if self.synthesis_max_tokens else ""
+        token_context1 = f"\n    - Merged artifact length: {self.synthesis_max_tokens}" if self.synthesis_max_tokens else ""
+        token_context2 = f" ({self.synthesis_max_tokens})" if self.synthesis_max_tokens else ""
 
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}
 
@@ -284,7 +284,7 @@ RESPONSE INSTRUCTIONS:
 
 EXAMPLE OUTPUT:
 {{
-    "abstract": "A 100-150 token summary of the artifact's core discovery and its significance",
+    "abstract": "A 80-120 word summary of the artifact's core discovery and its significance",
     "artifact": "Full merged text{token_context2} with citations [1,2]...",
     "sources": {{"https://example.com": 1, "https://another.com": 2}}
 }}
@@ -499,8 +499,8 @@ Respond with JSON:
             self.logger.info(f"[POST-PROCESS] Generating {tokens or 'unconstrained'} token ELI5")
 
             # Sanitize tokens for valid path and setup prompt context
-            current_suffix = f"{suffix}-{re.sub(r'[<>:\"/\\|?*\s]', '-', str(tokens))}tok" if tokens else suffix
-            token_context = f"\nIMPORTANT: Your explanation MUST be {tokens} tokens when counted using OpenAI's GPT-4o tokenizer.\n" if tokens else ""
+            current_suffix = f"{suffix}.{re.sub(r'[<>:\"/\\|?*\s]', '', str(tokens))[:16]}" if tokens else suffix
+            token_context = f"\nIMPORTANT: Your explanation MUST be {tokens}, double check to ensure that the limit is not exceeded!\n" if tokens else ""
 
             prompt = f"""--- ARTIFACT ---
 {artifact_text}
