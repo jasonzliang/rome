@@ -98,7 +98,7 @@ class ArtifactSynthesizer:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
-        token_context = f" ({self.synthesis_max_tokens})" if self.synthesis_max_tokens else ""
+        token_context = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
 
         # Build context from previous artifact if available
         previous_context = ""
@@ -165,8 +165,8 @@ Respond with valid JSON only:
             "sources_cited": len(source_map),
             "starting_url": self.agent.starting_url,
             "starting_query": self.agent.starting_query,
-            "synthesis_eli5_tokens": self.synthesis_eli5_tokens,
-            "synthesis_max_tokens": self.synthesis_max_tokens,
+            "synthesis_eli5_length": self.synthesis_eli5_length,
+            "synthesis_max_length": self.synthesis_max_length,
             "synthesis_mode": mode,
             "synthesis_queries": len(qa_pairs),
         }
@@ -251,8 +251,8 @@ Respond with JSON:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
-        token_context1 = f"\n    - Merged artifact length: {self.synthesis_max_tokens}" if self.synthesis_max_tokens else ""
-        token_context2 = f" ({self.synthesis_max_tokens})" if self.synthesis_max_tokens else ""
+        token_context1 = f"\n    - Merged artifact length: {self.synthesis_max_length} words" if self.synthesis_max_length else ""
+        token_context2 = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
 
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}
 
@@ -490,17 +490,17 @@ Respond with JSON:
             artifact_text = f"Artifact Abstract:\n{abstract_text}\n\nArtifact Text:\n{artifact_text}"
 
         # Support single int, list of ints, or None
-        token_lengths = ([self.synthesis_eli5_tokens] if isinstance(self.synthesis_eli5_tokens, int)
-                        else self.synthesis_eli5_tokens if isinstance(self.synthesis_eli5_tokens, list)
+        word_lengths = ([self.synthesis_eli5_length] if isinstance(self.synthesis_eli5_length, int)
+                        else self.synthesis_eli5_length if isinstance(self.synthesis_eli5_length, list)
                         else [None])
 
         results = []
-        for tokens in token_lengths:
-            self.logger.info(f"[POST-PROCESS] Generating {tokens or 'unconstrained'} token ELI5")
+        for length in word_lengths:
+            self.logger.info(f"[POST-PROCESS] Generating {length or 'unconstrained'} token ELI5")
 
-            # Sanitize tokens for valid path and setup prompt context
-            current_suffix = f"{suffix}.{re.sub(r'[<>:\"/\\|?*\s]', '-', str(tokens))[:16]}" if tokens else suffix
-            token_context = f"\nIMPORTANT: Your explanation MUST be {tokens}, double check to ensure that the limit is not exceeded!\n" if tokens else ""
+            # Sanitize "length" for valid path and setup prompt context
+            current_suffix = f"{suffix}.{re.sub(r'[<>:\"/\\|?*\s]', '-', str(length))[:16]}" if length else suffix
+            token_context = f"\nIMPORTANT: Your explanation MUST be {length} words, double check to ensure that the limit is not exceeded!\n" if length else ""
 
             prompt = f"""--- ARTIFACT ---
 {artifact_text}
@@ -544,6 +544,6 @@ Respond with valid JSON only:
                     self.logger.error(f"[POST-PROCESS] Attempt {attempt}/{NUM_SYNTHESIS_RETRIES} failed: {e}")
 
             if not success:
-                self.logger.error(f"[POST-PROCESS] Failed to generate {tokens or 'unconstrained'} token version")
+                self.logger.error(f"[POST-PROCESS] Failed to generate {length or 'unconstrained'} token version")
 
         return results[-1] if results else None

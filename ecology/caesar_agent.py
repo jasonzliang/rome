@@ -224,7 +224,7 @@ Using your current role as basis, analyze the page content{insights_info} to cre
  - Creates an overall goal for the agent to strive for{starting_query_task}
  - Focuses exploration toward most promising areas revealed by the page content{insights_task}
 
-Provide an adapted role description (~{self.role_max_tokens} tokens) that is creative, innovative, and original!
+Provide an adapted role description (~{self.role_max_length} words) that is creative, innovative, and original!
 
 IMPORATNT: Your response must start with "Your role:" followed by the adapted role description."""
 
@@ -533,7 +533,7 @@ Analyze this content and extract key insights focusing on:
 
 IMPORTANT: Use your role as a guide on how to respond!
 
-Depending on the complexity of the content, provide anywhere from 1 to 6 concise but substantive insights, but do not exceed ~800 tokens in total length:"""
+Depending on the complexity of the content, provide anywhere from 1 to 6 concise but substantive insights, but do not exceed ~600 words in total length:"""
 
         try:
             insights = self.chat_completion(

@@ -332,7 +332,7 @@ class ChromaClientManager:
         # context = "\n\n".join([node.node.get_content() for node in reranked_nodes])
 
         # Generate response
-        question = f"{question}\n\nIMPORTANT: Keep your response under {self.response_max_tokens} tokens!" if self.response_max_tokens else question
+        question = f"{question}\n\nIMPORTANT: Keep your response under {self.response_max_length} words!" if self.response_max_length else question
         response = self.response_synthesizer.synthesize(question, nodes=reranked_nodes)
 
         self.logger.debug(f"Using reranker (n={top_n}) for query")
@@ -351,7 +351,7 @@ class ChromaClientManager:
             llm=self.llm,
             embed_model=self.embed_model,
             filters=filters)
-        question = f"{question}\n\nIMPORTANT: Keep your response under {self.response_max_tokens} tokens!" if self.response_max_tokens else question
+        question = f"{question}\n\nIMPORTANT: Keep your response under {self.response_max_length} tokens!" if self.response_max_length else question
         return str(engine.query(question))
 
     def info(self):

@@ -51,8 +51,8 @@ SYNTHESIS_SAVE_JSON = False
 
 CAESAR_CONFIG = {
     "CaesarAgent": {
-        # Maximum number of tokens for adapting agent role description
-        "role_max_tokens": 500,
+        # Maximum number of words for adapting agent role description
+        "role_max_length": 400,
         # Total number of pages to explore before stopping
         "max_iterations": 10,
         # Maximum depth of exploration tree before backtracking
@@ -112,14 +112,14 @@ CAESAR_CONFIG = {
         "synthesis_top_n": 10,
         # When synthesizing artifact, use previous artifact if it exists
         "synthesis_prev_artifact": True,
-        # Maximum of tokens for generating final synthesis artifact
-        "synthesis_max_tokens": None,
+        # Maximum of words for generating final synthesis artifact
+        "synthesis_max_length": None,
         # Whether to merge all round artifacts into final artifact
         "synthesis_merge_artifacts": False,
         # Whether to generate ELI5 explanation for artifact text
         "synthesis_eli5": False,
-        # Maximum tokens for ELI5 explanation (None = unspecified token limit)
-        "synthesis_eli5_tokens": None,
+        # Maximum words for ELI5 explanation (None = unspecified word limit)
+        "synthesis_eli5_length": None,
         # Maximum exploration iterations to filter knowledge base for queries
         "synthesis_iteration_filter": None,
     },
@@ -166,7 +166,7 @@ CAESAR_CONFIG = {
         "llm_reasoning_effort": "medium",
          # LLM model temperature (for query/reranking)
         "llm_temperature": 0.1,
-        # Maximum number of tokens for query response
-        "response_max_tokens": 500,
+        # Maximum number of words for query response
+        "response_max_length": 500,
     }
 }

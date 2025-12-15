@@ -94,8 +94,8 @@ def print_config_summary(agent, logger):
             "Mode": "Classic" if synth.synthesis_classic_mode else "Iterative",
             "Rounds": synth.synthesis_rounds,
             "Iterations/Round": synth.synthesis_iterations,
-            "Max Tokens": synth.synthesis_max_tokens,
-            "Max ELI5 Tokens": synth.synthesis_eli5_tokens,
+            "Max Length (Words)": synth.synthesis_max_length,
+            "Max ELI5 Length (Words)": synth.synthesis_eli5_length,
         },
         "OpenAI": {
             "Model": agent.openai_handler.model,
