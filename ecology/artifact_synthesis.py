@@ -500,7 +500,7 @@ Respond with JSON:
 
             # Sanitize "length" for valid path and setup prompt context
             current_suffix = f"{suffix}.{re.sub(r'[<>:\"/\\|?*\s]', '-', str(length))[:16]}" if length else suffix
-            length_context = f"\nIMPORTANT: Your explanation MUST be {length} words, double check to ensure that the limit is not exceeded!\n" if length else ""
+            length_context = f"\nIMPORTANT: Your explanation MUST be around {length} words (double check to make sure)\n" if length else ""
 
             prompt = f"""--- ARTIFACT ---
 {artifact_text}
