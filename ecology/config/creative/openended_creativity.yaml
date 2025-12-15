@@ -33,7 +33,7 @@ ArtifactSynthesizer:
   synthesis_merge_artifacts: true
   synthesis_eli5: true
   synthesis_eli5_length: [null, 450, 900]
-  synthesis_max_length: None
+  synthesis_max_length: null
 
 # ============================================================================
 # LLM CONFIGURATION
