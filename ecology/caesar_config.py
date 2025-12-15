@@ -167,6 +167,6 @@ CAESAR_CONFIG = {
          # LLM model temperature (for query/reranking)
         "llm_temperature": 0.1,
         # Maximum number of words for query response
-        "response_max_length": 500,
+        "response_max_length": 350,
     }
 }
