@@ -458,7 +458,7 @@ Respond with JSON:
                 if abstract := result.get('abstract'):
                     f.write(f"ABSTRACT:\n{abstract}\n\n")
 
-                f.write(f"ARTIFACT:\n{result['artifact']}")
+                f.write(f"ARTIFACT:\n{result['artifact']}\n\n")
 
                 if sources := result.get('sources'):
                     f.write("SOURCES:\n")
