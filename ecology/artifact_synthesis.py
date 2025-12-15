@@ -98,7 +98,7 @@ class ArtifactSynthesizer:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
-        token_context = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
+        length_context = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
 
         # Build context from previous artifact if available
         previous_context = ""
@@ -125,7 +125,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
 1. **Artifact Abstract** (80-120 words):
     - Summary of the artifact's core discovery and its significance
 
-2. **Artifact Main Text**{token_context}:
+2. **Artifact Main Text**{length_context}:
     - IMPORTANT: Carefully analyze every key insight to generate a comprehensive and very detailed response, here are some loose guidelines:
         a. Emergent patterns not visible in individual insights
         b. Novel discoveries, connections, or applications
@@ -251,8 +251,8 @@ Respond with JSON:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
-        token_context1 = f"\n    - Merged artifact length: {self.synthesis_max_length} words" if self.synthesis_max_length else ""
-        token_context2 = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
+        length_context1 = f"\n    - Merged artifact length: {self.synthesis_max_length} words" if self.synthesis_max_length else ""
+        length_context2 = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
 
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}
 
@@ -280,12 +280,12 @@ MERGED ARTIFACT TEXT:
 RESPONSE INSTRUCTIONS:
     - CRITICAL: Your response must ONLY be valid JSON starting with {{ and ending with }}
     - CRITICAL: Following 3 fields required: abstract, artifact, sources
-    - Do NOT mention "Round 1", "Round 2", etc, in text{token_context1}
+    - Do NOT mention "Round 1", "Round 2", etc, in text{length_context1}
 
 EXAMPLE OUTPUT:
 {{
     "abstract": "A 80-120 word summary of the artifact's core discovery and its significance",
-    "artifact": "Full merged text{token_context2} with citations [1,2]...",
+    "artifact": "Full merged text{length_context2} with citations [1,2]...",
     "sources": {{"https://example.com": 1, "https://another.com": 2}}
 }}
 """
@@ -496,11 +496,11 @@ Respond with JSON:
 
         results = []
         for length in word_lengths:
-            self.logger.info(f"[POST-PROCESS] Generating {length or 'unconstrained'} token ELI5")
+            self.logger.info(f"[POST-PROCESS] Generating {length or 'unconstrained'} word ELI5")
 
             # Sanitize "length" for valid path and setup prompt context
             current_suffix = f"{suffix}.{re.sub(r'[<>:\"/\\|?*\s]', '-', str(length))[:16]}" if length else suffix
-            token_context = f"\nIMPORTANT: Your explanation MUST be {length} words, double check to ensure that the limit is not exceeded!\n" if length else ""
+            length_context = f"\nIMPORTANT: Your explanation MUST be {length} words, double check to ensure that the limit is not exceeded!\n" if length else ""
 
             prompt = f"""--- ARTIFACT ---
 {artifact_text}
@@ -512,7 +512,7 @@ YOUR TASK:
  - Your target audience is a non-expert but college educated reader
  - Capture the main ideas without oversimplifying
  - Clarify any confusing or convoluted parts of the artifact
-{token_context}
+{length_context}
 Respond with valid JSON only:
 {{
     "eli5": "<your ELI5 explanation>"
@@ -544,6 +544,6 @@ Respond with valid JSON only:
                     self.logger.error(f"[POST-PROCESS] Attempt {attempt}/{NUM_SYNTHESIS_RETRIES} failed: {e}")
 
             if not success:
-                self.logger.error(f"[POST-PROCESS] Failed to generate {length or 'unconstrained'} token version")
+                self.logger.error(f"[POST-PROCESS] Failed to generate {length or 'unconstrained'} word version")
 
         return results[-1] if results else None
