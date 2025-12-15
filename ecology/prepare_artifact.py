@@ -34,7 +34,7 @@ def setup_transfer_dict():
 
     eli5_600 = {
         'caesar_sources': '11_17_*/*12130327/*merged-eli5-3*',
-        'other_sources': '12_4_answers_eli5_short/*/',
+        'other_sources': '12_4_answers_eli5_600t/*/',
     }
     return [full, eli5, eli5_600]
 
