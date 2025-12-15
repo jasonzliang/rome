@@ -21,7 +21,7 @@ CATEGORY_NEW_FILES = ['judge_claude.txt', 'judge_gemini.txt', 'judge_gpt.txt']
 META_CATEGORY_NEW_FILES = ['judge_summary.txt', 'judge_csv.txt']
 
 
-def setup_transfer_dict():
+def setup_transfer_dict_11_17():
     full = {
         'caesar_sources': '11_17_*/*12130155/*merged-3*',
         'other_sources': '12_4_answers/*/',
@@ -40,7 +40,7 @@ def setup_transfer_dict():
 
 
 def prepare_artifact():
-    transfer_dicts = setup_transfer_dict()
+    transfer_dicts = setup_transfer_dict_11_17()
     for td in transfer_dicts:
         other_source_dirs = glob.glob(os.path.join(OTHER_AGENT_BASE_DIR, td['other_sources']))
         for caesar_file in glob.glob(os.path.join(CAESAR_AGENT_BASE_DIR, td['caesar_sources'])):
