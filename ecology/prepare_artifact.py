@@ -11,7 +11,7 @@ CAESAR_AGENT_BASE_DIR = os.path.abspath("result")
 # Filename for Caesar agent answer in answer directory
 CAESAR_AGENT_FILENAME = "answer_cat_cam.txt"
 # Base directory filled with answers from other agents
-OTHER_AGENT_BASE_DIR = os.path.abspath("query_result/other_agent_answers")
+OTHER_AGENT_BASE_DIR = os.path.abspath("query_result/external_agent_answers")
 
 # Base directory to output all agent answers
 ALL_AGENT_BASE_DIR = os.path.abspath("query_result/all_agent_answers")
@@ -39,8 +39,26 @@ def setup_transfer_dict_11_17():
     return [full, eli5, eli5_600]
 
 
+def setup_transfer_dict_12_13():
+    full = {
+        'caesar_sources': '12_13_*/*12151843/*merged-3*',
+        'other_sources': '12_4_answers/*/',
+    }
+
+    eli5 = {
+        'caesar_sources': '12_13_*/*12151843/*merged-eli5-3.1*',
+        'other_sources': '12_4_answers_eli5/*/',
+    }
+
+    eli5_450 = {
+        'caesar_sources': '12_13_*/*12151843/*merged-eli5-3.450w.1*',
+        'other_sources': '12_4_answers_eli5_450w/*/',
+    }
+    return [full, eli5, eli5_450]
+
+
 def prepare_artifact():
-    transfer_dicts = setup_transfer_dict_11_17()
+    transfer_dicts = setup_transfer_dict_12_13()
     for td in transfer_dicts:
         other_source_dirs = glob.glob(os.path.join(OTHER_AGENT_BASE_DIR, td['other_sources']))
         for caesar_file in glob.glob(os.path.join(CAESAR_AGENT_BASE_DIR, td['caesar_sources'])):
