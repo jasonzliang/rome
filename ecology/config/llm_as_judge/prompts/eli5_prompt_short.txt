@@ -6,4 +6,4 @@ For the original query answer(s) above, write an "Explain Like I'm 5" (ELI5) exp
  - Capture the main ideas without oversimplifying
  - Clarify any confusing or convoluted parts of the answer
 
-IMPORTANT: Your explanation for each answer MUST be 450 words, double check to make sure that the 450 word limit is not exceeded!
+IMPORTANT: Your explanation for each answer MUST be 450 words, double check to make sure

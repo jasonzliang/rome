@@ -501,7 +501,7 @@ Respond with JSON:
             # Sanitize length suffix string and setup prompt context
             # re.sub(r'[<>:\"/\\|?*\s]', '-', str(length))
             current_suffix = f"{suffix}.{re.sub(r'\D', '', str(length))}w" if length else suffix
-            length_context = f"\nIMPORTANT: Your explanation MUST be {length} words (double check to make sure it is not exceeded)\n" if length else ""
+            length_context = f"\nIMPORTANT: Your explanation MUST be {length} words, double check to make sure\n" if length else ""
 
             prompt = f"""--- ARTIFACT ---
 {artifact_text}
