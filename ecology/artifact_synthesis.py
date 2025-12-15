@@ -499,7 +499,7 @@ Respond with JSON:
             self.logger.info(f"[POST-PROCESS] Generating {tokens or 'unconstrained'} token ELI5")
 
             # Sanitize tokens for valid path and setup prompt context
-            current_suffix = f"{suffix}.{re.sub(r'[<>:\"/\\|?*\s]', '', str(tokens))[:16]}" if tokens else suffix
+            current_suffix = f"{suffix}.{re.sub(r'[<>:\"/\\|?*\s]', '-', str(tokens))[:16]}" if tokens else suffix
             token_context = f"\nIMPORTANT: Your explanation MUST be {tokens}, double check to ensure that the limit is not exceeded!\n" if tokens else ""
 
             prompt = f"""--- ARTIFACT ---
