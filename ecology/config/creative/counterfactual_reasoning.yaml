@@ -32,8 +32,8 @@ ArtifactSynthesizer:
   synthesis_rounds: 3
   synthesis_merge_artifacts: true
   synthesis_eli5: true
-  synthesis_eli5_tokens: [None, "around 450 or less", "around 900 or less"]
-  synthesis_max_tokens: None
+  synthesis_eli5_length: [None, "around 450 or less", "around 900 or less"]
+  synthesis_max_length: None
 
 # ============================================================================
 # LLM CONFIGURATION

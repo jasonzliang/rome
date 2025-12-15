@@ -498,7 +498,7 @@ Respond with JSON:
         for length in word_lengths:
             self.logger.info(f"[POST-PROCESS] Generating {length or 'unconstrained'} word ELI5")
 
-            # Sanitize "length" for valid path and setup prompt context
+            # Sanitize length suffix string and setup prompt context
             # re.sub(r'[<>:\"/\\|?*\s]', '-', str(length))
             current_suffix = f"{suffix}.{re.sub(r'\D', '', str(length))}w" if length else suffix
             length_context = f"\nIMPORTANT: Your explanation MUST be {length} words (double check to make sure)\n" if length else ""
