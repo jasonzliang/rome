@@ -1,9 +1,9 @@
 ### YOUR TASK
 
-For the answer/answers above, write an "Explain Like I'm 5" (ELI5) explanation:
+For the original query answer(s) above, write an "Explain Like I'm 5" (ELI5) explanation:
  - Do NOT mention or reference the original answer, your explanation should be a standalone text
  - Your target audience is a non-expert but college educated reader
  - Capture the main ideas without oversimplifying
  - Clarify any confusing or convoluted parts of the answer
 
-IMPORTANT: Your explanation MUST be 450 words or less, double check to make sure that the 450 word limit is not exceeded!
+IMPORTANT: Your explanation for each answer MUST be 450 words or less, double check to make sure that the 450 word limit is not exceeded!
