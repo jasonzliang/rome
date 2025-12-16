@@ -252,7 +252,7 @@ Respond with JSON:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
-        length_context1 = f"\n    - Merged artifact length: {self.synthesis_max_length} words" if self.synthesis_max_length else ""
+        length_context1 = f"{self.synthesis_max_length} words" if self.synthesis_max_length else "equal to or more than the average round artifact length"
         length_context2 = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
 
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}
@@ -276,13 +276,13 @@ MERGED ARTIFACT CITATIONS:
 
 MERGED ARTIFACT TEXT:
     - IMPORTANT: Avoid excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
-    - IMPORTANT: The merged artifact should be at least as long as each individual round artifact
+    - IMPORTANT: Merged artifact length: {length_context1}
     - Use your role as a guide on how to respond{query_role}
 
 RESPONSE INSTRUCTIONS:
     - CRITICAL: Your response must ONLY be valid JSON starting with {{ and ending with }}
     - CRITICAL: Following 3 fields required: abstract, artifact, sources
-    - Do NOT mention "Round 1", "Round 2", etc, in text{length_context1}
+    - Do NOT mention "Round 1", "Round 2", etc, in text
 
 EXAMPLE OUTPUT:
 {{
