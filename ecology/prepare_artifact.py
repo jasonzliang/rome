@@ -41,17 +41,17 @@ def setup_transfer_dict_11_17():
 
 def setup_transfer_dict_12_13():
     full = {
-        'caesar_sources': '12_13_*/*12151843/*merged-3*',
+        'caesar_sources': '12_13_*/*12152154/*merged-3*',
         'other_sources': '12_4_answers/*/',
     }
 
     eli5 = {
-        'caesar_sources': '12_13_*/*12151843/*merged-eli5-3.1*',
+        'caesar_sources': '12_13_*/*12152154/*merged-eli5-3.1*',
         'other_sources': '12_4_answers_eli5/*/',
     }
 
     eli5_450 = {
-        'caesar_sources': '12_13_*/*12151843/*merged-eli5-3.450w.1*',
+        'caesar_sources': '12_13_*/*12152154/*merged-eli5-3.450w.1*',
         'other_sources': '12_4_answers_eli5_450w/*/',
     }
     return [full, eli5, eli5_450]
