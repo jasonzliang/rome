@@ -276,7 +276,7 @@ MERGED ARTIFACT CITATIONS:
 
 MERGED ARTIFACT TEXT:
     - IMPORTANT: Avoid excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
-    - IMPORTANT: Merged artifact length: {length_context1}
+    - IMPORTANT: Merged artifact must be {length_context1}
     - Use your role as a guide on how to respond{query_role}
 
 RESPONSE INSTRUCTIONS:
