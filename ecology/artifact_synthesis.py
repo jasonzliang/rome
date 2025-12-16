@@ -280,8 +280,8 @@ MERGED ARTIFACT TEXT:
     - Use your role as a guide on how to respond{query_role}
 
 RESPONSE INSTRUCTIONS:
-    - CRITICAL: Your response must ONLY be valid JSON starting with {{ and ending with }}
-    - CRITICAL: Following 3 fields required: abstract, artifact, sources
+    - IMPORTANT: Your response must ONLY be valid JSON starting with {{ and ending with }}
+    - IMPORTANT: Following 3 fields required: abstract, artifact, sources
     - Do NOT mention "Round 1", "Round 2", etc, in text
 
 EXAMPLE OUTPUT:
