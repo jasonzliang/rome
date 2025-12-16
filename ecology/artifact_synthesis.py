@@ -252,7 +252,7 @@ Respond with JSON:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
-        length_context1 = f"{self.synthesis_max_length} words" if self.synthesis_max_length else "equal to or more than the average round artifact length"
+        length_context1 = f"{self.synthesis_max_length} words" if self.synthesis_max_length else "at least more than the average round artifact word count"
         length_context2 = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
 
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}
