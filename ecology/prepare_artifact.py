@@ -39,26 +39,62 @@ def setup_transfer_dict_11_17():
     return [full, eli5, eli5_600]
 
 
-def setup_transfer_dict_12_13():
+def setup_transfer_dict_11_17_v2():
     full = {
-        'caesar_sources': '12_13_*/*121601*/*merged-3*',
+        'caesar_sources': '11_17_*/*1217*/*merged-3*',
         'other_sources': '12_4_answers/*/',
     }
 
     eli5 = {
-        'caesar_sources': '12_13_*/*121601*/*merged-eli5-3.1*',
+        'caesar_sources': '11_17_*/*1217*/*merged-eli5-3*',
+        'other_sources': '12_4_answers_eli5/*/',
+    }
+
+    eli5_600 = {
+        'caesar_sources': '11_17_*/*1217*/*merged-eli5-3*',
+        'other_sources': '12_4_answers_eli5_600t/*/',
+    }
+    return [full, eli5, eli5_600]
+
+
+def setup_transfer_dict_12_13():
+    full = {
+        'caesar_sources': '12_13_*/*12160*/*merged-3*',
+        'other_sources': '12_4_answers/*/',
+    }
+
+    eli5 = {
+        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.1*',
         'other_sources': '12_4_answers_eli5/*/',
     }
 
     eli5_450 = {
-        'caesar_sources': '12_13_*/*121601*/*merged-eli5-3.450w.1*',
+        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.450w.1*',
+        'other_sources': '12_4_answers_eli5_450w/*/',
+    }
+    return [full, eli5, eli5_450]
+
+
+def setup_transfer_dict_12_13_v2():
+    full = {
+        'caesar_sources': '12_13_*/*12161*/*merged-3*',
+        'other_sources': '12_4_answers/*/',
+    }
+
+    eli5 = {
+        'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.1*',
+        'other_sources': '12_4_answers_eli5/*/',
+    }
+
+    eli5_450 = {
+        'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.450w.1*',
         'other_sources': '12_4_answers_eli5_450w/*/',
     }
     return [full, eli5, eli5_450]
 
 
 def prepare_artifact():
-    transfer_dicts = setup_transfer_dict_12_13()
+    transfer_dicts = setup_transfer_dict_11_17_v2()
     for td in transfer_dicts:
         other_source_dirs = glob.glob(os.path.join(OTHER_AGENT_BASE_DIR, td['other_sources']))
         for caesar_file in glob.glob(os.path.join(CAESAR_AGENT_BASE_DIR, td['caesar_sources'])):

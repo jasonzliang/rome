@@ -126,7 +126,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
     - Summary of the artifact's core discovery and its significance
 
 2. **Artifact Main Text**{length_context}:
-    - IMPORTANT: Carefully analyze the most relevant key insights to generate a very comprehensive and detailed response
+    - IMPORTANT: Carefully analyze every relevant key insight to generate a comprehensive and detailed response
     - Loose guidelines for response:
         a. Emergent patterns not visible in individual insights
         b. Novel discoveries, connections, or applications
