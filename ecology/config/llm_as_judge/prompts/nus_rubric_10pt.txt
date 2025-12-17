@@ -32,8 +32,8 @@
 
 1.  You are given a query.txt file that contains a short query or question.
 2.  You are given a set of files (answer_*.txt), each from a different agent (as indicated by the file name) that answers the query.
-3.  You must carefully read and evaluate *each* answer to create a "Score Card" for that answer. The score card must show the agent name and a short 3-4 sentence summary of its answer. The agent name MUST be the same as the answer file name.
-4.  For each metric on the score card, you must *first* provide a brief analysis (a 2-3 sentence justification) *before* giving the numeric score.
+3.  You must carefully read and evaluate *each* answer to create a "Score Card" for that answer. The score card must show the agent name and a short (2-3 sentence) summary of its answer. The agent name MUST be the same as the answer file name.
+4.  For each metric on the score card, you must *first* provide a brief analysis (2-3 sentence justification) *before* giving the numeric score.
 5.  You must strictly follow the definitions in the "Scoring Guide" below to assign your 1-10 scores. Do not deviate.
 6.  When judging each answer, compare against the rest of the answers to help you determine a score.
 7.  Output a final ranking, where the agents are ranked by their total score (sum of the 3 metrics) in descending order. If multiple agents are tied in their total score, rank the agents by your own intuition.
