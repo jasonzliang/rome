@@ -127,7 +127,7 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
 
 2. **Artifact Main Text**{length_context}:
     - IMPORTANT: Carefully analyze every relevant key insight to generate a comprehensive and detailed response
-    - Loose guidelines for response:
+    - General guidelines for response:
         a. Emergent patterns not visible in individual insights
         b. Novel discoveries, connections, or applications
         c. Surprising new directions or perspectives
@@ -252,7 +252,7 @@ Respond with JSON:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
-        length_context1 = f"{self.synthesis_max_length} words" if self.synthesis_max_length else "greater than or equal to average round artifact word count"
+        length_context1 = f"{self.synthesis_max_length} words" if self.synthesis_max_length else ">= average round artifact length"
         length_context2 = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
 
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}
@@ -276,7 +276,7 @@ MERGED ARTIFACT CITATIONS:
 
 MERGED ARTIFACT TEXT:
     - IMPORTANT: Avoid excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
-    - IMPORTANT: Merged artifact length: {length_context1}
+    - Merged artifact length: {length_context1}
     - Do NOT mention "Round 1", "Round 2", etc, in text
 
 RESPONSE INSTRUCTIONS:
