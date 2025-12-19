@@ -1,4 +1,4 @@
-"""Artifact Preparation - Copy Caesar artifacts to query results directory for LLM judging"""
+"""Artifact Analysis - Prepare Caesar artifacts and analyze them for interesting patterns"""
 import glob
 import os
 import random
@@ -94,6 +94,7 @@ def setup_transfer_dict_12_13_v2():
 
 
 def prepare_artifact():
+    """Copy Caesar artifacts to query answer directory for LLM judging"""
     transfer_dicts = setup_transfer_dict_11_17_v2()
     for td in transfer_dicts:
         other_source_dirs = glob.glob(os.path.join(OTHER_AGENT_BASE_DIR, td['other_sources']))
