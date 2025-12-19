@@ -28,11 +28,11 @@ CaesarAgent:
   adapt_role: True
 
 ArtifactSynthesizer:
-  synthesis_iterations: 25
+  synthesis_iterations: 30
   synthesis_rounds: 3
   synthesis_merge_artifacts: true
   synthesis_eli5: true
-  synthesis_eli5_length: [null, 450, 900]
+  synthesis_eli5_length: [null, within 450 to 500, within 900 to 1000]
   synthesis_max_length: null
 
 # ============================================================================

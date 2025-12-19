@@ -126,8 +126,8 @@ Drawing heavily upon the patterns that emerged from the key insights{', and buil
     - Summary of the artifact's core discovery and its significance
 
 2. **Artifact Main Text**{length_context}:
-    - IMPORTANT: Carefully analyze the most relevant key insights to generate a very comprehensive and detailed response
-    - Loose guidelines for response:
+    - IMPORTANT: Carefully analyze every relevant key insight to generate a comprehensive and detailed response
+    - General guidelines for response:
         a. Emergent patterns not visible in individual insights
         b. Novel discoveries, connections, or applications
         c. Surprising new directions or perspectives
@@ -252,7 +252,7 @@ Respond with JSON:
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
-        length_context1 = f"{self.synthesis_max_length} words" if self.synthesis_max_length else "greater than or equal to average round artifact word count"
+        length_context1 = f"{self.synthesis_max_length} words" if self.synthesis_max_length else ">= average round artifact length"
         length_context2 = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
 
         prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}
@@ -276,7 +276,7 @@ MERGED ARTIFACT CITATIONS:
 
 MERGED ARTIFACT TEXT:
     - IMPORTANT: Avoid excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
-    - IMPORTANT: Merged artifact length: {length_context1}
+    - Merged artifact length: {length_context1}
     - Do NOT mention "Round 1", "Round 2", etc, in text
 
 RESPONSE INSTRUCTIONS:
@@ -503,7 +503,7 @@ Respond with JSON:
             # Sanitize length suffix string and setup prompt context
             # re.sub(r'[<>:\"/\\|?*\s]', '-', str(length))
             current_suffix = f"{suffix}.{re.sub(r'\D', '', str(length))}w" if length else suffix
-            length_context = f"\nIMPORTANT: Your explanation MUST be {length} words, double check to make sure\n" if length else ""
+            length_context = f"\nIMPORTANT: Your explanation MUST be {length} words, double check to make sure" if length else ""
 
             prompt = f"""--- ARTIFACT ---
 {artifact_text}
@@ -516,6 +516,8 @@ YOUR TASK:
  - Capture the main ideas without oversimplifying
  - Clarify any confusing or convoluted parts of the artifact
 {length_context}
+IMPORTANT: Use your role as a guide on how to respond!
+
 Respond with valid JSON only:
 {{
     "eli5": "<your ELI5 explanation>"
