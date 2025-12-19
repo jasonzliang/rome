@@ -29,10 +29,13 @@ class ArtifactSynthesizer:
         self.kb_manager = self.agent.kb_manager; self.filters = None
 
         if self.synthesis_iteration_filter:
+            self.logger.assert_true(
+                isinstance(self.synthesis_iteration_filter, int) and self.synthesis_iteration_filter > 0,
+                "synthesis_iteration_filter must be an non-negative integer")
             self.filters = MetadataFilters(
                 filters=[MetadataFilter(
                     key="iteration",
-                    value=int(self.synthesis_iteration_filter),
+                    value=self.synthesis_iteration_filter,
                     operator=FilterOperator.LT)]
                 )
 
@@ -92,7 +95,7 @@ class ArtifactSynthesizer:
 
         qa_pairs = self._generate_qa_pairs(mode, current_query)
         if not qa_pairs:
-            self.logger.error("[SYNTHESIS] Unable to generate Q/A pairs")
+            self.logger.error("[SYNTHESIS] Unable to generate Q/A pairs for artifact")
             return None
         qa_list, source_list, source_map = self._build_answers_with_citations(qa_pairs)
 
@@ -341,7 +344,11 @@ EXAMPLE OUTPUT:
         if starting_query: queries = [starting_query] + queries
         if mode == "classic": return self._generate_qa_pairs_classic(queries)
 
-        # Iterative mode
+        # Validate iterations
+        # if not isinstance(self.synthesis_iterations, int) or self.synthesis_iterations < 1:
+        #     self.logger.error(f"[SYNTHESIS] Invalid synthesis_iterations: {self.synthesis_iterations}, using 1")
+        #     self.synthesis_iterations = 1
+
         queries, answers, sources_list = [queries[0]], [], []
 
         for i in range(self.synthesis_iterations):
@@ -351,17 +358,22 @@ EXAMPLE OUTPUT:
                 top_n=self.synthesis_top_n,
                 return_sources=True,
                 filters=self.filters)
-            if not answer: break
+
+            iter_str = f"[SYNTHESIS ITERATION {i+1}/{self.synthesis_iterations}]"
+            if not answer:
+                self.logger.error(f"{iter_str} KB query failed"); break
+            if not isinstance(sources, list): sources = []
 
             answers.append(answer)
             sources_list.append(sources)
+            self.logger.info(f"{iter_str}\nQ: {queries[-1]}\nA: {answers[-1]}")
 
-            self.logger.info(f"[SYNTHESIS ITERATION {i+1}/{self.synthesis_iterations}]\nQ: {queries[-1]}\nA: {answers[-1]}")
+            if i >= self.synthesis_iterations - 1: break
 
-            if i < self.synthesis_iterations - 1:
-                if not (next_query := self._generate_next_query(queries, answers)):
-                    break
-                queries.append(next_query)
+            next_query = self._generate_next_query(queries, answers)
+            if not next_query:
+                self.logger.error(f"{iter_str} Next query failed"); break
+            queries.append(next_query)
 
         return list(zip(queries, answers, sources_list))
 
