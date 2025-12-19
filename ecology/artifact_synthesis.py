@@ -503,7 +503,7 @@ Respond with JSON:
             # Sanitize length suffix string and setup prompt context
             # re.sub(r'[<>:\"/\\|?*\s]', '-', str(length))
             current_suffix = f"{suffix}.{re.sub(r'\D', '', str(length))}w" if length else suffix
-            length_context = f"\nIMPORTANT: Your explanation MUST be {length} words, double check to make sure\n" if length else ""
+            length_context = f"\nIMPORTANT: Your explanation MUST be {length} words, double check to make sure" if length else ""
 
             prompt = f"""--- ARTIFACT ---
 {artifact_text}
@@ -516,6 +516,8 @@ YOUR TASK:
  - Capture the main ideas without oversimplifying
  - Clarify any confusing or convoluted parts of the artifact
 {length_context}
+IMPORTANT: Use your role as a guide on how to respond!
+
 Respond with valid JSON only:
 {{
     "eli5": "<your ELI5 explanation>"
