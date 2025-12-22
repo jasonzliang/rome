@@ -528,6 +528,7 @@ YOUR TASK:
  - Capture the main ideas without oversimplifying
  - Clarify any confusing or convoluted parts of the artifact
 {length_context}
+IMPORTANT: Format your explanation so it is human readable (do not write everything in one big paragraph)
 IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with valid JSON only:
