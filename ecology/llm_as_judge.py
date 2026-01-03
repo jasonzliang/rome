@@ -295,8 +295,8 @@ def find_and_judge_all(args, rubric: str):
         if d.is_dir() and list(d.glob("answer_*.txt"))
     ]
 
-    mode_msg = "🧠 REASONING" if args.reasoning else "🤖 DETERMINISTIC"
-    format_msg = "JSON" if args.json else "TEXT"
+    mode_msg = "🧠 Reasoning" if args.reasoning else "🤖 Deterministic"
+    format_msg = "JSON" if args.json else "Text"
 
     print(f"\nMode: {mode_msg} | Format: {format_msg} | Trials: {args.trials} | Overwrite: {args.overwrite} | Debug: {args.debug}")
     print(f"Found {len(dirs_with_answers)} directories in {args.root_directory}")
