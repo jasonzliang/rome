@@ -307,7 +307,7 @@ def find_and_judge_all(args, rubric: str):
         for directory in sorted(dirs_with_answers):
             submit_directory_tasks(directory, rubric, executor, args)
 
-    print("\n✨ All tasks completed.")
+    print("\n✨ All tasks completed")
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Multi-LLM Judge (Parallelized)")
