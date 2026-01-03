@@ -26,7 +26,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 # --- Configuration ---
 
-DEFAULT_RUBRIC_PATH = "config/llm_as_judge/prompts/nus_rubric_10pt_v2.txt"
+DEFAULT_RUBRIC_PATH = "config/llm_as_judge/prompts/nus_rubric_10pt_api.txt"
 
 RETRY_CONFIG = {
     "stop": stop_after_attempt(2),
@@ -34,10 +34,6 @@ RETRY_CONFIG = {
 }
 
 PRINT_LOCK = threading.Lock()
-
-def safe_print(*args, **kwargs):
-    with PRINT_LOCK:
-        print(*args, **kwargs)
 
 JUDGES = {
     "gpt": {
@@ -116,6 +112,10 @@ JSON_FORMAT_INSTRUCTION = """
 """
 
 # --- Helper Functions ---
+
+def safe_print(*args, **kwargs):
+    with PRINT_LOCK:
+        print(*args, **kwargs)
 
 def should_retry_gemini(exception):
     if isinstance(exception, (ValueError, TypeError, AttributeError, KeyError)):
@@ -297,8 +297,9 @@ def find_and_judge_all(args, rubric: str):
     mode_msg = "🧠 REASONING" if args.reasoning else "🤖 DETERMINISTIC"
     format_msg = "JSON" if args.json else "TEXT"
 
-    print(f"\nMode: {mode_msg} | Format: {format_msg} | Trials: {args.trials}")
-    print(f"Found {len(dirs_with_answers)} directories.")
+    print(f"\nMode: {mode_msg} | Format: {format_msg} | Trials: {args.trials} | Overwrite: {args.overwrite} | Debug: {args.debug}")
+    print(f"Found {len(dirs_with_answers)} directories in {args.root_directory}")
+    print(f"Using grading rubric: {args.rubric}")
     print(f"Starting execution pool with {args.jobs} workers...")
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
@@ -313,10 +314,8 @@ def parse_args():
     parser.add_argument("-r", "--rubric", type=Path, default=Path(DEFAULT_RUBRIC_PATH))
     parser.add_argument("-o", "--overwrite", action="store_true")
     parser.add_argument("-d", "--debug", action="store_true")
-    parser.add_argument("-j", "--jobs", type=int, default=5)
+    parser.add_argument("-j", "--jobs", type=int, default=3)
     parser.add_argument("-R", "--reasoning", action="store_true", help="Enable reasoning/thinking")
-
-    # New Arguments
     parser.add_argument("--json", action="store_true", help="Output results in JSON format")
     parser.add_argument("-t", "--trials", type=int, default=1, help="Number of trials per judge (default: 1)")
 
