@@ -87,7 +87,7 @@ JSON_FORMAT_INSTRUCTION = """
 ### Evaluation Output Instructions
 - You MUST output a valid JSON object.
 - Do NOT output markdown formatting (like ```json ... ```). Output RAW JSON only.
-- The JSON structure must be exactly:
+- The JSON structure must be exactly like the example below:
 
 {
   "query": "The original query text",
@@ -140,7 +140,7 @@ def create_judge_prompt(query: str, answers: Dict[str, str], rubric: str, json_m
     for filename, content in sorted(answers.items()):
         prompt += f"#### AGENT ANSWER FILE ({filename}):\n{content.strip()}\n\n"
 
-    prompt += f"{sep}\n\n### SCORING RUBRIC\n{rubric.strip()}\n\n"
+    prompt += f"{sep}\n\n#### SCORING RUBRIC\n{rubric.strip()}\n\n"
 
     # Dynamically append the correct formatting instruction
     if json_mode:
@@ -166,9 +166,8 @@ def call_gpt(client, prompt: str, use_reasoning: bool, json_mode: bool) -> str:
     if use_reasoning:
         kwargs["reasoning_effort"] = "high"
     else:
-        kwargs["temperature"] = 0.0
-        kwargs["seed"] = 42
-        kwargs["top_p"] = 1.0
+        kwargs["temperature"] = 0.0; kwargs["seed"] = 42
+        # kwargs["top_p"] = 1.0
 
     response = client.chat.completions.create(**kwargs)
     return response.choices[0].message.content
@@ -186,28 +185,30 @@ def call_claude(client, prompt: str, use_reasoning: bool, json_mode: bool) -> st
         # Omit temperature for reasoning
     else:
         kwargs["temperature"] = 0.0
+        # kwargs["top_k"] = 1
+        # kwargs["top_p"] = 1.0
 
     response = client.messages.create(**kwargs)
     return next(block.text for block in response.content if block.type == "text")
 
 @retry(**RETRY_CONFIG, retry=retry_if_exception(should_retry_gemini))
 def call_gemini(client, prompt: str, use_reasoning: bool, json_mode: bool) -> str:
-    gen_config_args = {}
+    kwargs = {}
 
     if json_mode:
-        gen_config_args["response_mime_type"] = "application/json"
+        kwargs["response_mime_type"] = "application/json"
 
     if use_reasoning:
-        gen_config_args["thinking_config"] = types.ThinkingConfig(thinking_level=types.ThinkingLevel.HIGH)
+        kwargs["thinking_config"] = types.ThinkingConfig(thinking_level=types.ThinkingLevel.HIGH)
     else:
-        gen_config_args["temperature"] = 0.0
-        gen_config_args["top_p"] = 1.0
-        gen_config_args["top_k"] = 1
+        kwargs["temperature"] = 0.0
+        # kwargs["top_k"] = 1
+        # kwargs["top_p"] = 1.0
 
     response = client.models.generate_content(
         model=JUDGES["gemini"]["model"],
         contents=prompt,
-        config=types.GenerateContentConfig(**gen_config_args),
+        config=types.GenerateContentConfig(**kwargs),
     )
     return response.text
 
