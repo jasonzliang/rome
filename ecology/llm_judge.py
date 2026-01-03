@@ -51,15 +51,18 @@ def safe_print(*args, **kwargs):
 JUDGES = {
     "gpt": {
         "model": "gpt-5.2",
-        "client_init": lambda: openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"), timeout=600.0),
+        "client_init": lambda: openai.OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"), timeout=600.0),
     },
     "claude": {
-        "model": "claude-sonnet-4-5-20250929",
-        "client_init": lambda: anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=600.0),
+        "model": "claude-opus-4-5-20251101",
+        "client_init": lambda: anthropic.Anthropic(
+            api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=600.0),
     },
     "gemini": {
         "model": "gemini-3-pro-preview",
-        "client_init": lambda: genai.Client(api_key=os.getenv("GOOGLE_API_KEY"), http_options={'timeout': 600000}),
+        "client_init": lambda: genai.Client(
+            api_key=os.getenv("GOOGLE_API_KEY"), http_options={'timeout': 600000}),
     },
 }
 
@@ -84,10 +87,32 @@ def load_answers(directory: Path) -> Dict[str, str]:
     return answers
 
 def create_judge_prompt(query: str, answers: Dict[str, str], rubric: str) -> str:
-    prompt = f"{rubric}\n\n---\n\n#### Query File (query.txt):\n{query}\n\n"
+    prompt = f"#### QUERY FILE (query.txt):\n{query.strip()}\n\n---\n\n"
     for filename, content in sorted(answers.items()):
-        prompt += f"#### Answer File ({filename}):\n{content}\n\n"
+        prompt += f"#### AGENT ANSWER FILE ({filename}):\n{content.strip()}\n\n"
+    prompt += "-"*80 + f"\n\n{rubric.strip()}"
     return prompt
+
+# def create_judge_prompt(query: str, answers: Dict[str, str], rubric: str) -> str:
+#     """Create the judging prompt using XML tags for strict separation."""
+#     # We build the string carefully to ensure clean spacing
+#     prompt_parts = []
+#     prompt_parts.append('<query_file id="query.txt">')
+#     prompt_parts.append(query.strip())
+#     prompt_parts.append("</query_file>")
+
+#     prompt_parts.append("<agent_answers>")
+#     for filename, content in sorted(answers.items()):
+#         # We add the filename as an attribute for clear distinction
+#         prompt_parts.append(f'<agent_answer_file id="{filename}">')
+#         prompt_parts.append(content.strip())
+#         prompt_parts.append("</agent_answer_file>")
+#     prompt_parts.append("</agent_answers>")
+
+#     # prompt_parts.append("<grading_rubric>")
+#     prompt_parts.append(rubric.strip())
+#     # prompt_parts.append("</grading_rubric>")
+#     return "\n\n".join(prompt_parts)
 
 # --- API Call Wrappers ---
 
@@ -178,6 +203,7 @@ def submit_directory_tasks(directory: Path, rubric: str, executor: concurrent.fu
     if debug:
         with PRINT_LOCK:
             print(f"DEBUG: Generated prompt for {directory.name} ({len(prompt)} chars):")
+            # print(f"{prompt}")
             print(f"{prompt[:1000]}... [truncated]")
 
     # Submit a task for each judge
@@ -226,7 +252,7 @@ def parse_args():
     parser.add_argument("-r", "--rubric", type=Path, default=Path(DEFAULT_RUBRIC_PATH), help="Path to rubric file")
     parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite existing judge files")
     parser.add_argument("-d", "--debug", action="store_true", help="Enable debug mode")
-    parser.add_argument("-j", "--jobs", type=int, default=5, help="Number of parallel workers (default: 5)")
+    parser.add_argument("-j", "--jobs", type=int, default=3, help="Number of parallel workers (default: 5)")
 
     return parser.parse_args()
 
