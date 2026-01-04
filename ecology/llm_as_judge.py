@@ -161,7 +161,8 @@ def call_gpt(client, prompt: str, use_reasoning: bool, json_mode: bool) -> str:
     if use_reasoning:
         kwargs["reasoning_effort"] = "high"
     else:
-        kwargs["temperature"] = 0.0; kwargs["seed"] = 42
+        kwargs["temperature"] = 0.0
+        kwargs["seed"] = 42
         # kwargs["top_p"] = 1.0
 
     response = client.chat.completions.create(**kwargs)
