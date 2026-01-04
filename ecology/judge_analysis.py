@@ -3,11 +3,14 @@
 Script to extract scoring results from judge JSON files and generate a CSV report.
 Automatically discovers query categories from directory structure.
 """
-import json
-import csv
 import argparse
-from pathlib import Path
 from collections import defaultdict
+import csv
+import json
+from pathlib import Path
+import statistics
+
+from scipy import stats
 
 def load_agent_mapping(mapping_file):
     """Load agent name mapping from file (code_name: real_name format)."""
@@ -201,7 +204,7 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
             row['Surprising Score'] = int(row['Surprising Score'])
             row['Total Score'] = int(row['Total Score'])
             # Apply agent name mapping
-            row['Display Name'] = agent_mapping.get(row['Agent Name'], row['Agent Name'])
+            row['Display Name'] = agent_mapping[row['Agent Name']]
             csv_data.append(row)
 
     if not csv_data:
@@ -246,6 +249,29 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
 
         return "\n".join(lines)
 
+    def get_significance_report(agent_stats):
+        """Sort agents by total score and run Mann-Whitney U test on Top 1 vs Top 2."""
+        # Sort agents by average total score (Descending)
+        sorted_agents = sorted(
+            agent_stats.keys(),
+            key=lambda x: sum(agent_stats[x]['total']) / len(agent_stats[x]['total']),
+            reverse=True
+        )
+
+        if len(sorted_agents) < 2:
+            return ""
+
+        top, second = sorted_agents[0], sorted_agents[1]
+
+        # Mann-Whitney U test (Default is two-sided: checks if distributions differ)
+        stat, p_val = stats.mannwhitneyu(agent_stats[top]['total'], agent_stats[second]['total'])
+
+        report = (f"\n\n🏆 STATISTICAL SIGNIFICANCE (Top 1 vs Top 2): {top} vs {second}\n"
+                  f"   MWU Stat: {stat:.1f} | P-Value: {p_val:.4e} | "
+                  f"{'✅ SIGNIFICANT' if p_val < 0.05 else '❌ NOT SIGNIFICANT'}")
+
+        return report
+
     # Extract unique values
     categories = sorted(set(row['Query Category'] for row in csv_data))
     agents = sorted(set(row['Agent Name'] for row in csv_data))
@@ -263,21 +289,21 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
             agent_scores[row['Display Name']]['surprising'].append(row['Surprising Score'])
             agent_scores[row['Display Name']]['total'].append(row['Total Score'])
 
-        headers = ["Agent", "New", "Useful", "Surprising", "Total", "Avg Total"]
+        headers = ["Agent", "New", "Useful", "Surprising", "Total", "Std", "Samples"]
         rows = []
         for agent in sorted(agent_scores.keys()):
             scores = agent_scores[agent]
-            avg_total = sum(scores['total']) / len(scores['total'])
             rows.append([
                 agent,
                 f"{sum(scores['new'])/len(scores['new']):.2f}",
                 f"{sum(scores['useful'])/len(scores['useful']):.2f}",
                 f"{sum(scores['surprising'])/len(scores['surprising']):.2f}",
                 f"{sum(scores['total'])/len(scores['total']):.2f}",
-                f"{avg_total:.2f}"
+                f"{statistics.stdev(scores['total']):.2f}",
+                f"{len(scores['total'])}",
             ])
 
-        query_tables.append(f"\nQUERY: {category}\n{format_table(headers, rows, sort_by_col=5, reverse=True)}")
+        query_tables.append(f"\nQUERY: {category}\n{format_table(headers, rows, sort_by_col=4, reverse=True)}")
 
     add_section("TABLE 1: RAW METRICS FOR ALL AGENTS ON EACH QUERY", "\n".join(query_tables))
 
@@ -289,7 +315,7 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
         agent_metric_stats[row['Display Name']]['surprising'].append(row['Surprising Score'])
         agent_metric_stats[row['Display Name']]['total'].append(row['Total Score'])
 
-    headers = ["Agent", "Avg New", "Avg Useful", "Avg Surprising", "Avg Total", "Reviews"]
+    headers = ["Agent", "New", "Useful", "Surprising", "Total", "Std", "Samples"]
     rows = []
     for agent in sorted(agent_metric_stats.keys()):
         scores = agent_metric_stats[agent]
@@ -299,17 +325,13 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
             f"{sum(scores['useful'])/len(scores['useful']):.2f}",
             f"{sum(scores['surprising'])/len(scores['surprising']):.2f}",
             f"{sum(scores['total'])/len(scores['total']):.2f}",
-            sum(scores['total'])/len(scores['total']),  # For sorting
+            f"{statistics.stdev(scores['total']):.2f}",
+            f"{len(scores['total'])}",
         ])
 
-    # Replace last column with review count after sorting
-    rows_sorted = sorted(rows, key=lambda x: x[5], reverse=True)
-    for i, row in enumerate(rows_sorted):
-        agent_name = row[0]
-        row[5] = len(agent_metric_stats[agent_name]['total'])
-
-    add_section("TABLE 2: AVERAGE SCORE FOR EACH METRIC BY AGENT (Sorted by Avg Total)",
-                format_table(headers, rows_sorted))
+    sig_report = get_significance_report(agent_metric_stats)
+    add_section("TABLE 2: OVERALL AVERAGE SCORE FOR EACH METRIC BY AGENT (Sorted by Total)",
+                format_table(headers, rows, sort_by_col=4, reverse=True) + sig_report)
 
     # TABLE 3: Average Score for Each Agent from Each Judge
     agent_judge_stats = defaultdict(lambda: defaultdict(lambda: {'scores': [], 'total': 0}))
@@ -349,9 +371,9 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
 
         # 1. Define mappings based on your agent_names.txt suffixes
         mappings = {
-            'claude': ['claude', 'cld', 'cls', 'sonnet'], # Matches answer_cow_cld, answer_dog_cls
+            'claude': ['claude', 'sonnet', 'cld', 'cls'], # Matches answer_cow_cld, answer_dog_cls
             'gemini': ['gemini', 'ged', 'ges'],           # Matches answer_fox_ged, answer_lion_ges
-            'gpt':    ['gpt', 'gps', 'gpd']               # Matches answer_pig_gps, answer_owl_gpd
+            'gpt':    ['gpt', 'gpd', 'gps']               # Matches answer_pig_gps, answer_owl_gpd
         }
 
         # 2. Get the list of search terms for this judge (default to just the judge name)
@@ -366,7 +388,7 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
         judge_base = extract_judge_base_name(judge)
 
         # Find agents with similar names to this judge
-        similar_agents = [row['Agent Name'] for row in csv_data if agent_similar_to_judge(row['Agent Name'], judge_base)]
+        similar_agents = [row['Display Name'] for row in csv_data if agent_similar_to_judge(row['Agent Name'], judge_base)]
         similar_agents = list(set(similar_agents))  # Unique
 
         if not similar_agents:
@@ -376,11 +398,11 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
 
         # Calculate average score THIS judge gave to similar-named agents
         same_judge_scores = [row['Total Score'] for row in csv_data
-                            if row['Judge Name'] == judge and row['Agent Name'] in similar_agents]
+                            if row['Judge Name'] == judge and row['Display Name'] in similar_agents]
 
         # Calculate average score OTHER judges gave to the same similar-named agents
         other_judges_scores = [row['Total Score'] for row in csv_data
-                              if row['Judge Name'] != judge and row['Agent Name'] in similar_agents]
+                              if row['Judge Name'] != judge and row['Display Name'] in similar_agents]
 
         if same_judge_scores and other_judges_scores:
             same_avg = sum(same_judge_scores) / len(same_judge_scores)
