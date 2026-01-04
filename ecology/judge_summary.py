@@ -3,7 +3,6 @@
 Script to extract scoring results from judge JSON files and generate a CSV report.
 Automatically discovers query categories from directory structure.
 """
-
 import json
 import csv
 import argparse
