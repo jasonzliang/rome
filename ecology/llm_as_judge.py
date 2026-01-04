@@ -222,7 +222,7 @@ def run_single_judge_task(directory: Path, judge_name: str, config: dict, prompt
     """
     try:
         mode_str = "Reasoning" if use_reasoning else "Standard"
-        safe_print(f"⏳ Starting {judge_name} [Trial {output_file.name}]...")
+        safe_print(f"⏳ Starting trial {output_file.name}...")
 
         client = config["client_init"]()
 
@@ -234,7 +234,7 @@ def run_single_judge_task(directory: Path, judge_name: str, config: dict, prompt
             judgment = judgment.replace("```json", "").replace("```", "").strip()
 
         output_file.write_text(judgment, encoding="utf-8")
-        safe_print(f"✅ Finished {output_file.name}")
+        safe_print(f"✅ Finished trial {output_file.name}")
 
         if debug:
             with PRINT_LOCK:

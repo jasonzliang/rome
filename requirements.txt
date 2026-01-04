@@ -25,6 +25,10 @@ llama-index-llms-openai
 mem0ai[graph]
 
 # Ecology agent packages
+anthropic
 beautifulsoup4
+google-genai
 pygraphviz
 PyPDF2
+tabulate
+tenacity
