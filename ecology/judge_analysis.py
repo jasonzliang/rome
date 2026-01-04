@@ -433,9 +433,7 @@ Examples:
   %(prog)s -i /path/to/data                      # Output to /path/to/data/judge_csv.txt
   %(prog)s -i data -o csv.txt                    # Custom output file location
   %(prog)s -i data -a analysis.txt               # Generate CSV and analyze it
-  %(prog)s -i data -a analysis.txt -m names.txt  # Analyze with custom agent mapping
-        """
-    )
+  %(prog)s -i data -a analysis.txt -m names.txt  # Analyze with custom agent mapping""")
 
     parser.add_argument('-i', '--input-dir', default='.',
         help='Base directory containing category folders (default: current directory)')

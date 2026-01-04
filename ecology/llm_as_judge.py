@@ -2,11 +2,6 @@
 """
 Multi-LLM Judge for Answer Evaluation (Parallelized)
 Evaluates LLM answers using GPT, Claude, and Gemini as judges.
-
-Usage:
-    python judge.py ./data --json             (Output JSON format)
-    python judge.py ./data -t 3               (Run 3 trials per judge)
-    python judge.py ./data -R --json -t 5     (Reasoning mode, JSON, 5 trials)
 """
 
 import argparse
@@ -310,7 +305,17 @@ def find_and_judge_all(args, rubric: str):
     print("\n✨ All tasks completed")
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Multi-LLM Judge (Parallelized)")
+    parser = argparse.ArgumentParser(
+        description="Multi-LLM Judge (Parallelized)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s ./experiments                   # Basic run on directory
+  %(prog)s ./experiments --json -t 3       # JSON output, 3 trials per judge
+  %(prog)s ./experiments -R -o --jobs 10   # Reasoning mode, overwrite, 10 threads
+  %(prog)s ./experiments -r ./rubric.txt   # Use custom scoring rubric file
+  %(prog)s ./experiments -d --json         # Debug mode with JSON output""")
+
     parser.add_argument("root_directory", type=Path)
     parser.add_argument("-r", "--rubric", type=Path, default=Path(DEFAULT_RUBRIC_PATH))
     parser.add_argument("-o", "--overwrite", action="store_true")
