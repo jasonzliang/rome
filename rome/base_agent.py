@@ -1,4 +1,5 @@
 """Base Agent class providing core functionality for all agent types"""
+import copy
 import os
 import json
 import time
@@ -38,7 +39,8 @@ class BaseAgent:
 
     def _setup_config(self, config_dict: Dict = None) -> None:
         """Setup and validate configuration"""
-        self.config = merge_with_default_config(config_dict) if config_dict else DEFAULT_CONFIG.copy()
+        self.config = merge_with_default_config(config_dict) if config_dict else \
+            copy.deepcopy(DEFAULT_CONFIG)
         agent_config = self.config.get('Agent', {})
         set_attributes_from_config(self, agent_config,
             ['name', 'role', 'repository', 'log_pid'])
@@ -68,7 +70,7 @@ class BaseAgent:
             self.repository and os.path.exists(self.repository),
             f"Repository path does not exist: {self.repository}")
 
-        log_config = self.config.get('Logger', {}).copy()
+        log_config = self.config.get('Logger', {})
         if not log_config.get('base_dir'):
             log_config['base_dir'] = self.get_log_dir()
         if not log_config.get('filename'):
