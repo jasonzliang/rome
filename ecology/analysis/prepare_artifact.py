@@ -1,4 +1,4 @@
-"""Artifact Analysis - Prepare Caesar artifacts and analyze them for interesting patterns"""
+"""Prepare Caesar artifacts for LLM as Judge"""
 import glob
 import os
 import random
