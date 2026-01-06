@@ -27,6 +27,7 @@ class OpenAIHandler:
     # OpenAI model pricing (per 1M tokens) - Updated with latest models
     MODEL_PRICING = {
         # GPT-5 series (as of November 2025)
+        "gpt-5.2": {"input": 1.75, "output": 14.0},
         "gpt-5.1": {"input": 1.25, "output": 10.0},
         "gpt-5": {"input": 1.25, "output": 10.0},
         "gpt-5-mini": {"input": 0.25, "output": 2.0},
@@ -57,6 +58,7 @@ class OpenAIHandler:
 
     MODEL_CONTEXT_SIZE = {
         # GPT-5 series
+        "gpt-5.2": 272000,
         "gpt-5.1": 272000,
         "gpt-5": 272000,
         "gpt-5-mini": 272000,
@@ -87,7 +89,7 @@ class OpenAIHandler:
 
     # Newer models with different API
     REASONING_MODELS = {
-        "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro",
+        "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro",
         "o1", "o1-mini", "o1-pro", "o3", "o3-mini", "o4-mini",
     }
 
