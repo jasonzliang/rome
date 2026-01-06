@@ -34,7 +34,7 @@ ArtifactSynthesizer:
   synthesis_eli5: true
   synthesis_eli5_length: [null, 450]
   synthesis_max_length: null
-  synthesis_iteration_filter: 500
+  synthesis_iteration_filter: 250
 
 # ============================================================================
 # LLM CONFIGURATION
