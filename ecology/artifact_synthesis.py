@@ -359,6 +359,12 @@ EXAMPLE OUTPUT:
                 return_sources=True,
                 filters=self.filters)
 
+            if self.filters and sources:
+                iters = [s.get('iteration') for s in sources]
+                violations = [i for i in iters if isinstance(i, int) and i >= self.synthesis_iteration_filter]
+                if violations:
+                    raise AssertionError(f"Iteration filter failed: {violations} >= {self.synthesis_iteration_filter}")
+
             iter_str = f"[SYNTHESIS ITERATION {i+1}/{self.synthesis_iterations}]"
             if not answer:
                 self.logger.error(f"{iter_str} KB query failed"); break
