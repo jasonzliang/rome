@@ -359,6 +359,7 @@ EXAMPLE OUTPUT:
                 return_sources=True,
                 filters=self.filters)
 
+            # Check if iteration filter is working properly
             if self.filters and sources:
                 iters = [s.get('iteration') for s in sources]
                 violations = [it for it in iters if isinstance(it, int) and it >= self.synthesis_iteration_filter]
