@@ -195,7 +195,7 @@ def main():
         return 130
 
     except Exception as e:
-        logger.error(f"\nError: {e}")
+        logger.error(f"\nAgent stopped due to error: {e}")
         traceback.print_exc()
         if 'agent' in locals():
             agent.shutdown()
