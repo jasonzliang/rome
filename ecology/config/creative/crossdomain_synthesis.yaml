@@ -21,7 +21,7 @@ CaesarAgent:
   save_graph_interval: 50
 
   exploration_llm_config:
-    model: gpt-5.1
+    model: gpt-5.2
 
   # overwrite_role_file: config/role/self_transcend_role.txt
   # adapt_role_file: config/role/self_transcend_insights_v1.txt
@@ -41,7 +41,7 @@ ArtifactSynthesizer:
 # ============================================================================
 OpenAIHandler:
   cost_limit: 300.0
-  model: gpt-5
+  model: gpt-5.2
   reasoning_effort: medium
   temperature: 0.1
   timeout: 1000

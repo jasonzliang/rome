@@ -84,7 +84,7 @@ CAESAR_CONFIG = {
         "max_web_searches": 0,
         # LLM config for agent's ACT/THINK phases to encourage exploration
         "exploration_llm_config": {
-            "model": "gpt-5.1",
+            "model": "gpt-5.2",
             "reasoning_effort": "low",
             "temperature": 0.9,
             "max_completion_tokens": 5000,
@@ -147,7 +147,7 @@ CAESAR_CONFIG = {
     # Default config for LLM outside of agent exploration
     "OpenAIHandler": {
         # Model name for LLM
-        "model": "gpt-5.1",
+        "model": "gpt-5.2",
         # Reasoning effort for GPT-5/O models
         "reasoning_effort": "medium",
         # Base temperature for LLM (overridden by exploration_llm_config for ACT/THINK)
@@ -161,7 +161,7 @@ CAESAR_CONFIG = {
     # Default config for vector store knowledge base
     "ChromaClientManager": {
         # Model name for LLM
-        "llm_model": "gpt-5.1",
+        "llm_model": "gpt-5.2",
         # Reasoning effort for GPT-5/O models
         "llm_reasoning_effort": "medium",
          # LLM model temperature (for query/reranking)
