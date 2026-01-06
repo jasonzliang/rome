@@ -363,7 +363,6 @@ EXAMPLE OUTPUT:
             if self.filters and sources:
                 iters = [s.get('iteration') for s in sources]
                 violations = [it for it in iters if isinstance(it, int) and it >= self.synthesis_iteration_filter]
-                # self.logger.debug(f"Source document iterations: {iters}")
                 if violations:
                     raise AssertionError(f"Iteration filter failed: {violations} >= {self.synthesis_iteration_filter}")
 
