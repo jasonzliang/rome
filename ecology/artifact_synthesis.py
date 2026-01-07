@@ -28,6 +28,7 @@ class ArtifactSynthesizer:
         # Shortcuts to KB resources
         self.kb_manager = self.agent.kb_manager; self.filters = None
 
+        # Setup maximum of iterations to filter for when querying
         if self.synthesis_iteration_filter:
             self.logger.assert_true(
                 isinstance(self.synthesis_iteration_filter, int) and self.synthesis_iteration_filter > 0,
