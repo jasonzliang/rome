@@ -170,6 +170,7 @@ Respond with valid JSON only:
             "starting_url": self.agent.starting_url,
             "starting_query": self.agent.starting_query,
             "synthesis_eli5_length": self.synthesis_eli5_length,
+            "synthesis_iteration_filter": self.synthesis_iteration_filter,
             "synthesis_max_length": self.synthesis_max_length,
             "synthesis_mode": mode,
             "synthesis_queries": len(qa_pairs),
