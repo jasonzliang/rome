@@ -28,6 +28,7 @@ class ArtifactSynthesizer:
         # Shortcuts to KB resources
         self.kb_manager = self.agent.kb_manager; self.filters = None
 
+        # Setup maximum of iterations to filter for when querying
         if self.synthesis_iteration_filter:
             self.logger.assert_true(
                 isinstance(self.synthesis_iteration_filter, int) and self.synthesis_iteration_filter > 0,
@@ -170,6 +171,7 @@ Respond with valid JSON only:
             "starting_url": self.agent.starting_url,
             "starting_query": self.agent.starting_query,
             "synthesis_eli5_length": self.synthesis_eli5_length,
+            "synthesis_iteration_filter": self.synthesis_iteration_filter,
             "synthesis_max_length": self.synthesis_max_length,
             "synthesis_mode": mode,
             "synthesis_queries": len(qa_pairs),
