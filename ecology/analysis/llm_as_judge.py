@@ -37,7 +37,7 @@ JUDGES = {
             api_key=os.getenv("OPENAI_API_KEY"), timeout=600.0),
     },
     "claude": {
-        "model": "claude-opus-4-5-20251101",
+        "model": "claude-sonnet-4-5-20250929",
         "client_init": lambda: anthropic.Anthropic(
             api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=600.0),
     },
