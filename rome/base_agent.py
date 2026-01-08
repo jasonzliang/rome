@@ -164,6 +164,10 @@ class BaseAgent:
         """Query long-term memory and get most relevant results"""
         return self.agent_memory.recall(query, context)
 
+    def summarize_memory(self, total_items: int = 40, recent_ratio: float = 0.5) -> str:
+        """Recall both short term and long term memory"""
+        return self.agent_memory.summarize_memory(total_items, recent_ratio)
+
     def chat_completion(self, prompt: str, system_message: str = None,
                        override_config: Dict = None, response_format: Dict = None) -> str:
         """Direct access to chat completion with configuration options"""

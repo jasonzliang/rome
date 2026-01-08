@@ -248,7 +248,7 @@ class AgentMemory:
             self.logger.error(traceback.format_exc())
             return ""
 
-    def summarize_memory(self, total_items: int = 40, recent_ratio: float = 0.5) -> str:
+    def summarize_memory(self, total_items: int, recent_ratio: float) -> str:
         """
         Combines a dense buffer of recent memories with equidistant samples from distant history
         Args:
