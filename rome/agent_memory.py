@@ -248,6 +248,95 @@ class AgentMemory:
             self.logger.error(traceback.format_exc())
             return ""
 
+    def summarize_memory(self, total_items: int = 40, recent_ratio: float = 0.5) -> str:
+        """
+        Combines a dense buffer of recent memories with equidistant samples from distant history
+        Args:
+            total_items: Total number of memories to retrieve for the context window
+            recent_ratio: Fraction defining the fraction of memories to the dense buffer
+        """
+        if not self.is_enabled():
+            return "Memory is disabled."
+
+        try:
+            # 1. Fetch a large pool to ensure we have deep history to sample from
+            # (Fetching 10x the needed amount ensures we catch the "beginning of time")
+            fetch_pool_size = max(total_items * 10, 2000)
+            results = self.memory.get_all(user_id=self.mem_id, limit=fetch_pool_size)
+
+            if not results or not results.get('results'):
+                return "No memories available to summarize."
+
+            all_memories = results['results']
+
+            # 2. Sort all by timestamp (Newest -> Oldest)
+            # We use 0 as fallback if timestamp is missing
+            all_memories.sort(
+                key=lambda x: x.get('metadata', {}).get('timestamp', 0),
+                reverse=True
+            )
+
+            # 3. Calculate Slice Sizes
+            num_recent = int(total_items * recent_ratio)
+            num_distant = total_items - num_recent
+
+            # 4. Dense Sampling: Take the most recent block as-is
+            selected_memories = all_memories[:num_recent]
+
+            # 5. Sparse Sampling: Stride through the remaining history
+            history_pool = all_memories[num_recent:]
+
+            if history_pool and num_distant > 0:
+                if len(history_pool) <= num_distant:
+                    # If history is small, just take it all
+                    selected_memories.extend(history_pool)
+                else:
+                    # Calculate stride (step size) to sample evenly
+                    step = len(history_pool) / num_distant
+                    for i in range(num_distant):
+                        idx = int(i * step)
+                        selected_memories.append(history_pool[idx])
+
+            # 6. Re-sort the final selection for the LLM
+            # (Newest -> Oldest is maintained to keep the prompt consistent)
+            selected_memories.sort(
+                key=lambda x: x.get('metadata', {}).get('timestamp', 0),
+                reverse=True
+            )
+
+            # 7. Format Context
+            context_items = []
+            for m in selected_memories:
+                text = m.get('memory', '').strip()
+                ctx_type = m.get('metadata', {}).get('context', 'general')
+                # Optional: You could add " (Old)" or " (Recent)" tags here if helpful
+                context_items.append(f"- [{ctx_type}] {text}")
+
+            context_block = "\n".join(context_items)
+
+            # 8. Generate Summary
+            prompt = f"""Analyze the following sparse memory log (containing both dense recent events and sparse historical samples) and generate a "State of the Exploration" summary.
+
+MEMORY LOG (Sorted Newest to Oldest):
+{context_block}
+
+INSTRUCTIONS:
+- Construct a cohesive narrative of the agent's journey.
+- Connect recent actions (top of list) to long-term patterns, original goals, or old failures (sparse items from bottom).
+- Explicitly check if the agent is repeating a strategy attempted long ago.
+
+SUMMARY:"""
+
+            return self.agent.chat_completion(prompt=prompt)
+                # system_message="You are an analytical observer summarizing an agent's memory stream.",
+                # override_config={"reasoning_effort": "medium"}
+
+
+        except Exception as e:
+            self.logger.error(f"Failed to summarize memory: {e}")
+            self.logger.error(traceback.format_exc())
+            return "Error generating memory summary."
+
     def should_remember(self, prompt: str, response: str) -> bool:
         """Heuristic check if interaction should be remembered"""
         if len(prompt) + len(response) < self.auto_remember_len:
