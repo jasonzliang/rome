@@ -138,7 +138,7 @@ class OpenAIHandler:
         """Get tiktoken encoding for the model."""
         try:
             import tiktoken
-            # Hack to ensure support for latest GPT models
+            # Hack to ensure Tiktoken support for latest models
             if model.startswith(("gpt-5", "o4")):
                 return tiktoken.get_encoding("o200k_base")
 
