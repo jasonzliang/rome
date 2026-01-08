@@ -1,4 +1,4 @@
-# Library core packages
+# Rome Core Packages
 colorama
 networkx
 numpy
@@ -8,15 +8,7 @@ psutil
 pytest
 tinydb
 
-# Library optional packages
-curl_cffi
-evalplus
-graphviz
-llmlingua
-ribs
-xxhash
-
-# Knowledge-base/memory packages
+# KB/Memory Packages
 chromadb
 llama-index
 llama-index-vector-stores-chroma
@@ -24,11 +16,20 @@ llama-index-embeddings-openai
 llama-index-llms-openai
 mem0ai[graph]
 
-# Ecology agent packages
+# Casear Agent Packages
 anthropic
 beautifulsoup4
+curl_cffi
 google-genai
 pygraphviz
 PyPDF2
 tabulate
 tenacity
+
+# Rome Optional Packages
+evalplus
+graphviz
+llmlingua
+ribs
+tiktoken
+xxhash

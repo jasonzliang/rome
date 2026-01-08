@@ -138,7 +138,11 @@ class OpenAIHandler:
         """Get tiktoken encoding for the model."""
         try:
             import tiktoken
-            return tiktoken.encoding_for_model(self.model)
+            # Hack to ensure support for latest GPT models
+            if model.startswith(("gpt-5", "o4")):
+                return tiktoken.get_encoding("o200k_base")
+
+            return tiktoken.encoding_for_model(model)
         except (ImportError, KeyError):
             self.logger.error("Tiktoken not available or model unknown, using character estimation")
             return None
