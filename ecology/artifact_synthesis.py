@@ -269,9 +269,9 @@ Respond with JSON:
 YOUR TASK:
 Create a comprehensive merged artifact that:
     - Combines the round artifacts into a single cohesive and complete artifact
-    - Integrates most interesting insights across all round artifacts
+    - Selectively integrates the most interesting/relevant insights across all round artifacts
     - Discovers emergent patterns not visible in individual artifacts
-    - Further develops the core strengths and improves upon the weaknesses of the round artifacts
+    - Develops the core strengths and addresses the weaknesses of the round artifacts
 
 MERGED ARTIFACT CITATIONS:
     - Each round has its own [n] citations (Round 1's [1] and Round 2's [1] are DIFFERENT URLs)
