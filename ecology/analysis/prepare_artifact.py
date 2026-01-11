@@ -1,42 +1,44 @@
 """Prepare Caesar artifacts for LLM as Judge"""
 import glob
 import os
-import random
 import shutil
 import sys
 import time
 
-# Base directory filled with answers from Caesar agent
-CAESAR_AGENT_BASE_DIR = os.path.abspath("result")
-# Filename for Caesar agent answer in answer directory
-CAESAR_AGENT_FILENAME = "answer_cat_cam.txt"
-# Base directory filled with answers from other agents
-OTHER_AGENT_BASE_DIR = os.path.abspath("query_result/external_agent_answers")
+# Default Configuration Dictionary
+DEFAULT_CONFIG = {
+    # Base directory filled with answers from Caesar agent
+    "CAESAR_AGENT_BASE_DIR": os.path.abspath("result"),
+    # Filename for Caesar agent answer in answer directory
+    "CAESAR_AGENT_FILENAME": "answer_cat_cam.txt",
+    # Base directory filled with answers from other agents
+    "OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/other_agent_answers"),
+    # Clean up the output directory before answer file is copied
+    "CLEAR_OUTPUT_DIR": True,
 
-# Base directory to output all agent answers
-ALL_AGENT_BASE_DIR = os.path.abspath("query_result/all_agent_answers")
-# Empty files to create in the category level output directory
-CATEGORY_NEW_FILES = ['judge_claude.txt', 'judge_gemini.txt', 'judge_gpt.txt']
-# Empty files to create in the meta-category level output directory
-META_CATEGORY_NEW_FILES = ['judge_summary.txt', 'judge_csv.txt']
-
+    # Base directory to output all agent answers
+    "ALL_AGENT_BASE_DIR": os.path.abspath("query_result/all_agent_answers"),
+    # Empty files to create in the category level output directory
+    "CATEGORY_NEW_FILES": ['judge_claude.txt', 'judge_gemini.txt', 'judge_gpt.txt'],
+    # Empty files to create in the meta-category level output directory
+    "META_CATEGORY_NEW_FILES": ['judge_summary.txt', 'judge_csv.txt']
+}
 
 def setup_transfer_dict_11_17():
     full = {
         'caesar_sources': '11_17_*/*12130155/*merged-3*',
         'other_sources': '12_4_answers/*/',
     }
-
     eli5 = {
         'caesar_sources': '11_17_*/*12130155/*merged-eli5-3*',
         'other_sources': '12_4_answers_eli5/*/',
     }
-
     eli5_600 = {
         'caesar_sources': '11_17_*/*12130327/*merged-eli5-3*',
         'other_sources': '12_4_answers_eli5_600t/*/',
     }
-    return [full, eli5, eli5_600]
+    # Returns (transfer_list, config_overrides)
+    return [full, eli5, eli5_600], {}
 
 
 def setup_transfer_dict_11_17_v2():
@@ -44,54 +46,73 @@ def setup_transfer_dict_11_17_v2():
         'caesar_sources': '11_17_*/*1217*/*merged-3*',
         'other_sources': '12_4_answers/*/',
     }
-
     eli5 = {
         'caesar_sources': '11_17_*/*1217*/*merged-eli5-3*',
         'other_sources': '12_4_answers_eli5/*/',
     }
-
     eli5_600 = {
         'caesar_sources': '11_17_*/*1217*/*merged-eli5-3*',
         'other_sources': '12_4_answers_eli5_600t/*/',
     }
-    return [full, eli5, eli5_600]
+    return [full, eli5, eli5_600], {}
 
 
 def setup_transfer_dict_12_13():
     full = {
         'caesar_sources': '12_13_*/*12160*/*merged-3*',
         'other_sources': '12_4_answers/*/',
-        'output_name': 'answer_caesar_syn1.txt'
     }
-
     eli5 = {
         'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.1*',
         'other_sources': '12_4_answers_eli5/*/',
     }
-
     eli5_450 = {
         'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.450w.1*',
         'other_sources': '12_4_answers_eli5_450w/*/',
     }
-    return [full, eli5, eli5_450]
+    return [full, eli5, eli5_450], {}
 
 
 def setup_transfer_dict_12_13_syn_ablation():
     syn1 = {
         'caesar_sources': '12_13_*/*12161*/*synthesis-1*',
         'other_sources': '12_4_answers/*/',
+        'caesar_filename': 'answer_cat_ca1.txt'
     }
-
     syn3 = {
         'caesar_sources': '12_13_*/*12161*/*synthesis-3*',
         'other_sources': '12_4_answers/*/',
+        'caesar_filename': 'answer_cat_ca3.txt'
     }
-
     merged = {
         'caesar_sources': '12_13_*/*12161*/*merged-3*',
         'other_sources': '12_4_answers/*/',
+        'caesar_filename': 'answer_cat_cam.txt'
     }
-    return [syn1, syn3, merged]
+    overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
+        "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
+    return [syn1, syn3, merged], overrides
+
+
+def setup_transfer_dict_12_13_iter_ablation():
+    iter250 = {
+        'caesar_sources': '12_13_*/*12161*/*synthesis-1*',
+        'other_sources': '12_4_answers/*/',
+        'caesar_filename': 'answer_cat_t250.txt'
+    }
+    iter500 = {
+        'caesar_sources': '12_13_*/*12161*/*synthesis-3*',
+        'other_sources': '12_4_answers/*/',
+        'caesar_filename': 'answer_cat_t500.txt'
+    }
+    merged = {
+        'caesar_sources': '12_13_*/*12161*/*merged-3*',
+        'other_sources': '12_4_answers/*/',
+        'caesar_filename': 'answer_cat_t1000.txt'
+    }
+    overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
+        "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
+    return [iter250, iter500, merged], overrides
 
 
 def setup_transfer_dict_12_13_v2():
@@ -99,25 +120,36 @@ def setup_transfer_dict_12_13_v2():
         'caesar_sources': '12_13_*/*12161*/*merged-3*',
         'other_sources': '12_4_answers/*/',
     }
-
     eli5 = {
         'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.1*',
         'other_sources': '12_4_answers_eli5/*/',
     }
-
     eli5_450 = {
         'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.450w.1*',
         'other_sources': '12_4_answers_eli5_450w/*/',
     }
-    return [full, eli5, eli5_450]
+    return [full, eli5, eli5_450], {}
 
 
-def prepare_artifact():
+def prepare_artifact(transfer_func):
     """Copy Caesar artifacts to query answer directory for LLM judging"""
-    transfer_dicts = setup_transfer_dict_11_17_v2()
+
+    # Unpack transfer list and any configuration overrides
+    transfer_dicts, config_overrides = transfer_func()
+
+    # Create the active config by merging defaults with overrides
+    config = DEFAULT_CONFIG.copy()
+    if config_overrides:
+        config.update(config_overrides)
+
+    print(f"Active Output Dir: {config['ALL_AGENT_BASE_DIR']}")
+
     for td in transfer_dicts:
-        other_source_dirs = glob.glob(os.path.join(OTHER_AGENT_BASE_DIR, td['other_sources']))
-        for caesar_file in glob.glob(os.path.join(CAESAR_AGENT_BASE_DIR, td['caesar_sources'])):
+        # Use config dictionary instead of globals
+        other_source_dirs = glob.glob(os.path.join(config['OTHER_AGENT_BASE_DIR'],
+            td['other_sources']))
+        for caesar_file in glob.glob(os.path.join(config['CAESAR_AGENT_BASE_DIR'],
+            td['caesar_sources'])):
             matched = None
             for other_source_dir in other_source_dirs:
                 category_name = os.path.normpath(other_source_dir).split(os.sep)[-1]
@@ -133,24 +165,35 @@ def prepare_artifact():
                 print(f"Matching other agent answer directory: {matched}")
                 other_source_dir = matched
 
-            os.makedirs(ALL_AGENT_BASE_DIR, exist_ok=True)
-            output_dir = os.path.join(ALL_AGENT_BASE_DIR,
+            os.makedirs(config['ALL_AGENT_BASE_DIR'], exist_ok=True)
+            output_dir = os.path.join(config['ALL_AGENT_BASE_DIR'],
                 os.path.join(*os.path.normpath(other_source_dir).split(os.sep)[-2:]))
             meta_output_dir = os.path.dirname(os.path.normpath(output_dir))
 
-            if os.path.exists(output_dir):
-                os.system(f"rm -rf {output_dir}")
-            shutil.copytree(other_source_dir, output_dir)
-            # os.system(f'find {output_dir} -type f -name "judge_*" -exec truncate -s 0 {{}} +')
-            for new_file in CATEGORY_NEW_FILES:
-                os.system(f"touch {os.path.join(output_dir, new_file)}")
-            for new_file in META_CATEGORY_NEW_FILES:
-                os.system(f"touch {os.path.join(meta_output_dir, new_file)}")
+            if config['CLEAR_OUTPUT_DIR'] and os.path.exists(output_dir):
+                shutil.rmtree(output_dir) # Replaced os.system rm -rf
 
-            caesar_filename = td.get("caesar_filename") or CAESAR_AGENT_FILENAME
-            cmd = f"cp {caesar_file} {os.path.join(output_dir, caesar_filename)}"
-            print(f'{cmd}\n'); os.system(cmd)
+            shutil.copytree(other_source_dir, output_dir, dirs_exist_ok=True)
+
+            for new_file in config['CATEGORY_NEW_FILES']:
+                # Replaced os.system touch
+                with open(os.path.join(output_dir, new_file), 'a'):
+                    os.utime(os.path.join(output_dir, new_file), None)
+
+            for new_file in config['META_CATEGORY_NEW_FILES']:
+                # Replaced os.system touch
+                with open(os.path.join(meta_output_dir, new_file), 'a'):
+                    os.utime(os.path.join(meta_output_dir, new_file), None)
+
+            # Use local filename override from td, otherwise fallback to config default
+            caesar_filename = td.get("caesar_filename") or config['CAESAR_AGENT_FILENAME']
+
+            # Using shutil.copy2 to preserve metadata instead of os.system cp
+            src = caesar_file
+            dst = os.path.join(output_dir, caesar_filename)
+            print(f'cp {src} {dst}\n')
+            shutil.copy2(src, dst)
 
 
 if __name__ == '__main__':
-    prepare_artifact()
+    prepare_artifact(setup_transfer_dict_12_13_syn_ablation)
