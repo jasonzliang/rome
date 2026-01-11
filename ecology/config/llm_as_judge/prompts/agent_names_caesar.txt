@@ -1,7 +1,7 @@
 Agent Code Name: Agent Real Name
-answer_cat_ca1: Caesar (Synthesis-1)
-answer_cat_ca3: Caesar (Synthesis-3)
-answer_cat_cam: Caesar (Merged)
+answer_cat_syn1: Caesar (Synthesis-1)
+answer_cat_syn3: Caesar (Synthesis-3)
+answer_cat_merge: Caesar (Merged)
 answer_cat_250: Caesar (Merged, 250 Iter)
 answer_cat_500: Caesar (Merged, 500 Iter)
 answer_cat_1000: Caesar (Merged, 1000 Iter)

@@ -457,7 +457,7 @@ Examples:
   %(prog)s -i data -a analysis.txt               # Generate CSV and analyze it
   %(prog)s -i data -a analysis.txt -m names.txt  # Analyze with custom agent mapping""")
 
-    parser.add_argument('-i', '--input-dir', default='.',
+    parser.add_argument("input_dir", type=Path,
         help='Base directory containing category folders (default: current directory)')
     parser.add_argument('-o', '--output', default=None,
         help='Output CSV filename (default: judge_csv.txt in input directory)')

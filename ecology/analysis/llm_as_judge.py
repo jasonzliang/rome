@@ -54,7 +54,8 @@ JUDGES = {
 TEXT_FORMAT_INSTRUCTION = """
 ### Evaluation Output Instructions
 - You MUST output your judgement in the following format. Output NOTHING else.
-- Do not output markdown code blocks (```). Just the raw text.
+- Do NOT output markdown code blocks (```). Just the raw text.
+- Do NOT consider the "Abstract" or "Sources" section when evaluating scores
 
 #### Query: [Query text]
 
@@ -83,6 +84,7 @@ JSON_FORMAT_INSTRUCTION = """
 ### Evaluation Output Instructions
 - You MUST output a valid JSON object.
 - Do NOT output markdown formatting (like ```json ... ```). Output RAW JSON only.
+- Do NOT consider the "Abstract" or "Sources" section when evaluating scores
 - The JSON structure must be exactly like the example below:
 
 {
@@ -288,7 +290,7 @@ def run_single_judge_task(
     'rubric' accessed via args.rubric_content.
     """
     try:
-        safe_print(f"⏳ Starting trial {output_file.name}...")
+        safe_print(f"⏳ Starting trial {output_file}...")
 
         # Resolve configuration internally
         config = JUDGES[judge_name]
@@ -331,7 +333,7 @@ def run_single_judge_task(
 
         # Write Result
         output_file.write_text(final_output, encoding="utf-8")
-        safe_print(f"✅ Finished trial {output_file.name}")
+        safe_print(f"✅ Finished trial {output_file}")
 
         if args.debug:
             with PRINT_LOCK:
@@ -340,7 +342,7 @@ def run_single_judge_task(
                 print(f"JUDGE RESPONSE: {final_output[:800]}...\n")
 
     except Exception as e:
-        safe_print(f"❌ Error in {output_file.name}: {e}")
+        safe_print(f"❌ Error in {output_file}: {e}")
         if args.debug:
             traceback.print_exc()
 

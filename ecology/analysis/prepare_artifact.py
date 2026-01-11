@@ -77,21 +77,53 @@ def setup_transfer_dict_12_13_syn_ablation():
     syn1 = {
         'caesar_sources': '12_13_*/*12161*/*synthesis-1*',
         'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_ca1.txt'
+        'caesar_filename': 'answer_cat_syn1.txt'
     }
     syn3 = {
         'caesar_sources': '12_13_*/*12161*/*synthesis-3*',
         'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_ca3.txt'
+        'caesar_filename': 'answer_cat_syn3.txt'
     }
     merged = {
         'caesar_sources': '12_13_*/*12161*/*merged-3*',
         'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_cam.txt'
+        'caesar_filename': 'answer_cat_merge.txt'
+    }
+
+    syn1_eli5 = {
+        'caesar_sources': '12_13_*/*12161*/*synth-eli5-1.1*',
+        'other_sources': '12_4_answers_eli5/*/',
+        'caesar_filename': 'answer_cat_syn1.txt'
+    }
+    syn3_eli5 = {
+        'caesar_sources': '12_13_*/*12161*/*synth-eli5-3.1*',
+        'other_sources': '12_4_answers_eli5/*/',
+        'caesar_filename': 'answer_cat_syn3.txt'
+    }
+    merged_eli5 = {
+        'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.1*',
+        'other_sources': '12_4_answers_eli5/*/',
+        'caesar_filename': 'answer_cat_merge.txt'
+    }
+
+    syn1_eli5_450w = {
+        'caesar_sources': '12_13_*/*12161*/*synth-eli5-1.450w.1*',
+        'other_sources': '12_4_answers_eli5_450w/*/',
+        'caesar_filename': 'answer_cat_syn1.txt'
+    }
+    syn3_eli5_450w = {
+        'caesar_sources': '12_13_*/*12161*/*synth-eli5-3.450w.1*',
+        'other_sources': '12_4_answers_eli5_450w/*/',
+        'caesar_filename': 'answer_cat_syn3.txt'
+    }
+    merged_eli5_450w = {
+        'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.450w*',
+        'other_sources': '12_4_answers_eli5_450w/*/',
+        'caesar_filename': 'answer_cat_merge.txt'
     }
     overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
         "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return [syn1, syn3, merged], overrides
+    return [syn1, syn3, merged, syn1_eli5, syn3_eli5, merged_eli5, syn1_eli5_450w, syn3_eli5_450w, merged_eli5_450w], overrides
 
 
 def setup_transfer_dict_12_13_iter_ablation():
@@ -105,14 +137,14 @@ def setup_transfer_dict_12_13_iter_ablation():
         'other_sources': '12_4_answers/*/',
         'caesar_filename': 'answer_cat_t500.txt'
     }
-    merged = {
+    iter1000 = {
         'caesar_sources': '12_13_*/*12161*/*merged-3*',
         'other_sources': '12_4_answers/*/',
         'caesar_filename': 'answer_cat_t1000.txt'
     }
     overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
         "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return [iter250, iter500, merged], overrides
+    return [iter250, iter500, iter1000], overrides
 
 
 def setup_transfer_dict_12_13_v2():
