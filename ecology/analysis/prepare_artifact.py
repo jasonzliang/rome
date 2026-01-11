@@ -123,7 +123,7 @@ def setup_transfer_dict_12_13_iter_ablation():
         'caesar_filename': 'answer_cat_500.txt'
     }
     iter1000 = {
-        'caesar_sources': '12_13_*/*12160*/*merged-3*',
+        'caesar_sources': '12_13_*/*01110646*/*merged-3*',
         'other_sources': '12_4_answers/*/',
         'caesar_filename': 'answer_cat_1000.txt'
     }
@@ -139,7 +139,7 @@ def setup_transfer_dict_12_13_iter_ablation():
         'caesar_filename': 'answer_cat_500.txt'
     }
     iter1000_eli5 = {
-        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.1*',
+        'caesar_sources': '12_13_*/*01110646*/*merged-eli5-3.0*',
         'other_sources': '12_4_answers_eli5/*/',
         'caesar_filename': 'answer_cat_1000.txt'
     }
@@ -155,7 +155,7 @@ def setup_transfer_dict_12_13_iter_ablation():
         'caesar_filename': 'answer_cat_500.txt'
     }
     iter1000_eli5_450w = {
-        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.450w*',
+        'caesar_sources': '12_13_*/*01110646*/*merged-eli5-3.450w*',
         'other_sources': '12_4_answers_eli5_450w/*/',
         'caesar_filename': 'answer_cat_1000.txt'
     }
