@@ -32,15 +32,15 @@ RETRY_CONFIG = {
 PRINT_LOCK = threading.Lock()
 
 JUDGES = {
-    "gpt": {
-        "model": "gpt-5.2",
-        "client_init": lambda: openai.OpenAI(
-            api_key=os.getenv("OPENAI_API_KEY"), timeout=600.0),
-    },
     "claude": {
         "model": "claude-sonnet-4-5-20250929",
         "client_init": lambda: anthropic.Anthropic(
             api_key=os.getenv("ANTHROPIC_API_KEY"), timeout=600.0),
+    },
+    "gpt": {
+        "model": "gpt-5.2",
+        "client_init": lambda: openai.OpenAI(
+            api_key=os.getenv("OPENAI_API_KEY"), timeout=600.0),
     },
     "gemini": {
         "model": "gemini-3-pro-preview",
@@ -209,7 +209,7 @@ def aggregate_text_responses(query: str, individual_responses: List[str]) -> str
         cleaned_resp = re.sub(r"#### Query:.*?\n", "", cleaned_resp, flags=re.DOTALL).strip()
 
         output_buffer.append(cleaned_resp)
-        output_buffer.append("\n" + "-"*40 + "\n")
+        output_buffer.append("\n" + "-"*80 + "\n")
 
     output_buffer.append("\n#### Final Ranking\n(Ranking not generated in individual mode)")
     return "\n".join(output_buffer)
@@ -297,6 +297,7 @@ def run_single_judge_task(
 
         final_output = ""
         rubric_content = args.rubric_content
+        prompt = ""
 
         if args.individual:
             # --- Individual Mode: 1 API call per answer file ---
@@ -334,7 +335,9 @@ def run_single_judge_task(
 
         if args.debug:
             with PRINT_LOCK:
-                print(f"DEBUG {output_file.name}: {final_output[:200]}...")
+                print(f"JUDGE PROMPT: {prompt[:800]}...\n")
+                print("=" * 80)
+                print(f"JUDGE RESPONSE: {final_output[:800]}...\n")
 
     except Exception as e:
         safe_print(f"❌ Error in {output_file.name}: {e}")
@@ -343,8 +346,7 @@ def run_single_judge_task(
 
 def submit_directory_tasks(directory: Path, executor: concurrent.futures.ThreadPoolExecutor, args):
     """
-    Submits tasks for all judges and all trials.
-    Passed args to worker function, removed config/directory arguments from worker call.
+    Submits tasks for selected judges and all trials.
     """
     query_file = directory / "query.txt"
     if not query_file.exists():
@@ -356,8 +358,10 @@ def submit_directory_tasks(directory: Path, executor: concurrent.futures.ThreadP
 
     query_text = query_file.read_text(encoding="utf-8")
 
-    # Loop for Judges
-    for judge_name, config in sorted(JUDGES.items()):
+    # --- MODIFIED LOOP ---
+    # Iterate only over the judges selected in args
+    for judge_name in sorted(args.judges):
+
         # Loop for Trials
         for i in range(1, args.trials + 1):
 
@@ -377,8 +381,7 @@ def submit_directory_tasks(directory: Path, executor: concurrent.futures.ThreadP
                 query_text,
                 answers,
                 output_file,
-                args
-            )
+                args)
 
 def find_and_judge_all(args):
     """
@@ -418,13 +421,16 @@ Examples:
 
     parser.add_argument("root_directory", type=Path, help="Root directory for answer files")
     parser.add_argument("-d", "--debug", action="store_true", help="Debug print statements")
-    parser.add_argument("-i", "--individual", action="store_true", help="Evaluate each answer file separately")
     parser.add_argument("-j", "--json", action="store_true", help="Output results in JSON format")
-    parser.add_argument("-n", "--workers", type=int, default=3, help="Number of workers (def: 1)")
+    parser.add_argument("-i", "--individual", action="store_true", help="Evaluate each answer file separately")
+
     parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite previous results")
-    parser.add_argument("-r", "--rubric", type=Path, default=Path(DEFAULT_RUBRIC_PATH), help="Rubric file path")
     parser.add_argument("-R", "--reasoning", action="store_true", help="Enable reasoning/thinking")
-    parser.add_argument("-t", "--trials", type=int, default=1, help="Number of trials (def: 3)")
+    parser.add_argument("-r", "--rubric", type=Path, default=Path(DEFAULT_RUBRIC_PATH), help="Rubric file path")
+
+    parser.add_argument("-n", "--workers", type=int, default=1, help="Number of workers (def: 1)")
+    parser.add_argument("-t", "--trials", type=int, default=1, help="Number of trials (def: 1)")
+    parser.add_argument("-J", "--judges", nargs="+", choices=list(JUDGES.keys()), default=list(JUDGES.keys()), help="Specific judges to run (def: all)")
 
     return parser.parse_args()
 
