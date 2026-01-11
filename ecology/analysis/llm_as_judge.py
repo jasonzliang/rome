@@ -10,8 +10,9 @@ import os
 import threading
 import traceback
 import json
+import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List, Any
 
 import anthropic
 import openai
@@ -145,6 +146,74 @@ def create_judge_prompt(query: str, answers: Dict[str, str], rubric: str, json_m
 
     return prompt
 
+# --- Aggregation Helpers ---
+
+def aggregate_json_responses(query: str, individual_responses: List[str]) -> str:
+    """
+    Parses multiple JSON responses and merges them into a single structure
+    with a calculated ranking.
+    """
+    aggregated = {
+        "query": query,
+        "reviews": [],
+        "ranking": []
+    }
+
+    for resp in individual_responses:
+        try:
+            # Clean generic markdown if present
+            clean_resp = resp.replace("```json", "").replace("```", "").strip()
+            data = json.loads(clean_resp)
+
+            # Extract reviews
+            if "reviews" in data and isinstance(data["reviews"], list):
+                aggregated["reviews"].extend(data["reviews"])
+
+        except json.JSONDecodeError:
+            safe_print("❌ Failed to parse JSON chunk during aggregation")
+            continue
+
+    # Programmatic Ranking based on total score
+    def get_total_score(review):
+        scores = review.get("scores", {})
+        # Handle potential string scores
+        total = 0
+        for v in scores.values():
+            try:
+                total += float(v)
+            except (ValueError, TypeError):
+                continue
+        return total
+
+    # Sort reviews desc by score
+    aggregated["reviews"].sort(key=get_total_score, reverse=True)
+
+    # Generate ranking list
+    aggregated["ranking"] = [r.get("agent_name", "unknown") for r in aggregated["reviews"]]
+
+    return json.dumps(aggregated, indent=2)
+
+def aggregate_text_responses(query: str, individual_responses: List[str]) -> str:
+    """
+    Concatenates text responses, stripping individual 'Final Ranking' sections
+    to avoid confusion, as they are meaningless in isolation.
+    """
+    output_buffer = [f"#### Query: {query}\n"]
+
+    for resp in individual_responses:
+        # Strip the "Final Ranking" section from individual responses using regex
+        # Look for "#### Final Ranking" and everything after it
+        cleaned_resp = re.sub(r"#### Final Ranking.*", "", resp, flags=re.DOTALL).strip()
+
+        # Also strip the "Query:" header if the model repeats it
+        cleaned_resp = re.sub(r"#### Query:.*?\n", "", cleaned_resp, flags=re.DOTALL).strip()
+
+        output_buffer.append(cleaned_resp)
+        output_buffer.append("\n" + "-"*40 + "\n")
+
+    output_buffer.append("\n#### Final Ranking\n(Ranking not generated in individual mode)")
+    return "\n".join(output_buffer)
+
 # --- API Call Wrappers ---
 
 @retry(**RETRY_CONFIG, retry=retry_if_exception_type((openai.RateLimitError, openai.APIError, openai.APITimeoutError)))
@@ -163,7 +232,6 @@ def call_gpt(client, prompt: str, use_reasoning: bool, json_mode: bool) -> str:
     else:
         kwargs["temperature"] = 0.0
         kwargs["seed"] = 42
-        # kwargs["top_p"] = 1.0
 
     response = client.chat.completions.create(**kwargs)
     return response.choices[0].message.content
@@ -178,11 +246,8 @@ def call_claude(client, prompt: str, use_reasoning: bool, json_mode: bool) -> st
 
     if use_reasoning:
         kwargs["thinking"] = {"type": "enabled", "budget_tokens": 10000}
-        # Omit temperature for reasoning
     else:
         kwargs["temperature"] = 0.0
-        # kwargs["top_k"] = 1
-        # kwargs["top_p"] = 1.0
 
     response = client.messages.create(**kwargs)
     return next(block.text for block in response.content if block.type == "text")
@@ -198,8 +263,6 @@ def call_gemini(client, prompt: str, use_reasoning: bool, json_mode: bool) -> st
         kwargs["thinking_config"] = types.ThinkingConfig(thinking_level=types.ThinkingLevel.HIGH)
     else:
         kwargs["temperature"] = 0.0
-        # kwargs["top_k"] = 1
-        # kwargs["top_p"] = 1.0
 
     response = client.models.generate_content(
         model=JUDGES["gemini"]["model"],
@@ -212,38 +275,76 @@ JUDGE_CALLS = {"gpt": call_gpt, "claude": call_claude, "gemini": call_gemini}
 
 # --- Core Logic ---
 
-def run_single_judge_task(directory: Path, judge_name: str, config: dict, prompt: str, output_file: Path, debug: bool, use_reasoning: bool, json_mode: bool):
+def run_single_judge_task(
+    judge_name: str,
+    query_text: str,
+    answers: Dict[str, str],
+    output_file: Path,
+    args: argparse.Namespace
+):
     """
     Worker function executed by the thread pool.
+    Simplified signature: 'config' and 'directory' removed.
+    'rubric' accessed via args.rubric_content.
     """
     try:
-        mode_str = "Reasoning" if use_reasoning else "Standard"
         safe_print(f"⏳ Starting trial {output_file.name}...")
 
+        # Resolve configuration internally
+        config = JUDGES[judge_name]
         client = config["client_init"]()
+        caller_func = JUDGE_CALLS[judge_name]
 
-        # Pass json_mode to the API call
-        judgment = JUDGE_CALLS[judge_name](client, prompt, use_reasoning, json_mode)
+        final_output = ""
+        rubric_content = args.rubric_content
 
-        # Cleanup: Remove Markdown fences if the model added them despite instructions
-        if json_mode:
-            judgment = judgment.replace("```json", "").replace("```", "").strip()
+        if args.individual:
+            # --- Individual Mode: 1 API call per answer file ---
+            individual_responses = []
 
-        output_file.write_text(judgment, encoding="utf-8")
+            # Sort to ensure consistent order
+            for filename, content in sorted(answers.items()):
+                # Create a prompt specifically for this one answer
+                single_answer_dict = {filename: content}
+                prompt = create_judge_prompt(query_text, single_answer_dict, rubric_content, args.json)
+
+                # Call API
+                resp = caller_func(client, prompt, args.reasoning, args.json)
+                individual_responses.append(resp)
+
+            # Aggregate results
+            if args.json:
+                final_output = aggregate_json_responses(query_text, individual_responses)
+            else:
+                final_output = aggregate_text_responses(query_text, individual_responses)
+
+        else:
+            # --- Bulk Mode: 1 API call for ALL answers ---
+            prompt = create_judge_prompt(query_text, answers, rubric_content, args.json)
+            judgment = caller_func(client, prompt, args.reasoning, args.json)
+
+            if args.json:
+                final_output = judgment.replace("```json", "").replace("```", "").strip()
+            else:
+                final_output = judgment
+
+        # Write Result
+        output_file.write_text(final_output, encoding="utf-8")
         safe_print(f"✅ Finished trial {output_file.name}")
 
-        if debug:
+        if args.debug:
             with PRINT_LOCK:
-                print(f"DEBUG {output_file.name}: {judgment[:200]}...")
+                print(f"DEBUG {output_file.name}: {final_output[:200]}...")
 
     except Exception as e:
         safe_print(f"❌ Error in {output_file.name}: {e}")
-        if debug:
+        if args.debug:
             traceback.print_exc()
 
-def submit_directory_tasks(directory: Path, rubric: str, executor: concurrent.futures.ThreadPoolExecutor, args):
+def submit_directory_tasks(directory: Path, executor: concurrent.futures.ThreadPoolExecutor, args):
     """
     Submits tasks for all judges and all trials.
+    Passed args to worker function, removed config/directory arguments from worker call.
     """
     query_file = directory / "query.txt"
     if not query_file.exists():
@@ -253,16 +354,13 @@ def submit_directory_tasks(directory: Path, rubric: str, executor: concurrent.fu
     if not answers:
         return
 
-    # Pass json_mode to prompt creation
-    query = query_file.read_text(encoding="utf-8")
-    prompt = create_judge_prompt(query, answers, rubric, args.json)
+    query_text = query_file.read_text(encoding="utf-8")
 
     # Loop for Judges
     for judge_name, config in sorted(JUDGES.items()):
         # Loop for Trials
         for i in range(1, args.trials + 1):
 
-            # Naming convention: judge_gpt_1.json or judge_gpt_1.txt
             ext = "json" if args.json else "txt"
             suffix = f"_{i}" if args.trials > 1 else ""
             filename = f"judge_{judge_name}{suffix}.{ext}"
@@ -275,17 +373,17 @@ def submit_directory_tasks(directory: Path, rubric: str, executor: concurrent.fu
 
             executor.submit(
                 run_single_judge_task,
-                directory,
                 judge_name,
-                config,
-                prompt,
+                query_text,
+                answers,
                 output_file,
-                args.debug,
-                args.reasoning,
-                args.json
+                args
             )
 
-def find_and_judge_all(args, rubric: str):
+def find_and_judge_all(args):
+    """
+    Main controller for finding and submitting tasks.
+    """
     dirs_with_answers = [
         d for d in args.root_directory.rglob("*")
         if d.is_dir() and list(d.glob("answer_*.txt"))
@@ -293,15 +391,16 @@ def find_and_judge_all(args, rubric: str):
 
     mode_msg = "🧠 Reasoning" if args.reasoning else "🤖 Deterministic"
     format_msg = "JSON" if args.json else "Text"
+    strategy_msg = "Individual Calls" if args.individual else "Bulk Context"
 
-    print(f"\nMode: {mode_msg} | Format: {format_msg} | Trials: {args.trials} | Overwrite: {args.overwrite} | Debug: {args.debug}")
+    print(f"\nMode: {mode_msg} | Format: {format_msg} | Strategy: {strategy_msg}")
     print(f"Found {len(dirs_with_answers)} directories in {args.root_directory}")
     print(f"Using grading rubric: {args.rubric}")
-    print(f"Starting execution pool with {args.jobs} workers...")
+    print(f"Starting execution pool with {args.workers} workers...")
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=args.jobs) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=args.workers) as executor:
         for directory in sorted(dirs_with_answers):
-            submit_directory_tasks(directory, rubric, executor, args)
+            submit_directory_tasks(directory, executor, args)
 
     print("\n✨ All tasks completed")
 
@@ -312,19 +411,20 @@ def parse_args():
         epilog="""
 Examples:
   %(prog)s ./experiments                   # Basic run on directory
-  %(prog)s ./experiments --json -t 3       # JSON output, 3 trials per judge
-  %(prog)s ./experiments -R -o --jobs 10   # Reasoning mode, overwrite, 10 threads
-  %(prog)s ./experiments -r ./rubric.txt   # Use custom scoring rubric file
-  %(prog)s ./experiments -d --json         # Debug mode with JSON output""")
+  %(prog)s ./experiments -j -t 3           # JSON output, 3 trials per judge
+  %(prog)s ./experiments -i -j             # Individual calls per answer, aggregated to JSON
+  %(prog)s ./experiments -R -o -n 10       # Reasoning mode, overwrite, 10 workers
+""")
 
-    parser.add_argument("root_directory", type=Path)
-    parser.add_argument("-r", "--rubric", type=Path, default=Path(DEFAULT_RUBRIC_PATH))
-    parser.add_argument("-o", "--overwrite", action="store_true")
-    parser.add_argument("-d", "--debug", action="store_true")
-    parser.add_argument("-j", "--jobs", type=int, default=3)
+    parser.add_argument("root_directory", type=Path, help="Root directory for answer files")
+    parser.add_argument("-d", "--debug", action="store_true", help="Debug print statements")
+    parser.add_argument("-i", "--individual", action="store_true", help="Evaluate each answer file separately")
+    parser.add_argument("-j", "--json", action="store_true", help="Output results in JSON format")
+    parser.add_argument("-n", "--workers", type=int, default=3, help="Number of workers (def: 1)")
+    parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite previous results")
+    parser.add_argument("-r", "--rubric", type=Path, default=Path(DEFAULT_RUBRIC_PATH), help="Rubric file path")
     parser.add_argument("-R", "--reasoning", action="store_true", help="Enable reasoning/thinking")
-    parser.add_argument("--json", action="store_true", help="Output results in JSON format")
-    parser.add_argument("-t", "--trials", type=int, default=1, help="Number of trials per judge (default: 1)")
+    parser.add_argument("-t", "--trials", type=int, default=1, help="Number of trials (def: 3)")
 
     return parser.parse_args()
 
@@ -333,5 +433,7 @@ if __name__ == "__main__":
     if not args.root_directory.exists():
         exit(1)
 
-    rubric = load_rubric(args.rubric)
-    find_and_judge_all(args, rubric)
+    # Attach loaded rubric content to args to avoid passing it through every function
+    args.rubric_content = load_rubric(args.rubric)
+
+    find_and_judge_all(args)

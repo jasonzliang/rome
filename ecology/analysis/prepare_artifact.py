@@ -61,6 +61,7 @@ def setup_transfer_dict_12_13():
     full = {
         'caesar_sources': '12_13_*/*12160*/*merged-3*',
         'other_sources': '12_4_answers/*/',
+        'output_name': 'answer_caesar_syn1.txt'
     }
 
     eli5 = {
@@ -73,6 +74,24 @@ def setup_transfer_dict_12_13():
         'other_sources': '12_4_answers_eli5_450w/*/',
     }
     return [full, eli5, eli5_450]
+
+
+def setup_transfer_dict_12_13_syn_ablation():
+    syn1 = {
+        'caesar_sources': '12_13_*/*12161*/*synthesis-1*',
+        'other_sources': '12_4_answers/*/',
+    }
+
+    syn3 = {
+        'caesar_sources': '12_13_*/*12161*/*synthesis-3*',
+        'other_sources': '12_4_answers/*/',
+    }
+
+    merged = {
+        'caesar_sources': '12_13_*/*12161*/*merged-3*',
+        'other_sources': '12_4_answers/*/',
+    }
+    return [syn1, syn3, merged]
 
 
 def setup_transfer_dict_12_13_v2():
