@@ -24,6 +24,7 @@ DEFAULT_CONFIG = {
     "META_CATEGORY_NEW_FILES": ['judge_summary.txt', 'judge_csv.txt']
 }
 
+
 def setup_transfer_dict_11_17():
     full = {
         'caesar_sources': '11_17_*/*12130155/*merged-3*',
@@ -38,22 +39,6 @@ def setup_transfer_dict_11_17():
         'other_sources': '12_4_answers_eli5_600t/*/',
     }
     # Returns (transfer_list, config_overrides)
-    return [full, eli5, eli5_600], {}
-
-
-def setup_transfer_dict_11_17_v2():
-    full = {
-        'caesar_sources': '11_17_*/*1217*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-    }
-    eli5 = {
-        'caesar_sources': '11_17_*/*1217*/*merged-eli5-3*',
-        'other_sources': '12_4_answers_eli5/*/',
-    }
-    eli5_600 = {
-        'caesar_sources': '11_17_*/*1217*/*merged-eli5-3*',
-        'other_sources': '12_4_answers_eli5_600t/*/',
-    }
     return [full, eli5, eli5_600], {}
 
 
@@ -107,12 +92,12 @@ def setup_transfer_dict_12_13_syn_ablation():
     }
 
     syn1_eli5_450w = {
-        'caesar_sources': '12_13_*/*12161*/*synth-eli5-1.450w.1*',
+        'caesar_sources': '12_13_*/*12161*/*synth-eli5-1.450w*',
         'other_sources': '12_4_answers_eli5_450w/*/',
         'caesar_filename': 'answer_cat_syn1.txt'
     }
     syn3_eli5_450w = {
-        'caesar_sources': '12_13_*/*12161*/*synth-eli5-3.450w.1*',
+        'caesar_sources': '12_13_*/*12161*/*synth-eli5-3.450w*',
         'other_sources': '12_4_answers_eli5_450w/*/',
         'caesar_filename': 'answer_cat_syn3.txt'
     }
@@ -128,12 +113,12 @@ def setup_transfer_dict_12_13_syn_ablation():
 
 def setup_transfer_dict_12_13_iter_ablation():
     iter250 = {
-        'caesar_sources': '12_13_*/*12161*/*synthesis-1*',
+        'caesar_sources': '12_13_*/*01072*/*merged-3*',
         'other_sources': '12_4_answers/*/',
         'caesar_filename': 'answer_cat_t250.txt'
     }
     iter500 = {
-        'caesar_sources': '12_13_*/*12161*/*synthesis-3*',
+        'caesar_sources': '12_13_*/*01071*/*merged-3*',
         'other_sources': '12_4_answers/*/',
         'caesar_filename': 'answer_cat_t500.txt'
     }
@@ -142,9 +127,41 @@ def setup_transfer_dict_12_13_iter_ablation():
         'other_sources': '12_4_answers/*/',
         'caesar_filename': 'answer_cat_t1000.txt'
     }
+
+    iter250_eli5 = {
+        'caesar_sources': '12_13_*/*01072*/*merged-eli5-3.0*',
+        'other_sources': '12_4_answers_eli5/*/',
+        'caesar_filename': 'answer_cat_t250.txt'
+    }
+    iter500_eli5 = {
+        'caesar_sources': '12_13_*/*01071*/*merged-eli5-3.0*',
+        'other_sources': '12_4_answers_eli5/*/',
+        'caesar_filename': 'answer_cat_t500.txt'
+    }
+    iter1000_eli5 = {
+        'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.1*',
+        'other_sources': '12_4_answers_eli5/*/',
+        'caesar_filename': 'answer_cat_t1000.txt'
+    }
+
+    iter250_eli5_450w = {
+        'caesar_sources': '12_13_*/*01072*/*merged-eli5-3.450w*',
+        'other_sources': '12_4_answers_eli5_450w/*/',
+        'caesar_filename': 'answer_cat_t250.txt'
+    }
+    iter500_eli5_450w = {
+        'caesar_sources': '12_13_*/*01071*/*merged-eli5-3.450w*',
+        'other_sources': '12_4_answers_eli5_450w/*/',
+        'caesar_filename': 'answer_cat_t500.txt'
+    }
+    iter1000_eli5_450w = {
+        'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.450w*',
+        'other_sources': '12_4_answers_eli5_450w/*/',
+        'caesar_filename': 'answer_cat_t1000.txt'
+    }
     overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
         "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return [iter250, iter500, iter1000], overrides
+    return [iter250, iter500, iter1000, iter250_eli5, iter500_eli5, iter1000_eli5, iter250_eli5_450w, iter500_eli5_450w, iter1000_eli5_450w], overrides
 
 
 def setup_transfer_dict_12_13_v2():
@@ -228,4 +245,4 @@ def prepare_artifact(transfer_func):
 
 
 if __name__ == '__main__':
-    prepare_artifact(setup_transfer_dict_12_13_syn_ablation)
+    prepare_artifact(setup_transfer_dict_12_13_iter_ablation)
