@@ -30,6 +30,6 @@ tenacity
 evalplus
 graphviz
 llmlingua
-ribs
+# ribs
 tiktoken
 xxhash
