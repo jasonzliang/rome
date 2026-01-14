@@ -473,9 +473,17 @@ with tab1:
     with col2:
         layout = st.selectbox("Layout Algorithm", ['kamada', 'spring', 'circular', 'shell'], index=0)
 
+    config = {
+        'displayModeBar': True,
+        'responsive': True,
+        'toImageButtonOptions': {
+            'format': 'svg',
+            'filename': f'graph_iter_{iteration}'
+        }
+    }
     data = graphs[iteration]
     fig, G = create_network_graph(data, layout)
-    st.plotly_chart(fig, config={'displayModeBar': True, 'responsive': True})
+    st.plotly_chart(fig, config=config, use_container_width=True)
 
     depths = [G.nodes[n].get('depth', 0) for n in G.nodes()]
     col1, col2, col3, col4 = st.columns(4)
