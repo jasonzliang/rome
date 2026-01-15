@@ -95,14 +95,18 @@ JSON_FORMAT_INSTRUCTION = """
       "summary": "Short summary of answer...",
       "scores": {
         "New": 8,
-        "Useful": 6,
-        "Surprising": 9
+        "Useful": 8,
+        "Surprising": 8
       },
       "analysis": {
         "New": "Reasoning for New score...",
         "Useful": "Reasoning for Useful score...",
         "Surprising": "Reasoning for Surprising score..."
       }
+    },
+    {
+        "agent_name": "answer_agent2.txt",
+        ...
     }
   ],
   "ranking": ["answer_agent1.txt", "answer_agent2.txt"]
