@@ -247,7 +247,7 @@ Respond with JSON:
         # Build context with per-draft sources as prettified JSON
         # artifacts_text = json.dumps([
         #     {
-        #         "Round": i,
+        #         "Draft": i,
         #         "Artifact": r['artifact'],
         #         "Sources": {idx: url for url, idx in sorted(
         #             r.get('sources', {}).items(), key=lambda x: x[1])}
@@ -260,10 +260,10 @@ Respond with JSON:
         length_context1 = f"{self.synthesis_max_length} words" if self.synthesis_max_length else ">= average draft artifact length"
         length_context2 = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
 
-    # - Combines the round artifacts into a single cohesive and complete artifact
-    # - Selectively integrates the most interesting, relevant insights across all round artifacts
+    # - Combines the draft artifacts into a single cohesive and complete artifact
+    # - Selectively integrates the most interesting, relevant insights across all draft artifacts
     # - Discovers emergent patterns not visible in individual artifacts
-    # - Further develops the core strengths while addressing the weaknesses of the round artifacts
+    # - Further develops the core strengths while addressing the weaknesses of the draft artifacts
         prompt = f"""You are merging {len(all_drafts)} drafts of research artifacts into one unified artifact{query_context}
 
 === RESEARCH ARTIFACTS ===
