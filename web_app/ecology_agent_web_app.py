@@ -1,3 +1,4 @@
+import copy
 from collections import defaultdict
 import json
 import multiprocessing
@@ -41,6 +42,15 @@ NLTK_STOPWORDS = {
     "haven't", 'isn', "isn't", 'ma', 'mightn', "mightn't", 'mustn', "mustn't",
     'needn', "needn't", 'shan', "shan't", 'shouldn', "shouldn't", 'wasn', "wasn't",
     'weren', "weren't", 'won', "won't", 'wouldn', "wouldn't"
+}
+
+PLOTLY_CONFIG = {
+    'displayModeBar': True,
+    'responsive': True,
+    'toImageButtonOptions': {
+        'format': 'svg',
+        'filename': None
+    }
 }
 
 def extract_label_from_url(url):
@@ -475,7 +485,9 @@ with tab1:
 
     data = graphs[iteration]
     fig, G = create_network_graph(data, layout)
-    st.plotly_chart(fig, config={'displayModeBar': True, 'responsive': True})
+    config = copy.deepcopy(PLOTLY_CONFIG)
+    config['toImageButtonOptions']['filename'] =  f'graph_iter_{iteration}'
+    st.plotly_chart(fig, config=config, use_container_width=True)
 
     depths = [G.nodes[n].get('depth', 0) for n in G.nodes()]
     col1, col2, col3, col4 = st.columns(4)
@@ -618,10 +630,12 @@ with tab4:
                 x=coords[:, 0], y=coords[:, 1], mode='markers',
                 hovertext=[f"<b>{t}</b><br>Depth: {node_colors[i]}{' (Start)' if t == starting_topic else ''}" for i, t in enumerate(topics)],
                 marker=dict(size=10, color=node_colors, colorscale='Viridis', showscale=True,
-                           colorbar=dict(title="Depth"))))
-            embedding_fig.update_layout(title='Topic Embedding Space (t-SNE)', xaxis_title='Dimension 1',
-                                       yaxis_title='Dimension 2', height=600, hovermode='closest')
-            st.plotly_chart(embedding_fig, config={'displayModeBar': True, 'responsive': True})
+                    colorbar=dict(title="Depth"))))
+            embedding_fig.update_layout(title='Topic Embedding Space (t-SNE)', xaxis_title='Dimension 1', yaxis_title='Dimension 2', height=600, hovermode='closest')
+
+            config = copy.deepcopy(PLOTLY_CONFIG)
+            config['toImageButtonOptions']['filename'] = 'tsne_plot'
+            st.plotly_chart(embedding_fig, config=config, use_container_width=True)
 
             st.subheader("📚 Top Topic Keywords by Frequency")
             st.caption("Most frequently occurring words across all topics")
