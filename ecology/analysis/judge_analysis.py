@@ -10,7 +10,7 @@ import json
 from pathlib import Path
 import statistics
 
-from scipy import stats
+from scipy.stats import mannwhitneyu
 
 def load_agent_mapping(mapping_file):
     """Load agent name mapping from file (code_name: real_name format)."""
@@ -78,9 +78,9 @@ def process_judge_file(judge_file, category_name, csv_data, stats):
                 'Query Category': category_name,
                 'Agent Name': agent_name,
                 'Judge Name': judge_name,
-                'New Score': scores.get('New', 0),
-                'Useful Score': scores.get('Useful', 0),
-                'Surprising Score': scores.get('Surprising', 0),
+                'New Score': float(scores['New']),
+                'Useful Score': float(scores['Useful']),
+                'Surprising Score': float(scores['Surprising']),
             }
             row['Total Score'] = row['New Score'] + row['Useful Score'] + row['Surprising Score']
 
@@ -199,12 +199,12 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
     with open(csv_file, 'r', encoding='utf-8') as f:
         reader = csv.DictReader(f)
         for row in reader:
-            row['New Score'] = int(row['New Score'])
-            row['Useful Score'] = int(row['Useful Score'])
-            row['Surprising Score'] = int(row['Surprising Score'])
-            row['Total Score'] = int(row['Total Score'])
+            row['New Score'] = float(row['New Score'])
+            row['Useful Score'] = float(row['Useful Score'])
+            row['Surprising Score'] = float(row['Surprising Score'])
+            row['Total Score'] = float(row['Total Score'])
             # Apply agent name mapping
-            row['Display Name'] = agent_mapping[row['Agent Name']]
+            row['Display Name'] = agent_mapping.get(row['Agent Name'], row['Agent Name'])
             csv_data.append(row)
 
     if not csv_data:
@@ -264,7 +264,7 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
         top, second = sorted_agents[0], sorted_agents[1]
 
         # Mann-Whitney U test (Default is two-sided: checks if distributions differ)
-        stat, p_val = stats.mannwhitneyu(agent_stats[top]['total'], agent_stats[second]['total'])
+        stat, p_val = mannwhitneyu(agent_stats[top]['total'], agent_stats[second]['total'])
 
         report = (f"\n\n🏆 STATISTICAL SIGNIFICANCE (Top 1 vs Top 2): {top} vs {second}\n"
                   f"   MWU Stat: {stat:.1f} | P-Value: {p_val:.4e} | "
@@ -299,7 +299,7 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
                 f"{sum(scores['useful'])/len(scores['useful']):.2f}",
                 f"{sum(scores['surprising'])/len(scores['surprising']):.2f}",
                 f"{sum(scores['total'])/len(scores['total']):.2f}",
-                f"{statistics.stdev(scores['total']):.2f}",
+                f"{statistics.stdev(scores['total']):.2f}" if len(scores['total']) > 1 else "0.00",
                 f"{len(scores['total'])}",
             ])
 
@@ -325,7 +325,7 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
             f"{sum(scores['useful'])/len(scores['useful']):.2f}",
             f"{sum(scores['surprising'])/len(scores['surprising']):.2f}",
             f"{sum(scores['total'])/len(scores['total']):.2f}",
-            f"{statistics.stdev(scores['total']):.2f}",
+            f"{statistics.stdev(scores['total']):.2f}" if len(scores['total']) > 1 else "0.00",
             f"{len(scores['total'])}",
         ])
 
