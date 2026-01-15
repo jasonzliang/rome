@@ -277,7 +277,6 @@ Create a comprehensive merged artifact that:
     - Derive new patterns/tensions across all drafts and at least one unifying framework that doesn’t appear in any single artifact.
     - Strengthen and extend the result: tighten structure, resolve/reconcile contradictions, and push into implications, applications, and open questions (flag speculation explicitly).
 
-
 MERGED ARTIFACT CITATIONS:
     - Each draft has its own [n] citations (Draft 1's [1] and Draft 2's [1] are DIFFERENT URLs)
     - In your merged artifact, create NEW sequential numbering: [1], [2], [3]...
