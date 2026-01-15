@@ -40,58 +40,58 @@ class ArtifactSynthesizer:
                     operator=FilterOperator.LT)]
                 )
 
-    def synthesize_artifact(self, num_rounds: int = None) -> None:
-        """Generate final synthesis with optional multi-round refinement"""
-        if not num_rounds: num_rounds = self.synthesis_rounds
-        num_rounds = max(num_rounds, 1)
+    def synthesize_artifact(self, num_drafts: int = None) -> None:
+        """Generate final synthesis with optional multi-draft refinement"""
+        if not num_drafts: num_drafts = self.synthesis_drafts
+        num_drafts = max(num_drafts, 1)
 
         mode = f"iterative (n={self.synthesis_iterations})" if not self.synthesis_classic_mode else "classic"
-        self.logger.info(f"[SYNTHESIS] Using {mode} mode with {num_rounds} round(s)")
+        self.logger.info(f"[SYNTHESIS] Using {mode} mode with {num_drafts} draft(s)")
 
         if self.kb_manager.size() == 0:
             return {"abstract": "", "artifact": "No insights collected during exploration."}
 
-        # Multi-round synthesis loop
+        # Multi-draft synthesis loop
         current_query = self.agent.starting_query
-        all_rounds = []; previous_result = None; base_dir = None
-        if num_rounds > 1:
+        all_drafts = []; previous_result = None; base_dir = None
+        if num_drafts > 1:
             base_dir = os.path.join(self.agent.get_repo(),
                 f"{self.agent.get_id()}.synthesis.{datetime.now().strftime("%m%d%H%M")}")
 
-        for round_num in range(1, num_rounds + 1):
-            self.logger.info(f"\n{'='*80}\n[SYNTHESIS ROUND {round_num}/{num_rounds}]\n{'='*80}")
+        for draft_num in range(1, num_drafts + 1):
+            self.logger.info(f"\n{'='*80}\n[SYNTHESIS DRAFT {draft_num}/{num_drafts}]\n{'='*80}")
             if current_query: self.logger.info(f"Current query: {current_query}")
 
-            # Generate synthesis for current round (with previous artifact context)
-            result = self._synthesize_single_round(mode, current_query, previous_result)
+            # Generate synthesis for current draft (with previous artifact context)
+            result = self._synthesize_single_draft(mode, current_query, previous_result)
             if not result: break
-            self._save_synthesis(result, base_dir=base_dir, suffix=f'synthesis-{round_num}')
-            self._post_process(result, base_dir=base_dir, suffix=f'synth-eli5-{round_num}')
-            all_rounds.append(result); previous_result = result
+            self._save_synthesis(result, base_dir=base_dir, suffix=f'synthesis-{draft_num}')
+            self._post_process(result, base_dir=base_dir, suffix=f'synth-eli5-{draft_num}')
+            all_drafts.append(result); previous_result = result
 
-            # Refine query for next round (if not last round)
-            if round_num < num_rounds:
+            # Refine query for next draft (if not last draft)
+            if draft_num < num_drafts:
                 current_query = self._refine_query(result)
                 if not current_query: break
 
-        if len(all_rounds) < 1:
+        if len(all_drafts) < 1:
             raise ValueError("No synthesis artifacts created!")
-        elif len(all_rounds) < num_rounds:
-            self.logger.error(f"Artifact synthesis ended early at round: {len(all_rounds)}/{num_rounds}")
+        elif len(all_drafts) < num_drafts:
+            self.logger.error(f"Artifact synthesis ended early at draft: {len(all_drafts)}/{num_drafts}")
 
-        # Merge artifacts if requested and multiple rounds exist
-        if self.synthesis_merge_artifacts and len(all_rounds) > 1:
-            self.logger.info(f"\n{'='*80}\n[MERGING {len(all_rounds)} ARTIFACTS]\n{'='*80}")
-            merged_result = self._merge_artifacts(all_rounds)
+        # Merge artifacts if requested and multiple drafts exist
+        if self.synthesis_merge_artifacts and len(all_drafts) > 1:
+            self.logger.info(f"\n{'='*80}\n[MERGING {len(all_drafts)} ARTIFACTS]\n{'='*80}")
+            merged_result = self._merge_artifacts(all_drafts)
             if merged_result:
-                self._save_synthesis(merged_result, base_dir=base_dir, suffix=f'merged-{len(all_rounds)}')
-                self._post_process(merged_result, base_dir, suffix=f'merged-eli5-{len(all_rounds)}')
+                self._save_synthesis(merged_result, base_dir=base_dir, suffix=f'merged-{len(all_drafts)}')
+                self._post_process(merged_result, base_dir, suffix=f'merged-eli5-{len(all_drafts)}')
                 return merged_result
-        return all_rounds[-1]
+        return all_drafts[-1]
 
-    def _synthesize_single_round(self, mode: str, current_query: Optional[str] = None,
+    def _synthesize_single_draft(self, mode: str, current_query: Optional[str] = None,
                                  previous_artifact: Optional[Dict] = None) -> Dict[str, str]:
-        """Execute a single synthesis round with optional query and previous artifact"""
+        """Execute a single synthesis draft with optional query and previous artifact"""
         self.logger.info("[SYNTHESIS] Generating synthesis artifact")
 
         qa_pairs = self._generate_qa_pairs(mode, current_query)
@@ -170,6 +170,7 @@ Respond with valid JSON only:
             "sources_cited": len(source_map),
             "starting_url": self.agent.starting_url,
             "starting_query": self.agent.starting_query,
+            "synthesis_drafts": self.synthesis_drafts,
             "synthesis_eli5_length": self.synthesis_eli5_length,
             "synthesis_iteration_filter": self.synthesis_iteration_filter,
             "synthesis_max_length": self.synthesis_max_length,
@@ -223,44 +224,48 @@ Respond with JSON:
             self.logger.error(f"[REFINE] Query refinement failed: {e}")
         return None
 
-    def _merge_artifacts(self, all_rounds: List[Dict]) -> Optional[Dict[str, str]]:
-        """Merge artifacts from all rounds into a single comprehensive artifact"""
+    def _merge_artifacts(self, all_drafts: List[Dict]) -> Optional[Dict[str, str]]:
+        """Merge artifacts from all drafts into a single comprehensive artifact"""
         self.logger.info(f"[MERGE] Generating merged artifact")
-        if len(all_rounds) == 0:
+        if len(all_drafts) == 0:
             self.logger.error("[MERGE] No artifacts to merge"); return None
 
-        # Build context with per-round sources (optimized string building)
+        # Build context with per-draft sources (optimized string building)
         artifacts_context = []
-        for i, r in enumerate(all_rounds, 1):
+        for i, r in enumerate(all_drafts, 1):
             sources = r.get('sources', {})
             source_list = "\n".join(f"  [{idx}] {url}"
                 for url, idx in sorted(sources.items(), key=lambda x: x[1]))
 
             artifacts_context.append(
-                f"--- ROUND {i} ---\n\n"
+                f"--- DRAFT {i} ---\n\n"
                 f"ARTIFACT:\n{r['artifact']}\n\n"
-                f"SOURCES (for citations in round {i} artifact):\n{source_list}\n\n"
-                f"--- END OF ROUND {i} ---\n\n"
+                f"SOURCES (for citations in draft {i} artifact):\n{source_list}\n\n"
+                f"--- END OF DRAFT {i} ---\n\n"
             )
         artifacts_text = "\n\n".join(artifacts_context)
 
-        # Build context with per-round sources as prettified JSON
+        # Build context with per-draft sources as prettified JSON
         # artifacts_text = json.dumps([
         #     {
-        #         "Round": i,
+        #         "Draft": i,
         #         "Artifact": r['artifact'],
         #         "Sources": {idx: url for url, idx in sorted(
         #             r.get('sources', {}).items(), key=lambda x: x[1])}
         #     }
-        #     for i, r in enumerate(all_rounds, 1)
+        #     for i, r in enumerate(all_drafts, 1)
         # ], indent=4, ensure_ascii=False)
 
         query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
         query_role = f" to the query creatively!" if self.agent.starting_query else "!"
-        length_context1 = f"{self.synthesis_max_length} words" if self.synthesis_max_length else ">= average round artifact length"
+        length_context1 = f"{self.synthesis_max_length} words" if self.synthesis_max_length else ">= average draft artifact length"
         length_context2 = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
 
-        prompt = f"""You are merging {len(all_rounds)} rounds of research artifacts into one unified artifact{query_context}
+    # - Combines the draft artifacts into a single cohesive and complete artifact
+    # - Selectively integrates the most interesting, relevant insights across all draft artifacts
+    # - Discovers emergent patterns not visible in individual artifacts
+    # - Further develops the core strengths while addressing the weaknesses of the draft artifacts
+        prompt = f"""You are merging {len(all_drafts)} drafts of research artifacts into one unified artifact{query_context}
 
 === RESEARCH ARTIFACTS ===
 {artifacts_text}
@@ -268,13 +273,13 @@ Respond with JSON:
 
 YOUR TASK:
 Create a comprehensive merged artifact that:
-    - Combines the round artifacts into a single cohesive and complete artifact
-    - Carefully integrates the most interesting, relevant insights across all round artifacts
-    - Discovers emergent patterns not visible in individual artifacts
-    - Further develops the core strengths while addressing the weaknesses of the round artifacts
+    - Fuse the draft artifacts into one standalone work with a single clear narrative spine (not a stitched summary).
+    - Curate and reinterpret the highest‑leverage insights across all drafts; cut redundancy while preserving essential caveats.
+    - Derive new patterns/tensions across all drafts and at least one unifying framework that doesn’t appear in any single artifact.
+    - Strengthen and extend the result: tighten structure, resolve/reconcile contradictions, and push into implications, applications, and open questions (flag speculation explicitly).
 
 MERGED ARTIFACT CITATIONS:
-    - Each round has its own [n] citations (Round 1's [1] and Round 2's [1] are DIFFERENT URLs)
+    - Each draft has its own [n] citations (Draft 1's [1] and Draft 2's [1] are DIFFERENT URLs)
     - In your merged artifact, create NEW sequential numbering: [1], [2], [3]...
     - Map each cited URL to its new number in the "sources" field
     - Use citations to support relevant claims and statements (up to {MAX_SYNTHESIS_QUERY_SOURCES} citations per claim), but do NOT create a "Sources" or "References" section
@@ -282,7 +287,7 @@ MERGED ARTIFACT CITATIONS:
 MERGED ARTIFACT TEXT:
     - IMPORTANT: Avoid excessive jargon, ensure artifact text is well-organized (logical, clear, focused), and convincing to a skeptical reader
     - Merged artifact length: {length_context1}
-    - Do NOT mention "Round 1", "Round 2", etc, in text
+    - Do NOT mention "Draft 1", "Draft 2", etc, in text
 
 RESPONSE INSTRUCTIONS:
     - IMPORTANT: Use your role as a guide on how to respond{query_role}
@@ -326,7 +331,7 @@ EXAMPLE OUTPUT:
                         result["sources"] = {}
 
                 # Success - add metadata and return
-                result["metadata"] = all_rounds[-1].get("metadata", {})
+                result["metadata"] = all_drafts[-1].get("metadata", {})
                 return result
 
             except Exception as e:

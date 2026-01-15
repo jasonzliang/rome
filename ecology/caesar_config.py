@@ -102,9 +102,9 @@ CAESAR_CONFIG = {
     "ArtifactSynthesizer": {
         # Set to True for classic mode (ask all queries at once)
         "synthesis_classic_mode": False,
-        # Number of rounds of synthesizing artifact
-        "synthesis_rounds": 1,
-        # Number of Q/A iterations per round
+        # Number of drafts of synthesizing artifact
+        "synthesis_drafts": 1,
+        # Number of Q/A iterations per draft
         "synthesis_iterations": 20,
         # Top_k for synthesis query and retrieval from DB
         "synthesis_top_k": 50,
@@ -114,7 +114,7 @@ CAESAR_CONFIG = {
         "synthesis_prev_artifact": True,
         # Maximum of words for generating final synthesis artifact
         "synthesis_max_length": None,
-        # Whether to merge all round artifacts into final artifact
+        # Whether to merge all draft artifacts into final artifact
         "synthesis_merge_artifacts": False,
         # Whether to generate ELI5 explanation for artifact text
         "synthesis_eli5": False,

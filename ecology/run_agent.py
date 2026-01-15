@@ -92,8 +92,8 @@ def print_config_summary(agent, logger):
         },
         "Synthesis": {
             "Mode": "Classic" if synth.synthesis_classic_mode else "Iterative",
-            "Rounds": synth.synthesis_rounds,
-            "Iterations/Round": synth.synthesis_iterations,
+            "Drafts": synth.synthesis_drafts,
+            "Iterations/Draft": synth.synthesis_iterations,
             "Max Length (Words)": synth.synthesis_max_length,
             "Max ELI5 Length (Words)": synth.synthesis_eli5_length,
         },
