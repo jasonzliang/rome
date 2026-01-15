@@ -105,8 +105,8 @@ JSON_FORMAT_INSTRUCTION = """
       }
     },
     {
-        "agent_name": "answer_agent2.txt",
-        ... [Same structure as before] ...
+      "agent_name": "answer_agent2.txt",
+      ... [Same structure as before] ...
     }
   ],
   "ranking": ["answer_agent1.txt", "answer_agent2.txt"]
