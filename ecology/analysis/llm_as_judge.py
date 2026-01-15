@@ -80,11 +80,11 @@ TEXT_FORMAT_INSTRUCTION = """
 [Numbered list in descending order of total score]
 """
 
-# - Do NOT consider the "Abstract" or "Sources" section when evaluating scores
 JSON_FORMAT_INSTRUCTION = """
 ### Evaluation Output Instructions
 - You MUST output a valid JSON object.
 - Do NOT output markdown formatting (like ```json ... ```). Output RAW JSON only.
+- Do NOT consider the "Abstract" or "Sources" section when evaluating scores
 - The JSON structure must be exactly like the example below:
 
 {
