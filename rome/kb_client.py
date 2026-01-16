@@ -11,7 +11,6 @@ import warnings
 warnings.filterwarnings('ignore', message='.*validate_default.*', category=UserWarning)
 
 try:
-    import chromadb
     from chromadb.utils.embedding_functions import (
        SentenceTransformerEmbeddingFunction, OpenAIEmbeddingFunction)
     from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
