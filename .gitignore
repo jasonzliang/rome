@@ -180,6 +180,7 @@ benchmark/result
 test/result
 caesar/*result
 query_result.zip
+CLAUDE.md
 .DS_Store
 .tags*
 *.log
