@@ -178,7 +178,7 @@ cython_debug/
 # Rome library files
 benchmark/result
 test/result
-ecology/*result
+caesar/*result
 query_result.zip
 .DS_Store
 .tags*
