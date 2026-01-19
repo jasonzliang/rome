@@ -5,8 +5,8 @@ Attached is a CSV file with results from multiple judges (judge_*) where each ju
 Output the following:
 
 1. Modified CSV file showing actual agent names
-  - Use attached agent_names.txt to replace the agent code names in the CSV file with their actual names.
-  - For example, replace "answer_bat_ca1" with "Caesar Synthesis-1"
+  - Use attached agent names file to replace the agent code names in the CSV file with their actual names.
+  - For example, replace "answer_cat_cam" or "cat" with "Caesar Deep Research"
 
 2. Using the modified CSV file, create clean, well formatted tables:
   - Show all of the raw metrics (in a compact table) for all agents on each query
