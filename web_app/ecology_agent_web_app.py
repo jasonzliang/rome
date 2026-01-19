@@ -5,6 +5,7 @@ import multiprocessing
 import os
 from pathlib import Path
 import re
+from urllib.parse import unquote
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -16,6 +17,7 @@ import numpy as np
 from gensim.models import Word2Vec
 from sklearn.manifold import TSNE
 from sklearn.metrics.pairwise import cosine_similarity
+# pip install watchdog
 
 st.set_page_config(page_title="Ecology Agent Graph Explorer", layout="wide")
 
@@ -122,46 +124,153 @@ def get_layout_position(G, layout_type='spring'):
     }
     return layouts.get(layout_type, layouts['spring'])()
 
-def create_plotly_traces(G, pos):
-    """Create Plotly edge and node traces."""
+def create_plotly_traces(G, pos, highlight_nodes=None):
+    """Create Plotly edge and node traces with optional highlighting."""
+    if highlight_nodes is None:
+        highlight_nodes = set()
+
+    # --- 1. Edge Traces ---
     edge_x, edge_y = [], []
     for src, tgt in G.edges():
         x0, y0 = pos[src]
         x1, y1 = pos[tgt]
         edge_x.extend([x0, x1, None])
         edge_y.extend([y0, y1, None])
-    edge_trace = go.Scatter(x=edge_x, y=edge_y, line=dict(width=0.8, color='#888'),
-                           hoverinfo='none', mode='lines')
 
-    node_x, node_y, node_text, node_color = [], [], [], []
+    edge_trace = go.Scatter(
+        x=edge_x, y=edge_y,
+        line=dict(width=0.8, color='#888'),
+        hoverinfo='none',
+        mode='lines'
+    )
+
+    # --- 2. Node Traces Setup ---
+    node_x, node_y, node_text = [], [], []
+    starting_url = G.graph.get('starting_url')
+
     for node in G.nodes():
         x, y = pos[node]
         node_x.append(x)
         node_y.append(y)
+
         title = extract_label_from_url(node)
         depth = G.nodes[node].get('depth', 0)
         iteration = G.nodes[node].get('iteration', 0)
         node_text.append(f"{title}<br>Depth: {depth}<br>Iteration: {iteration}")
-        node_color.append('red' if node == G.graph.get('starting_url') else depth)
 
-    node_trace = go.Scatter(
-        x=node_x, y=node_y, mode='markers', hoverinfo='text', hovertext=node_text,
-        marker=dict(showscale=True, colorscale='Viridis', size=10, color=node_color,
-                   colorbar=dict(thickness=15, title=dict(text='Depth', side='right'), xanchor='left'),
-                   line=dict(width=2, color='white')))
-    return edge_trace, node_trace
+    # --- 3. Split into Normal vs Special (Start + Highlighted) ---
+    normal_x, normal_y, normal_txt, normal_c = [], [], [], []
+    special_x, special_y, special_txt, special_c = [], [], [], []
 
-def create_network_graph(data, layout_type='spring'):
+    for i, node in enumerate(G.nodes()):
+        if node == starting_url:
+            special_x.append(node_x[i]); special_y.append(node_y[i])
+            special_txt.append(node_text[i]); special_c.append('red')
+        elif node in highlight_nodes:
+            special_x.append(node_x[i]); special_y.append(node_y[i])
+            special_txt.append(node_text[i]); special_c.append('#00FFFF')
+        else:
+            normal_x.append(node_x[i]); normal_y.append(node_y[i])
+            normal_txt.append(node_text[i]); normal_c.append(G.nodes[node].get('depth', 0))
+
+    traces = [edge_trace]
+
+    # Add Normal nodes (Depth Gradient)
+    if normal_x:
+        traces.append(go.Scatter(
+            x=normal_x, y=normal_y, mode='markers', hoverinfo='text', hovertext=normal_txt,
+            marker=dict(
+                showscale=True, colorscale='Viridis', size=10,
+                color=normal_c,
+                colorbar=dict(thickness=15, title=dict(text='Depth', side='right'), xanchor='left'),
+                line=dict(width=1, color='white')
+            )
+        ))
+
+    # Add Special nodes (Start/Highlighted) - No Gradient, Explicit Colors
+    if special_x:
+        traces.append(go.Scatter(
+            x=special_x, y=special_y, mode='markers', hoverinfo='text', hovertext=special_txt,
+            marker=dict(
+                showscale=False, size=15,
+                color=special_c,
+                line=dict(width=1, color='white')
+            )
+        ))
+
+    return traces
+
+def create_network_graph(data, layout_type='spring', highlight_nodes=None):
     """Create interactive network visualization."""
     G = create_graph_object(data)
     pos = get_layout_position(G, layout_type)
-    edge_trace, node_trace = create_plotly_traces(G, pos)
+    traces = create_plotly_traces(G, pos, highlight_nodes)
+
     fig = go.Figure(
-        data=[edge_trace, node_trace],
-        layout=go.Layout(showlegend=False, hovermode='closest', margin=dict(b=0, l=0, r=0, t=0),
-                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
-                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False), height=600))
+        data=traces,
+        layout=go.Layout(
+            showlegend=False, hovermode='closest', margin=dict(b=0, l=0, r=0, t=0),
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            height=600
+        )
+    )
     return fig, G
+
+def extract_highlight_nodes(raw_text, graph_nodes):
+    """
+    Parses text for URLs and finds matches in the current graph nodes.
+    Prioritizes Exact Matches to prevent double-counting parent/child nodes.
+    """
+    if not raw_text:
+        return set()
+
+    extracted_urls = re.findall(r'(https?://[^\s)\]]+)', raw_text)
+    if not extracted_urls:
+        return set()
+
+    def clean_url(u):
+        u = unquote(u).lower()
+        u = re.sub(r'^https?://(www\.)?', '', u)
+        return u.strip().rstrip('/')
+
+    # Build map: clean_url -> list of (length, node_id)
+    # We store length to prefer longer (more specific) matches if needed
+    graph_map = {}
+    for n in graph_nodes:
+        cleaned = clean_url(n)
+        if cleaned not in graph_map:
+            graph_map[cleaned] = []
+        graph_map[cleaned].append(n)
+
+    matches = set()
+
+    for input_url in extracted_urls:
+        cleaned_input = clean_url(input_url)
+
+        # 1. Try Exact Match First (Best Case)
+        if cleaned_input in graph_map:
+            # Add all nodes that exactly match this clean URL
+            for node_id in graph_map[cleaned_input]:
+                matches.add(node_id)
+            continue # Stop processing this input URL
+
+        # 2. Fallback: Substring Match (e.g. Input is PDF, Graph is Article)
+        # We look for graph nodes that are substrings of the input
+        found_substring = False
+        for graph_clean, nodes in graph_map.items():
+            if len(graph_clean) > 10 and graph_clean in cleaned_input:
+                for node_id in nodes:
+                    matches.add(node_id)
+                found_substring = True
+
+        # If we found matches via substring, we consider this URL "handled"
+        # This prevents aggressive over-matching if we wanted to be even stricter,
+        # but usually allowing all valid parent substrings is correct behavior.
+        # If you still get 20, it means your graph genuinely has both the Article AND the PDF
+        # as separate nodes, and you are technically highlighting both valid destinations.
+
+    return matches
 
 # ============================================================================
 # ANALYSIS FUNCTIONS
@@ -473,6 +582,8 @@ tab1, tab2, tab3, tab4 = st.tabs(["📊 Single Graph View", "📈 Evolution Anal
 
 with tab1:
     st.header("Individual Graph Visualization")
+
+    # --- 1. Configuration Controls ---
     col1, col2 = st.columns([2, 1])
     with col1:
         if len(graphs.keys()) > 1:
@@ -483,12 +594,50 @@ with tab1:
     with col2:
         layout = st.selectbox("Layout Algorithm", ['kamada', 'spring', 'circular', 'shell'], index=0)
 
+    # --- 2. Load Graph Data Early ---
+    # We load G here so we can pass its nodes to the highlighter before plotting
     data = graphs[iteration]
-    fig, G = create_network_graph(data, layout)
+    G = create_graph_object(data)
+
+    # --- 3. Highlight Feature UI ---
+    highlighted_nodes = set()
+
+    with st.expander("🖍️ Highlight Specific URLs from Text"):
+        raw_text = st.text_area(
+            "Paste text containing URLs (e.g., bibliography)",
+            height=150,
+            placeholder="[1] https://example.com/article\n[2] https://google.com..."
+        )
+
+        if raw_text:
+            # Call the extracted function
+            highlighted_nodes = extract_highlight_nodes(raw_text, G.nodes())
+
+            if highlighted_nodes:
+                st.success(f"✅ Matched {len(highlighted_nodes)} nodes! (Shown in Cyan)")
+            else:
+                st.warning("⚠️ URLs found in text, but none matched the current graph.")
+
+    # --- 4. Plotting ---
+    # We pass the existing G and the highlighted set
+    pos = get_layout_position(G, layout)
+    traces = create_plotly_traces(G, pos, highlight_nodes=highlighted_nodes)
+
+    fig = go.Figure(
+        data=traces,
+        layout=go.Layout(
+            showlegend=False, hovermode='closest', margin=dict(b=0, l=0, r=0, t=0),
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            height=600
+        )
+    )
+
     config = copy.deepcopy(PLOTLY_CONFIG)
     config['toImageButtonOptions']['filename'] =  f'graph_iter_{iteration}'
-    st.plotly_chart(fig, config=config, use_container_width=True)
+    st.plotly_chart(fig, config=config)
 
+    # --- 5. Metrics & Details ---
     depths = [G.nodes[n].get('depth', 0) for n in G.nodes()]
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Nodes", len(G.nodes()))
@@ -510,15 +659,10 @@ with tab2:
     """)
 
     df_metrics = compute_graph_metrics(graphs)
-    st.plotly_chart(create_metric_plot(df_metrics, 'iteration', [('num_nodes', 'Nodes'), ('num_edges', 'Edges')],
-                                      'Graph Growth Over Time', 'Count'),
-                   config={'displayModeBar': True, 'responsive': True})
-    st.plotly_chart(create_metric_plot(df_metrics, 'iteration', [('avg_depth', 'Average Depth'), ('max_depth', 'Max Depth')],
-                                      'Exploration Depth Over Time', 'Depth'),
-                   config={'displayModeBar': True, 'responsive': True})
+    st.plotly_chart(create_metric_plot(df_metrics, 'iteration', [('num_nodes', 'Nodes'), ('num_edges', 'Edges')], 'Graph Growth Over Time', 'Count'), config={'displayModeBar': True, 'responsive': True})
+    st.plotly_chart(create_metric_plot(df_metrics, 'iteration', [('avg_depth', 'Average Depth'), ('max_depth', 'Max Depth')], 'Exploration Depth Over Time', 'Depth'), config={'displayModeBar': True, 'responsive': True})
     st.plotly_chart(create_metric_plot(df_metrics, 'iteration', [('density', 'Graph Density')],
-                                      'Graph Density Over Time', 'Density'),
-                   config={'displayModeBar': True, 'responsive': True})
+        'Graph Density Over Time', 'Density'), config={'displayModeBar': True, 'responsive': True})
 
 with tab3:
     st.header("Detailed Insights Explorer")
@@ -635,7 +779,7 @@ with tab4:
 
             config = copy.deepcopy(PLOTLY_CONFIG)
             config['toImageButtonOptions']['filename'] = 'tsne_plot'
-            st.plotly_chart(embedding_fig, config=config, use_container_width=True)
+            st.plotly_chart(embedding_fig, config=config)
 
             st.subheader("📚 Top Topic Keywords by Frequency")
             st.caption("Most frequently occurring words across all topics")
