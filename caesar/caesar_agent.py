@@ -740,6 +740,7 @@ Respond with a JSON object in this exact format:
         """Use LLM to select best link, returns (url, reason)"""
         kb_context = memory_context = explore_strategy = ""
         try:
+            # TODO: Replace with Qdrant or SummaryIndex?
             if self.starting_query:
                 kb_context = self.kb_manager.query(f"In order to answer this query ({self.starting_query}), what should we explore next?")
             else:
