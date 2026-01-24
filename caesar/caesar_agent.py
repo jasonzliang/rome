@@ -490,6 +490,7 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
         self.logger.info("[THINK] Analyzing content")
         if not content: return ""
 
+        # TODO: More advanced context with larger neighborhood and long-term traversal history
         prev_insights = ''; related_insights = ''
         if self.current_url in self.graph.nodes:
             prev_insights = self.graph.nodes[self.current_url].get('insights', '')
@@ -733,7 +734,8 @@ Respond with a JSON object in this exact format:
                 enhanced_query = f"{base_query} {' '.join(key_terms)}"
                 return self.recall(enhanced_query)
 
-        # Default: just navigation query
+        # TODO: Use agent memory's summarize_past instead of recall
+        # Default is just navigation query
         return self.recall(base_query)
 
     def _select_next_link(self, links: List[Tuple[str, str]]) -> Tuple[Optional[str], str]:
