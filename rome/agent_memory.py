@@ -193,7 +193,7 @@ class AgentMemory:
                 messages,
                 user_id=self.mem_id,
                 metadata=meta,
-                infer=False,
+                infer=self.infer,
             )
 
             if not result:
