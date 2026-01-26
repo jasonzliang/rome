@@ -912,6 +912,7 @@ Your response must be valid JSON only, nothing else."""
         if start_iter < end_iter:
             self.logger.info(f"[EXPLORE] Beginning exploration: iterations {start_iter} to {self.max_iterations}")
 
+        # TODO: Replace Perceive-Think-Act with LangGraph nodes
         for iteration in range(start_iter, end_iter):
             if self.shutdown_called: break
             self.current_iteration = iteration
