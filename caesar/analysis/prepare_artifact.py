@@ -55,7 +55,9 @@ def setup_transfer_dict_12_13():
         'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.450w.1*',
         'other_sources': '12_4_answers_eli5_450w/*/',
     }
-    return [full, eli5, eli5_450], {}
+
+    overrides = {"CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
+    return [full, eli5, eli5_450], overrides
 
 
 def setup_transfer_dict_12_13_syn_ablation():
@@ -177,7 +179,9 @@ def setup_transfer_dict_12_13_v2():
         'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.450w.1*',
         'other_sources': '12_4_answers_eli5_450w/*/',
     }
-    return [full, eli5, eli5_450], {}
+
+    overrides = {"CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
+    return [full, eli5, eli5_450], overrides
 
 
 def prepare_artifact(transfer_func):
@@ -245,4 +249,4 @@ def prepare_artifact(transfer_func):
 
 
 if __name__ == '__main__':
-    prepare_artifact(setup_transfer_dict_12_13_iter_ablation)
+    prepare_artifact(setup_transfer_dict_12_13)
