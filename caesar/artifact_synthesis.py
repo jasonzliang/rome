@@ -542,6 +542,7 @@ YOUR TASK:
  - Your target audience is a non-expert but college educated reader
  - Capture the main ideas without oversimplifying
  - Clarify any confusing or convoluted parts of the artifact
+ - Your explanation should start with a short but interesting title
 {length_context}
 IMPORTANT: Format your explanation so humans can easily read it (use more than one big paragraph)
 IMPORTANT: Use your role as a guide on how to respond!
