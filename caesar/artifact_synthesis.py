@@ -339,7 +339,8 @@ EXAMPLE OUTPUT:
 
         self.logger.error(f"[MERGE] All attempts exhausted"); return None
 
-    # TODO: Ring merge of drafts (feed random draft sequence in ring of agents with unique identities)
+    # TODO: Ring merge of drafts (feed random draft sequence in connected ring of unique agents)
+    # TODO: Debate marge of drafts (multiple of rounds of unique agents critiquing drafts)
     def _generate_qa_pairs(self, mode: str, starting_query: str = None) -> List[Tuple[str, str, List[Dict]]]:
         """Generate Q&A pairs with sources"""
         queries = [
