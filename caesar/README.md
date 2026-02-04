@@ -178,7 +178,7 @@ ArtifactSynthesizer:
 
 # LLM configuration
 OpenAIHandler:
-  model: gpt-4o
+  model: gpt-5.2
   cost_limit: 50.0
   temperature: 0.1
 
@@ -191,6 +191,8 @@ AgentMemory:
 Logger:
   level: "info"
 ```
+
+For a full configurations used to run actual experiments, see YAML files under config/creative
 
 ### Key Configuration Parameters
 
@@ -456,7 +458,7 @@ The agent will stop gracefully when the limit is approached.
 2. **Tune iterations**: More iterations = more insights but higher cost
 3. **Use checkpoints**: Set `checkpoint_interval: 10` for long runs
 4. **Domain restriction**: Limit `allowed_domains` to avoid tangents
-5. **Model selection**: Use `gpt-4o` for cost efficiency, `gpt-5` for quality
+5. **Model selection**: Use `gpt-4o` for cost efficiency, `gpt-5.2` for quality
 
 ## API Cost Estimates
 
@@ -466,8 +468,8 @@ Rough estimates (varies by content and settings):
 |---------------|-------------------------|
 | gpt-4o, basic synthesis | $2-5 |
 | gpt-4o, multi-draft synthesis | $5-15 |
-| gpt-5, basic synthesis | $10-30 |
-| gpt-5, multi-draft synthesis | $30-80 |
+| gpt-5.2, basic synthesis | $10-30 |
+| gpt-5.2, multi-draft synthesis | $30-80 |
 
 Always set a `cost_limit` when experimenting!
 
