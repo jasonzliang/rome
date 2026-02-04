@@ -130,19 +130,16 @@ python run_agent.py <repository_path> <config_path> [--max-iterations N]
 - `config_path` - Path to YAML configuration file (relative to caesar/)
 - `--max-iterations` - Override max iterations from config (optional)
 
-### Example: Explore Wikipedia
+### Example: Simple Test Run
 
 ```bash
 cd /path/to/caesar
-
-# Explore AI from Wikipedia (1000 pages)
-python run_agent.py ./results/ai_exploration config/wikipedia/single_agent_ai.yaml
 
 # Quick test run (5 pages)
 python run_agent.py ./results/test config/single_agent_test.yaml
 ```
 
-### Example: Web Search Mode
+### Example: Deep Web Search
 
 ```bash
 cd /path/to/caesar
