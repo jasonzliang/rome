@@ -121,7 +121,7 @@ pip install pygraphviz
 Run from the **`caesar/` directory** (config paths are relative to this location):
 
 ```bash
-cd /path/to/rome/caesar
+cd /path/to/caesar
 python run_agent.py <repository_path> <config_path> [--max-iterations N]
 ```
 
@@ -133,7 +133,7 @@ python run_agent.py <repository_path> <config_path> [--max-iterations N]
 ### Example: Explore Wikipedia
 
 ```bash
-cd /path/to/rome/caesar
+cd /path/to/caesar
 
 # Explore AI from Wikipedia (1000 pages)
 python run_agent.py ./results/ai_exploration config/wikipedia/single_agent_ai.yaml
@@ -145,7 +145,7 @@ python run_agent.py ./results/test config/single_agent_test.yaml
 ### Example: Web Search Mode
 
 ```bash
-cd /path/to/rome/caesar
+cd /path/to/caesar
 
 # Creative exploration starting from web search
 python run_agent.py ./results/creativity config/creative/openended_creativity.yaml
