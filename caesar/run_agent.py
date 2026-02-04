@@ -20,7 +20,7 @@ import traceback
 # Add the parent directory to sys.path to import from the module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ecology.caesar_agent import CaesarAgent
+from caesar.caesar_agent import CaesarAgent
 from rome.config import load_config, format_yaml_like
 from rome.logger import get_logger
 
