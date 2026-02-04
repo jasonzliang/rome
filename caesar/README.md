@@ -476,3 +476,20 @@ Always set a `cost_limit` when experimenting!
 ## License
 
 See parent rome repository for license information.
+
+## Syncing repo
+
+### To Update (Pull changes from Rome to Caesar)
+
+```bash
+git fetch rome
+git subtree pull --prefix caesar rome main --squash
+
+```
+
+### To Push (Send changes from Caesar back to Rome)
+
+```bash
+git subtree push --prefix caesar rome main
+
+```
