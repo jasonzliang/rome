@@ -7,6 +7,9 @@ Caesar is an LLM-powered autonomous agent that explores the web to discover, syn
 - [Overview](#overview)
 - [Architecture](#architecture)
 - [Installation](#installation)
+  - [Neo4j Graph Database](#optional-neo4j-graph-database)
+  - [ChromaDB Vector Database](#optional-chromadb-vector-database)
+  - [Database Configuration](#database-configuration-parameters)
 - [Quick Start](#quick-start)
 - [Configuration](#configuration)
 - [Exploration Modes](#exploration-modes)
@@ -112,6 +115,110 @@ pip install pygraphviz
 # Ubuntu/Debian
 sudo apt-get install graphviz graphviz-dev
 pip install pygraphviz
+```
+
+### Optional: Neo4j Graph Database
+
+Neo4j is required if you want to use the graph memory feature (`use_graph: true` in config). This enables persistent storage of entities and relationships discovered during exploration.
+
+**macOS (using Homebrew):**
+```bash
+# Install Neo4j
+brew install neo4j
+
+# Start Neo4j service
+brew services start neo4j
+
+# Or run manually (foreground)
+neo4j console
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+# Add Neo4j repository
+curl -fsSL https://debian.neo4j.com/neotechnology.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/neo4j.gpg
+echo "deb [signed-by=/usr/share/keyrings/neo4j.gpg] https://debian.neo4j.com stable latest" | sudo tee /etc/apt/sources.list.d/neo4j.list
+
+# Install Neo4j
+sudo apt-get update
+sudo apt-get install neo4j
+
+# Start Neo4j service
+sudo systemctl start neo4j
+sudo systemctl enable neo4j  # Optional: start on boot
+```
+
+**Linux (RHEL/CentOS/Fedora):**
+```bash
+# Add Neo4j repository
+sudo rpm --import https://debian.neo4j.com/neotechnology.gpg.key
+cat << EOF | sudo tee /etc/yum.repos.d/neo4j.repo
+[neo4j]
+name=Neo4j RPM Repository
+baseurl=https://yum.neo4j.com/stable/5
+enabled=1
+gpgcheck=1
+gpgkey=https://debian.neo4j.com/neotechnology.gpg.key
+EOF
+
+# Install Neo4j
+sudo yum install neo4j
+
+# Start Neo4j service
+sudo systemctl start neo4j
+```
+
+After installation, Neo4j web interface is available at `http://localhost:7474`. Default credentials are `neo4j`/`neo4j` (you'll be prompted to change the password on first login).
+
+### Optional: ChromaDB Vector Database
+
+ChromaDB is used for semantic storage and retrieval of insights. It can run in embedded mode (default) or as a standalone server.
+
+**Running ChromaDB as a server (recommended for production):**
+```bash
+# Install ChromaDB
+pip install chromadb
+
+# Run the server
+chroma run --host localhost --port 8000
+```
+
+### Database Configuration Parameters
+
+Configure database connections in your YAML config file or via the `rome/config.py` defaults:
+
+**Neo4j (Graph Database) - `AgentMemory` section:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `use_graph` | false | Enable graph memory (requires Neo4j) |
+| `graph_url` | "bolt://localhost:7687" | Neo4j Bolt connection URL |
+| `graph_username` | "neo4j" | Neo4j username |
+| `graph_password` | "neo4jneo4j" | Neo4j password |
+
+**ChromaDB (Vector Database) - `AgentMemory` section:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `vector_host` | "localhost" | ChromaDB server host |
+| `vector_port` | 8000 | ChromaDB server port |
+| `embedding_model` | "text-embedding-3-small" | OpenAI embedding model |
+
+**ChromaDB Server - `ChromaServerManager` section:**
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `host` | "localhost" | Server bind host |
+| `port` | 8000 | Server bind port |
+| `persist_path` | None | Data persistence directory (auto-set if None) |
+
+**Example config with graph memory enabled:**
+```yaml
+AgentMemory:
+  enabled: true
+  use_graph: true
+  graph_url: "bolt://localhost:7687"
+  graph_username: "neo4j"
+  graph_password: "your-password-here"
+  vector_host: "localhost"
+  vector_port: 8000
 ```
 
 ## Quick Start
