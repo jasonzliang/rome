@@ -52,17 +52,17 @@ SYNTHESIS_SAVE_JSON = False
 CAESAR_CONFIG = {
     "CaesarAgent": {
         # Maximum number of words for adapting agent role description
-        "role_max_length": 400,
+        "role_max_length": 350,
         # Total number of pages to explore before stopping
-        "max_iterations": 10,
+        "max_iterations": 1000,
         # Maximum depth of exploration tree before backtracking
-        "max_depth": 10000,
+        "max_depth": 1000,
         # Initial URL to begin exploration (enabling means start_query must be None)
         "starting_url": None,
         # Initial query to being exploration (enabling means starting_url must be None)
         "starting_query": None,
         # Additional queries to generate from initial query to help agent
-        "additional_starting_queries": 0,
+        "additional_starting_queries": 5,
         # Domains to allow exploration; empty list uses starting_url domain; use ["*"] to allow any
         "allowed_domains": [],
         # Generate visual graph representations (requires pygraphviz)
@@ -103,7 +103,7 @@ CAESAR_CONFIG = {
         # Set to True for classic mode (ask all queries at once)
         "synthesis_classic_mode": False,
         # Number of drafts of synthesizing artifact
-        "synthesis_drafts": 1,
+        "synthesis_drafts": 3,
         # Number of Q/A iterations per draft
         "synthesis_iterations": 20,
         # Top_k for synthesis query and retrieval from DB
