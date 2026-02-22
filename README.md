@@ -14,7 +14,7 @@ Rome is a Python framework for building intelligent, autonomous AI agents. It pr
 
 Current web agents and RAG systems treat the internet as a flat sequence of disconnected documents, optimizing for retrieval precision but overlooking the hidden structure of the information space. This makes them effective summarizers, but poor researchers — they suffer from "navigational amnesia," looping through redundant content and producing derivative outputs that lack the novelty and lateral logic required for genuine insight.
 
-Caesar is an agentic LLM architecture designed to bridge the gap between passive information gathering and creative synthesis of new ideas. It constructs a dynamic knowledge graph during web traversal and uses it as an engine for associative reasoning, automating the combinatorial process that drives creative hypothesis generation — the discovery of non-obvious connections between disparate concepts.
+Caesar is an agentic LLM architecture designed to bridge the gap between passive information gathering and creative synthesis of new ideas. It constructs a dynamic knowledge graph during web traversal and uses it as an engine for associative reasoning, automating the combinatorial process that drives creative hypothesis generation — the discovery of non-obvious connections between disparate concepts. See [Caesar README](caesar/README.md) for full documentation.
 
 <p align="center">
   <img src="caesar/paper/caesar.png" alt="Caesar Architecture" width="700"/>
@@ -32,7 +32,7 @@ In evaluations using a blinded LLM-as-a-Judge framework, Caesar significantly ou
 
 ### [Rome](rome/README.md) — FSM-Based AI Agent Framework
 
-Rome is the core library providing Finite State Machine (FSM) architecture for building AI agents that autonomously analyze, edit, test, and execute code. It includes configurable FSM workflows, multi-agent coordination, smart action selection strategies, and built-in benchmarking against coding datasets like HumanEval+. See the [Rome README](rome/README.md) for full documentation.
+Rome is the core library providing Finite State Machine (FSM) architecture for building AI agents that autonomously analyze, edit, test, and execute code. It includes configurable FSM workflows, multi-agent coordination, smart action selection strategies, and built-in benchmarking against coding datasets like HumanEval+. See [Rome README](rome/README.md) for full documentation.
 
 ## Getting Started
 
