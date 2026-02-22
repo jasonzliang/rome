@@ -4,7 +4,7 @@
 
 # Rome
 
-Rome is a Python framework for building intelligent, autonomous AI agents. It provides shared infrastructure — LLM integration, configuration, logging, knowledge base management, and memory — on top of which specialized agent modules are built.
+Rome is a Python framework for building intelligent, autonomous AI agents. It provides shared infrastructure — LLM integration, configuration, logging, knowledge base management, and memory — on top of which specialized agent modules are built. It is used to build the following projects below:
 
 ## Projects
 
@@ -32,7 +32,7 @@ In evaluations using a blinded LLM-as-a-Judge framework, Caesar significantly ou
 
 ### [Rome](rome/README.md) — FSM-Based AI Agent Framework
 
-Rome is the core framework providing Finite State Machine (FSM) architecture for building AI agents that autonomously analyze, edit, test, and execute code. It includes configurable FSM workflows, multi-agent coordination, smart action selection strategies, and built-in benchmarking against coding datasets like HumanEval+. See the [Rome README](rome/README.md) for full documentation.
+Rome is the core library providing Finite State Machine (FSM) architecture for building AI agents that autonomously analyze, edit, test, and execute code. It includes configurable FSM workflows, multi-agent coordination, smart action selection strategies, and built-in benchmarking against coding datasets like HumanEval+. See the [Rome README](rome/README.md) for full documentation.
 
 ## Getting Started
 
