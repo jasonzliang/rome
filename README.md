@@ -4,17 +4,17 @@
 
 # Rome
 
-Rome is a foundational architecture for verifiable agentic reasoning and autonomous scientific discovery. It provides the stateful environment, episodic memory, and FSM-based scaffolding necessary to deploy Generator-Verifier loops and facilitate on-policy RL. It is used to build the following projects below:
+Rome is a foundational architecture for verifiable agentic reasoning and autonomous scientific discovery. It provides the stateful environment, episodic memory, and FSM-based scaffolding necessary to deploy Generator-Verifier loops and facilitate on-policy RL. It serves as the infrastructure for the following active research projects:
 
 ## Projects
 
-### [Caesar](caesar/README.md) — An Environment for Autonomous Scientific Discovery and Verifiable Hypothesis Generation
+### [Caesar](caesar/README.md) — An Environment for Autonomous Hypothesis Generation
 
-**Paper Link:** [Caesar: Deep Agentic Web Exploration for Autonomous Hypothesis Generation (PDF)](caesar/paper/caesar.pdf)
+**Paper Link:** [Caesar: Deep Agentic Web Exploration for Autonomous Hypothesis Generation (Currently in preparation for ICML)](caesar/paper/caesar.pdf)
 
-Current LLM research agents optimize for retrieval precision over a flat sequence of documents. While they act as effective synthesizers of known information, they fail at *novel, verifiable discovery*. They suffer from "navigational amnesia" and frequently fall into local minima, looping through redundant content to produce derivative, consensus-driven outputs. 
+Current LLM research agents optimize for retrieval precision over a flat sequence of documents. While effective at synthesizing known information, they struggle with *novel, verifiable discovery*. They suffer from "navigational amnesia" and frequently fall into local minima, looping through redundant content to produce derivative outputs. 
 
-Project Caesar is an agentic environment designed to provide the high-fidelity reward signals necessary for multi-step, empirical reasoning. It constructs a dynamic knowledge graph during topological web traversal, automating the rigorous combinatorial process required for autonomous hypothesis generation—discovering statistically significant, non-obvious connections in non-verifiable domains. 
+Project Caesar solves this by providing the high-fidelity reward signals necessary for multi-step, empirical reasoning. By constructing a dynamic knowledge graph during web traversal, Caesar automates the rigorous combinatorial process required to discover statistically significant, non-obvious connections in non-verifiable domains. 
 
 <p align="center">
   <img src="caesar/paper/caesar.png" alt="Caesar Architecture" width="700"/>
@@ -22,22 +22,22 @@ Project Caesar is an agentic environment designed to provide the high-fidelity r
 
 Caesar operates in two primary phases:
 
-1. **Deep Web Exploration (Stateful Traversal):** A recursive Perceive-Think-Act loop performs a topological traversal of information spaces. Rather than isolated summarization, Caesar generates context-aware insights conditioned on the local structure of the exploration graph—analyzing how new empirical content builds upon or contradicts neighboring nodes (Think). It selects the next action using a dynamic policy informed by both a vector knowledge base and episodic memory. This allows the system to autonomously switch between depth-first expansion, strategic backtracking, and targeted search to maximize information gain and escape local optima (Act).
+1. **Deep Web Exploration (Stateful Traversal):** A recursive Perceive-Think-Act loop performs a topological traversal of information spaces. Rather than isolating summaries, Caesar generates context-aware insights conditioned on the local structure of the exploration graph—analyzing how new empirical content builds upon or contradicts neighboring nodes (Think). It uses a dynamic policy informed by a vector knowledge base and episodic memory to autonomously switch between depth-first expansion, strategic backtracking, and targeted search to maximize information gain (Act).
 
-2. **The Generator-Verifier-Reviser Loop (Adversarial Synthesis):** Rather than producing a single-pass summary, Caesar operates as a recursive self-correction environment. It performs rigorous insight discovery via iterative Q&A chains against the knowledge base. Between generation rounds, an independent verifier module formulates adversarial queries explicitly targeting logical weaknesses, missing citations, and contradictions in the current belief state. This forces the agent into exploration directions that maximize empirical grounding. Multiple valid trajectories are then consolidated through a generative merge that recovers utility while retaining discovered novelties. 
+2. **The Generator-Verifier-Reviser Loop (Adversarial Synthesis):** Rather than producing a single-pass summary, Caesar operates as a recursive self-correction environment. It performs rigorous insight discovery via iterative Q&A chains. Between generation rounds, an independent verifier module formulates adversarial queries explicitly targeting logical weaknesses, missing citations, and contradictions in the current belief state. This forces the agent into exploration directions that maximize empirical grounding before a generative merge consolidates the verified trajectories. 
 
 **Architectural Innovations:**
-* **Domain-Specific Empirical Adaptation:** The agent dynamically rewrites its own system prompt to adopt constraints tuned to the target domain, overcoming the safety-biased, generic responses typical of RLHF models.
-* **Graph-Augmented Insight Generation:** Information extraction is conditioned on the exploration graph neighborhood, enabling online associative reasoning that identifies verifiable connections relative to neighboring nodes.
+* **Domain-Specific Empirical Adaptation:** The agent dynamically rewrites its own system prompt to adopt constraints tuned to the target domain, overriding the safety-biased, generic responses typical of RLHF models.
+* **Graph-Augmented Insight Generation:** Information extraction is conditioned on the exploration graph neighborhood, enabling associative reasoning that identifies verifiable connections relative to adjacent nodes.
 * **Knowledge-Guided Exploration Policy:** A dynamic decision-making policy uses exploration context and episodic memory to detect navigational stagnation and force backtracking.
 * **Adversarial Query Refinement:** Orthogonal queries designed to push the agent out of the local minima of generic LLM consensus to discover novel, grounded facts.
 
 **Evaluations:**
-In evaluations using a blinded LLM-as-a-Judge framework, Caesar significantly outperformed the native deep research modes of state-of-the-art frontier models (Mann-Whitney U, p < 0.001). It achieved the highest scores across dimensions of empirical novelty, rigorous alignment (usefulness), and non-obvious associative reasoning. Ablation studies confirm that both deep topological exploration and the adversarial verifier loop are independently necessary: shallow retrieval cannot reach the rare, long-tail insights that elevate reasoning beyond surface-level analysis, and single-pass synthesis cannot escape derivative hallucination.
+In a blinded LLM-as-a-Judge framework, Caesar significantly outperformed the native deep research modes of state-of-the-art frontier models (Mann-Whitney U, p < 0.001). It achieved the highest scores across dimensions of empirical novelty, rigorous alignment (usefulness), and non-obvious associative reasoning. Ablation studies confirm that both deep topological exploration and the adversarial verifier loop are independently necessary: shallow retrieval cannot reach the rare, long-tail insights, and single-pass synthesis cannot escape derivative hallucination.
 
 ### [Rome](rome/README.md) — Stateful Environment for Autonomous Reasoning
 
-Rome is the foundational Finite State Machine (FSM) infrastructure that underpins these autonomous research loops. Moving beyond brittle, linear prompting pipelines, Rome provides the stateful scaffolding necessary to deploy rigorous Generator-Verifier-Reviser topologies. It handles multi-agent coordination, episodic memory management, dynamic policy routing, and verifiable code execution—serving as a high-fidelity environment for evaluating and scaling the reasoning capabilities of foundation models. See [Rome README](rome/README.md) for full architectural documentation.
+Rome is the core Finite State Machine (FSM) infrastructure that underpins these autonomous research loops. Moving beyond brittle, linear prompting pipelines, Rome provides the stateful scaffolding necessary to deploy rigorous Generator-Verifier-Reviser topologies. It handles multi-agent coordination, episodic memory management, dynamic policy routing, and verifiable code execution—serving as a high-fidelity environment for evaluating and scaling the reasoning capabilities of foundation models. See [Rome README](rome/README.md) for full architectural documentation.
 
 ## Getting Started
 
