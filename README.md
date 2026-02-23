@@ -8,7 +8,7 @@ Rome is a foundational architecture for verifiable agentic reasoning and autonom
 
 ## Projects
 
-### [Caesar](caesar/README.md) — An Environment for Autonomous Hypothesis Generation
+### [Caesar](caesar/README.md) — A Framework for Autonomous Creative Deep Research and Answer Generation
 
 **Paper Link:** [Caesar: Deep Agentic Web Exploration for Creative Answer Synthesis](caesar/paper/caesar.pdf)
 
