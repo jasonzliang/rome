@@ -33,7 +33,7 @@ Caesar operates in two primary cognitive phases:
 * **Adversarial Query Refinement:** Orthogonal queries designed to push the agent out of the basin of attraction of generic LLM consensus to discover novel, grounded facts.
 
 **Evaluations:**
-In a blinded LLM-as-a-Judge framework evaluating System 2 combinatorial reasoning, Caesar significantly outperformed the native deep research modes of state-of-the-art frontier models, including GPT-5.2, Claude Sonnet 4.5, and Gemini 3 Pro (Mann-Whitney U, p < 0.001). Ablation studies confirm that both deep topological exploration and the adversarial verifier loop are independently necessary: shallow retrieval cannot reach rare, long-tail insights, and single-pass synthesis cannot escape derivative hallucination.
+In a blinded LLM-as-a-Judge framework evaluating System 2 combinatorial reasoning, Caesar significantly outperformed the native deep research modes of state-of-the-art frontier models (Mann-Whitney U, p < 0.001). Ablation studies confirm that both deep topological exploration and the adversarial verifier loop are independently necessary: shallow retrieval cannot reach rare, long-tail insights, and single-pass synthesis cannot escape derivative hallucination.
 
 ### [Rome](rome/README.md) — Stateful Environment for Autonomous Reasoning
 
