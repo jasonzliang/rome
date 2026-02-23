@@ -10,7 +10,7 @@ Rome is a foundational architecture for verifiable agentic reasoning and autonom
 
 ### [Caesar](caesar/README.md) — Deep Agentic Web Exploration for Creative Answer Synthesis
 
-**Paper Link:** [Caesar: Deep Agentic Web Exploration for Creative Answer Synthesis (Currently in preparation for ICML)](caesar/paper/caesar.pdf)
+**Paper Link:** [Caesar: Deep Agentic Web Exploration for Creative Answer Synthesis](caesar/paper/caesar.pdf)
 
 Current LLM research agents optimize for retrieval precision over a flat sequence of documents. While effective at synthesizing known information, they struggle to advance from passive retrieval to the active discovery of new ideas. They suffer from "navigational amnesia" and frequently fall into local minima, looping through redundant content to produce derivative, consensus-driven outputs. 
 
