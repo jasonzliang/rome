@@ -10,7 +10,7 @@ Rome is a foundational architecture for verifiable agentic reasoning and autonom
 
 ### [Caesar](caesar/README.md) — An Environment for Autonomous Scientific Discovery and Verifiable Hypothesis Generation
 
-**Paper Link:** [Caesar: Deep Agentic Web Exploration for Autonomous Hypothesis Generation (Currently in preparation for ICML)](caesar/paper/caesar.pdf)
+**Paper Link:** [Caesar: Deep Agentic Web Exploration for Autonomous Hypothesis Generation (PDF)](caesar/paper/caesar.pdf)
 
 Current LLM research agents optimize for retrieval precision over a flat sequence of documents. While they act as effective synthesizers of known information, they fail at *novel, verifiable discovery*. They suffer from "navigational amnesia" and frequently fall into local minima, looping through redundant content to produce derivative, consensus-driven outputs. 
 
