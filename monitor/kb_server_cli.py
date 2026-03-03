@@ -10,6 +10,7 @@ Usage:
     python kb_server_cli.py list [--collection NAME] [--limit LIMIT]
     python kb_server_cli.py export [--collection NAME] [--output FILE] [--include-embeddings]
     python kb_server_cli.py import [--file FILE] [--collection NAME] [--overwrite]
+    python kb_server_cli.py merge --collection NAME [--destination NAME] [--include-embeddings]
 """
 import atexit
 import argparse
@@ -564,6 +565,12 @@ Examples:
 
     # Import from JSON file and overwrite existing collection
     python kb_server_cli.py import --file my_export.json --overwrite
+
+    # Merge multiple collections into a destination collection
+    python kb_server_cli.py merge --collection "data_*,test_*" --destination merged_collection
+
+    # Merge with embeddings preserved
+    python kb_server_cli.py merge --collection "run1,run2,run3" --destination combined --include-embeddings
 """
     )
 
@@ -602,7 +609,13 @@ Examples:
                                     lambda p: p.add_argument('--include-embeddings', action='store_true')]),
         ('import', 'Import from JSON', [add_collection_arg, add_batch_arg,
                                       lambda p: p.add_argument('--file', required=True, help='Input file'),
-                                      lambda p: p.add_argument('--overwrite', action='store_true')])
+                                      lambda p: p.add_argument('--overwrite', action='store_true')]),
+        ('merge', 'Merge collections into a destination collection',
+         [add_collection_arg, add_batch_arg,
+          lambda p: p.add_argument('--destination', required=True, help='Destination collection name'),
+          lambda p: p.add_argument('--include-embeddings', action='store_true',
+                                   help='Preserve embeddings from source collections'),
+          add_force_arg])
     ]
 
     for cmd, help_text, arg_funcs in commands:
@@ -956,6 +969,139 @@ def handle_import(args):
         print("❌ No collections were imported")
         return 1
 
+@error_handler
+@requires_server
+def handle_merge(args):
+    """Merge documents from source collections into a destination collection"""
+    if not args.collection:
+        print("❌ --collection is required to specify source collections")
+        return 1
+
+    client = get_client()
+    all_collections = client.list_collections()
+
+    if not all_collections:
+        print("📄 No collections found in database")
+        return 1
+
+    patterns = parse_collection_patterns(args.collection)
+    matched = match_collections(patterns, all_collections)
+
+    if not matched:
+        print(f"❌ No collections matched pattern(s): {args.collection}")
+        return 1
+
+    # Don't merge a collection into itself
+    if args.destination in matched:
+        matched.discard(args.destination)
+        if not matched:
+            print("❌ No source collections remaining after excluding destination")
+            return 1
+        print(f"   ℹ️  Excluding destination '{args.destination}' from sources")
+
+    source_names = sorted(matched)
+    print(f"📋 Source collections: {', '.join(source_names)}")
+    print(f"📋 Destination: {args.destination}")
+
+    # Count total documents across sources
+    total_docs = 0
+    for col in all_collections:
+        if col.name in matched:
+            total_docs += col.count()
+    print(f"   Total documents to merge: {total_docs}")
+
+    if not args.force:
+        if not confirm_action(f"Merge {len(source_names)} collection(s) ({total_docs} documents) into '{args.destination}'?"):
+            return 0
+
+    # Get or create destination collection
+    existing_names = [col.name for col in all_collections]
+    dest_exists = args.destination in existing_names
+
+    include_fields = ['documents', 'metadatas']
+    if args.include_embeddings:
+        include_fields.append('embeddings')
+        print("   Including embeddings in merge")
+
+    if dest_exists:
+        dest_collection = client.get_collection(args.destination)
+        print(f"   Destination '{args.destination}' exists ({dest_collection.count()} documents)")
+    else:
+        dest_collection = client.create_collection(args.destination)
+        print(f"   Created destination collection '{args.destination}'")
+
+    merged_count = 0
+    skipped_count = 0
+
+    # Get existing IDs in destination to avoid duplicates
+    dest_existing_ids = set()
+    if dest_exists:
+        dest_total = dest_collection.count()
+        for offset in range(0, dest_total, args.batch_size):
+            result = dest_collection.get(limit=args.batch_size, offset=offset)
+            dest_existing_ids.update(result['ids'])
+
+    for source_name in source_names:
+        source_collection = client.get_collection(source_name)
+        source_count = source_collection.count()
+        print(f"\n🔀 Merging '{source_name}' ({source_count} documents)...")
+
+        for offset in range(0, source_count, args.batch_size):
+            results = source_collection.get(
+                limit=args.batch_size, offset=offset, include=include_fields
+            )
+
+            # Filter out documents that already exist in destination
+            batch_ids = []
+            batch_documents = []
+            batch_metadatas = []
+            batch_embeddings = []
+
+            for i in range(len(results['ids'])):
+                doc_id = results['ids'][i]
+                if doc_id in dest_existing_ids:
+                    skipped_count += 1
+                    continue
+
+                batch_ids.append(doc_id)
+                if results.get('documents'):
+                    batch_documents.append(results['documents'][i])
+                if results.get('metadatas'):
+                    batch_metadatas.append(results['metadatas'][i])
+                if args.include_embeddings and results.get('embeddings') is not None:
+                    embedding = results['embeddings'][i]
+                    batch_embeddings.append(
+                        embedding.tolist() if hasattr(embedding, 'tolist') else embedding
+                    )
+
+            if not batch_ids:
+                continue
+
+            add_kwargs = {'ids': batch_ids}
+            if batch_documents:
+                add_kwargs['documents'] = batch_documents
+            if batch_metadatas:
+                add_kwargs['metadatas'] = batch_metadatas
+            if batch_embeddings:
+                add_kwargs['embeddings'] = batch_embeddings
+
+            dest_collection.add(**add_kwargs)
+            dest_existing_ids.update(batch_ids)
+            merged_count += len(batch_ids)
+
+            if source_count > args.batch_size:
+                print(f"   Merged {min(offset + args.batch_size, source_count)}/{source_count} documents...")
+
+        print(f"   ✅ Done with '{source_name}'")
+
+    print(f"\n✅ Merge completed successfully")
+    print(f"   Destination: {args.destination} ({dest_collection.count()} documents)")
+    print(f"   Documents merged: {merged_count}")
+    if skipped_count > 0:
+        print(f"   Duplicates skipped: {skipped_count}")
+
+    return 0
+
 def main():
     """Main CLI entry point"""
     parser = create_parser()
@@ -973,7 +1119,7 @@ def main():
     commands = {
         'start': handle_start, 'stop': handle_stop, 'restart': handle_restart,
         'status': handle_status, 'delete': handle_delete, 'list': handle_list,
-        'export': handle_export, 'import': handle_import
+        'export': handle_export, 'import': handle_import, 'merge': handle_merge
     }
 
     handler = commands.get(args.command)
