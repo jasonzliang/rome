@@ -12,9 +12,10 @@ from .kb_server import ChromaServerManager, CHROMA_BASE_DIR
 from .kb_client import EMBEDDING_MODELS
 
 OPENAI_CONFIG =  {
-    "model": "gpt-5-mini",
-    "reasoning_effort": "low",
-    # "temperature": 0.1,
+    # "model": "gpt-5-mini",
+    # "reasoning_effort": "low",
+    "model": "gpt-4o",
+    "temperature": 0.1,
     "max_tokens": DEFAULT_CONFIG['OpenAIHandler']['max_completion_tokens'],
     "api_key": os.environ.get("OPENAI_API_KEY"),
     "openai_base_url": DEFAULT_CONFIG['OpenAIHandler']['base_url'],
