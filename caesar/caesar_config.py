@@ -97,6 +97,8 @@ CAESAR_CONFIG = {
         "adapt_role": False,
         # Insights file path used to adapt the role and change it
         "adapt_role_file": None
+        # Whether to load role from checkpoint, or recreate it when agent starts
+        "load_saved_role": True,
     },
 
     "ArtifactSynthesizer": {
