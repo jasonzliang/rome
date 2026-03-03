@@ -366,7 +366,7 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
             self.graph = nx.node_link_graph(data.get('graph', self.graph), edges="edges")
 
             # Restore role from checkpoint if enabled
-            if not self.load_saved_role:
+            if self.load_saved_role:
                 self.role = data.get('role', self.role)
             else:
                 self._update_role()
