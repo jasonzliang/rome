@@ -45,6 +45,11 @@ EMBEDDING_MODELS = {
     "paraphrase-MiniLM-L6-v2": 384
 }
 
+REASONING_MODELS = {
+    "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro",
+    "o1", "o1-mini", "o1-pro", "o3", "o3-mini", "o4-mini",
+}
+
 
 class ChromaClientManager:
     """Enhanced ChromaDB + LlamaIndex knowledge base with reranking"""
@@ -180,7 +185,7 @@ class ChromaClientManager:
                 temperature=self.llm_temperature,
                 max_tokens=DEFAULT_CONFIG['OpenAIHandler']['max_completion_tokens'],
                 additional_kwargs={"reasoning_effort": self.llm_reasoning_effort} \
-                    if self.llm_reasoning_effort else None
+                    if (self.llm_reasoning_effort and self.llm_model in REASONING_MODELS) else None
             )
             self.embed_model = OpenAIEmbedding(model=self.embedding_model)
 
