@@ -166,8 +166,8 @@ CAESAR_CONFIG = {
     "ChromaClientManager": {
         # Model name for LLM
         "llm_model": "gpt-4o",
-        # Reasoning effort for GPT-5/O models
-        "llm_reasoning_effort": "low",
+        # Reasoning effort for GPT-5/O models (set to None for non-reasoning models)
+        "llm_reasoning_effort": None,
          # LLM model temperature (for query/reranking)
         "llm_temperature": 0.1,
         # Maximum number of words for query response
