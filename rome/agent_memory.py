@@ -12,6 +12,7 @@ from .kb_server import ChromaServerManager, CHROMA_BASE_DIR
 from .kb_client import EMBEDDING_MODELS
 
 OPENAI_CONFIG =  {
+    # Reasoning effort not supported in mem0ai v1.0.4
     # "model": "gpt-5-mini",
     # "reasoning_effort": "low",
     "model": "gpt-4o",
