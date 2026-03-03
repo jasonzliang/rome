@@ -131,7 +131,6 @@ You navigate through information space systematically yet creatively, always wit
         queries = [self.starting_query]
         if self.additional_starting_queries > 0:
             try:
-# IMPORTANT: If no additional queries are generated, return an empty list
                 prompt = f"""Given this query: "{self.starting_query}"
 
 Generate anywhere from 0 to {self.additional_starting_queries} additional search queries that would help comprehensively answer the original query. These queries should:
@@ -146,6 +145,7 @@ Respond with valid JSON only:
 {{
 "queries": ["query1", "query2", ...]
 }}"""
+# IMPORTANT: If no additional queries are generated, return an empty list
 
                 response = self.chat_completion(
                     prompt,
