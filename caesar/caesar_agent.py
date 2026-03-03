@@ -598,9 +598,10 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
 CURRENT EXPLORATION CONTEXT:
 - Current iteration: {self.current_iteration}/{self.max_iterations}
 - Current depth: {self.current_depth}/{self.max_depth}
+- Current page: {self.current_url}
+- Starting query/page: {self.starting_query if self.starting_query else self.starting_url}
 - Web pages visited: {len(self.visited_urls)}
 - Average visits per page: {float(np.mean(list(self.visited_urls.values())))}
-- Current URL: {self.current_url}
 
 CURRENT EXPLORATION INSIGHTS:
 {kb_context if kb_context else "No exploration insights available."}
