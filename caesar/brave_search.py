@@ -90,7 +90,7 @@ class BraveSearch:
         filename = self._generate_filename(queries)
         html_file = os.path.abspath(os.path.join(self.output_dir, filename))
         if os.path.exists(html_file):
-            self.logger.info(f"Using cached search results html file: {html_file}")
+            self.logger.debug(f"Using cached search results html file: {html_file}")
             return f"file://{html_file}"
 
         # Execute all searches
@@ -110,7 +110,7 @@ class BraveSearch:
         with open(html_file, 'w', encoding='utf-8') as f:
             f.write(html)
 
-        self.logger.info(f"Saved search results to html file: {html_file}")
+        self.logger.debug(f"Saved search results to html file: {html_file}")
         return f"file://{html_file}"
 
     def _search_with_retry(self, query: str) -> Dict:

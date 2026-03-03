@@ -133,7 +133,7 @@ You navigate through information space systematically yet creatively, always wit
             try:
                 prompt = f"""Given this query: "{self.starting_query}"
 
-Generate anywhere from 0 to {self.additional_starting_queries} additional search queries that would help comprehensively answer the original query. These queries should:
+Generate up to {self.additional_starting_queries} additional search queries that would help comprehensively answer the original query. These queries should:
 - Explore different aspects or angles of the original query
 - Cover related concepts that provide essential context
 - Include specific technical or domain-specific variations
