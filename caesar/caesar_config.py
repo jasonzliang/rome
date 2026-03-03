@@ -165,7 +165,7 @@ CAESAR_CONFIG = {
     # Default config for vector store knowledge base
     "ChromaClientManager": {
         # Model name for LLM
-        "llm_model": "gpt-5-mini",
+        "llm_model": "gpt-4o",
         # Reasoning effort for GPT-5/O models
         "llm_reasoning_effort": "low",
          # LLM model temperature (for query/reranking)
