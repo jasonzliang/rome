@@ -152,10 +152,10 @@ Respond with valid JSON only:
                     response_format={"type": "json_object"}
                 )
                 result = self.parse_json_response(response)
-                if result and result.get("queries"):
-                    additional = result["queries"][:self.additional_starting_queries]
-                    queries.extend(additional)
-                    self.logger.info(f"Generated {len(additional)} additional queries: {additional}")
+                additional = result["queries"][:self.additional_starting_queries]
+                queries.extend(additional)
+                self.logger.info(f"Generated {len(additional)} additional queries: {additional}")
+
             except Exception as e:
                 self.logger.error(f"Failed to generate additional queries: {e}")
 
