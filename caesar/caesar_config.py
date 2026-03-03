@@ -125,12 +125,14 @@ CAESAR_CONFIG = {
     },
 
     "AgentMemory": {
-        # Whether to clear memory or not
+        # Whether to clear memory or not on startup
         "clear_memory": False,
-        # Whether to enable agent memory
+        # Whether to enable memory for Caesar agent
         "enabled": True,
         # Whether to use vector DB or graph DB
         "use_graph": False,
+        # Whether to enable inference to consolidate memories
+        "infer": False,
     },
 
     "BraveSearch": {
