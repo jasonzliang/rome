@@ -140,7 +140,6 @@ Generate {self.additional_starting_queries} additional search queries that would
 - Be concise (1-6 words each for optimal search results)
 
 IMPORTANT: Use your role as a guide on how to respond!
-IMPORTANT: If no additional queries are generated, return an empty list
 
 Respond with valid JSON only:
 {{
