@@ -131,9 +131,10 @@ You navigate through information space systematically yet creatively, always wit
         queries = [self.starting_query]
         if self.additional_starting_queries > 0:
             try:
+# IMPORTANT: If no additional queries are generated, return an empty list
                 prompt = f"""Given this query: "{self.starting_query}"
 
-Generate {self.additional_starting_queries} additional search queries that would help comprehensively answer the original query. These queries should:
+Generate anywhere from 0 to {self.additional_starting_queries} additional search queries that would help comprehensively answer the original query. These queries should:
 - Explore different aspects or angles of the original query
 - Cover related concepts that provide essential context
 - Include specific technical or domain-specific variations
