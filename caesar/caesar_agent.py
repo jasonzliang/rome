@@ -593,14 +593,13 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
         else:
             web_search_option = f"\n4. **WEB_SEARCH** (do NOT pick, no uses remaining)"
 
-        query_task = ' that bests answers the starting query.' if self.starting_query else '.'
+        query_task = f' that bests answers the starting query: {self.starting_query}' if self.starting_query else '.'
         prompt = f"""Based on accumulated knowledge and navigation patterns, determine the optimal exploration strategy{query_task}
 
 CURRENT EXPLORATION CONTEXT:
 - Current iteration: {self.current_iteration}/{self.max_iterations}
 - Current depth: {self.current_depth}/{self.max_depth}
 - Current page: {self.current_url}
-- Starting query/page: {self.starting_query if self.starting_query else self.starting_url}
 - Web pages visited: {len(self.visited_urls)}
 - Average visits per page: {float(np.mean(list(self.visited_urls.values())))}
 
