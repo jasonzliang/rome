@@ -593,8 +593,8 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
         else:
             web_search_option = f"\n4. **WEB_SEARCH** (do NOT pick, no uses remaining)"
 
-        answer_query_option = ' that bests answers the starting query.' if self.starting_query else '.'
-        prompt = f"""Based on accumulated knowledge and navigation patterns, determine the optimal exploration strategy{answer_query_option}
+        query_task = ' that bests answers the starting query.' if self.starting_query else '.'
+        prompt = f"""Based on accumulated knowledge and navigation patterns, determine the optimal exploration strategy{query_task}
 
 CURRENT EXPLORATION CONTEXT:
 - Current iteration: {self.current_iteration}/{self.max_iterations}
