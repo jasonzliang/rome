@@ -416,16 +416,20 @@ EXAMPLE OUTPUT:
         recent_queries = previous_queries[-MAX_SYNTHESIS_QA_CONTEXT:]
         recent_responses = previous_responses[-MAX_SYNTHESIS_QA_CONTEXT:]
 
-        context = "\n\n".join([f"Q: {q}\nA: {r}"
-                              for q, r in zip(recent_queries, recent_responses)])
+        query_context = self.agent.starting_query if self.agent.starting_query else "No query provided"
+        prev_insights = "\n\n".join([f"Q: {q}\nA: {r}"
+            for q, r in zip(recent_queries, recent_responses)])
 
-        prompt = f"""PREVIOUS INSIGHTS:
-{context}
+        prompt = f"""
+STARTING QUERY:
+{query_context}
+
+PREVIOUS INSIGHTS:
+{prev_insights}
 
 YOUR TASK:
-Based on the insights gathered so far, what is the next most important question to ask
-to deepen understanding and reveal emergent patterns? The question should:
-- Build on previous insights rather than repeat them
+Based on the starting query (if provided) and previous insights gathered so far, what is the next most important question to ask to deepen understanding and reveal emergent patterns? The question should:
+- Build on past insights rather than repeat them
 - Seek connections between different themes
 - Identify gaps or contradictions to explore
 - Move toward synthesis and creation rather than enumeration
