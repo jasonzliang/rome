@@ -420,8 +420,7 @@ EXAMPLE OUTPUT:
         prev_insights = "\n\n".join([f"Q: {q}\nA: {r}"
             for q, r in zip(recent_queries, recent_responses)])
 
-        prompt = f"""
-STARTING QUERY:
+        prompt = f"""STARTING QUERY:
 {query_context}
 
 PREVIOUS INSIGHTS:
