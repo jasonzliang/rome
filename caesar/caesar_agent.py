@@ -248,6 +248,7 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
         self.current_url = self.starting_url
         self.current_depth = len(self.url_stack)
         self.current_iteration = 0
+        self.traversal_history = []
 
     def _validate_caesar_config(self) -> None:
         """Validate Caesar-specific configuration"""
@@ -300,6 +301,7 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
                 'failed_urls': list(self.failed_urls),
                 'visited_urls': self.visited_urls,
                 'web_searches_used': self.web_searches_used,
+                'traversal_history': self.traversal_history,
                 'graph': nx.node_link_data(self.graph, edges="edges"),
                 'config': {
                     'starting_url': self.starting_url,
@@ -354,6 +356,7 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
             self.current_url = self.url_stack[-1]
 
             self.web_searches_used = data.get('web_searches_used', self.web_searches_used)
+            self.traversal_history = data.get('traversal_history', self.traversal_history)
             self.visited_urls = data.get('visited_urls', self.visited_urls)
             self.url_stack = data.get('url_stack', self.url_stack)
             if not self.url_stack:
@@ -839,6 +842,16 @@ Your response must be valid JSON only, nothing else."""
 
         self.graph.add_edge(self.current_url, next_url, reason=reason)
 
+        traversal_metadata = {
+            'iteration': self.current_iteration,
+            'depth': self.current_depth,
+            'from_url': self.current_url,
+            'to_url': next_url,
+            'reason': reason,
+            'alternatives': len(links),
+        }
+        self.traversal_history.append(traversal_metadata)
+
         current_domain = urlparse(self.current_url).netloc
         next_domain = urlparse(next_url).netloc
         self.remember(
@@ -847,15 +860,7 @@ Your response must be valid JSON only, nothing else."""
             f"Navigation performed on iteration {self.current_iteration} at depth {self.current_depth}. "
             f"Agent selected new webpage from {len(links)} options because: {reason}",
             context="navigation",
-            metadata={
-                'from_url': self.current_url,
-                'to_url': next_url,
-                'from_domain': current_domain,
-                'to_domain': next_domain,
-                'reason': reason,
-                'alternatives': len(links),
-                'depth': self.current_depth
-            }
+            metadata=traversal_metadata
         )
 
         self._advance_to_url(next_url)
