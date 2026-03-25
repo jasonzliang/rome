@@ -54,6 +54,10 @@ AgentMemory:
   enabled: true
   use_graph: true
 
+ChromaClientManager:
+  llm_model: gpt-5.2
+  llm_reasoning_effort: medium
+
 # ============================================================================
 # LOGGING CONFIGURATION
 # ============================================================================
