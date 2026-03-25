@@ -41,11 +41,8 @@ ArtifactSynthesizer:
 # LLM CONFIGURATION
 # ============================================================================
 OpenAIHandler:
-  cost_limit: 300.0
   model: gpt-5.2
   reasoning_effort: medium
-  temperature: 0.1
-  timeout: 1000
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION

@@ -152,6 +152,8 @@ CAESAR_CONFIG = {
 
     # Default config for LLM outside of agent exploration
     "OpenAIHandler": {
+        # Total API cost limit in dollars
+        "cost_limit": 300.0,
         # Model name for LLM
         "model": "gpt-5.2",
         # Reasoning effort for GPT-5/O models
@@ -161,7 +163,7 @@ CAESAR_CONFIG = {
         # Maximum tokens per LLM response
         "max_completion_tokens": 50000,
         # API timeout in seconds
-        "timeout": 300,
+        "timeout": 600,
     },
 
     # Default config for vector store knowledge base
