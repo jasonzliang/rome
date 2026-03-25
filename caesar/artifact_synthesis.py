@@ -552,7 +552,6 @@ YOUR TASK:
  - Your explanation should start with a short but interesting title
 {length_context}
 IMPORTANT: Format your explanation so humans can easily read it (use more than one big paragraph)
-IMPORTANT: Use your role as a guide on how to respond!
 
 Respond with valid JSON only:
 {{
@@ -625,7 +624,7 @@ PARAGRAPH 2 - CREATIVITY ARGUMENT (3-4 sentences):
 
 IMPORTANT: Do NOT mention or reference "the artifact" — write as if describing the idea itself
 IMPORTANT: Start paragraph 1 with "SUMMARY: " and paragraph 2 with "WHY ITS CREATIVE: "
-IMPORTANT: Use your role as a guide on how to respond!
+IMPORTANT: Use simple and clear English, do not overuse jargon
 
 Respond with valid JSON only:
 {{
