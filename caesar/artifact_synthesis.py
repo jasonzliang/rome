@@ -67,7 +67,8 @@ class ArtifactSynthesizer:
             if not result: break
             self._save_synthesis(result, base_dir=base_dir, suffix=f'synthesis-{draft_num}')
             self._post_process_eli5(result, base_dir=base_dir, suffix=f'synth-eli5-{draft_num}')
-            self._post_process_human_eval(result, base_dir=base_dir, suffix=f'synth-he-{draft_num}')
+            self._post_process_human_eval(
+                result, base_dir=base_dir, suffix=f'synth-human-eval-{draft_num}')
             all_drafts.append(result); previous_result = result
 
             # Refine query for next draft (if not last draft)
@@ -88,7 +89,7 @@ class ArtifactSynthesizer:
                 self._save_synthesis(merged_result, base_dir=base_dir, suffix=f'merged-{len(all_drafts)}')
                 self._post_process_eli5(merged_result, base_dir, suffix=f'merged-eli5-{len(all_drafts)}')
                 self._post_process_human_eval(
-                    merged_result, base_dir, suffix=f'merged-he-{len(all_drafts)}')
+                    merged_result, base_dir, suffix=f'merged-human-eval-{len(all_drafts)}')
                 return merged_result
         return all_drafts[-1]
 
