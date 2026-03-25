@@ -66,7 +66,8 @@ class ArtifactSynthesizer:
             result = self._synthesize_single_draft(mode, current_query, previous_result)
             if not result: break
             self._save_synthesis(result, base_dir=base_dir, suffix=f'synthesis-{draft_num}')
-            self._post_process(result, base_dir=base_dir, suffix=f'synth-eli5-{draft_num}')
+            self._post_process_eli5(result, base_dir=base_dir, suffix=f'synth-eli5-{draft_num}')
+            self._post_process_human_eval(result, base_dir=base_dir, suffix=f'synth-he-{draft_num}')
             all_drafts.append(result); previous_result = result
 
             # Refine query for next draft (if not last draft)
@@ -85,7 +86,9 @@ class ArtifactSynthesizer:
             merged_result = self._merge_artifacts(all_drafts)
             if merged_result:
                 self._save_synthesis(merged_result, base_dir=base_dir, suffix=f'merged-{len(all_drafts)}')
-                self._post_process(merged_result, base_dir, suffix=f'merged-eli5-{len(all_drafts)}')
+                self._post_process_eli5(merged_result, base_dir, suffix=f'merged-eli5-{len(all_drafts)}')
+                self._post_process_human_eval(
+                    merged_result, base_dir, suffix=f'merged-he-{len(all_drafts)}')
                 return merged_result
         return all_drafts[-1]
 
@@ -506,7 +509,7 @@ Respond with JSON:
         except Exception as e:
             self.logger.error(f"Failed to save synthesis: {e}")
 
-    def _post_process(self, result: Dict,
+    def _post_process_eli5(self, result: Dict,
         base_dir: str = None,
         suffix: str = "eli5",
         timestamp: str = None) -> Optional[Dict]:
@@ -585,3 +588,72 @@ Respond with valid JSON only:
                 self.logger.error(f"[POST-PROCESS] Failed to generate {length or 'unconstrained'} word version")
 
         return results[-1] if results else None
+
+    def _post_process_human_eval(self, result: Dict,
+        base_dir: str = None,
+        suffix: str = "human-eval",
+        timestamp: str = None) -> Optional[Dict]:
+        """Generate a two-paragraph human eval summary: core idea + creativity argument"""
+        if not self.synthesis_human_eval: return None
+
+        artifact_text = result.get("artifact", "")
+        if not artifact_text:
+            self.logger.error("[POST-PROCESS] No artifact text to process")
+            return None
+
+        abstract_text = result.get("abstract", "")
+        if abstract_text:
+            artifact_text = f"Artifact Abstract:\n{abstract_text}\n\nArtifact Text:\n{artifact_text}"
+
+        prompt = f"""--- ARTIFACT ---
+{artifact_text}
+--- END OF ARTIFACT ---
+
+YOUR TASK:
+Write exactly two short paragraphs about the artifact above:
+
+PARAGRAPH 1 - CORE IDEA SUMMARY (2-3 sentences):
+ - Identify and summarize the single most important key idea in the artifact
+ - Be concise, clear, and specific — no filler or vague language
+ - A reader should immediately understand what the artifact is about
+
+PARAGRAPH 2 - CREATIVITY ARGUMENT (3-4 sentences):
+ - Make a clear, convincing argument for why the key idea in the artifact is creative
+ - Explain what makes it novel, surprising, or useful
+ - Ground your argument in specific aspects of the idea, not generic praise
+ - Write to persuade a skeptical reader
+
+IMPORTANT: Do NOT mention or reference "the artifact" — write as if describing the idea itself
+IMPORTANT: Start paragraph 1 with "SUMMARY: " and paragraph 2 with "WHY ITS CREATIVE: "
+IMPORTANT: Use your role as a guide on how to respond!
+
+Respond with valid JSON only:
+{{
+    "human_eval": "SUMMARY: <paragraph 1>\\n\\nWHY ITS CREATIVE: <paragraph 2>"
+}}"""
+
+        for attempt in range(1, NUM_SYNTHESIS_RETRIES + 1):
+            try:
+                response = self.agent.chat_completion(prompt,
+                    override_config={"reasoning_effort": "high"},
+                    response_format={"type": "json_object"})
+                eval_result = self.agent.parse_json_response(response)
+                if not eval_result or "human_eval" not in eval_result:
+                    raise ValueError("Missing 'human_eval' key in response")
+
+                processed_result = {
+                    "artifact": eval_result["human_eval"],
+                    "metadata": result.get("metadata", {}),
+                }
+
+                self._save_synthesis(processed_result,
+                    base_dir=base_dir,
+                    suffix=suffix,
+                    timestamp=timestamp)
+
+                return processed_result
+            except Exception as e:
+                self.logger.error(f"[POST-PROCESS] Attempt {attempt}/{NUM_SYNTHESIS_RETRIES} failed: {e}")
+
+        self.logger.error("[POST-PROCESS] All attempts exhausted")
+        return None

@@ -122,6 +122,8 @@ CAESAR_CONFIG = {
         "synthesis_eli5": False,
         # Maximum words for ELI5 explanation (None = unspecified word limit)
         "synthesis_eli5_length": None,
+        # Whether to enable human evaluation summary for artifact text
+        "synthesis_human_eval": False,
         # Maximum exploration iterations to filter knowledge base for queries
         "synthesis_iteration_filter": None,
     },
