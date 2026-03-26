@@ -103,7 +103,7 @@ with st.sidebar:
         f_q, _, _ = load_files()
         total_queries = len(f_q)
         finished_count = get_finished_user_count(total_queries)
-        st.metric("### Users Finished", finished_count)
+        st.metric("Users Finished", finished_count)
     except:
         pass
     if st.session_state.user_name:
