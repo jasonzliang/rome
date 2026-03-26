@@ -100,6 +100,7 @@ with st.sidebar:
             st.write("Wipe the entire database (all users).")
             if st.button("🔥 DELETE ALL RECORDS"):
                 delete_all_records()
+                st.session_state.user_name = ""
                 st.session_state.current_pair = 0
                 st.rerun()
     else:
