@@ -111,7 +111,7 @@ with st.sidebar:
 
         # Standard User Reset
         # st.write(f"Reset ratings for **{st.session_state.user_name}**.")
-        if st.button(f"🚨 Reset Ratings for **{st.session_state.user_name}**"):
+        if st.button(f"🚨 Delete All Ratings for **{st.session_state.user_name}**"):
             reset_user_ratings(st.session_state.user_name)
             st.session_state.user_name = ""
             st.session_state.current_pair = 0
