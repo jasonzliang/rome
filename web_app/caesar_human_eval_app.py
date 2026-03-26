@@ -92,7 +92,7 @@ if not st.session_state.user_name:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         st.title("Query Answer Evaluation")
-        name_input = st.text_input("Enter your user name:")
+        name_input = st.text_input("Enter your name:")
         if st.button("Start"):
             if name_input.strip():
                 st.session_state.user_name = name_input.strip()
@@ -102,7 +102,7 @@ if not st.session_state.user_name:
 
 # --- 8. Main UI: Evaluation Screen ---
 else:
-    st.title(f"Evaluator: {st.session_state.user_name}")
+    st.title(f"Evaluator Name: {st.session_state.user_name}")
 
     files_q, files_a, files_b = load_files()
     total_evals = len(files_a)
