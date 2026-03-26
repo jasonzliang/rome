@@ -189,3 +189,4 @@ CLAUDE.md
 *.avif
 *.heic
 *.test.yaml
+.claude
