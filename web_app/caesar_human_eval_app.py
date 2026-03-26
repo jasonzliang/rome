@@ -99,17 +99,16 @@ init_db()
 # --- 6. User Sidebar Controls ---
 with st.sidebar:
     st.header("User Controls")
+    # Calculate finished users
+    try:
+        f_q, _, _ = load_files()
+        total_queries = len(f_q)
+        finished_count = get_finished_user_count(total_queries)
+        st.info(f"Users Finished: {finished_count}")
+        st.markdown("---")
+    except:
+        pass
     if st.session_state.user_name:
-        # Calculate finished users
-        try:
-            f_q, _, _ = load_files()
-            total_queries = len(f_q)
-            finished_count = get_finished_user_count(total_queries)
-            st.metric("Users Finished", finished_count)
-            st.markdown("---")
-        except:
-            pass
-
         # Standard User Reset
         st.warning(f"Reset ratings for **{st.session_state.user_name}**.")
         if st.button("🚨 Reset My Ratings"):
