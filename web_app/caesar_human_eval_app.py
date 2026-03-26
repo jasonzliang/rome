@@ -7,15 +7,7 @@ import sqlite3
 st.set_page_config(page_title="Model Evaluation (A/B Test)", layout="wide")
 
 # --- 2. Configuration & Validation ---
-EVAL_DIR = os.environ.get('CAESAR_HUMAN_EVAL_DIR')
-
-if not EVAL_DIR:
-    st.error("CRITICAL ERROR: The environment variable 'CAESAR_HUMAN_EVAL_DIR' is not set.")
-    st.stop()
-
-if not os.path.isdir(EVAL_DIR):
-    st.error(f"CRITICAL ERROR: The base evaluation directory does not exist: {EVAL_DIR}")
-    st.stop()
+EVAL_DIR = os.environ.get('CAESAR_HUMAN_EVAL_DIR', '.')
 
 QUERY_DIR = os.path.join(EVAL_DIR, "query")
 SOURCE_A_DIR = os.path.join(EVAL_DIR, "source_a")
