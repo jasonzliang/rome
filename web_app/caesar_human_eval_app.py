@@ -125,6 +125,7 @@ with st.sidebar:
             confirm_wipe = st.checkbox("I confirm I want to wipe EVERYTHING")
             if st.button("🔥 DELETE ALL RECORDS", disabled=not confirm_wipe):
                 delete_all_records()
+                st.session_state.user_name = ""
                 st.session_state.current_pair = 0
                 st.success("Database wiped!")
                 st.rerun()
