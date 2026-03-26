@@ -613,8 +613,8 @@ YOUR TASK:
 Write exactly two short paragraphs about the artifact above:
 
 PARAGRAPH 1 - CORE IDEA SUMMARY (2-3 sentences):
- - Identify and summarize the single most creative key idea in the artifact
- - Be concise and concise when explaining so it is understandable by a non-expert
+ - Identify and summarize the most important creative key idea in the artifact
+ - Be concise and clear so the summary is understandable by a non-expert
  - Do not overuse jargon or too many technical terms
 
 PARAGRAPH 2 - CREATIVITY ARGUMENT (3-4 sentences):
