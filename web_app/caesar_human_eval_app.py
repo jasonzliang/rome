@@ -122,7 +122,7 @@ with st.sidebar:
             st.markdown("---")
             st.error("🛠️ Admin Panel")
             # st.write("Wipe the entire database (all users).")
-            confirm_wipe = st.checkbox("I confirm I want to wipe EVERYTHING")
+            confirm_wipe = st.checkbox("I want to wipe EVERYTHING")
             if st.button("🔥 DELETE ALL RECORDS", disabled=not confirm_wipe):
                 delete_all_records()
                 st.session_state.user_name = ""
