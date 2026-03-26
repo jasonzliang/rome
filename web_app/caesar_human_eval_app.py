@@ -110,8 +110,8 @@ with st.sidebar:
         st.header("User Controls")
 
         # Standard User Reset
-        st.warning(f"Reset ratings for **{st.session_state.user_name}**.")
-        if st.button("🚨 Reset My Ratings"):
+        # st.write(f"Reset ratings for **{st.session_state.user_name}**.")
+        if st.button(f"🚨 Reset Ratings for **{st.session_state.user_name}**"):
             reset_user_ratings(st.session_state.user_name)
             st.session_state.user_name = ""
             st.session_state.current_pair = 0
