@@ -59,6 +59,13 @@ def reset_user_ratings(user_name):
         cursor.execute('DELETE FROM comparative_evals WHERE user_name = ?', (user_name,))
         conn.commit()
 
+def delete_all_records():
+    """Admin only: Wipes the entire database table."""
+    with sqlite3.connect(DB_FILE, timeout=15) as conn:
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM comparative_evals')
+        conn.commit()
+
 # --- 5. File Loading ---
 def load_files():
     files_q = sorted([f for f in os.listdir(QUERY_DIR) if f.endswith('.txt')])
@@ -78,12 +85,23 @@ init_db()
 with st.sidebar:
     st.header("User Controls")
     if st.session_state.user_name:
-        st.warning(f"Warning: This will permanently delete all saved scores for **{st.session_state.user_name}**.")
+        # Standard User Reset
+        st.warning(f"Reset ratings for **{st.session_state.user_name}**.")
         if st.button("🚨 Reset My Ratings"):
             reset_user_ratings(st.session_state.user_name)
             st.session_state.user_name = ""
             st.session_state.current_pair = 0
             st.rerun()
+
+        # Admin Global Reset
+        if st.session_state.user_name == "Admin":
+            st.markdown("---")
+            st.error("### 🛠️ Admin Panel")
+            st.write("Wipe the entire database (all users).")
+            if st.button("🔥 DELETE ALL RECORDS"):
+                delete_all_records()
+                st.session_state.current_pair = 0
+                st.rerun()
     else:
         st.info("Log in to see user controls.")
 
@@ -166,7 +184,6 @@ else:
         # --- Comparative Scoring ---
         st.markdown("### Which answer is more creative?")
 
-        # Removed the 'Tie' option here
         choice = st.radio(
             "Based on the New, Useful, and Surprising (NUS) metrics:",
             ["Answer 1", "Answer 2"],
@@ -179,11 +196,7 @@ else:
             if choice is None:
                 st.error("⚠️ Please select a winner before continuing.")
             else:
-                # Updated logic to only handle Answer 1 and Answer 2
                 winning_file = left_name if choice == "Answer 1" else right_name
-
-                # Save the mapping
                 save_result(query_name, left_name, right_name, st.session_state.user_name, choice, winning_file)
-
                 st.session_state.current_pair += 1
                 st.rerun()

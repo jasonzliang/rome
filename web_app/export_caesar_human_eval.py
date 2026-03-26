@@ -16,13 +16,19 @@ def export_to_csv():
     # 2. Connect to the database and load into a Pandas DataFrame
     print(f"📥 Connecting to database at {DB_FILE}...")
     with sqlite3.connect(DB_FILE) as conn:
-        # Extract exactly the columns requested
+        # This query uses MAX(id) and GROUP BY to ensure if a user rated
+        # the same query twice, only the most recent one is exported.
         query = """
             SELECT
                 query_file,
                 user_name,
                 winning_file
             FROM comparative_evals
+            WHERE id IN (
+                SELECT MAX(id)
+                FROM comparative_evals
+                GROUP BY user_name, query_file
+            )
         """
         df = pd.read_sql_query(query, conn)
 
@@ -32,15 +38,15 @@ def export_to_csv():
 
     # 3. Export to CSV
     df.to_csv(EXPORT_CSV_NAME, index=False)
-    print(f"✅ Success! Exported {len(df)} evaluation records to {EXPORT_CSV_NAME}")
+    print(f"✅ Success! Exported {len(df)} unique evaluation records to {EXPORT_CSV_NAME}")
 
     # 4. Show a quick summary in the terminal
-    print("\n📊 Current Win Counts by Specific File:")
+    print("\n📊 Unique Win Counts by Specific File:")
     print(df['winning_file'].value_counts().to_string())
 
     # 5. Extract the base model name (caesar vs gemini) for a high-level summary
     df['model_name'] = df['winning_file'].apply(lambda x: x.split('_')[0] if '_' in x else x)
-    print("\n🏆 Overall Win Counts by Model:")
+    print("\n🏆 Unique Overall Win Counts by Model:")
     print(df['model_name'].value_counts().to_string())
     print()
 
