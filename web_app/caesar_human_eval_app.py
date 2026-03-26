@@ -111,7 +111,7 @@ with st.sidebar:
 
         # Standard User Reset
         # st.write(f"Reset ratings for **{st.session_state.user_name}**.")
-        if st.button(f"🚨 Delete All Ratings for **{st.session_state.user_name}**"):
+        if st.button(f"🚨 Delete Ratings for **{st.session_state.user_name}**"):
             reset_user_ratings(st.session_state.user_name)
             st.session_state.user_name = ""
             st.session_state.current_pair = 0
@@ -120,7 +120,7 @@ with st.sidebar:
         # Admin Global Reset
         if st.session_state.user_name == "Admin":
             st.markdown("---")
-            st.error("🛠️ Admin Panel")
+            st.header("Admin Panel")
             # st.write("Wipe the entire database (all users).")
             confirm_wipe = st.checkbox("I want to wipe EVERYTHING")
             if st.button("🔥 DELETE ALL RECORDS", disabled=not confirm_wipe):
