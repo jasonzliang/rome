@@ -66,6 +66,21 @@ def delete_all_records():
         cursor.execute('DELETE FROM comparative_evals')
         conn.commit()
 
+def get_finished_user_count(total_required):
+    """Counts how many unique users have completed all evaluations."""
+    with sqlite3.connect(DB_FILE, timeout=15) as conn:
+        cursor = conn.cursor()
+        # Counts users who have entries for every unique query_file
+        cursor.execute('''
+            SELECT COUNT(*) FROM (
+                SELECT user_name
+                FROM comparative_evals
+                GROUP BY user_name
+                HAVING COUNT(DISTINCT query_file) >= ?
+            )
+        ''', (total_required,))
+        return cursor.fetchone()[0]
+
 # --- 5. File Loading ---
 def load_files():
     files_q = sorted([f for f in os.listdir(QUERY_DIR) if f.endswith('.txt')])
@@ -85,6 +100,16 @@ init_db()
 with st.sidebar:
     st.header("User Controls")
     if st.session_state.user_name:
+        # Calculate finished users
+        try:
+            f_q, _, _ = load_files()
+            total_queries = len(f_q)
+            finished_count = get_finished_user_count(total_queries)
+            st.metric("Users Finished", finished_count)
+            st.markdown("---")
+        except:
+            pass
+
         # Standard User Reset
         st.warning(f"Reset ratings for **{st.session_state.user_name}**.")
         if st.button("🚨 Reset My Ratings"):
