@@ -131,9 +131,9 @@ else:
         with st.expander("📚 **How to judge Creativity (The NUS Framework)**", expanded=True):
             st.markdown("""
             **Creativity is defined as a combination of three elements:**
-            * 🌟 **New (Novelty & Rarity):** Is this a genuinely new invention or a fresh synthesis? Avoids relying on common tropes, cliches, or the "low-hanging fruit."
-            * 🛠️ **Useful (Viability & Alignment):** Is the idea actionable, logically sound, and aligned with the query's constraints? It shouldn't be random just for the sake of being random.
-            * 🤯 **Surprising (Subversion & Trajectory):** Did the answer take a clever "lateral leap"? It shouldn't be the most obvious, predictable "default" answer.
+            * 🌟 **New (Novelty & Rarity):** Is the answer a genuinely new invention or a fresh synthesis that avoids tropes or cliches?
+            * 🛠️ **Useful (Viability & Alignment):** Is the answer actionable, logically sound, and aligned with the query's constraints?
+            * 🤯 **Surprising (Subversion & Trajectory):** Did the answer take a clever, non-obvious, or unpredictable lateral leap?
             """)
 
         idx = st.session_state.current_pair
