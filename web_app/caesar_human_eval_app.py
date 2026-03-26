@@ -96,7 +96,7 @@ with st.sidebar:
         # Admin Global Reset
         if st.session_state.user_name == "Admin":
             st.markdown("---")
-            st.error("### 🛠️ Admin Panel")
+            st.error("🛠️ Admin Panel")
             st.write("Wipe the entire database (all users).")
             if st.button("🔥 DELETE ALL RECORDS"):
                 delete_all_records()
