@@ -190,8 +190,9 @@ else:
         st.markdown("---")
 
         # Randomize layout
-        random.seed(f"{st.session_state.user_name}_{idx}")
-        swap = random.choice([True, False])
+        seed_string = f"{st.session_state.user_name}_{idx}"
+        rng = random.Random(seed_string)
+        swap = rng.choice([True, False])
 
         col1, col2 = st.columns(2)
 
