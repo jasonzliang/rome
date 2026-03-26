@@ -625,7 +625,7 @@ PARAGRAPH 2 - CREATIVITY ARGUMENT (3-4 sentences):
 
 IMPORTANT: Do NOT mention or reference "the artifact" — write as if describing the idea itself
 IMPORTANT: Start paragraph 1 with "SUMMARY: " and paragraph 2 with "WHY ITS CREATIVE: "
-IMPORTANT: Use simple and clear English, do not overuse jargon
+IMPORTANT: Use simple and clear English that is understandable by a broad audience
 
 Respond with valid JSON only:
 {{
