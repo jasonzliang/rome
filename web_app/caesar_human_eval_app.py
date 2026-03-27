@@ -2,6 +2,7 @@ import streamlit as st
 import os
 import random
 import sqlite3
+import pandas as pd
 
 # --- 1. Page Configuration ---
 st.set_page_config(page_title="Model Evaluation (A/B Test)", layout="wide")
@@ -14,6 +15,7 @@ SOURCE_A_DIR = os.path.join(EVAL_DIR, "source_a")
 SOURCE_B_DIR = os.path.join(EVAL_DIR, "source_b")
 DB_FILE = os.path.join(EVAL_DIR, "results_ab.db")
 
+# Ensure directories exist
 for directory in [QUERY_DIR, SOURCE_A_DIR, SOURCE_B_DIR]:
     if not os.path.isdir(directory):
         st.error(f"CRITICAL ERROR: Required subdirectory is missing: {directory}")
@@ -24,6 +26,8 @@ if "user_name" not in st.session_state:
     st.session_state.user_name = ""
 if "current_pair" not in st.session_state:
     st.session_state.current_pair = 0
+if "view_mode" not in st.session_state:
+    st.session_state.view_mode = "eval"
 
 # --- 4. Database Functions ---
 def init_db():
@@ -60,17 +64,14 @@ def reset_user_ratings(user_name):
         conn.commit()
 
 def delete_all_records():
-    """Admin only: Wipes the entire database table."""
     with sqlite3.connect(DB_FILE, timeout=15) as conn:
         cursor = conn.cursor()
         cursor.execute('DELETE FROM comparative_evals')
         conn.commit()
 
 def get_finished_user_count(total_required):
-    """Counts how many unique users have completed all evaluations."""
     with sqlite3.connect(DB_FILE, timeout=15) as conn:
         cursor = conn.cursor()
-        # Counts users who have entries for every unique query_file
         cursor.execute('''
             SELECT COUNT(*) FROM (
                 SELECT user_name
@@ -81,58 +82,69 @@ def get_finished_user_count(total_required):
         ''', (total_required,))
         return cursor.fetchone()[0]
 
+def get_all_results():
+    with sqlite3.connect(DB_FILE, timeout=15) as conn:
+        return pd.read_sql_query("SELECT * FROM comparative_evals", conn)
+
 # --- 5. File Loading ---
 def load_files():
     files_q = sorted([f for f in os.listdir(QUERY_DIR) if f.endswith('.txt')])
     files_a = sorted([f for f in os.listdir(SOURCE_A_DIR) if f.endswith('.txt')])
     files_b = sorted([f for f in os.listdir(SOURCE_B_DIR) if f.endswith('.txt')])
-
     if not (len(files_q) == len(files_a) == len(files_b)):
-        st.error(f"File count mismatch! Queries: {len(files_q)}, Source A: {len(files_a)}, Source B: {len(files_b)}")
+        st.error(f"File count mismatch! Q:{len(files_q)}, A:{len(files_a)}, B:{len(files_b)}")
         st.stop()
-
     return files_q, files_a, files_b
 
-# Initialize DB
 init_db()
 
 # --- 6. User Sidebar Controls ---
 with st.sidebar:
-    # Calculate finished users
     try:
         f_q, _, _ = load_files()
         total_queries = len(f_q)
         finished_count = get_finished_user_count(total_queries)
-        st.metric("User Evaluations Completed", finished_count)
+        st.metric("Total Users Finished", finished_count)
     except:
         pass
+
     if st.session_state.user_name:
-        st.header("User Controls")
+        st.header(f"👤 {st.session_state.user_name}")
 
-        # Standard User Reset
-        # st.write(f"Reset ratings for **{st.session_state.user_name}**.")
-        if st.button(f"🚨 Delete Ratings for **{st.session_state.user_name}**"):
-            reset_user_ratings(st.session_state.user_name)
-            st.session_state.user_name = ""
-            st.session_state.current_pair = 0
-            st.rerun()
-
-        # Admin Global Reset
+        # Navigation for Admin
         if st.session_state.user_name == "Admin":
-            st.markdown("---")
-            st.header("Admin Panel")
-            # st.write("Wipe the entire database (all users).")
-            confirm_wipe = st.checkbox("I want to wipe EVERYTHING")
+            st.subheader("Admin Navigation")
+            if st.button("📊 View Results Dashboard"):
+                st.session_state.view_mode = "results"
+                st.rerun()
+            if st.button("📝 Back to Evaluation"):
+                st.session_state.view_mode = "eval"
+                st.rerun()
+
+            st.subheader("Database Management")
+            confirm_wipe = st.checkbox("Confirm Wipe All Data")
             if st.button("🔥 DELETE ALL RECORDS", disabled=not confirm_wipe):
                 delete_all_records()
                 st.session_state.user_name = ""
                 st.session_state.current_pair = 0
                 st.success("Database wiped!")
                 st.rerun()
-    else:
-        st.info("Log in to see user controls.")
 
-# --- 7. Main UI: Login Screen ---
+        # Updated Reset Progress logic
+        st.markdown("---")
+        if st.button(f"🚨 Reset My Progress"):
+            reset_user_ratings(st.session_state.user_name)
+            # CLEARING THE NAME SO IT GOES TO LOGIN
+            st.session_state.user_name = ""
+            st.session_state.current_pair = 0
+            st.session_state.view_mode = "eval"
+            st.rerun()
+    else:
+        st.info("Please log in.")
+
+# --- 7. Main UI Logic ---
+
+# Scenario A: Login Screen
 if not st.session_state.user_name:
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -145,9 +157,27 @@ if not st.session_state.user_name:
             else:
                 st.warning("Please enter a valid name.")
 
-# --- 8. Main UI: Evaluation Screen ---
+# Scenario B: Admin Dashboard View
+elif st.session_state.view_mode == "results" and st.session_state.user_name == "Admin":
+    st.title("Admin Results Dashboard")
+    df = get_all_results()
+
+    if df.empty:
+        st.info("No records found in the database.")
+    else:
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total Responses", len(df))
+        m2.metric("Unique Evaluators", df['user_name'].nunique())
+
+        st.markdown("### Selection History")
+        st.dataframe(df, width="stretch")
+
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("Download CSV", csv, "evaluation_results.csv", "text/csv")
+
+# Scenario C: Evaluation View (Standard)
 else:
-    st.title(f"Evaluator Name: {st.session_state.user_name}")
+    st.title(f"Evaluator: {st.session_state.user_name}")
 
     files_q, files_a, files_b = load_files()
     total_evals = len(files_a)
@@ -159,12 +189,11 @@ else:
 
     if st.session_state.current_pair >= total_evals:
         st.success("You have completed all evaluations. Thank you!")
-        if st.button("Log Out"):
+        if st.button("Finish & Log Out"):
             st.session_state.user_name = ""
             st.session_state.current_pair = 0
             st.rerun()
     else:
-        # --- The NUS Rubric ---
         with st.expander("📚 **How to judge Creativity (The NUS Framework)**", expanded=True):
             st.markdown("""
             **Creativity is defined as a combination of three elements:**
@@ -189,13 +218,11 @@ else:
         st.info(text_q)
         st.markdown("---")
 
-        # Randomize layout
         seed_string = f"{st.session_state.user_name}_{idx}"
         rng = random.Random(seed_string)
         swap = rng.choice([True, False])
 
         col1, col2 = st.columns(2)
-
         left_text, right_text = (text_b, text_a) if swap else (text_a, text_b)
         left_name, right_name = (file_b_name, file_a_name) if swap else (file_a_name, file_b_name)
 
@@ -208,8 +235,6 @@ else:
             st.markdown(right_text)
 
         st.markdown("---")
-
-        # --- Comparative Scoring ---
         st.markdown("### Which answer is more creative?")
 
         choice = st.radio(
