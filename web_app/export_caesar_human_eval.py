@@ -1,23 +1,25 @@
 import sqlite3
 import pandas as pd
 import os
+import argparse
 
-# Grab the environment variable (or default to current directory if not set)
-EVAL_DIR = os.environ.get('CAESAR_HUMAN_EVAL_DIR', '.')
-DB_FILE = os.path.join(EVAL_DIR, "results_ab.db")
-EXPORT_CSV_NAME = os.path.join(EVAL_DIR, "evaluation_winners.csv")
+def export_to_csv(eval_dir, include_all=False):
+    # Construct paths based on the provided directory
+    db_file = os.path.join(eval_dir, "results_ab.db")
+    export_csv_name = os.path.join(eval_dir, "evaluation_winners.csv")
 
-def export_to_csv():
     # 1. Check if the database exists
-    if not os.path.exists(DB_FILE):
-        print(f"❌ Error: Could not find '{DB_FILE}'. Have any evaluations been submitted yet?")
+    if not os.path.exists(db_file):
+        print(f"❌ Error: Could not find '{db_file}'.")
+        print(f"   Checked directory: {os.path.abspath(eval_dir)}")
         return
 
-    # 2. Connect to the database and load into a Pandas DataFrame
-    print(f"📥 Connecting to database at {DB_FILE}...")
-    with sqlite3.connect(DB_FILE) as conn:
-        # This query uses MAX(id) and GROUP BY to ensure if a user rated
-        # the same query twice, only the most recent one is exported.
+    # 2. Determine which query to use
+    if include_all:
+        print("📝 Mode: Including ALL evaluation records.")
+        query = "SELECT query_file, user_name, winning_file FROM comparative_evals"
+    else:
+        print("📝 Mode: Filtering for MOST RECENT evaluation per user/query.")
         query = """
             SELECT
                 query_file,
@@ -30,25 +32,50 @@ def export_to_csv():
                 GROUP BY user_name, query_file
             )
         """
+
+    # 3. Connect to the database and load into a Pandas DataFrame
+    print(f"📥 Connecting to database at {db_file}...")
+    with sqlite3.connect(db_file) as conn:
         df = pd.read_sql_query(query, conn)
 
     if df.empty:
         print("⚠️ The database is empty. No evaluations to export.")
         return
 
-    # 3. Export to CSV
-    df.to_csv(EXPORT_CSV_NAME, index=False)
-    print(f"✅ Success! Exported {len(df)} unique evaluation records to {EXPORT_CSV_NAME}")
+    # 4. Export to CSV
+    df.to_csv(export_csv_name, index=False)
+    print(f"✅ Success! Exported {len(df)} records to {export_csv_name}")
 
-    # 4. Show a quick summary in the terminal
-    print("\n📊 Unique Win Counts by Specific File:")
+    # 5. Show summaries
+    print("\n📊 Win Counts by Specific File:")
     print(df['winning_file'].value_counts().to_string())
 
-    # 5. Extract the base model name (caesar vs gemini) for a high-level summary
     df['model_name'] = df['winning_file'].apply(lambda x: x.split('_')[0] if '_' in x else x)
-    print("\n🏆 Unique Overall Win Counts by Model:")
+    print("\n🏆 Overall Win Counts by Model:")
     print(df['model_name'].value_counts().to_string())
     print()
 
 if __name__ == "__main__":
-    export_to_csv()
+    # Get the default directory from environment variable or current dir
+    default_dir = os.environ.get('CAESAR_HUMAN_EVAL_DIR', '.')
+
+    parser = argparse.ArgumentParser(description="Export evaluation results from SQLite to CSV.")
+
+    # Path Override
+    parser.add_argument(
+        "--eval-dir", "-d",
+        type=str,
+        default=default_dir,
+        help=f"Directory containing the DB and where to save CSV (default: {default_dir})"
+    )
+
+    # Inclusion Toggle
+    parser.add_argument(
+        "--include-all",
+        action="store_true",
+        help="Include all historical evaluations instead of just the most recent one."
+    )
+
+    args = parser.parse_args()
+
+    export_to_csv(eval_dir=args.eval_dir, include_all=args.include_all)
