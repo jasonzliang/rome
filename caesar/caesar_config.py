@@ -72,6 +72,8 @@ CAESAR_CONFIG = {
         # Save checkpoint every N iterations for resumption
         "checkpoint_interval": 1,
 
+        # Whether to enable graph augmented insight generation
+        "graph_augmented_insights": True,
         # Whether to follow links that point to the same page (different fragments)
         "same_page_links": False,
         # Maximum times to revisiting page it has seen before during exploration

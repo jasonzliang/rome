@@ -498,7 +498,7 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
 
         # TODO: More advanced context with larger neighborhood and long-term traversal history
         prev_insights = ''; related_insights = ''
-        if self.current_url in self.graph.nodes:
+        if self.graph_augmented_insights and self.current_url in self.graph.nodes:
             prev_insights = self.graph.nodes[self.current_url].get('insights', '')
 
             # Get neighbor URLs (not node dicts)
