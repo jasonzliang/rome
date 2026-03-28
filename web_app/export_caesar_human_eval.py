@@ -71,7 +71,7 @@ if __name__ == "__main__":
 
     # Inclusion Toggle
     parser.add_argument(
-        "--most-recent",
+        "--most-recent", "-r",
         action="store_true",
         help="Include only the most recent evaluations from database."
     )
