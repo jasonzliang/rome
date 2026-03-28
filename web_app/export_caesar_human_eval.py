@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import argparse
 
-def export_to_csv(eval_dir, include_all=False):
+def export_to_csv(eval_dir, most_recent=False):
     # Construct paths based on the provided directory
     db_file = os.path.join(eval_dir, "results_ab.db")
     export_csv_name = os.path.join(eval_dir, "evaluation_winners.csv")
@@ -15,7 +15,7 @@ def export_to_csv(eval_dir, include_all=False):
         return
 
     # 2. Determine which query to use
-    if include_all:
+    if not most_recent:
         print("📝 Mode: Including ALL evaluation records.")
         query = "SELECT query_file, user_name, winning_file FROM comparative_evals"
     else:
@@ -71,11 +71,11 @@ if __name__ == "__main__":
 
     # Inclusion Toggle
     parser.add_argument(
-        "--include-all",
+        "--most-recent",
         action="store_true",
-        help="Include all historical evaluations instead of just the most recent one."
+        help="Include only the most recent evaluations from database."
     )
 
     args = parser.parse_args()
 
-    export_to_csv(eval_dir=args.eval_dir, include_all=args.include_all)
+    export_to_csv(eval_dir=args.eval_dir, most_recent=args.most_recent)
