@@ -40,6 +40,72 @@ class ArtifactSynthesizer:
                     operator=FilterOperator.LT)]
                 )
 
+    # ── Shared helpers ────────────────────────────────────────────────────
+
+    def _llm_call(self, prompt: str, required_keys: List[str],
+                  retries: int = NUM_SYNTHESIS_RETRIES,
+                  reasoning: str = None, label: str = "LLM") -> Optional[Dict]:
+        """LLM call with JSON parsing, key validation, and retries."""
+        override = {"reasoning_effort": reasoning} if reasoning else {}
+        for attempt in range(1, retries + 1):
+            try:
+                response = self.agent.chat_completion(prompt,
+                    override_config=override,
+                    response_format={"type": "json_object"})
+                result = self.agent.parse_json_response(response)
+                if not result:
+                    raise ValueError("parse_json_response returned None/empty")
+                missing = [k for k in required_keys if k not in result]
+                if missing:
+                    raise ValueError(f"Missing required keys: {missing}")
+                return result
+            except Exception as e:
+                self.logger.error(f"[{label}] Attempt {attempt}/{retries} failed: {e}")
+        self.logger.error(f"[{label}] All attempts exhausted")
+        return None
+
+    @staticmethod
+    def _format_source_list(sources: Dict[str, int]) -> str:
+        """Format a {url: idx} dict as a sorted '[idx] url' string."""
+        return "\n".join(f"[{idx}] {url}"
+            for url, idx in sorted(sources.items(), key=lambda x: x[1]))
+
+    def _get_artifact_text(self, result: Dict) -> Optional[str]:
+        """Extract artifact text with abstract prepended, or None if empty."""
+        artifact_text = result.get("artifact", "")
+        if not artifact_text:
+            self.logger.error("[POST-PROCESS] No artifact text to process")
+            return None
+        abstract_text = result.get("abstract", "")
+        if abstract_text:
+            artifact_text = f"Artifact Abstract:\n{abstract_text}\n\nArtifact Text:\n{artifact_text}"
+        return artifact_text
+
+    def _get_query_context(self) -> Tuple[str, str, str]:
+        """Return (query_context, query_role, length_context) strings used in prompts."""
+        q = self.agent.starting_query
+        query_context = f" that creatively answers this query: {q}" if q else ""
+        query_role = f" to the query creatively!" if q else "!"
+        return query_context, query_role
+
+    def _post_process(self, result: Dict, prompt: str, response_key: str,
+                      label: str, base_dir: str = None, suffix: str = "post",
+                      timestamp: str = None) -> Optional[Dict]:
+        """Shared post-process: LLM call → wrap as artifact → save."""
+        llm_result = self._llm_call(prompt, [response_key],
+            reasoning="high", label=label)
+        if not llm_result:
+            return None
+        processed = {
+            "artifact": llm_result[response_key],
+            "metadata": result.get("metadata", {}),
+        }
+        self._save_synthesis(processed, base_dir=base_dir,
+            suffix=suffix, timestamp=timestamp)
+        return processed
+
+    # ── Main synthesis entry point ────────────────────────────────────────
+
     def synthesize_artifact(self, num_drafts: int = None) -> None:
         """Generate final synthesis with optional multi-draft refinement"""
         if not num_drafts: num_drafts = self.synthesis_drafts
@@ -93,6 +159,8 @@ class ArtifactSynthesizer:
                 return merged_result
         return all_drafts[-1]
 
+    # ── Single draft synthesis ────────────────────────────────────────────
+
     def _synthesize_single_draft(self, mode: str, current_query: Optional[str] = None,
                                  previous_artifact: Optional[Dict] = None) -> Dict[str, str]:
         """Execute a single synthesis draft with optional query and previous artifact"""
@@ -104,9 +172,9 @@ class ArtifactSynthesizer:
             return None
         qa_list, source_list, source_map = self._build_answers_with_citations(qa_pairs)
 
-        query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
-        query_role = f" to the query creatively!" if self.agent.starting_query else "!"
+        query_context, query_role = self._get_query_context()
         length_context = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
+
 
         # Build context from previous artifact if available
         previous_context = ""
@@ -152,20 +220,9 @@ Respond with valid JSON only:
     "abstract": "<abstract text>",
     "artifact": "<artifact text>"
 }}"""
-        result = None
-        for i in range(NUM_SYNTHESIS_RETRIES):
-            try:
-                response = self.agent.chat_completion(prompt,
-                    override_config={"reasoning_effort": "high"},
-                    response_format={"type": "json_object"})
-                result = self.agent.parse_json_response(response)
-                if not result or "abstract" not in result or "artifact" not in result:
-                    raise ValueError("Missing required keys in response")
-                break
-            except Exception as e:
-                self.logger.error(f"[SYNTHESIS] Artifact generation ({i+1}) failed: {e}")
-
-        if not result: self.logger.error(f"[SYNTHESIS] All attempts exhausted"); return None
+        result = self._llm_call(prompt, ["abstract", "artifact"],
+            reasoning="high", label="SYNTHESIS")
+        if not result: return None
 
         result["sources"] = dict(sorted(source_map.items(), key=lambda x: x[1]))
         result["metadata"] = {
@@ -183,6 +240,8 @@ Respond with valid JSON only:
         }
 
         return result
+
+    # ── Query refinement ──────────────────────────────────────────────────
 
     def _refine_query(self, artifact_result: Dict, current_query: Optional[str] = None) -> Optional[str]:
         """Refine the synthesis query based on previous artifact"""
@@ -216,17 +275,15 @@ Respond with JSON:
     "reason": "<brief explanation of why the refined query improves upon the previous query>"
 }}"""
 
-        try:
-            response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
-            result = self.agent.parse_json_response(response)
-            if result and "refined_query" in result:
-                refined = result["refined_query"]
-                reason = result.get("reason", "No reason provided")
-                self.logger.info(f"[REFINE] Query: {refined}\nReason: {reason}")
-                return refined
-        except Exception as e:
-            self.logger.error(f"[REFINE] Query refinement failed: {e}")
+        result = self._llm_call(prompt, ["refined_query"], retries=1, label="REFINE")
+        if result:
+            self.logger.info(f"[REFINE] Query: {result['refined_query']}\nReason: {result.get('reason', 'No reason provided')}")
+            return result["refined_query"]
         return None
+
+    # ── Artifact merging ──────────────────────────────────────────────────
+    # TODO: Ring merge of drafts (feed random draft sequence in connected ring of unique agents)
+    # TODO: Debate merge of drafts (multiple of rounds of unique agents critiquing drafts)
 
     def _merge_artifacts(self, all_drafts: List[Dict]) -> Optional[Dict[str, str]]:
         """Merge artifacts from all drafts into a single comprehensive artifact"""
@@ -237,10 +294,7 @@ Respond with JSON:
         # Build context with per-draft sources (optimized string building)
         artifacts_context = []
         for i, r in enumerate(all_drafts, 1):
-            sources = r.get('sources', {})
-            source_list = "\n".join(f"  [{idx}] {url}"
-                for url, idx in sorted(sources.items(), key=lambda x: x[1]))
-
+            source_list = self._format_source_list(r.get('sources', {}))
             artifacts_context.append(
                 f"--- DRAFT {i} ---\n\n"
                 f"ARTIFACT:\n{r['artifact']}\n\n"
@@ -260,8 +314,7 @@ Respond with JSON:
         #     for i, r in enumerate(all_drafts, 1)
         # ], indent=4, ensure_ascii=False)
 
-        query_context = f" that creatively answers this query: {self.agent.starting_query}" if self.agent.starting_query else ""
-        query_role = f" to the query creatively!" if self.agent.starting_query else "!"
+        query_context, query_role = self._get_query_context()
         length_context1 = f"{self.synthesis_max_length} words" if self.synthesis_max_length else ">= average draft artifact length"
         length_context2 = f" ({self.synthesis_max_length} words)" if self.synthesis_max_length else ""
 
@@ -279,7 +332,7 @@ YOUR TASK:
 Create a comprehensive merged artifact that:
     - Fuse the draft artifacts into one standalone work with a single clear narrative spine (not a stitched summary).
     - Curate and reinterpret the highest‑leverage insights across all drafts; cut redundancy while preserving essential caveats.
-    - Derive new patterns/tensions across all drafts and at least one unifying framework that doesn’t appear in any single artifact.
+    - Derive new patterns/tensions across all drafts and at least one unifying framework that doesn't appear in any single artifact.
     - Strengthen and extend the result: tighten structure, resolve/reconcile contradictions, and push into implications, applications, and open questions (flag speculation explicitly).
 
 MERGED ARTIFACT CITATIONS:
@@ -306,45 +359,28 @@ EXAMPLE OUTPUT:
 }}
 """
 
-        for attempt in range(1, NUM_SYNTHESIS_RETRIES + 1):
+        result = self._llm_call(prompt, ["abstract", "artifact"],
+            reasoning="high", label="MERGE")
+        if not result: return None
+
+        # Normalize and validate sources
+        sources = result.get("sources", {})
+        if not isinstance(sources, dict):
+            self.logger.error(f"[MERGE] Invalid sources type: {type(sources)}, using empty dict")
+            result["sources"] = {}
+        else:
             try:
-                response = self.agent.chat_completion(prompt,
-                    override_config={"reasoning_effort": "high"},
-                    response_format={"type": "json_object"})
-                result = self.agent.parse_json_response(response)
+                result["sources"] = {url: int(idx) for url, idx in sources.items()}
+                result["sources"] = dict(sorted(result["sources"].items(), key=lambda x: x[1]))
+            except (ValueError, TypeError, AttributeError) as e:
+                self.logger.error(f"[MERGE] Error normalizing sources: {e}, using empty dict")
+                result["sources"] = {}
 
-                if not result:
-                    raise ValueError("parse_json_response returned None/empty")
+        result["metadata"] = all_drafts[-1].get("metadata", {})
+        return result
 
-                # Validate required fields
-                missing = [k for k in ["abstract", "artifact"] if k not in result]
-                if missing:
-                    raise ValueError(f"Missing required keys: {missing}")
+    # ── Q&A pair generation ───────────────────────────────────────────────
 
-                # Normalize and validate sources
-                sources = result.get("sources", {})
-                if not isinstance(sources, dict):
-                    self.logger.error(f"[MERGE] Invalid sources type: {type(sources)}, using empty dict")
-                    result["sources"] = {}
-                else:
-                    try:
-                        result["sources"] = {url: int(idx) for url, idx in sources.items()}
-                        result["sources"] = dict(sorted(result["sources"].items(), key=lambda x: x[1]))
-                    except (ValueError, TypeError, AttributeError) as e:
-                        self.logger.error(f"[MERGE] Error normalizing sources: {e}, using empty dict")
-                        result["sources"] = {}
-
-                # Success - add metadata and return
-                result["metadata"] = all_drafts[-1].get("metadata", {})
-                return result
-
-            except Exception as e:
-                self.logger.error(f"[MERGE] Attempt {attempt}/{NUM_SYNTHESIS_RETRIES} failed: {e}")
-
-        self.logger.error(f"[MERGE] All attempts exhausted"); return None
-
-    # TODO: Ring merge of drafts (feed random draft sequence in connected ring of unique agents)
-    # TODO: Debate merge of drafts (multiple of rounds of unique agents critiquing drafts)
     def _generate_qa_pairs(self, mode: str, starting_query: str = None) -> List[Tuple[str, str, List[Dict]]]:
         """Generate Q&A pairs with sources"""
         queries = [
@@ -445,14 +481,10 @@ Respond with JSON:
     "reason": "<brief explanation of why this question deepens understanding>"
 }}"""
 
-        try:
-            response = self.agent.chat_completion(prompt, response_format={"type": "json_object"})
-            result = self.agent.parse_json_response(response)
-            if result and "query" in result:
-                return result["query"]
-        except Exception as e:
-            self.logger.error(f"Query generation failed: {e}")
-        return None
+        result = self._llm_call(prompt, ["query"], retries=1, label="NEXT_QUERY")
+        return result["query"] if result else None
+
+    # ── Citation building ─────────────────────────────────────────────────
 
     def _build_answers_with_citations(self, qa_pairs):
         """Build formatted answers with citations and source index from Q&A pairs."""
@@ -470,10 +502,11 @@ Respond with JSON:
             answers.append(f"({i+1}) Question: {q}\n\nAnswer: {a} {refs}")
 
         qa_list = "\n\n\n".join(answers)
-        source_list = "\n".join([f"[{idx}] {url}"
-            for url, idx in sorted(source_map.items(), key=lambda x: x[1])])
+        source_list = self._format_source_list(source_map)
 
         return qa_list, source_list, source_map
+
+    # ── Saving ────────────────────────────────────────────────────────────
 
     def _save_synthesis(self, result: Dict,
             base_dir: str = None,
@@ -498,10 +531,7 @@ Respond with JSON:
                 f.write(f"ARTIFACT:\n{result['artifact']}\n\n")
 
                 if sources := result.get('sources'):
-                    f.write("SOURCES:\n")
-                    for url, idx in sorted(sources.items(), key=lambda x: x[1]):
-                        f.write(f"[{idx}] {url}\n")
-                    f.write("\n")
+                    f.write(f"SOURCES:\n{self._format_source_list(sources)}\n\n")
 
             if metadata := result.get('metadata'):
                 with open(meta_path, 'a', encoding='utf-8') as f:
@@ -510,6 +540,8 @@ Respond with JSON:
         except Exception as e:
             self.logger.error(f"Failed to save synthesis: {e}")
 
+    # ── Post-processing ───────────────────────────────────────────────────
+
     def _post_process_eli5(self, result: Dict,
         base_dir: str = None,
         suffix: str = "eli5",
@@ -517,14 +549,8 @@ Respond with JSON:
         """Generate ELI5 explanation(s) of artifact and save them"""
         if not self.synthesis_eli5: return None
 
-        artifact_text = result.get("artifact", "")
-        if not artifact_text:
-            self.logger.error("[POST-PROCESS] No artifact text to process")
-            return None
-
-        abstract_text = result.get("abstract", "")
-        if abstract_text:
-            artifact_text = f"Artifact Abstract:\n{abstract_text}\n\nArtifact Text:\n{artifact_text}"
+        artifact_text = self._get_artifact_text(result)
+        if not artifact_text: return None
 
         # Support single int, list of ints, or None
         word_lengths = ([self.synthesis_eli5_length] if isinstance(self.synthesis_eli5_length, int)
@@ -559,33 +585,11 @@ Respond with valid JSON only:
     "eli5": "<your ELI5 explanation>"
 }}"""
 
-            success = False
-            for attempt in range(1, NUM_SYNTHESIS_RETRIES + 1):
-                try:
-                    response = self.agent.chat_completion(prompt,
-                        override_config={"reasoning_effort": "high"},
-                        response_format={"type": "json_object"})
-                    eli5_result = self.agent.parse_json_response(response)
-                    if not eli5_result or "eli5" not in eli5_result:
-                        raise ValueError("Missing 'eli5' key in response")
-
-                    processed_result = {
-                        "artifact": eli5_result["eli5"],
-                        "metadata": result.get("metadata", {}),
-                    }
-
-                    self._save_synthesis(processed_result,
-                        base_dir=base_dir,
-                        suffix=current_suffix,
-                        timestamp=timestamp)
-
-                    results.append(processed_result)
-                    success = True; break
-                except Exception as e:
-                    self.logger.error(f"[POST-PROCESS] Attempt {attempt}/{NUM_SYNTHESIS_RETRIES} failed: {e}")
-
-            if not success:
-                self.logger.error(f"[POST-PROCESS] Failed to generate {length or 'unconstrained'} word version")
+            processed = self._post_process(result, prompt, "eli5",
+                label="POST-PROCESS", base_dir=base_dir,
+                suffix=current_suffix, timestamp=timestamp)
+            if processed: results.append(processed)
+            else: self.logger.error(f"[POST-PROCESS] {length or 'unconstrained'} ELI5 generation failed")
 
         return results[-1] if results else None
 
@@ -596,14 +600,8 @@ Respond with valid JSON only:
         """Generate a two-paragraph human eval summary: core idea + creativity argument"""
         if not self.synthesis_human_eval: return None
 
-        artifact_text = result.get("artifact", "")
-        if not artifact_text:
-            self.logger.error("[POST-PROCESS] No artifact text to process")
-            return None
-
-        abstract_text = result.get("abstract", "")
-        if abstract_text:
-            artifact_text = f"Artifact Abstract:\n{abstract_text}\n\nArtifact Text:\n{artifact_text}"
+        artifact_text = self._get_artifact_text(result)
+        if not artifact_text: return None
 
         prompt = f"""--- ARTIFACT ---
 {artifact_text}
@@ -632,28 +630,6 @@ Respond with valid JSON only:
     "human_eval": "SUMMARY: <paragraph 1>\\n\\nWHY ITS CREATIVE: <paragraph 2>"
 }}"""
 
-        for attempt in range(1, NUM_SYNTHESIS_RETRIES + 1):
-            try:
-                response = self.agent.chat_completion(prompt,
-                    override_config={"reasoning_effort": "high"},
-                    response_format={"type": "json_object"})
-                eval_result = self.agent.parse_json_response(response)
-                if not eval_result or "human_eval" not in eval_result:
-                    raise ValueError("Missing 'human_eval' key in response")
-
-                processed_result = {
-                    "artifact": eval_result["human_eval"],
-                    "metadata": result.get("metadata", {}),
-                }
-
-                self._save_synthesis(processed_result,
-                    base_dir=base_dir,
-                    suffix=suffix,
-                    timestamp=timestamp)
-
-                return processed_result
-            except Exception as e:
-                self.logger.error(f"[POST-PROCESS] Attempt {attempt}/{NUM_SYNTHESIS_RETRIES} failed: {e}")
-
-        self.logger.error("[POST-PROCESS] All attempts exhausted")
-        return None
+        return self._post_process(result, prompt, "human_eval",
+            label="POST-PROCESS", base_dir=base_dir,
+            suffix=suffix, timestamp=timestamp)
