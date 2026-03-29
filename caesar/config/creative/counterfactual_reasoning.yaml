@@ -21,7 +21,7 @@ CaesarAgent:
   save_graph_interval: 50
 
   exploration_llm_config:
-    model: gpt-5.2
+    model: gpt-5.4
 
   # overwrite_role_file: config/role/self_transcend_role.txt
   # adapt_role_file: config/role/self_transcend_insights_v1.txt
@@ -42,18 +42,18 @@ ArtifactSynthesizer:
 # LLM CONFIGURATION
 # ============================================================================
 OpenAIHandler:
-  model: gpt-5.2
-  reasoning_effort: low
+  model: gpt-5.4
+  reasoning_effort: medium
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
 # ============================================================================
 AgentMemory:
   enabled: true
-  use_graph: false
+  use_graph: true
 
 ChromaClientManager:
-  llm_model: gpt-5-mini
+  llm_model: gpt-5.4
   llm_reasoning_effort: low
 
 # ============================================================================
