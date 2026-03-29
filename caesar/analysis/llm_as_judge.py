@@ -425,17 +425,18 @@ Examples:
   %(prog)s ./experiments -R -o -n 10       # Reasoning mode, overwrite, 10 workers
 """)
 
+    parser.set_defaults(json=True, reasoning=True)
     parser.add_argument("root_directory", type=Path, help="Root directory for answer files")
     parser.add_argument("-d", "--debug", action="store_true", help="Debug print statements")
-    parser.add_argument("-j", "--json", action="store_true", help="Output results in JSON format")
+    parser.add_argument("-nj", "--no-json", dest="json", action="store_false", help="Output in text instead of JSON")
     parser.add_argument("-i", "--individual", action="store_true", help="Evaluate each answer file separately")
 
     parser.add_argument("-o", "--overwrite", action="store_true", help="Overwrite previous results")
-    parser.add_argument("-R", "--reasoning", action="store_true", help="Enable reasoning/thinking")
+    parser.add_argument("-nr", "--no-reasoning", dest="reasoning", action="store_false", help="Disable reasoning/thinking")
     parser.add_argument("-r", "--rubric", type=Path, default=Path(DEFAULT_RUBRIC_PATH), help="Rubric file path")
 
-    parser.add_argument("-n", "--workers", type=int, default=1, help="Number of workers (def: 1)")
-    parser.add_argument("-t", "--trials", type=int, default=1, help="Number of trials (def: 1)")
+    parser.add_argument("-n", "--workers", type=int, default=10, help="Number of workers (def: 10)")
+    parser.add_argument("-t", "--trials", type=int, default=10, help="Number of trials (def: 10)")
     parser.add_argument("-J", "--judges", nargs="+", choices=list(JUDGES.keys()), default=list(JUDGES.keys()), help="Specific judges to run (def: all)")
 
     return parser.parse_args()
