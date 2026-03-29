@@ -1,9 +1,12 @@
 """Prepare Caesar artifacts for LLM as Judge"""
 import glob
 import os
+import re
 import shutil
 import sys
 import time
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Default Configuration Dictionary
 DEFAULT_CONFIG = {
@@ -15,6 +18,8 @@ DEFAULT_CONFIG = {
     "OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/other_agent_answers"),
     # Clean up the output directory before answer file is copied
     "CLEAR_OUTPUT_DIR": True,
+    # Strip ABSTRACT section from start and SOURCES section from end of artifact
+    "STRIP_ABSTRACT_AND_SOURCES": True,
 
     # Base directory to output all agent answers
     "ALL_AGENT_BASE_DIR": os.path.abspath("query_result/all_agent_answers"),
@@ -25,163 +30,53 @@ DEFAULT_CONFIG = {
 }
 
 
-def setup_transfer_dict_11_17():
-    full = {
-        'caesar_sources': '11_17_*/*12130155/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-    }
-    eli5 = {
-        'caesar_sources': '11_17_*/*12130155/*merged-eli5-3*',
-        'other_sources': '12_4_answers_eli5/*/',
-    }
-    eli5_600 = {
-        'caesar_sources': '11_17_*/*12130327/*merged-eli5-3*',
-        'other_sources': '12_4_answers_eli5_600t/*/',
-    }
-    # Returns (transfer_list, config_overrides)
-    return [full, eli5, eli5_600], {}
+def strip_abstract_and_sources(text):
+    """Remove ABSTRACT section from start and SOURCES section from end."""
+    # Strip abstract: everything before "ARTIFACT:" line
+    artifact_match = re.search(r'^ARTIFACT:\s*\n', text, re.MULTILINE)
+    if artifact_match:
+        text = text[artifact_match.end():]
+    # Strip sources: everything from "SOURCES:" line onward
+    sources_match = re.search(r'\n\s*SOURCES:\s*\n', text)
+    if sources_match:
+        text = text[:sources_match.start()]
+    return text.strip() + '\n'
 
 
-def setup_transfer_dict_12_13():
-    full = {
-        'caesar_sources': '12_13_*/*12160*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-    }
-    eli5 = {
-        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.1*',
-        'other_sources': '12_4_answers_eli5/*/',
-    }
-    eli5_450 = {
-        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.450w.1*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-    }
+def find_latest_synthesis(experiment_glob, file_pattern="*merged-3*",
+                          base_dir=None):
+    """Find file_pattern in the highest-numbered synthesis folder.
 
-    overrides = {"CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return [full, eli5, eli5_450], overrides
+    Args:
+        experiment_glob: Glob for experiment dirs (e.g. '03_28_*')
+        file_pattern: Filename glob inside the synthesis folder
+        base_dir: Override for CAESAR_AGENT_BASE_DIR
 
-
-def setup_transfer_dict_12_13_syn_ablation():
-    syn1 = {
-        'caesar_sources': '12_13_*/*12160*/*synthesis-1*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_syn1.txt'
-    }
-    syn3 = {
-        'caesar_sources': '12_13_*/*12160*/*synthesis-3*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_syn3.txt'
-    }
-    merged = {
-        'caesar_sources': '12_13_*/*12160*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_merge.txt'
-    }
-
-    syn1_eli5 = {
-        'caesar_sources': '12_13_*/*12160*/*synth-eli5-1.1*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_syn1.txt'
-    }
-    syn3_eli5 = {
-        'caesar_sources': '12_13_*/*12160*/*synth-eli5-3.1*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_syn3.txt'
-    }
-    merged_eli5 = {
-        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.1*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_merge.txt'
-    }
-
-    syn1_eli5_450w = {
-        'caesar_sources': '12_13_*/*12160*/*synth-eli5-1.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_syn1.txt'
-    }
-    syn3_eli5_450w = {
-        'caesar_sources': '12_13_*/*12160*/*synth-eli5-3.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_syn3.txt'
-    }
-    merged_eli5_450w = {
-        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_merge.txt'
-    }
-    overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
-        "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return [syn1, syn3, merged, syn1_eli5, syn3_eli5, merged_eli5, syn1_eli5_450w, syn3_eli5_450w, merged_eli5_450w], overrides
-
-
-def setup_transfer_dict_12_13_iter_ablation():
-    iter250 = {
-        'caesar_sources': '12_13_*/*01072*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_250.txt'
-    }
-    iter500 = {
-        'caesar_sources': '12_13_*/*01071*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_500.txt'
-    }
-    iter1000 = {
-        'caesar_sources': '12_13_*/*01110646*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_1000.txt'
-    }
-
-    iter250_eli5 = {
-        'caesar_sources': '12_13_*/*01072*/*merged-eli5-3.0*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_250.txt'
-    }
-    iter500_eli5 = {
-        'caesar_sources': '12_13_*/*01071*/*merged-eli5-3.0*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_500.txt'
-    }
-    iter1000_eli5 = {
-        'caesar_sources': '12_13_*/*01110646*/*merged-eli5-3.0*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_1000.txt'
-    }
-
-    iter250_eli5_450w = {
-        'caesar_sources': '12_13_*/*01072*/*merged-eli5-3.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_250.txt'
-    }
-    iter500_eli5_450w = {
-        'caesar_sources': '12_13_*/*01071*/*merged-eli5-3.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_500.txt'
-    }
-    iter1000_eli5_450w = {
-        'caesar_sources': '12_13_*/*01110646*/*merged-eli5-3.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_1000.txt'
-    }
-    overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
-        "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return [iter250, iter500, iter1000, iter250_eli5, iter500_eli5, iter1000_eli5, iter250_eli5_450w, iter500_eli5_450w, iter1000_eli5_450w], overrides
-
-
-def setup_transfer_dict_12_13_v2():
-    full = {
-        'caesar_sources': '12_13_*/*12161*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-    }
-    eli5 = {
-        'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.1*',
-        'other_sources': '12_4_answers_eli5/*/',
-    }
-    eli5_450 = {
-        'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.450w.1*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-    }
-
-    overrides = {"CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return [full, eli5, eli5_450], overrides
+    Returns:
+        Relative glob string usable as caesar_sources value.
+    """
+    base = base_dir or DEFAULT_CONFIG["CAESAR_AGENT_BASE_DIR"]
+    # Find all synthesis dirs matching the experiment glob
+    synth_dirs = sorted(glob.glob(os.path.join(base, experiment_glob,
+        "*.synthesis.*")))
+    if not synth_dirs:
+        raise FileNotFoundError(
+            f"No synthesis dirs found for {experiment_glob!r} in {base}")
+    # Pick the one with the highest numeric suffix
+    def _synth_key(p):
+        m = re.search(r'\.synthesis\.(\d+)', p)
+        return int(m.group(1)) if m else 0
+    latest = max(synth_dirs, key=_synth_key)
+    # Build relative glob: <experiment>/<synthesis_dir_name>/<file_pattern>
+    rel = os.path.relpath(latest, base)
+    result = os.path.join(rel, file_pattern)
+    # Verify at least one file matches
+    matches = glob.glob(os.path.join(base, result))
+    if not matches:
+        raise FileNotFoundError(
+            f"No files matching {file_pattern!r} in {latest}")
+    print(f"Auto-resolved: {result}  ({len(matches)} file(s))")
+    return result
 
 
 def prepare_artifact(transfer_func):
@@ -247,6 +142,16 @@ def prepare_artifact(transfer_func):
             print(f'cp {src} {dst}\n')
             shutil.copy2(src, dst)
 
+            if config['STRIP_ABSTRACT_AND_SOURCES']:
+                with open(dst, 'r') as f:
+                    original = f.read()
+                stripped = strip_abstract_and_sources(original)
+                if stripped != original:
+                    with open(dst, 'w') as f:
+                        f.write(stripped)
+                    print(f'  Stripped abstract/sources from {caesar_filename}')
+
 
 if __name__ == '__main__':
-    prepare_artifact(setup_transfer_dict_12_13)
+    from transfer_configs import TRANSFER_CONFIGS
+    prepare_artifact(TRANSFER_CONFIGS['3_28_3_29'])
