@@ -14,8 +14,10 @@ IMPORT_TO_PACKAGE = {
     'Crypto': 'pycryptodome', 'Cryptodome': 'pycryptodomex',
     'magic': 'python-magic', 'slugify': 'python-slugify',
     'Levenshtein': 'python-Levenshtein', 'cStringIO': 'StringIO',
-    'typing_extensions': 'typing-extensions',
+    'typing_extensions': 'typing-extensions', 'sqlite3': 'pysqlite3',
 }
+
+ALWAYS_INSTALL = ['streamlit', 'watchdog']
 
 STDLIB = {
     'sys', 'os', 'subprocess', 'pathlib', 'json', 're', 'collections',
@@ -74,7 +76,7 @@ def setup_venv(script_path, venv_dir):
 
     print(f"Analyzing {script_path.name} for dependencies...")
     imports, pip_packages = extract_imports(script_path)
-    all_packages = sorted(set(get_package_names(imports)) | pip_packages)
+    all_packages = sorted(set(get_package_names(imports)) | pip_packages | set(ALWAYS_INSTALL))
 
     if not all_packages:
         print("No external packages detected.")
@@ -95,14 +97,24 @@ def setup_venv(script_path, venv_dir):
         subprocess.run([str(venv_python), "-m", "pip", "install", "--upgrade", "pip"],
                       check=True, capture_output=True)
 
-        result = subprocess.run([str(venv_python), "-m", "pip", "install",
-                               "--only-binary", ":all:"] + needed,
-                              capture_output=True, text=True)
-        if result.returncode != 0:
-            print("Note: Some packages lack binary wheels, retrying...")
-            subprocess.run([str(venv_python), "-m", "pip", "install"] + needed, check=True)
+        failed = []
+        for pkg in needed:
+            result = subprocess.run([str(venv_python), "-m", "pip", "install",
+                                   "--only-binary", ":all:", pkg],
+                                  capture_output=True, text=True)
+            if result.returncode != 0:
+                # Retry without --only-binary constraint
+                result = subprocess.run([str(venv_python), "-m", "pip", "install", pkg],
+                                      capture_output=True, text=True)
+            if result.returncode != 0:
+                print(f"  ✗ Failed to install {pkg}")
+                failed.append(pkg)
+            else:
+                print(f"  ✓ Installed {pkg}")
 
-        print(f"✓ Successfully installed {len(needed)} package(s)")
+        if failed:
+            print(f"\n⚠ {len(failed)} package(s) failed to install: {', '.join(failed)}")
+        print(f"✓ Successfully installed {len(needed) - len(failed)}/{len(needed)} package(s)")
     else:
         print("✓ All required packages already installed")
 
