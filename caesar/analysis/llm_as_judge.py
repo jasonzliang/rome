@@ -22,7 +22,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 # --- Configuration ---
 
-DEFAULT_RUBRIC_PATH = "config/llm_as_judge/prompts/nus_rubric_10pt_api.txt"
+DEFAULT_RUBRIC_PATH = Path(__file__).resolve().parent / "../config/llm_as_judge/prompts/nus_rubric_10pt_api.txt"
 
 RETRY_CONFIG = {
     "stop": stop_after_attempt(2),

@@ -464,7 +464,7 @@ Examples:
     parser.add_argument('-a', '--analyze', default='judge_analysis.txt', metavar='FILE',
         help='Output analysis filename (default: judge_analysis.txt in input directory)')
     parser.add_argument('-m', '--agent-mapping',
-        default='config/llm_as_judge/prompts/agent_names.txt',
+        default=Path(__file__).resolve().parent / '../config/llm_as_judge/prompts/agent_names_all.txt',
         help='Agent name mapping file (default: config/llm_as_judge/prompts/agent_names.txt)')
     parser.add_argument('-v', '--verbose', action='store_true',
         help='Show detailed progress information')
