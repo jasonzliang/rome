@@ -205,6 +205,14 @@ class BraveSearch:
             params = {'q': query, 'count': count, 'offset': offset}
             response = requests.get(
                 ENDPOINT, headers=headers, params=params, timeout=self.timeout)
+
+            if response.status_code == 422 and offset > 0:
+                # API plan doesn't support this offset; return what we have
+                self.logger.error(
+                    f"Brave API 422 at offset={offset}, pagination not supported; "
+                    f"returning {len(all_web_results)} results")
+                break
+
             response.raise_for_status()
             data = response.json()
 
