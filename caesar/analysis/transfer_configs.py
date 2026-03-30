@@ -168,8 +168,8 @@ def setup_transfer_dict_3_28_graph_ablation():
     categories = ['constrained_creativity', 'counterfactual_reasoning',
         'crossdomain_synthesis', 'meta_creativity', 'openended_creativity']
     variants = [
-        ('3_28_{cat}',    'answer_cat_3_28.txt'),
         ('3_29_{cat}_qe', 'answer_cat_3_29_qe.txt'),
+        ('3_28_{cat}',    'answer_cat_3_28.txt'),
         # ('3_28_{cat}_v2', 'answer_cat_3_28_v2.txt'),
         # ('3_29_{cat}',    'answer_cat_3_29.txt'),
         # ('3_29_{cat}_v2', 'answer_cat_3_29_v2.txt'),
@@ -180,22 +180,34 @@ def setup_transfer_dict_3_28_graph_ablation():
         ('12_4_answers_eli5_450w/*/', '*merged-eli5-3.450w*'),
     ]
 
-    # 12_13 uses hardcoded synthesis versions
+    # Baselines use hardcoded synthesis versions
     baseline_patterns = [
-        ('12_4_answers/*/',           '12_13_*/*12160*/*merged-3*'),
-        ('12_4_answers_eli5/*/',      '12_13_*/*12160*/*merged-eli5-3.1*'),
-        ('12_4_answers_eli5_450w/*/', '12_13_*/*12160*/*merged-eli5-3.450w.1*'),
+        # ('answer_cat_12_13.txt', [
+        #     ('12_4_answers/*/',           '12_13_*/*12160*/*merged-3*'),
+        #     ('12_4_answers_eli5/*/',      '12_13_*/*12160*/*merged-eli5-3.1*'),
+        #     ('12_4_answers_eli5_450w/*/', '12_13_*/*12160*/*merged-eli5-3.450w.1*'),
+        # ]),
+        ('answer_cat_250.txt', [
+            ('12_4_answers/*/',           '12_13_*/*01072*/*merged-3*'),
+            ('12_4_answers_eli5/*/',      '12_13_*/*01072*/*merged-eli5-3.0*'),
+            ('12_4_answers_eli5_450w/*/', '12_13_*/*01072*/*merged-eli5-3.450w*'),
+        ]),
+        ('answer_cat_1000.txt', [
+            ('12_4_answers/*/',           '12_13_*/*01110646*/*merged-3*'),
+            ('12_4_answers_eli5/*/',      '12_13_*/*01110646*/*merged-eli5-3.0*'),
+            ('12_4_answers_eli5_450w/*/', '12_13_*/*01110646*/*merged-eli5-3.450w*'),
+        ]),
     ]
 
     transfer_list = []
 
-    # 12_13 with hardcoded synthesis dirs
-    for other_sources, source_pattern in baseline_patterns:
-        transfer_list.append({
-            'caesar_sources': source_pattern,
-            'other_sources': other_sources,
-            'caesar_filename': 'answer_cat_12_13.txt',
-        })
+    for filename, patterns in baseline_patterns:
+        for other_sources, source_pattern in patterns:
+            transfer_list.append({
+                'caesar_sources': source_pattern,
+                'other_sources': other_sources,
+                'caesar_filename': filename,
+            })
 
     # Other variants use latest synthesis
     for exp_template, filename in variants:
