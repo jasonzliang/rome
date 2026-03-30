@@ -1,5 +1,6 @@
 """Caesar Agent - Web exploration agent with graph-based navigation"""
 from collections import Counter
+import concurrent.futures
 import copy
 from datetime import datetime
 import io
@@ -498,7 +499,7 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
 
         # TODO: More advanced context with larger neighborhood and long-term traversal history
         prev_insights = ''; related_insights = ''
-        if self.graph_augmented_insights and self.current_url in self.graph.nodes:
+        if self.current_url in self.graph.nodes: # Removed self.graph_augmented_insights
             prev_insights = self.graph.nodes[self.current_url].get('insights', '')
 
             # Get neighbor URLs (not node dicts)
@@ -915,8 +916,123 @@ Your response must be valid JSON only, nothing else."""
         self.current_url = self.starting_url
         self.current_depth = len(self.url_stack)
 
+    def _quick_perceive_and_think(self, url: str, iteration: int) -> Optional[Tuple[str, str, str, int]]:
+        """Fetch content from URL and generate insights. Thread-safe for the
+        IO-bound portions (fetch + LLM call). Returns insights or None."""
+        try:
+            html = self._fetch_html(url)
+            if not html:
+                self.failed_urls.add(url)
+                return None
+
+            text = self._extract_text_from_html(html)
+            if not text:
+                return None
+
+            # Build think prompt (no graph context in quick_explore)
+            query_task = "- How to answer the query\n" if self.starting_query else ""
+            prompt = f"""CONTENT:
+{text}
+
+QUERY:
+{self.starting_query if self.starting_query else 'No query is available'}
+
+PREVIOUS INSIGHTS:
+No previous insights available
+
+RELATED INSIGHTS:
+No related insights available
+
+YOUR TASK:
+Analyze this content and extract key insights focusing on:
+- Novel patterns or unexpected connections
+- Assumptions being made and alternative perspectives
+- Interesting questions raised by the content
+{query_task}
+IMPORTANT: Use your role as a guide on how to respond!
+
+Depending on the complexity of the content, provide anywhere from 1 to 6 concise but substantive insights, but do not exceed ~600 words in total length:"""
+
+            insights = self.chat_completion(
+                prompt, override_config=self.exploration_llm_config)
+            return (url, text, insights, iteration)
+
+        except Exception as e:
+            self.logger.error(f"[QUICK_EXPLORE] Failed for {url}: {e}")
+            self.failed_urls.add(url)
+            return None
+
+    def quick_explore(self) -> str:
+        """Fast parallel exploration: perceive+think all search result links, skip the act phase."""
+        self.logger.info("[QUICK_EXPLORE] Starting parallel exploration of search result links")
+
+        # Perceive the starting page (search results) to get all links
+        content, links = self.perceive()
+        if not content or not links:
+            self.logger.error("[QUICK_EXPLORE] No content or links from starting page")
+            return self.synthesizer.synthesize_artifact()
+
+        insights = self.think(content)
+        self.logger.info(f"[QUICK_EXPLORE] Found {len(links)} links to explore in parallel")
+
+        # Filter to max_iterations links
+        links_to_explore = [(url, text) for url, text in links
+                            if url not in self.visited_urls
+                            and url not in self.failed_urls]
+        if self.max_iterations > 0:
+            links_to_explore = links_to_explore[:self.max_iterations]
+
+        # Parallel perceive+think
+        results = []
+        with concurrent.futures.ThreadPoolExecutor(
+                max_workers=self.quick_explore_workers) as executor:
+            futures = {}
+            for i, (url, text) in enumerate(links_to_explore, start=1):
+                if self.shutdown_called:
+                    break
+                f = executor.submit(self._quick_perceive_and_think, url, i)
+                futures[f] = url
+
+            for f in concurrent.futures.as_completed(futures):
+                if self.shutdown_called:
+                    break
+                try:
+                    result = f.result()
+                except Exception as e:
+                    self.logger.error(f"[QUICK_EXPLORE] Worker exception for {futures[f]}: {e}")
+                    continue
+                if result:
+                    results.append(result)
+                    self.logger.info(
+                        f"[QUICK_EXPLORE] Completed {len(results)}/{len(links_to_explore)}: {futures[f]}")
+
+        # Sort by iteration so graph/checkpoint state is consistent
+        results.sort(key=lambda r: r[3])
+
+        # Write results to KB and graph sequentially
+        for url, text, insights, iteration in results:
+            try:
+                self.kb_manager.add_text(insights, metadata={
+                    'url': url, 'depth': 1, 'iteration': iteration})
+            except Exception as e:
+                self.logger.error(f"[QUICK_EXPLORE] KB add_text failed for {url}: {e}")
+
+            self.visited_urls[url] = self.visited_urls.get(url, 0) + 1
+            self.graph.add_node(url, insights=insights, depth=1,
+                iteration=iteration, visit_count=self.visited_urls[url])
+            self.graph.add_edge(self.starting_url, url)
+            self.current_iteration = iteration
+
+        self._save_checkpoint(self.current_iteration)
+        self.logger.info(
+            f"[QUICK_EXPLORE] Complete: explored {len(results)}/{len(links_to_explore)} links")
+        return self.synthesizer.synthesize_artifact()
+
     def explore(self) -> str:
         """Execute main exploration loop"""
+        if self.use_quick_explore:
+            return self.quick_explore()
+
         start_iter = self.current_iteration + 1; end_iter = self.max_iterations + 1
         if start_iter < end_iter:
             self.logger.info(f"[EXPLORE] Beginning exploration: iterations {start_iter} to {self.max_iterations}")

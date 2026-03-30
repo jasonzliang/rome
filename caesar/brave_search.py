@@ -19,8 +19,10 @@ from .caesar_config import CAESAR_CONFIG
 ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 # Result directory in which to store results
 SEARCH_RESULT_DIR = "search_result"
-# Max number of search results API supports
-MAX_NUM_RESULTS = 20
+# Max number of search results per API request
+MAX_NUM_RESULTS_PER_PAGE = 20
+# Max total results supported via pagination (offset max is 9, so 10 pages x 20)
+MAX_NUM_RESULTS = 200
 # Multiplier for backoff during search
 BACKOFF_MULTIPLIER = 2
 # Delay in sec between each search to avoid hitting rate limit
@@ -55,7 +57,7 @@ class BraveSearch:
         set_attributes_from_config(self, self.config, CAESAR_CONFIG['BraveSearch'].keys())
 
         if self.num_results > MAX_NUM_RESULTS:
-            self.logger.error(f"num_results={self.num_results} exceeds API limit, capping to {MAX_NUM_RESULTS}")
+            self.logger.error(f"num_results={self.num_results} exceeds max ({MAX_NUM_RESULTS}), capping")
             self.num_results = MAX_NUM_RESULTS
 
         self.output_dir = os.path.join(self.agent.get_log_dir(), SEARCH_RESULT_DIR)
@@ -177,23 +179,59 @@ class BraveSearch:
         raise BraveSearchError(f"Failed after {self.max_retries} retries") from last_exception
 
     def _search(self, query: str) -> Dict:
-        """Query Brave Search API (single attempt)"""
+        """Query Brave Search API with pagination if num_results > 20"""
         headers = {
             'Accept': 'application/json',
             'Accept-Encoding': 'gzip',
             'X-Subscription-Token': self.api_key
         }
-        params = {'q': query, 'count': self.num_results}
 
-        # Use hardcoded BRAVE_ENDPOINT constant
-        response = requests.get(
-            ENDPOINT,
-            headers=headers,
-            params=params,
-            timeout=self.timeout
-        )
-        response.raise_for_status()
-        return response.json()
+        if self.num_results <= MAX_NUM_RESULTS_PER_PAGE:
+            # Single request
+            params = {'q': query, 'count': self.num_results}
+            response = requests.get(
+                ENDPOINT, headers=headers, params=params, timeout=self.timeout)
+            response.raise_for_status()
+            return response.json()
+
+        # Paginated requests
+        all_web_results = []
+        remaining = self.num_results
+        offset = 0
+        first_response = None
+
+        while remaining > 0:
+            count = min(remaining, MAX_NUM_RESULTS_PER_PAGE)
+            params = {'q': query, 'count': count, 'offset': offset}
+            response = requests.get(
+                ENDPOINT, headers=headers, params=params, timeout=self.timeout)
+            response.raise_for_status()
+            data = response.json()
+
+            if first_response is None:
+                first_response = data
+
+            page_results = data.get('web', {}).get('results', [])
+            if not page_results:
+                break
+
+            all_web_results.extend(page_results)
+            remaining -= len(page_results)
+            offset += count
+
+            if len(page_results) < count:
+                break  # No more results available
+
+            if remaining > 0:
+                time.sleep(SEARCH_DELAY)
+
+        # Merge paginated results into first response
+        if first_response is None:
+            return {'web': {'results': []}}
+        if 'web' not in first_response:
+            first_response['web'] = {}
+        first_response['web']['results'] = all_web_results
+        return first_response
 
     def _json_to_html(self, search_results: Dict, query: str) -> str:
         """Convert JSON to detailed HTML"""

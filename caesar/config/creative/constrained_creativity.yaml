@@ -15,18 +15,18 @@ CaesarAgent:
   # starting_url: "https://arcprize.org/arc-agi"
   # allowed_domains: ["*"]
   starting_query: "Invent a new emotion that humans don't experience. Describe when it occurs, what causes it, and why evolution hasn't produced it in us."
-  additional_starting_queries: 5
+  additional_starting_queries: 4
   max_web_searches: 30
   max_iterations: 1000
   save_graph_interval: 50
 
+  use_quick_explore: True
   exploration_llm_config:
-    model: gpt-5.4
+    model: gpt-5.2
 
   # overwrite_role_file: config/role/self_transcend_role.txt
   # adapt_role_file: config/role/self_transcend_insights_v1.txt
   adapt_role: True
-  graph_augmented_insights: False
 
 ArtifactSynthesizer:
   synthesis_iterations: 30
@@ -41,9 +41,12 @@ ArtifactSynthesizer:
 # ============================================================================
 # LLM CONFIGURATION
 # ============================================================================
+BraveSearch:
+  num_results: 200
+
 OpenAIHandler:
-  model: gpt-5.4
-  reasoning_effort: medium
+  model: gpt-5.2
+  reasoning_effort: low
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
@@ -53,8 +56,8 @@ AgentMemory:
   use_graph: true
 
 ChromaClientManager:
-  llm_model: gpt-5.4
-  llm_reasoning_effort: medium
+  llm_model: gpt-5-mini
+  llm_reasoning_effort: low
 
 # ============================================================================
 # LOGGING CONFIGURATION

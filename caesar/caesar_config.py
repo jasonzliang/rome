@@ -72,8 +72,8 @@ CAESAR_CONFIG = {
         # Save checkpoint every N iterations for resumption
         "checkpoint_interval": 1,
 
-        # Whether to enable graph augmented insight generation
-        "graph_augmented_insights": True,
+        # Whether to enable graph augmented insight generation (removed)
+        # "graph_augmented_insights": True,
         # Whether to follow links that point to the same page (different fragments)
         "same_page_links": False,
         # Maximum times to revisiting page it has seen before during exploration
@@ -84,6 +84,10 @@ CAESAR_CONFIG = {
         "use_explore_strategy": True,
         # Maximum web searches allowed during exploration (including starting search)
         "max_web_searches": 0,
+        # Whether to enable fast exploration, analyze all search results instead
+        "use_quick_explore": False,
+        # Number of parallel workers for quick_explore mode
+        "quick_explore_workers": 10,
         # LLM config for agent's ACT/THINK phases to encourage exploration
         "exploration_llm_config": {
             "model": "gpt-5.2",
@@ -142,7 +146,7 @@ CAESAR_CONFIG = {
     },
 
     "BraveSearch": {
-        # Number of search results to fetch
+        # Total number of search results to fetch (paginated in batches of 20)
         "num_results": 20,
         # Number of tries to attempt to search
         "max_retries": 1000,
