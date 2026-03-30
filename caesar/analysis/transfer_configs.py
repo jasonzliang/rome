@@ -170,6 +170,7 @@ def setup_transfer_dict_3_28_graph_ablation():
     variants = [
         ('3_28_{cat}',    'answer_cat_3_28.txt'),
         ('3_29_{cat}_qe', 'answer_cat_3_29_qe.txt'),
+        ('3_30_{cat}_qe', 'answer_cat_3_30_qe.txt'),
         # ('03_2026_exp/3_29_{cat}',    'answer_cat_3_29.txt'),
         # ('3_28_{cat}_v2', 'answer_cat_3_28_v2.txt'),
         # ('3_29_{cat}_v2', 'answer_cat_3_29_v2.txt'),
@@ -200,14 +201,12 @@ def setup_transfer_dict_3_28_graph_ablation():
     ]
 
     transfer_list = []
-
     for filename, patterns in baseline_patterns:
         for other_sources, source_pattern in patterns:
             transfer_list.append({
                 'caesar_sources': source_pattern,
                 'other_sources': other_sources,
-                'caesar_filename': filename,
-            })
+                'caesar_filename': filename})
 
     # Other variants use latest synthesis
     for exp_template, filename in variants:
@@ -217,8 +216,7 @@ def setup_transfer_dict_3_28_graph_ablation():
                 transfer_list.append({
                     'caesar_sources': find_latest_synthesis(exp, merged_pattern),
                     'other_sources': other_sources,
-                    'caesar_filename': filename,
-                })
+                    'caesar_filename': filename})
 
     overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
         "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
