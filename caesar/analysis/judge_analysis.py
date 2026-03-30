@@ -8,6 +8,7 @@ from collections import defaultdict
 import csv
 import json
 from pathlib import Path
+import re
 import statistics
 
 from scipy.stats import mannwhitneyu
@@ -54,13 +55,41 @@ def extract_judge_name(filename):
     parts = stem.rsplit('_', 1)
     return parts[0] if len(parts) == 2 and parts[1].isdigit() else stem
 
+def repair_json(raw):
+    """Attempt to parse JSON, fixing common LLM output issues."""
+    # 1. Try as-is
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+    # 2. Strip trailing commas before } or ]
+    fixed = re.sub(r',\s*([}\]])', r'\1', raw)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
+        pass
+    # 3. Truncate at first complete top-level JSON object (Gemini double-output)
+    depth = 0
+    for i, ch in enumerate(raw):
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(raw[:i+1])
+                except json.JSONDecodeError:
+                    break
+    raise json.JSONDecodeError("Could not repair JSON", raw, 0)
+
+
 def process_judge_file(judge_file, category_name, csv_data, stats):
     """Process a single judge JSON file and extract reviews."""
     judge_name = extract_judge_name(judge_file)
 
     try:
         with open(judge_file, 'r', encoding='utf-8') as f:
-            reviews = json.load(f).get('reviews', [])
+            reviews = repair_json(f.read()).get('reviews', [])
 
         if not reviews:
             print(f"  ⚠️  No reviews in {judge_file.name}")

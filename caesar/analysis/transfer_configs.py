@@ -168,10 +168,10 @@ def setup_transfer_dict_3_28_graph_ablation():
     categories = ['constrained_creativity', 'counterfactual_reasoning',
         'crossdomain_synthesis', 'meta_creativity', 'openended_creativity']
     variants = [
-        ('3_29_{cat}_qe', 'answer_cat_3_29_qe.txt'),
         ('3_28_{cat}',    'answer_cat_3_28.txt'),
+        ('3_29_{cat}_qe', 'answer_cat_3_29_qe.txt'),
+        ('03_2026_exp/3_29_{cat}',    'answer_cat_3_29.txt'),
         # ('3_28_{cat}_v2', 'answer_cat_3_28_v2.txt'),
-        # ('3_29_{cat}',    'answer_cat_3_29.txt'),
         # ('3_29_{cat}_v2', 'answer_cat_3_29_v2.txt'),
     ]
     file_patterns = [
@@ -187,11 +187,11 @@ def setup_transfer_dict_3_28_graph_ablation():
         #     ('12_4_answers_eli5/*/',      '12_13_*/*12160*/*merged-eli5-3.1*'),
         #     ('12_4_answers_eli5_450w/*/', '12_13_*/*12160*/*merged-eli5-3.450w.1*'),
         # ]),
-        ('answer_cat_250.txt', [
-            ('12_4_answers/*/',           '12_13_*/*01072*/*merged-3*'),
-            ('12_4_answers_eli5/*/',      '12_13_*/*01072*/*merged-eli5-3.0*'),
-            ('12_4_answers_eli5_450w/*/', '12_13_*/*01072*/*merged-eli5-3.450w*'),
-        ]),
+        # ('answer_cat_250.txt', [
+        #     ('12_4_answers/*/',           '12_13_*/*01072*/*merged-3*'),
+        #     ('12_4_answers_eli5/*/',      '12_13_*/*01072*/*merged-eli5-3.0*'),
+        #     ('12_4_answers_eli5_450w/*/', '12_13_*/*01072*/*merged-eli5-3.450w*'),
+        # ]),
         ('answer_cat_1000.txt', [
             ('12_4_answers/*/',           '12_13_*/*01110646*/*merged-3*'),
             ('12_4_answers_eli5/*/',      '12_13_*/*01110646*/*merged-eli5-3.0*'),
