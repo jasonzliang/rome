@@ -54,7 +54,7 @@ AgentMemory:
 
 ChromaClientManager:
   llm_model: gpt-5.4
-  llm_reasoning_effort: low
+  llm_reasoning_effort: medium
 
 # ============================================================================
 # LOGGING CONFIGURATION

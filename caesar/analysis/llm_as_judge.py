@@ -435,7 +435,7 @@ Examples:
     parser.add_argument("-nr", "--no-reasoning", dest="reasoning", action="store_false", help="Disable reasoning/thinking")
     parser.add_argument("-r", "--rubric", type=Path, default=Path(DEFAULT_RUBRIC_PATH), help="Rubric file path")
 
-    parser.add_argument("-n", "--workers", type=int, default=10, help="Number of workers (def: 10)")
+    parser.add_argument("-n", "--workers", type=int, default=20, help="Number of workers (def: 20)")
     parser.add_argument("-t", "--trials", type=int, default=10, help="Number of trials (def: 10)")
     parser.add_argument("-J", "--judges", nargs="+", choices=list(JUDGES.keys()), default=list(JUDGES.keys()), help="Specific judges to run (def: all)")
 

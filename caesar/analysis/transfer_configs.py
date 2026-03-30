@@ -167,6 +167,7 @@ def setup_transfer_dict_3_28_3_29_ablation():
     categories = ['constrained_creativity', 'counterfactual_reasoning',
         'crossdomain_synthesis', 'meta_creativity', 'openended_creativity']
     variants = [
+        ('11_17_{cat}',   'answer_cat_11_17.txt'),
         ('3_28_{cat}',    'answer_cat_3_28.txt'),
         ('3_28_{cat}_v2', 'answer_cat_3_28_v2.txt'),
         ('3_29_{cat}',    'answer_cat_3_29.txt'),
@@ -174,7 +175,7 @@ def setup_transfer_dict_3_28_3_29_ablation():
     ]
     file_patterns = [
         ('12_4_answers/*/',           '*merged-3*'),
-        ('12_4_answers_eli5/*/',      '*merged-eli5-3.0*'),
+        ('12_4_answers_eli5/*/',      '*merged-eli5-3.[01]*'),
         ('12_4_answers_eli5_450w/*/', '*merged-eli5-3.450w*'),
     ]
 
