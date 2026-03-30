@@ -62,19 +62,22 @@ def find_latest_synthesis(experiment_glob, file_pattern="*merged-3*",
     if not synth_dirs:
         raise FileNotFoundError(
             f"No synthesis dirs found for {experiment_glob!r} in {base}")
-    # Pick the one with the highest numeric suffix
+    # Pick the highest-numbered synthesis dir that contains matching files
     def _synth_key(p):
         m = re.search(r'\.synthesis\.(\d+)', p)
         return int(m.group(1)) if m else 0
-    latest = max(synth_dirs, key=_synth_key)
-    # Build relative glob: <experiment>/<synthesis_dir_name>/<file_pattern>
-    rel = os.path.relpath(latest, base)
-    result = os.path.join(rel, file_pattern)
-    # Verify at least one file matches
-    matches = glob.glob(os.path.join(base, result))
-    if not matches:
+    synth_dirs.sort(key=_synth_key, reverse=True)
+
+    for candidate in synth_dirs:
+        rel = os.path.relpath(candidate, base)
+        result = os.path.join(rel, file_pattern)
+        matches = glob.glob(os.path.join(base, result))
+        if matches:
+            break
+    else:
         raise FileNotFoundError(
-            f"No files matching {file_pattern!r} in {latest}")
+            f"No synthesis dir with files matching {file_pattern!r} "
+            f"for {experiment_glob!r} in {base}")
     print(f"Auto-resolved: {result}  ({len(matches)} file(s))")
     return result
 
@@ -154,4 +157,4 @@ def prepare_artifact(transfer_func):
 
 if __name__ == '__main__':
     from transfer_configs import TRANSFER_CONFIGS
-    prepare_artifact(TRANSFER_CONFIGS['3_28_3_29'])
+    prepare_artifact(TRANSFER_CONFIGS['3_28_graph'])

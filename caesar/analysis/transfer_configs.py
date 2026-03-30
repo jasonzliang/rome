@@ -3,7 +3,7 @@ import os
 
 from prepare_artifact import find_latest_synthesis
 
-
+# Outdated, do not use
 def setup_transfer_dict_11_17():
     full = {
         'caesar_sources': '11_17_*/*12130155/*merged-3*',
@@ -39,6 +39,7 @@ def setup_transfer_dict_12_13():
     return [full, eli5, eli5_450], overrides
 
 
+# Outdated, do not use
 def setup_transfer_dict_12_13_v2():
     full = {
         'caesar_sources': '12_13_*/*12161*/*merged-3*',
@@ -163,15 +164,15 @@ def setup_transfer_dict_12_13_iter_ablation():
     return [iter250, iter500, iter1000, iter250_eli5, iter500_eli5, iter1000_eli5, iter250_eli5_450w, iter500_eli5_450w, iter1000_eli5_450w], overrides
 
 
-def setup_transfer_dict_3_28_3_29_ablation():
+def setup_transfer_dict_3_28_graph_ablation():
     categories = ['constrained_creativity', 'counterfactual_reasoning',
         'crossdomain_synthesis', 'meta_creativity', 'openended_creativity']
     variants = [
-        ('11_17_{cat}',   'answer_cat_11_17.txt'),
         ('3_28_{cat}',    'answer_cat_3_28.txt'),
         ('3_28_{cat}_v2', 'answer_cat_3_28_v2.txt'),
-        ('3_29_{cat}',    'answer_cat_3_29.txt'),
-        ('3_29_{cat}_v2', 'answer_cat_3_29_v2.txt'),
+        # ('3_29_{cat}',    'answer_cat_3_29.txt'),
+        # ('3_29_{cat}_v2', 'answer_cat_3_29_v2.txt'),
+        # ('3_28_{cat}_qe', 'answer_cat_3_29.txt'),
     ]
     file_patterns = [
         ('12_4_answers/*/',           '*merged-3*'),
@@ -179,7 +180,24 @@ def setup_transfer_dict_3_28_3_29_ablation():
         ('12_4_answers_eli5_450w/*/', '*merged-eli5-3.450w*'),
     ]
 
+    # 12_13 uses hardcoded synthesis versions
+    baseline_patterns = [
+        ('12_4_answers/*/',           '12_13_*/*12160*/*merged-3*'),
+        ('12_4_answers_eli5/*/',      '12_13_*/*12160*/*merged-eli5-3.1*'),
+        ('12_4_answers_eli5_450w/*/', '12_13_*/*12160*/*merged-eli5-3.450w.1*'),
+    ]
+
     transfer_list = []
+
+    # 12_13 with hardcoded synthesis dirs
+    for other_sources, source_pattern in baseline_patterns:
+        transfer_list.append({
+            'caesar_sources': source_pattern,
+            'other_sources': other_sources,
+            'caesar_filename': 'answer_cat_12_13.txt',
+        })
+
+    # Other variants use latest synthesis
     for exp_template, filename in variants:
         for cat in categories:
             exp = exp_template.format(cat=cat)
@@ -201,5 +219,5 @@ TRANSFER_CONFIGS = {
     '12_13_v2': setup_transfer_dict_12_13_v2,
     '12_13_syn': setup_transfer_dict_12_13_syn_ablation,
     '12_13_iter': setup_transfer_dict_12_13_iter_ablation,
-    '3_28_3_29': setup_transfer_dict_3_28_3_29_ablation,
+    '3_28_graph': setup_transfer_dict_3_28_graph_ablation,
 }

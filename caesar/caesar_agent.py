@@ -937,12 +937,6 @@ Your response must be valid JSON only, nothing else."""
 QUERY:
 {self.starting_query if self.starting_query else 'No query is available'}
 
-PREVIOUS INSIGHTS:
-No previous insights available
-
-RELATED INSIGHTS:
-No related insights available
-
 YOUR TASK:
 Analyze this content and extract key insights focusing on:
 - Novel patterns or unexpected connections
