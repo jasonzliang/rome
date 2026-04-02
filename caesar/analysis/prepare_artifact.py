@@ -157,4 +157,4 @@ def prepare_artifact(transfer_func):
 
 if __name__ == '__main__':
     from transfer_configs import TRANSFER_CONFIGS
-    prepare_artifact(TRANSFER_CONFIGS['3_28_graph'])
+    prepare_artifact(TRANSFER_CONFIGS['12_13_insights'])
