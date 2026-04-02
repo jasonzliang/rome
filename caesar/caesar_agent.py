@@ -283,6 +283,27 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
         self.logger.info(f"Domains: {self.allowed_domains}")
         self.logger.info(f"Iterations: {self.max_iterations}, Depth: {self.max_depth}")
 
+    def _log_iteration(self, iteration: int, explore_start_time: float, explore_start_iter: int) -> None:
+        """Log iteration header with elapsed time and ETA"""
+        self.logger.info(f"\n{'='*80}")
+        self.logger.info(f"Iteration {iteration}/{self.max_iterations}")
+        completed = iteration - explore_start_iter
+        if completed > 0:
+            elapsed = time.time() - explore_start_time
+            avg_per_iter = elapsed / completed
+            remaining = avg_per_iter * (self.max_iterations - iteration + 1)
+            mins, secs = divmod(int(remaining), 60)
+            hrs, mins = divmod(mins, 60)
+            eta = f"{hrs}h {mins}m {secs}s" if hrs else f"{mins}m {secs}s"
+            e_mins, e_secs = divmod(int(elapsed), 60)
+            e_hrs, e_mins = divmod(e_mins, 60)
+            elapsed_str = f"{e_hrs}h {e_mins}m {e_secs}s" if e_hrs else f"{e_mins}m {e_secs}s"
+            self.logger.info(f"Elapsed: {elapsed_str} | ETA: {eta} remaining ({avg_per_iter:.1f}s/iter)")
+
+        self.logger.info(f"Depth: {self.current_depth}/{self.max_depth}")
+        self.logger.info(f"URL: {self.current_url}")
+        self.logger.info(f"{'='*80}")
+
     def _get_checkpoint_path(self) -> str:
         """Get checkpoint file path"""
         return os.path.join(self.get_log_dir(), f"{self.get_id()}.checkpoint.json")
@@ -1043,16 +1064,15 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
         if start_iter < end_iter:
             self.logger.info(f"[EXPLORE] Beginning exploration: iterations {start_iter} to {self.max_iterations}")
 
+        explore_start_time = time.time()
+        explore_start_iter = start_iter
+
         # TODO: Replace Perceive-Think-Act with LangGraph nodes
         for iteration in range(start_iter, end_iter):
             if self.shutdown_called: break
             self.current_iteration = iteration
 
-            self.logger.info(f"\n{'='*80}")
-            self.logger.info(f"Iteration {iteration}/{self.max_iterations}")
-            self.logger.info(f"Depth: {self.current_depth}/{self.max_depth}")
-            self.logger.info(f"URL: {self.current_url}")
-            self.logger.info(f"{'='*80}")
+            self._log_iteration(iteration, explore_start_time, explore_start_iter)
 
             content, links = self.perceive()
             if not content:
