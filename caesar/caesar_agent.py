@@ -1005,6 +1005,9 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
 
         # Write results to KB and graph sequentially
         for url, text, insights, iteration in results:
+            if not self.quick_explore_insights:
+                insights = text
+
             try:
                 self.kb_manager.add_text(insights, metadata={
                     'url': url, 'depth': 1, 'iteration': iteration})

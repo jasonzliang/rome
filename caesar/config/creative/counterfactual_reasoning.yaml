@@ -21,6 +21,8 @@ CaesarAgent:
   save_graph_interval: 50
 
   use_quick_explore: True
+  quick_explore_insights: False
+
   exploration_llm_config:
     model: gpt-5.2
 

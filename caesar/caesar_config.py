@@ -84,9 +84,11 @@ CAESAR_CONFIG = {
         "use_explore_strategy": True,
         # Maximum web searches allowed during exploration (including starting search)
         "max_web_searches": 0,
-        # Whether to enable fast exploration, analyze all search results instead
+        # Whether to enable quick exploration, analyze all search results instead
         "use_quick_explore": False,
-        # Number of parallel workers for quick_explore mode
+        # Whether to disable insight generation for quick explore mode
+        "quick_explore_insights": True,
+        # Number of parallel workers for quick explore mode
         "quick_explore_workers": 10,
         # LLM config for agent's ACT/THINK phases to encourage exploration
         "exploration_llm_config": {
