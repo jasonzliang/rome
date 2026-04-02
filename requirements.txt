@@ -25,6 +25,7 @@ pygraphviz
 PyPDF2
 tabulate
 tenacity
+trafilatura
 
 # Rome Optional Packages
 evalplus

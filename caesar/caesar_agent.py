@@ -18,6 +18,7 @@ from curl_cffi import requests
 import networkx as nx
 import numpy as np
 from PyPDF2 import PdfReader
+import trafilatura
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.base_agent import BaseAgent
@@ -462,12 +463,20 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
         return links
 
     def _extract_text_from_html(self, html: str, max_length: int = MAX_TEXT_LENGTH) -> str:
-        """Extract clean text content from HTML"""
+        """Extract clean text content from HTML using trafilatura for robust boilerplate removal"""
         try:
-            soup = BeautifulSoup(html, 'html.parser')
-            for tag in soup(["script", "style", "nav", "footer", "header"]):
-                tag.decompose()
-            text = soup.get_text(separator=' ', strip=True)
+            text = trafilatura.extract(
+                html,
+                include_comments=False,
+                include_tables=True,
+                no_fallback=False,
+                favor_recall=True,
+            )
+            if not text:
+                soup = BeautifulSoup(html, 'html.parser')
+                for tag in soup(["script", "style"]):
+                    tag.decompose()
+                text = soup.get_text(separator=' ', strip=True)
             return ' '.join(text.split())[:max_length]
         except Exception as e:
             self.logger.error(f"HTML text extraction failed: {e}")
