@@ -3,7 +3,7 @@ MAX_NUM_LINKS = 2000
 # Maximum number of visited links to consider when selecting next webpage
 MAX_NUM_VISITED_LINKS = 1000
 # Maximum of neighboring nodes to look for related insights
-MAX_NUM_NEIGHBORS = 5
+MAX_NUM_NEIGHBORS = 30
 # Maximum length (characters) of text to extract from a webpage
 MAX_TEXT_LENGTH = 100000
 # Timeout for fetching webpage html using requests
