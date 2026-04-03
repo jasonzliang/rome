@@ -32,7 +32,7 @@ ArtifactSynthesizer:
   synthesis_iterations: 10
   synthesis_drafts: 5
   synthesis_merge_artifacts: true
-  synthesis_eli5: true
+  synthesis_eli5: false
   synthesis_eli5_length: [null, 450]
   synthesis_human_eval: false
   synthesis_max_length: null

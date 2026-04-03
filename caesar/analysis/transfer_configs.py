@@ -5,7 +5,7 @@ import os
 
 import networkx as nx
 
-from prepare_artifact import find_synthesis, DEFAULT_CONFIG
+from prepare_artifact import find_synthesis, DEFAULT_CONFIG, CATEGORIES
 
 # Outdated, do not use
 def setup_transfer_dict_11_17():
@@ -214,9 +214,7 @@ def _build_draft_patterns(num_drafts, has_merged):
     return patterns
 
 
-def setup_transfer_dict_3_28_graph_ablation(compare_all=True):
-    categories = ['constrained_creativity', 'counterfactual_reasoning',
-        'crossdomain_synthesis', 'meta_creativity', 'openended_creativity']
+def setup_transfer_dict_3_28_graph_ablation(categories=CATEGORIES, compare_all=True):
     variants = [
         # ('3_28_{cat}',),
         ('exp_03_2026/3_29_{cat}',),
