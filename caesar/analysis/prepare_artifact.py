@@ -30,6 +30,9 @@ DEFAULT_CONFIG = {
     "OUTPUT_DIR_FROM_PATTERN": False
     }
 
+CATEGORIES = ['constrained_creativity', 'counterfactual_reasoning',
+    'crossdomain_synthesis', 'meta_creativity', 'openended_creativity']
+
 
 def strip_abstract_and_sources(text):
     """Remove ABSTRACT section from start and SOURCES section from end."""
@@ -98,9 +101,6 @@ def _match_other_source(caesar_file, other_source_dirs):
             return d
     return None
 
-
-CATEGORIES = ['constrained_creativity', 'counterfactual_reasoning',
-    'crossdomain_synthesis', 'meta_creativity', 'openended_creativity']
 
 def _resolve_output_dir(config, caesar_file, other_source_dir, td):
     """Determine output directory."""

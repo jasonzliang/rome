@@ -219,18 +219,19 @@ def setup_transfer_dict_3_28_graph_ablation(compare_all=True):
         'crossdomain_synthesis', 'meta_creativity', 'openended_creativity']
     variants = [
         # ('3_28_{cat}',),
-        # ('exp_03_2026/3_29_{cat}',),
+        ('exp_03_2026/3_29_{cat}',),
         ('4_4_{cat}_qe',),
-        ('12_13_{cat}', '0403'),
+        # ('12_13_{cat}', '01072', 'answer_cat_250.txt'),
+        # ('4_2_{cat}_qe',),
+        # ('12_13_{cat}', '0403'),
         # ('3_30_{cat}_qe',),
         # ('3_28_{cat}_v2',),
         # ('3_29_{cat}_v2',),
         # ('12_13_{cat}', '12160'),
         # ('12_13_{cat}', '01110646', 'answer_cat_1000.txt'),
-        # ('12_13_{cat}', '01072', 'answer_cat_250.txt'),
     ]
     file_patterns = [
-        ('full_draft1/*/',           '*synthesis-1*'),
+        ('full_draft_1/*/',           '*synthesis-1*'),
         # ('full_answers/*/',         '*merged-3*'),
         # ('eli5_answers/*/',         '*merged-eli5-3.[01]*'),
         # ('eli5_450w_answers/*/',    '*merged-eli5-3.450w*'),
