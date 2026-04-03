@@ -618,7 +618,7 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
             for url in reversed(past_urls)
             if url in self.graph.nodes and self.graph.nodes[url].get('insights')
         ][:MAX_NUM_ANCESTORS]
-        past_insights = "\n\n".join(
+        past_insights = "\n\n\n".join(
             f"[{i+1}] Source: {url}\n{insight}"
             for i, (url, insight) in enumerate(past_insights_list)
         )
@@ -645,7 +645,7 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
                     related_insights_list.append((node, dist, insight))
             related_insights_list.sort(key=lambda x: x[1])
 
-        related_insights = "\n\n".join(
+        related_insights = "\n\n\n".join(
             f"[{i+1}] (dist={dist}) Source: {url}\n{insight}"
             for i, (url, dist, insight) in enumerate(related_insights_list[:MAX_NUM_NEIGHBORS])
         )
@@ -660,13 +660,13 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
 QUERY:
 {self.starting_query if self.starting_query else 'No query is available'}
 
-CURRENT INSIGHTS:
+EXISTING INSIGHTS FOR CURRENT PAGE:
 {curr_insights if curr_insights else 'No current insights available'}
 
-PAST INSIGHTS:
+PAST INSIGHTS FROM EXPLORATION HISTORY:
 {past_insights if past_insights else 'No past insights from exploration history'}
 
-RELATED INSIGHTS:
+RELATED INSIGHTS OF NEIGHBORING PAGES:
 {related_insights if related_insights else 'No related insights available'}
 
 YOUR TASK:
