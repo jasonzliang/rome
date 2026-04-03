@@ -124,7 +124,9 @@ class ArtifactSynthesizer:
             base_dir = os.path.join(self.agent.get_repo(),
                 f"{self.agent.get_id()}.synthesis.{datetime.now().strftime("%m%d%H%M")}")
 
+        self._num_drafts = num_drafts
         for draft_num in range(1, num_drafts + 1):
+            self._current_draft = draft_num
             self.logger.info(f"\n{'='*80}\n[SYNTHESIS DRAFT {draft_num}/{num_drafts}]\n{'='*80}")
             if current_query: self.logger.info(f"Current query: {current_query}")
 
@@ -415,7 +417,7 @@ EXAMPLE OUTPUT:
                 self.logger.assert_true(not violations,
                     f"Iteration filter failed: {violations} >= {self.synthesis_iteration_filter}")
 
-            iter_str = f"[SYNTHESIS ITERATION {i+1}/{self.synthesis_iterations}]"
+            iter_str = f"[SYNTHESIS DRAFT {self._current_draft}/{self._num_drafts} ITERATION {i+1}/{self.synthesis_iterations}]"
             if not answer:
                 self.logger.error(f"{iter_str} KB query failed"); break
             if not isinstance(sources, list): sources = []
