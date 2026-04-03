@@ -162,6 +162,8 @@ CAESAR_CONFIG = {
         "retry_delay": 1,
         # Request timeout in seconds
         "timeout": 30,
+        # Filter duplicate URLs across multiple queries
+        "filter_duplicates": False,
     },
 
     # Default config for LLM outside of agent exploration

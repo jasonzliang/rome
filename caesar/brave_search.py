@@ -325,6 +325,7 @@ class BraveSearch:
     </div>
 """
 
+        seen_urls = set()
         for query, search_results in query_results:
             results = search_results.get('web', {}).get('results', [])
             api_query = search_results.get('query', {}).get('original', query)
@@ -337,6 +338,10 @@ class BraveSearch:
                 title = r.get('title', 'No Title')
                 url = r.get('url', '')
                 description = r.get('description', 'No description available')
+
+                if self.filter_duplicates and url in seen_urls:
+                    continue
+                seen_urls.add(url)
 
                 html += f"""
     <div class="result">
