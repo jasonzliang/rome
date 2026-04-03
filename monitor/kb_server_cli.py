@@ -31,7 +31,7 @@ from chromadb.utils.embedding_functions import (
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.kb_server import ChromaServerManager
 from rome.logger import get_logger
-from rome.config import LONG_SUMMARY_LEN
+from rome.config import LONG_SUMMARY_LEN, LONGEST_SUMMARY_LEN
 from rome.kb_client import EMBEDDING_MODELS
 
 logger = get_logger()
@@ -490,7 +490,7 @@ class OutputFormatter:
         content = doc.get('document', '')
         metadata = doc.get('metadata', {})
 
-        maxlen = LONG_SUMMARY_LEN
+        maxlen = LONGEST_SUMMARY_LEN
         if content and len(content) > maxlen:
             truncated = content[:maxlen]
             last_space = truncated.rfind(' ')
