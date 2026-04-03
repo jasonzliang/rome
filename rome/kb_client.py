@@ -5,6 +5,7 @@ from typing import Optional, List, Dict
 import os
 from pathlib import Path
 import re
+import traceback
 import time
 import sys
 import warnings
@@ -310,8 +311,9 @@ class ChromaClientManager:
 
             return response
 
-        except openai.APITimeoutError as e:
-            self.logger.error(f"KB query timed out (OpenAI API): {e}")
+        except Exception as e:
+            self.logger.error(f"KB query error: {e}")
+            self.logger.error(traceback.format_exc())
             return ("", []) if return_sources else ""
 
     def _retrieve_nodes(self, question: str, retrieval_k: int, filters: MetadataFilters):
