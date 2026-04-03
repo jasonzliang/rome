@@ -44,7 +44,7 @@ ArtifactSynthesizer:
 # ============================================================================
 OpenAIHandler:
   model: gpt-5.2
-  reasoning_effort: low
+  reasoning_effort: medium
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
@@ -54,8 +54,8 @@ AgentMemory:
   use_graph: true
 
 ChromaClientManager:
-  llm_model: gpt-5-mini
-  llm_reasoning_effort: low
+  llm_model: gpt-5.2
+  llm_reasoning_effort: medium
 
 # ============================================================================
 # LOGGING CONFIGURATION
