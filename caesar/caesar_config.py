@@ -2,8 +2,12 @@
 MAX_NUM_LINKS = 2000
 # Maximum number of visited links to consider when selecting next webpage
 MAX_NUM_VISITED_LINKS = 1000
-# Maximum of neighboring nodes to look for related insights
+# Max graph distance for collecting related insights in think2
+NEIGHBORHOOD_DISTANCE = 3
+# Maximum number of neighboring nodes to use for related insights in think
 MAX_NUM_NEIGHBORS = 30
+# Maximum number of past nodes to use for past insights in think
+MAX_NUM_ANCESTORS = 5
 # Maximum length (characters) of text to extract from a webpage
 MAX_TEXT_LENGTH = 100000
 # Timeout for fetching webpage html using requests
@@ -72,6 +76,8 @@ CAESAR_CONFIG = {
         # Save checkpoint every N iterations for resumption
         "checkpoint_interval": 1,
 
+        # Whether to use new think
+        "new_think": False,
         # Whether to enable graph augmented insight generation (removed)
         # "graph_augmented_insights": True,
         # Whether to follow links that point to the same page (different fragments)

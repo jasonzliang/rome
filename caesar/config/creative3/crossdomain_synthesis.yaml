@@ -20,9 +20,10 @@ CaesarAgent:
   max_iterations: 1000
   save_graph_interval: 50
 
+  new_think: True
   exploration_llm_config:
     model: gpt-5.2
-    reasoning_effort: medium
+    reasoning_effort: low
 
   # overwrite_role_file: config/role/self_transcend_role.txt
   # adapt_role_file: config/role/self_transcend_insights_v1.txt

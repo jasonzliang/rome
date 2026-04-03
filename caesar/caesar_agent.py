@@ -28,7 +28,7 @@ from rome.kb_client import ChromaClientManager
 
 from .artifact_synthesis import ArtifactSynthesizer
 from .brave_search import BraveSearch
-from .caesar_config import MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS, MAX_NUM_NEIGHBORS, MAX_TEXT_LENGTH, REQUESTS_TIMEOUT, REQUESTS_HEADERS, CAESAR_CONFIG
+from .caesar_config import MAX_NUM_LINKS, MAX_NUM_VISITED_LINKS, NEIGHBORHOOD_DISTANCE, MAX_NUM_NEIGHBORS, MAX_NUM_ANCESTORS, MAX_TEXT_LENGTH, REQUESTS_TIMEOUT, REQUESTS_HEADERS, CAESAR_CONFIG
 
 
 class CaesarAgent(BaseAgent):
@@ -524,6 +524,9 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
 
     def think(self, content: str) -> str:
         """Phase 2: Analyze content and extract insights"""
+        if self.new_think:
+            return self.think2(content)
+
         self.logger.info("[THINK] Analyzing content")
         if not content: return ""
 
@@ -580,6 +583,110 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
             )
         except Exception as e:
             self.logger.error(f"LLM call failed in think phase: {e}")
+            return ""
+
+        try:
+            self.kb_manager.add_text(insights, metadata={
+                'url': self.current_url,
+                'depth': self.current_depth,
+                'iteration': self.current_iteration
+            })
+        except Exception as e:
+            self.logger.error(f"KB add_text failed: {e}")
+
+        self.visited_urls[self.current_url] = self.visited_urls.get(self.current_url, 0) + 1
+        self.graph.add_node(self.current_url, insights=insights,
+            depth=self.current_depth, iteration=self.current_iteration,
+            visit_count=self.visited_urls[self.current_url])
+        return insights
+
+    def think2(self, content: str) -> str:
+        """Phase 2 (v2): Analyze content with exploration history and extended neighborhood"""
+        self.logger.info("[THINK2] Analyzing content")
+        if not content: return ""
+
+        # Collect past insights from traversal history (unique URLs, preserve order)
+        past_urls = []
+        seen = set()
+        for entry in self.traversal_history:
+            url = entry['from_url']
+            if url not in seen and url != self.current_url:
+                seen.add(url)
+                past_urls.append(url)
+        past_insights_list = [
+            (url, self.graph.nodes[url].get('insights', ''))
+            for url in reversed(past_urls)
+            if url in self.graph.nodes and self.graph.nodes[url].get('insights')
+        ][:MAX_NUM_ANCESTORS]
+        past_insights = "\n\n".join(
+            f"[{i+1}] Source: {url}\n{insight}"
+            for i, (url, insight) in enumerate(past_insights_list)
+        )
+        past_urls_set = {url for url, _ in past_insights_list}
+
+        # Previous insights for current URL
+        curr_insights = ''
+        if self.current_url in self.graph.nodes:
+            curr_insights = self.graph.nodes[self.current_url].get('insights', '')
+
+        # Extended neighborhood: all nodes within NEIGHBORHOOD_DISTANCE hops
+        related_insights_list = []
+        if self.current_url in self.graph:
+            undirected = self.graph.to_undirected(as_view=True)
+            nearby = nx.single_source_shortest_path_length(
+                undirected, self.current_url, cutoff=NEIGHBORHOOD_DISTANCE)
+            for node, dist in nearby.items():
+                if node == self.current_url or dist == 0:
+                    continue
+                if node in past_urls_set:
+                    continue
+                insight = self.graph.nodes[node].get('insights', '')
+                if insight:
+                    related_insights_list.append((node, dist, insight))
+            related_insights_list.sort(key=lambda x: x[1])
+
+        related_insights = "\n\n".join(
+            f"[{i+1}] (dist={dist}) Source: {url}\n{insight}"
+            for i, (url, dist, insight) in enumerate(related_insights_list[:MAX_NUM_NEIGHBORS])
+        )
+
+        query_task = "- How to answer the query\n" if self.starting_query else ""
+        context_task = "- How this builds upon or challenges current/past/related insights" if (
+            curr_insights or related_insights or past_insights) else ""
+
+        prompt = f"""CONTENT:
+{content}
+
+QUERY:
+{self.starting_query if self.starting_query else 'No query is available'}
+
+CURRENT INSIGHTS:
+{curr_insights if curr_insights else 'No current insights available'}
+
+PAST INSIGHTS:
+{past_insights if past_insights else 'No past insights from exploration history'}
+
+RELATED INSIGHTS:
+{related_insights if related_insights else 'No related insights available'}
+
+YOUR TASK:
+Analyze this content and extract key insights focusing on:
+- Novel patterns or unexpected connections
+- Assumptions being made and alternative perspectives
+- Interesting questions raised by the content
+{query_task}{context_task}
+
+IMPORTANT: Use your role as a guide on how to respond!
+
+Depending on the complexity of the content, provide anywhere from 1 to 6 concise but substantive insights, but do not exceed ~600 words in total length:"""
+
+        try:
+            insights = self.chat_completion(
+                prompt,
+                override_config=self.exploration_llm_config
+            )
+        except Exception as e:
+            self.logger.error(f"LLM call failed in think2 phase: {e}")
             return ""
 
         try:
@@ -1060,19 +1167,17 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
         if self.use_quick_explore:
             return self.quick_explore()
 
+        start_time = time.time()
         start_iter = self.current_iteration + 1; end_iter = self.max_iterations + 1
         if start_iter < end_iter:
             self.logger.info(f"[EXPLORE] Beginning exploration: iterations {start_iter} to {self.max_iterations}")
-
-        explore_start_time = time.time()
-        explore_start_iter = start_iter
 
         # TODO: Replace Perceive-Think-Act with LangGraph nodes
         for iteration in range(start_iter, end_iter):
             if self.shutdown_called: break
             self.current_iteration = iteration
 
-            self._log_iteration(iteration, explore_start_time, explore_start_iter)
+            self._log_iteration(iteration, start_time, start_iter)
 
             content, links = self.perceive()
             if not content:
