@@ -184,9 +184,9 @@ def setup_transfer_dict_3_28_graph_ablation():
     ]
     file_patterns = [
         ('12_4_answers/*/',           '*synthesis-1*'),
-        # ('12_4_answers/*/',           '*merged-3*'),
-        # ('12_4_answers_eli5/*/',      '*merged-eli5-3.[01]*'),
-        # ('12_4_answers_eli5_450w/*/', '*merged-eli5-3.450w*'),
+        # ('12_4_answers/*/',         '*merged-3*'),
+        # ('eli5_answers/*/',         '*merged-eli5-3.[01]*'),
+        # ('eli5_450w_answers/*/',    '*merged-eli5-3.450w*'),
     ]
 
     transfer_list = []
