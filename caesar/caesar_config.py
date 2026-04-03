@@ -76,10 +76,10 @@ CAESAR_CONFIG = {
         # Save checkpoint every N iterations for resumption
         "checkpoint_interval": 1,
 
-        # Whether to use new think
-        "new_think": False,
         # Whether to enable graph augmented insight generation (removed)
         # "graph_augmented_insights": True,
+        # Whether to use new think which increases graph neighbor size
+        "new_think": False,
         # Whether to follow links that point to the same page (different fragments)
         "same_page_links": False,
         # Maximum times to revisiting page it has seen before during exploration

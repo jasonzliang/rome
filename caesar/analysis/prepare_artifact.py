@@ -157,4 +157,16 @@ def prepare_artifact(transfer_func):
 
 if __name__ == '__main__':
     from transfer_configs import TRANSFER_CONFIGS
-    prepare_artifact(TRANSFER_CONFIGS['12_13_insights'])
+
+    keys = list(TRANSFER_CONFIGS.keys())
+    print("Select a transfer config:")
+    for i, key in enumerate(keys):
+        print(f"  [{i}] {key}")
+    choice = input(f"\nEnter number (0-{len(keys)-1}): ")
+    try:
+        selected = keys[int(choice)]
+    except (ValueError, IndexError):
+        print("Invalid selection")
+        sys.exit(1)
+    print(f"Using: {selected}\n")
+    prepare_artifact(TRANSFER_CONFIGS[selected])

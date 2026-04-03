@@ -1066,6 +1066,9 @@ Your response must be valid JSON only, nothing else."""
             text = self._extract_text_from_html(html)
             if not text:
                 return None
+            if not self.quick_explore_insights:
+                return (url, text, text, iteration)
+
 
             # Build think prompt (no graph context in quick_explore)
             query_task = "- How to answer the query\n" if self.starting_query else ""
@@ -1143,12 +1146,10 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
 
         # Write results to KB and graph sequentially
         for url, text, insights, iteration in results:
-            if not self.quick_explore_insights:
-                insights = text
-
             try:
                 self.kb_manager.add_text(insights, metadata={
                     'url': url, 'depth': 1, 'iteration': iteration})
+                self.info(f"[QUICK_EXPLORE] Added insights ({len(insights)} length) for {url} to knowledge base")
             except Exception as e:
                 self.logger.error(f"[QUICK_EXPLORE] KB add_text failed for {url}: {e}")
 
