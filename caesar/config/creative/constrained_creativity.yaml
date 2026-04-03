@@ -30,8 +30,8 @@ CaesarAgent:
   adapt_role: True
 
 ArtifactSynthesizer:
-  synthesis_iterations: 10
-  synthesis_drafts: 5
+  synthesis_iterations: 30
+  synthesis_drafts: 3
   synthesis_merge_artifacts: true
   synthesis_eli5: false
   synthesis_eli5_length: [null, 450]
@@ -44,7 +44,7 @@ ArtifactSynthesizer:
 # ============================================================================
 OpenAIHandler:
   model: gpt-5.2
-  reasoning_effort: medium
+  reasoning_effort: low
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
@@ -54,8 +54,8 @@ AgentMemory:
   use_graph: true
 
 ChromaClientManager:
-  llm_model: gpt-5.2
-  llm_reasoning_effort: medium
+  llm_model: gpt-5-mini
+  llm_reasoning_effort: low
 
 # ============================================================================
 # LOGGING CONFIGURATION
