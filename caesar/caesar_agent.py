@@ -287,6 +287,9 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
         """Log iteration header with elapsed time and ETA"""
         self.logger.info(f"\n{'='*80}")
         self.logger.info(f"Iteration {iteration}/{self.max_iterations}")
+        self.logger.info(f"Depth: {self.current_depth}/{self.max_depth}")
+        self.logger.info(f"URL: {self.current_url}")
+
         completed = iteration - explore_start_iter
         if completed > 0:
             elapsed = time.time() - explore_start_time
@@ -300,8 +303,6 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
             elapsed_str = f"{e_hrs}h {e_mins}m {e_secs}s" if e_hrs else f"{e_mins}m {e_secs}s"
             self.logger.info(f"Elapsed: {elapsed_str} | ETA: {eta} remaining ({avg_per_iter:.1f}s/iter)")
 
-        self.logger.info(f"Depth: {self.current_depth}/{self.max_depth}")
-        self.logger.info(f"URL: {self.current_url}")
         self.logger.info(f"{'='*80}")
 
     def _get_checkpoint_path(self) -> str:
