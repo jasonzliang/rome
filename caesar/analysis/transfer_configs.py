@@ -216,9 +216,9 @@ def _build_draft_patterns(num_drafts, has_merged):
 
 def setup_transfer_dict_3_28_graph_ablation(categories=CATEGORIES, compare_all=True):
     variants = [
-        # ('3_28_{cat}',),
-        ('exp_03_2026/3_29_{cat}',),
+        ('3_28_{cat}',),
         ('4_4_{cat}_qe',),
+        # ('exp_03_2026/3_29_{cat}',),
         # ('12_13_{cat}', '01072', 'answer_cat_250.txt'),
         # ('4_2_{cat}_qe',),
         # ('12_13_{cat}', '0403'),
