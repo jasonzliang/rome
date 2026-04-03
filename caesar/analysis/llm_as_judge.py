@@ -441,6 +441,7 @@ Examples:
     parser.add_argument("-n", "--workers", type=int, default=18, help="Number of workers (def: 18)")
     parser.add_argument("-t", "--trials", type=int, default=3, help="Number of trials (def: 3)")
     parser.add_argument("-J", "--judges", nargs="+", choices=list(JUDGES.keys()), default=list(JUDGES.keys()), help="Specific judges to run (def: all)")
+    parser.add_argument("-b", "--batch", action="store_true", help="Treat each subdir as a separate root directory")
 
     return parser.parse_args()
 
@@ -449,6 +450,16 @@ if __name__ == "__main__":
     if not args.root_directory.exists():
         exit(1)
 
-    # Attach loaded rubric content to args to avoid passing it through every function
     args.rubric_content = load_rubric(args.rubric)
-    find_and_judge_all(args)
+
+    if args.batch:
+        subdirs = sorted(d for d in args.root_directory.iterdir() if d.is_dir())
+        print(f"Batch mode: {len(subdirs)} subdirectories in {args.root_directory}\n")
+        for subdir in subdirs:
+            print(f"\n{'='*80}\nBatch: {subdir.name}\n{'='*80}")
+            sub_args = argparse.Namespace(**vars(args))
+            sub_args.root_directory = subdir
+            sub_args.batch = False
+            find_and_judge_all(sub_args)
+    else:
+        find_and_judge_all(args)

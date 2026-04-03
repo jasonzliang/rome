@@ -5,7 +5,7 @@ import os
 
 import networkx as nx
 
-from prepare_artifact import find_synthesis
+from prepare_artifact import find_synthesis, DEFAULT_CONFIG
 
 # Outdated, do not use
 def setup_transfer_dict_11_17():
@@ -168,48 +168,119 @@ def setup_transfer_dict_12_13_iter_ablation():
     return [iter250, iter500, iter1000, iter250_eli5, iter500_eli5, iter1000_eli5, iter250_eli5_450w, iter500_eli5_450w, iter1000_eli5_450w], overrides
 
 
-def setup_transfer_dict_3_28_graph_ablation():
+def _count_drafts(exp_glob, synthesis_id=None, base=None):
+    """Count synthesis draft files in the latest (or specified) synthesis folder."""
+    base = base or DEFAULT_CONFIG["CAESAR_AGENT_BASE_DIR"]
+    if synthesis_id:
+        sdirs = glob.glob(os.path.join(base, exp_glob, f"*{synthesis_id}*"))
+    else:
+        sdirs = sorted(glob.glob(os.path.join(base, exp_glob, "*.synthesis.*")))
+    if not sdirs:
+        return 0
+    return len(glob.glob(os.path.join(sdirs[-1], "*synthesis-[0-9]*")))
+
+
+def _has_merged(exp_glob, base=None):
+    """Check if any synthesis folder for this experiment has merged files."""
+    base = base or DEFAULT_CONFIG["CAESAR_AGENT_BASE_DIR"]
+    return bool(glob.glob(os.path.join(base, exp_glob, "*.synthesis.*", "*merged*")))
+
+
+def _variant_filename(variant):
+    """Derive base filename from a variant tuple."""
+    exp_template = variant[0]
+    custom = variant[2] if len(variant) > 2 else None
+    if custom:
+        return custom
+    name = exp_template.rsplit('/', 1)[-1].replace('{cat}', '').strip('_')
+    while '__' in name: name = name.replace('__', '_')
+    return f"answer_cat_{name}.txt"
+
+
+def _draft_filename(base_filename, pattern):
+    """Derive per-draft filename from base filename and a file pattern."""
+    stem = base_filename.rsplit('.', 1)[0]
+    if 'merged' in pattern:
+        return f"{stem}_merge.txt"
+    draft_num = pattern.strip('*').strip('-').replace('synthesis-', 'syn')
+    return f"{stem}_{draft_num}.txt"
+
+
+def _build_draft_patterns(num_drafts, has_merged):
+    """Build file pattern list for all drafts and optionally merged."""
+    patterns = [('12_4_answers/*/', f'*synthesis-{i}*') for i in range(1, num_drafts + 1)]
+    if has_merged:
+        patterns.append(('12_4_answers/*/', f'*merged-{num_drafts}*'))
+    return patterns
+
+
+def setup_transfer_dict_3_28_graph_ablation(compare_all=True):
     categories = ['constrained_creativity', 'counterfactual_reasoning',
         'crossdomain_synthesis', 'meta_creativity', 'openended_creativity']
     variants = [
-        ('3_28_{cat}',),
-        ('exp_03_2026/3_29_{cat}',),
-        ('4_2_{cat}_qe',),
+        # ('3_28_{cat}',),
+        # ('exp_03_2026/3_29_{cat}',),
+        ('4_4_{cat}_qe',),
+        ('12_13_{cat}', '0403'),
         # ('3_30_{cat}_qe',),
         # ('3_28_{cat}_v2',),
         # ('3_29_{cat}_v2',),
         # ('12_13_{cat}', '12160'),
-        ('12_13_{cat}', '01110646', 'answer_cat_1000.txt'),
+        # ('12_13_{cat}', '01110646', 'answer_cat_1000.txt'),
         # ('12_13_{cat}', '01072', 'answer_cat_250.txt'),
     ]
     file_patterns = [
-        ('12_4_answers/*/',           '*synthesis-1*'),
-        # ('12_4_answers/*/',         '*merged-3*'),
+        ('full_draft1/*/',           '*synthesis-1*'),
+        # ('full_answers/*/',         '*merged-3*'),
         # ('eli5_answers/*/',         '*merged-eli5-3.[01]*'),
         # ('eli5_450w_answers/*/',    '*merged-eli5-3.450w*'),
     ]
+
+    # Auto-detect drafts from the first variant
+    num_drafts = 0
+    all_draft_patterns = []
+    if compare_all:
+        first_exp = variants[0][0].format(cat=categories[0])
+        first_synth_id = variants[0][1] if len(variants[0]) > 1 else None
+        num_drafts = _count_drafts(first_exp, first_synth_id)
+        merged = _has_merged(first_exp)
+        all_draft_patterns = _build_draft_patterns(num_drafts, merged)
+        print(f"Auto-detected {num_drafts} synthesis drafts from {first_exp}")
 
     transfer_list = []
     for variant in variants:
         exp_template = variant[0]
         synthesis_id = variant[1] if len(variant) > 1 else None
-        custom_filename = variant[2] if len(variant) > 2 else None
-        if custom_filename:
-            filename = custom_filename
-        else:
-            name = exp_template.rsplit('/', 1)[-1].replace('{cat}', '').strip('_')
-            while '__' in name: name = name.replace('__', '_')
-            filename = f"answer_cat_{name}.txt"
+        base_filename = _variant_filename(variant)
+
+        # Check if this variant's draft count matches for comparison
+        use_comparison = compare_all and num_drafts > 0
+        if use_comparison:
+            check_exp = exp_template.format(cat=categories[0])
+            variant_drafts = _count_drafts(check_exp, synthesis_id)
+            if variant_drafts != num_drafts:
+                print(f"Skipping comparison for {exp_template} ({variant_drafts} drafts != {num_drafts})")
+                use_comparison = False
+
+        patterns = all_draft_patterns if use_comparison else file_patterns
         for cat in categories:
             exp = exp_template.format(cat=cat)
-            for other_sources, merged_pattern in file_patterns:
+            for other_sources, merged_pattern in patterns:
+                filename = _draft_filename(base_filename, merged_pattern) if use_comparison else base_filename
+                try:
+                    source = find_synthesis(exp, merged_pattern, synthesis_id=synthesis_id)
+                except FileNotFoundError:
+                    if use_comparison:
+                        continue
+                    raise
                 transfer_list.append({
-                    'caesar_sources': find_synthesis(exp, merged_pattern, synthesis_id=synthesis_id),
+                    'caesar_sources': source,
                     'other_sources': other_sources,
                     'caesar_filename': filename})
 
     overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
-        "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
+        "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": [],
+        "OUTPUT_DIR_FROM_PATTERN": True}
     return transfer_list, overrides
 
 
@@ -277,8 +348,7 @@ def setup_transfer_dict_12_13_insights(base_dir=None, output_dir=None):
                 'caesar_filename': f'answer_cat_{suffix}.txt',
             })
 
-    overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
-        "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
+    overrides = {"CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
     return transfer_list, overrides
 
 

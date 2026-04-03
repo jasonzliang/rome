@@ -4,7 +4,6 @@ import os
 import re
 import shutil
 import sys
-import time
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -26,8 +25,10 @@ DEFAULT_CONFIG = {
     # Empty files to create in the category level output directory
     "CATEGORY_NEW_FILES": ['judge_claude.txt', 'judge_gemini.txt', 'judge_gpt.txt'],
     # Empty files to create in the meta-category level output directory
-    "META_CATEGORY_NEW_FILES": ['judge_summary.txt', 'judge_csv.txt']
-}
+    "META_CATEGORY_NEW_FILES": ['judge_summary.txt', 'judge_csv.txt'],
+    # Whether to determine output format directory from artifact draft names
+    "OUTPUT_DIR_FROM_PATTERN": False
+    }
 
 
 def strip_abstract_and_sources(text):
@@ -90,68 +91,92 @@ def find_synthesis(experiment_glob, file_pattern="*merged-3*",
     return result
 
 
+def _match_other_source(caesar_file, other_source_dirs):
+    """Find the other_source_dir whose category name appears in the caesar file path."""
+    for d in other_source_dirs:
+        if os.path.normpath(d).split(os.sep)[-1] in caesar_file:
+            return d
+    return None
+
+
+CATEGORIES = ['constrained_creativity', 'counterfactual_reasoning',
+    'crossdomain_synthesis', 'meta_creativity', 'openended_creativity']
+
+def _resolve_output_dir(config, caesar_file, other_source_dir, td):
+    """Determine output directory."""
+    if other_source_dir:
+        parts = os.path.normpath(other_source_dir).split(os.sep)
+        category, parent_dir = parts[-1], parts[-2]
+    else:
+        category = next((c for c in CATEGORIES if c in caesar_file), 'unknown')
+        parent_dir = td['other_sources'].split('/')[0]
+
+    if config['OUTPUT_DIR_FROM_PATTERN']:
+        draft_type = os.path.basename(td['caesar_sources']).strip('*').strip('.') or 'default'
+        parent_dir = f"{draft_type}_answers"
+
+    return os.path.join(config['ALL_AGENT_BASE_DIR'], parent_dir, category)
+
+
+def _touch_files(directory, filenames):
+    """Create or update timestamps on files in a directory."""
+    os.makedirs(directory, exist_ok=True)
+    for f in filenames:
+        path = os.path.join(directory, f)
+        with open(path, 'a'):
+            os.utime(path, None)
+
+
+def _ensure_query_file(output_dir):
+    """Copy query.txt from empty_agent_answers if missing from output directory."""
+    query_file = os.path.join(output_dir, 'query.txt')
+    if not os.path.exists(query_file):
+        category = os.path.basename(os.path.normpath(output_dir))
+        src = os.path.join('query_result/empty_agent_answers/full_answers', category, 'query.txt')
+        if os.path.exists(src):
+            shutil.copy2(src, query_file)
+            print(f'  Copied missing query.txt from {src}')
+
+
 def prepare_artifact(transfer_func):
-    """Copy Caesar artifacts to query answer directory for LLM judging"""
-
-    # Unpack transfer list and any configuration overrides
+    """Copy Caesar artifacts to query answer directory for LLM judging."""
     transfer_dicts, config_overrides = transfer_func()
-
-    # Create the active config by merging defaults with overrides
-    config = DEFAULT_CONFIG.copy()
-    if config_overrides:
-        config.update(config_overrides)
-
+    config = {**DEFAULT_CONFIG, **(config_overrides or {})}
+    os.makedirs(config['ALL_AGENT_BASE_DIR'], exist_ok=True)
     print(f"Active Output Dir: {config['ALL_AGENT_BASE_DIR']}")
 
     for td in transfer_dicts:
-        # Use config dictionary instead of globals
-        other_source_dirs = glob.glob(os.path.join(config['OTHER_AGENT_BASE_DIR'],
-            td['other_sources']))
-        for caesar_file in glob.glob(os.path.join(config['CAESAR_AGENT_BASE_DIR'],
-            td['caesar_sources'])):
-            matched = None
-            for other_source_dir in other_source_dirs:
-                category_name = os.path.normpath(other_source_dir).split(os.sep)[-1]
-                if category_name in caesar_file:
-                    matched = other_source_dir
-                    break
+        other_source_dirs = glob.glob(os.path.join(
+            config['OTHER_AGENT_BASE_DIR'], td['other_sources']))
+        caesar_files = glob.glob(os.path.join(
+            config['CAESAR_AGENT_BASE_DIR'], td['caesar_sources']))
 
+        for caesar_file in caesar_files:
+            other_dir = _match_other_source(caesar_file, other_source_dirs)
             print(f"Caesar answer: {caesar_file}")
-            if not matched:
-                print(f"Cannot find matching other source dir to caesar answer")
-                continue
+            if other_dir:
+                print(f"Matched: {other_dir}")
             else:
-                print(f"Matching other agent answer directory: {matched}")
-                other_source_dir = matched
+                print(f"No match, copying caesar answer only")
 
-            os.makedirs(config['ALL_AGENT_BASE_DIR'], exist_ok=True)
-            output_dir = os.path.join(config['ALL_AGENT_BASE_DIR'],
-                os.path.join(*os.path.normpath(other_source_dir).split(os.sep)[-2:]))
-            meta_output_dir = os.path.dirname(os.path.normpath(output_dir))
+            output_dir = _resolve_output_dir(config, caesar_file, other_dir, td)
+            meta_dir = os.path.dirname(os.path.normpath(output_dir))
 
             if config['CLEAR_OUTPUT_DIR'] and os.path.exists(output_dir):
-                shutil.rmtree(output_dir) # Replaced os.system rm -rf
+                shutil.rmtree(output_dir)
+            if other_dir:
+                shutil.copytree(other_dir, output_dir, dirs_exist_ok=True)
+            else:
+                os.makedirs(output_dir, exist_ok=True)
 
-            shutil.copytree(other_source_dir, output_dir, dirs_exist_ok=True)
+            _ensure_query_file(output_dir)
+            _touch_files(output_dir, config['CATEGORY_NEW_FILES'])
+            _touch_files(meta_dir, config['META_CATEGORY_NEW_FILES'])
 
-            for new_file in config['CATEGORY_NEW_FILES']:
-                # Replaced os.system touch
-                with open(os.path.join(output_dir, new_file), 'a'):
-                    os.utime(os.path.join(output_dir, new_file), None)
-
-            for new_file in config['META_CATEGORY_NEW_FILES']:
-                # Replaced os.system touch
-                with open(os.path.join(meta_output_dir, new_file), 'a'):
-                    os.utime(os.path.join(meta_output_dir, new_file), None)
-
-            # Use local filename override from td, otherwise fallback to config default
             caesar_filename = td.get("caesar_filename") or config['CAESAR_AGENT_FILENAME']
-
-            # Using shutil.copy2 to preserve metadata instead of os.system cp
-            src = caesar_file
             dst = os.path.join(output_dir, caesar_filename)
-            print(f'cp {src} {dst}\n')
-            shutil.copy2(src, dst)
+            print(f'cp {caesar_file} {dst}\n')
+            shutil.copy2(caesar_file, dst)
 
             if config['STRIP_ABSTRACT_AND_SOURCES']:
                 with open(dst, 'r') as f:
