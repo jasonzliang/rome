@@ -5,7 +5,7 @@ import os
 
 import networkx as nx
 
-from prepare_artifact import find_latest_synthesis
+from prepare_artifact import find_synthesis
 
 # Outdated, do not use
 def setup_transfer_dict_11_17():
@@ -172,12 +172,15 @@ def setup_transfer_dict_3_28_graph_ablation():
     categories = ['constrained_creativity', 'counterfactual_reasoning',
         'crossdomain_synthesis', 'meta_creativity', 'openended_creativity']
     variants = [
-        ('3_28_{cat}',    'answer_cat_3_28.txt'),
-        ('exp_03_2026/3_29_{cat}',    'answer_cat_3_29.txt'),
-        ('4_2_{cat}_qe',  'answer_cat_4_2_qe.txt'),
-        ('3_30_{cat}_qe', 'answer_cat_3_30_qe.txt'),
-        # ('3_28_{cat}_v2', 'answer_cat_3_28_v2.txt'),
-        # ('3_29_{cat}_v2', 'answer_cat_3_29_v2.txt'),
+        ('3_28_{cat}',),
+        ('exp_03_2026/3_29_{cat}',),
+        ('4_2_{cat}_qe',),
+        # ('3_30_{cat}_qe',),
+        # ('3_28_{cat}_v2',),
+        # ('3_29_{cat}_v2',),
+        # ('12_13_{cat}', '12160'),
+        ('12_13_{cat}', '01110646', 'answer_cat_1000.txt'),
+        # ('12_13_{cat}', '01072', 'answer_cat_250.txt'),
     ]
     file_patterns = [
         ('12_4_answers/*/',           '*synthesis-1*'),
@@ -186,40 +189,22 @@ def setup_transfer_dict_3_28_graph_ablation():
         # ('12_4_answers_eli5_450w/*/', '*merged-eli5-3.450w*'),
     ]
 
-    # Baselines use hardcoded synthesis versions
-    baseline_patterns = [
-        # ('answer_cat_12_13.txt', [
-        #     ('12_4_answers/*/',           '12_13_*/*12160*/*merged-3*'),
-        #     ('12_4_answers_eli5/*/',      '12_13_*/*12160*/*merged-eli5-3.1*'),
-        #     ('12_4_answers_eli5_450w/*/', '12_13_*/*12160*/*merged-eli5-3.450w.1*'),
-        # ]),
-        # ('answer_cat_250.txt', [
-        #     ('12_4_answers/*/',           '12_13_*/*01072*/*merged-3*'),
-        #     ('12_4_answers_eli5/*/',      '12_13_*/*01072*/*merged-eli5-3.0*'),
-        #     ('12_4_answers_eli5_450w/*/', '12_13_*/*01072*/*merged-eli5-3.450w*'),
-        # ]),
-        # ('answer_cat_1000.txt', [
-        #     ('12_4_answers/*/',           '12_13_*/*01110646*/*merged-3*'),
-        #     ('12_4_answers_eli5/*/',      '12_13_*/*01110646*/*merged-eli5-3.0*'),
-        #     ('12_4_answers_eli5_450w/*/', '12_13_*/*01110646*/*merged-eli5-3.450w*'),
-        # ]),
-    ]
-
     transfer_list = []
-    for filename, patterns in baseline_patterns:
-        for other_sources, source_pattern in patterns:
-            transfer_list.append({
-                'caesar_sources': source_pattern,
-                'other_sources': other_sources,
-                'caesar_filename': filename})
-
-    # Other variants use latest synthesis
-    for exp_template, filename in variants:
+    for variant in variants:
+        exp_template = variant[0]
+        synthesis_id = variant[1] if len(variant) > 1 else None
+        custom_filename = variant[2] if len(variant) > 2 else None
+        if custom_filename:
+            filename = custom_filename
+        else:
+            name = exp_template.rsplit('/', 1)[-1].replace('{cat}', '').strip('_')
+            while '__' in name: name = name.replace('__', '_')
+            filename = f"answer_cat_{name}.txt"
         for cat in categories:
             exp = exp_template.format(cat=cat)
             for other_sources, merged_pattern in file_patterns:
                 transfer_list.append({
-                    'caesar_sources': find_latest_synthesis(exp, merged_pattern),
+                    'caesar_sources': find_synthesis(exp, merged_pattern, synthesis_id=synthesis_id),
                     'other_sources': other_sources,
                     'caesar_filename': filename})
 

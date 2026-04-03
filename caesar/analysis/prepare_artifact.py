@@ -43,30 +43,38 @@ def strip_abstract_and_sources(text):
     return text.strip() + '\n'
 
 
-def find_latest_synthesis(experiment_glob, file_pattern="*merged-3*",
-                          base_dir=None):
-    """Find file_pattern in the highest-numbered synthesis folder.
+def find_synthesis(experiment_glob, file_pattern="*merged-3*",
+                   base_dir=None, synthesis_id=None):
+    """Find file_pattern in a synthesis folder.
 
     Args:
         experiment_glob: Glob for experiment dirs (e.g. '03_28_*')
         file_pattern: Filename glob inside the synthesis folder
         base_dir: Override for CAESAR_AGENT_BASE_DIR
+        synthesis_id: Specific synthesis folder ID (e.g. '01110646').
+                      If None, uses the highest-numbered synthesis folder.
 
     Returns:
         Relative glob string usable as caesar_sources value.
     """
     base = base_dir or DEFAULT_CONFIG["CAESAR_AGENT_BASE_DIR"]
-    # Find all synthesis dirs matching the experiment glob
-    synth_dirs = sorted(glob.glob(os.path.join(base, experiment_glob,
-        "*.synthesis.*")))
-    if not synth_dirs:
-        raise FileNotFoundError(
-            f"No synthesis dirs found for {experiment_glob!r} in {base}")
-    # Pick the highest-numbered synthesis dir that contains matching files
-    def _synth_key(p):
-        m = re.search(r'\.synthesis\.(\d+)', p)
-        return int(m.group(1)) if m else 0
-    synth_dirs.sort(key=_synth_key, reverse=True)
+
+    if synthesis_id:
+        synth_dirs = sorted(glob.glob(os.path.join(base, experiment_glob,
+            f"*{synthesis_id}*")))
+        if not synth_dirs:
+            raise FileNotFoundError(
+                f"No synthesis dirs matching {synthesis_id!r} for {experiment_glob!r} in {base}")
+    else:
+        synth_dirs = sorted(glob.glob(os.path.join(base, experiment_glob,
+            "*.synthesis.*")))
+        if not synth_dirs:
+            raise FileNotFoundError(
+                f"No synthesis dirs found for {experiment_glob!r} in {base}")
+        def _synth_key(p):
+            m = re.search(r'\.synthesis\.(\d+)', p)
+            return int(m.group(1)) if m else 0
+        synth_dirs.sort(key=_synth_key, reverse=True)
 
     for candidate in synth_dirs:
         rel = os.path.relpath(candidate, base)

@@ -413,6 +413,9 @@ def find_and_judge_all(args):
 
     print("\n✨ All tasks completed")
 
+    print("\n📊 Running judge analysis...")
+    os.system(f"python3 {Path(__file__).parent / 'judge_analysis.py'} {args.root_directory}")
+
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Multi-LLM Judge (Parallelized)",
@@ -448,5 +451,4 @@ if __name__ == "__main__":
 
     # Attach loaded rubric content to args to avoid passing it through every function
     args.rubric_content = load_rubric(args.rubric)
-
     find_and_judge_all(args)
