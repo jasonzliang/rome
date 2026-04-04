@@ -17,11 +17,11 @@ CaesarAgent:
   starting_query: "Invent a completely original business idea that doesn't exist yet."
   additional_starting_queries: 11
   max_web_searches: 30
-  max_iterations: 1000
+  max_iterations: 250
   save_graph_interval: 50
 
   exploration_llm_config:
-    model: gpt-5.2
+    model: gpt-5.4-mini
     reasoning_effort: low
 
   # overwrite_role_file: config/role/self_transcend_role.txt
@@ -42,7 +42,7 @@ ArtifactSynthesizer:
 # LLM CONFIGURATION
 # ============================================================================
 OpenAIHandler:
-  model: gpt-5.2
+  model: gpt-5.4-mini
   reasoning_effort: medium
 
 # ============================================================================
@@ -53,7 +53,7 @@ AgentMemory:
   use_graph: false
 
 ChromaClientManager:
-  llm_model: gpt-5.2
+  llm_model: gpt-5.4-mini
   llm_reasoning_effort: medium
 
 # ============================================================================
