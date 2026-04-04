@@ -335,6 +335,10 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
                     'max_depth': self.max_depth,
                 },
                 'timestamp': datetime.now().isoformat(),
+                'cost': {
+                    'accumulated_cost': self.openai_handler.accumulated_cost,
+                    'call_count': self.openai_handler.call_count,
+                },
             }
 
             # Save checkpoint
@@ -391,6 +395,11 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
 
             # Restore graph inline
             self.graph = nx.node_link_graph(data.get('graph', self.graph), edges="edges")
+
+            # Restore accumulated cost from checkpoint
+            cost_data = data.get('cost', {})
+            self.openai_handler.accumulated_cost = cost_data.get('accumulated_cost', 0.0)
+            self.openai_handler.call_count = cost_data.get('call_count', 0)
 
             # Restore role from checkpoint if enabled
             if self.load_saved_role:
