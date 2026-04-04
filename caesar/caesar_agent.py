@@ -251,6 +251,9 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
         self.current_depth = len(self.url_stack)
         self.current_iteration = 0
         self.traversal_history = []
+        self.session_costs = []
+        self.session_start_cost = 0.0
+        self.session_start_calls = 0
 
     def _validate_caesar_config(self) -> None:
         """Validate Caesar-specific configuration"""
@@ -338,6 +341,11 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
                 'cost': {
                     'accumulated_cost': self.openai_handler.accumulated_cost,
                     'call_count': self.openai_handler.call_count,
+                    'sessions': self.session_costs + [{
+                        'session_cost': self.openai_handler.accumulated_cost - self.session_start_cost,
+                        'session_calls': self.openai_handler.call_count - self.session_start_calls,
+                        'timestamp': datetime.now().isoformat(),
+                    }],
                 },
             }
 
@@ -400,6 +408,9 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
             cost_data = data.get('cost', {})
             self.openai_handler.accumulated_cost = cost_data.get('accumulated_cost', 0.0)
             self.openai_handler.call_count = cost_data.get('call_count', 0)
+            self.session_costs = cost_data.get('sessions', [])
+            self.session_start_cost = self.openai_handler.accumulated_cost
+            self.session_start_calls = self.openai_handler.call_count
 
             # Restore role from checkpoint if enabled
             if self.load_saved_role:
@@ -1224,6 +1235,11 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
 
         # Set flags IMMEDIATELY to stop loops
         self.shutdown_called = True
+
+        # Save final checkpoint with session cost
+        if hasattr(self, 'current_iteration') and hasattr(self, 'openai_handler') and self.url_stack:
+            self._save_checkpoint(self.current_iteration)
+            self.logger.info("Final checkpoint saved on shutdown")
 
         # Cleanup in reverse order of initialization
         if hasattr(self, 'kb_manager'):
