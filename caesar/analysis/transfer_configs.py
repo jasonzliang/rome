@@ -215,25 +215,15 @@ def _build_draft_patterns(num_drafts, has_merged):
 
 
 def setup_transfer_dict_3_28_graph_ablation(
-    categories=CATEGORIES,
-    compare_all=False,
-    caesar_only=False):
-
-    overrides = {
-        "CLEAR_OUTPUT_DIR": False,
-        "CATEGORY_NEW_FILES": [],
-        "META_CATEGORY_NEW_FILES": [],
-        "OUTPUT_DIR_FROM_PATTERN": True if compare_all else False
-    }
-    if caesar_only:
-        overrides["OTHER_AGENT_BASE_DIR"] = os.path.abspath("query_result/empty_agent_answers")
+    categories=CATEGORIES, # Query categories
+    compare_all=False, # Compare every artifact draft
+    caesar_only=False): # Compare against baseline agents
 
     variants = [
-        ('4_5_{cat}',)
         # ('3_28_{cat}',),
         # ('exp_03_2026/3_29_{cat}', '04031'),
-        # ('4_1_{cat}', '0403104'),
-        # ('4_1_{cat}', '04030'),
+        # ('4_1_{cat}', '04031', 'answer_cat_cam.txt'),
+        ('4_5_{cat}', '040406', 'answer_cat_cam.txt')
         # ('4_2_{cat}_qe',),
         # ('4_3_{cat}', '040311'),
         # ('4_3_{cat}', '04030'),
@@ -245,10 +235,19 @@ def setup_transfer_dict_3_28_graph_ablation(
     ]
     file_patterns = [
         # ('full_draft_1/*/',           '*synthesis-1*'),
-        ('full_answers/*/',         '*merged-3*'),
-        # ('eli5_answers/*/',         '*merged-eli5-3.[01]*'),
-        # ('eli5_450w_answers/*/',    '*merged-eli5-3.450w*'),
+        ('full_answers/*/',         '*merged-?.*'),
+        # ('eli5_answers/*/',         '*merged-eli5-?.[01]*'),
+        # ('eli5_450w_answers/*/',    '*merged-eli5-?.450w*'),
     ]
+
+    overrides = {
+        "CLEAR_OUTPUT_DIR": False,
+        "CATEGORY_NEW_FILES": [],
+        "META_CATEGORY_NEW_FILES": [],
+        "OUTPUT_DIR_FROM_PATTERN": True if compare_all else False
+    }
+    if caesar_only:
+        overrides["OTHER_AGENT_BASE_DIR"] = os.path.abspath("query_result/empty_agent_answers")
 
     # Auto-detect drafts from the first variant
     num_drafts = 0
