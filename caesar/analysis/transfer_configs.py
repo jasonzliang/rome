@@ -214,27 +214,38 @@ def _build_draft_patterns(num_drafts, has_merged):
     return patterns
 
 
-def setup_transfer_dict_3_28_graph_ablation(categories=CATEGORIES, compare_all=True):
+def setup_transfer_dict_3_28_graph_ablation(
+    categories=CATEGORIES,
+    compare_all=False,
+    caesar_only=False):
+
+    overrides = {
+        "CLEAR_OUTPUT_DIR": False,
+        "CATEGORY_NEW_FILES": [],
+        "META_CATEGORY_NEW_FILES": [],
+        "OUTPUT_DIR_FROM_PATTERN": True if compare_all else False
+    }
+    if caesar_only:
+        overrides["OTHER_AGENT_BASE_DIR"] = os.path.abspath("query_result/empty_agent_answers")
+
     variants = [
+        ('4_5_{cat}',)
         # ('3_28_{cat}',),
-        # ('4_4_{cat}_qe', '04031'),
         # ('exp_03_2026/3_29_{cat}', '04031'),
-        ('4_3_{cat}', '040311'),
-        ('12_13_{cat}', '04030'),
-        # ('12_13_{cat}', '12160'),
         # ('4_1_{cat}', '0403104'),
         # ('4_1_{cat}', '04030'),
-        # ('12_13_{cat}', '01110646', 'answer_cat_1000.txt'),
-        # ('4_3_{cat}', '04030'),
         # ('4_2_{cat}_qe',),
-        # ('3_30_{cat}_qe',),
-        # ('3_28_{cat}_v2',),
-        # ('3_29_{cat}_v2',),
+        # ('4_3_{cat}', '040311'),
+        # ('4_3_{cat}', '04030'),
+        # ('4_4_{cat}_qe', '04031'),
+        # ('12_13_{cat}', '04030'),
+        # ('12_13_{cat}', '12160'),
+        # ('12_13_{cat}', '01110646', 'answer_cat_1000.txt'),
         # ('12_13_{cat}', '01072', 'answer_cat_250.txt'),
     ]
     file_patterns = [
-        ('full_draft_1/*/',           '*synthesis-1*'),
-        # ('full_answers/*/',         '*merged-3*'),
+        # ('full_draft_1/*/',           '*synthesis-1*'),
+        ('full_answers/*/',         '*merged-3*'),
         # ('eli5_answers/*/',         '*merged-eli5-3.[01]*'),
         # ('eli5_450w_answers/*/',    '*merged-eli5-3.450w*'),
     ]
@@ -281,9 +292,6 @@ def setup_transfer_dict_3_28_graph_ablation(categories=CATEGORIES, compare_all=T
                     'other_sources': other_sources,
                     'caesar_filename': filename})
 
-    overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
-        "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": [],
-        "OUTPUT_DIR_FROM_PATTERN": True}
     return transfer_list, overrides
 
 

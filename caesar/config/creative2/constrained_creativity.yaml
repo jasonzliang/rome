@@ -36,13 +36,13 @@ ArtifactSynthesizer:
   synthesis_eli5_length: [null, 450]
   synthesis_human_eval: false
   synthesis_max_length: null
-  synthesis_iteration_filter: 251
+  # synthesis_iteration_filter: 251
 
 # ============================================================================
 # LLM CONFIGURATION
 # ============================================================================
 OpenAIHandler:
-  model: gpt-5.4-mini
+  model: gpt-5.4
   reasoning_effort: medium
 
 # ============================================================================
@@ -54,7 +54,7 @@ AgentMemory:
 
 ChromaClientManager:
   llm_model: gpt-5.4-mini
-  llm_reasoning_effort: medium
+  llm_reasoning_effort: low
 
 # ============================================================================
 # LOGGING CONFIGURATION
