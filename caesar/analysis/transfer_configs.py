@@ -217,19 +217,19 @@ def _build_draft_patterns(num_drafts, has_merged):
 def setup_transfer_dict_3_28_graph_ablation(categories=CATEGORIES, compare_all=True):
     variants = [
         # ('3_28_{cat}',),
-        # ('exp_03_2026/3_29_{cat}',),
-        # ('4_4_{cat}_qe',),
-        # ('4_3_{cat}', '040311'),
+        # ('4_4_{cat}_qe', '04031'),
+        # ('exp_03_2026/3_29_{cat}', '04031'),
+        ('4_3_{cat}', '040311'),
+        ('12_13_{cat}', '04030'),
+        # ('12_13_{cat}', '12160'),
         # ('4_1_{cat}', '0403104'),
         # ('4_1_{cat}', '04030'),
-        # ('12_13_{cat}', '12160'),
-        ('12_13_{cat}', '01110646', 'answer_cat_1000.txt'),
-        ('4_3_{cat}', '04030'),
+        # ('12_13_{cat}', '01110646', 'answer_cat_1000.txt'),
+        # ('4_3_{cat}', '04030'),
         # ('4_2_{cat}_qe',),
         # ('3_30_{cat}_qe',),
         # ('3_28_{cat}_v2',),
         # ('3_29_{cat}_v2',),
-        # ('12_13_{cat}', '0403'),
         # ('12_13_{cat}', '01072', 'answer_cat_250.txt'),
     ]
     file_patterns = [
@@ -287,7 +287,7 @@ def setup_transfer_dict_3_28_graph_ablation(categories=CATEGORIES, compare_all=T
     return transfer_list, overrides
 
 
-def setup_transfer_dict_12_13_insights(base_dir=None, output_dir=None):
+def setup_transfer_dict_12_13_insights(base_dir=None, output_dir=None, exp_glob='4_3_*'):
     """Parse 12_13 checkpoint graphs, find top/bottom pages by neighbor count, write to files.
 
     Top 10: pages with most neighbors (visit_count > 1) — high-connectivity hubs.
@@ -296,10 +296,10 @@ def setup_transfer_dict_12_13_insights(base_dir=None, output_dir=None):
     if base_dir is None:
         base_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'result')
     if output_dir is None:
-        output_dir = os.path.join(base_dir, '12_13_insights')
+        output_dir = os.path.join(base_dir, 'hub_leaf_insights')
     os.makedirs(output_dir, exist_ok=True)
 
-    experiment_dirs = sorted(glob.glob(os.path.join(base_dir, '12_13_*')))
+    experiment_dirs = sorted(glob.glob(os.path.join(base_dir, exp_glob)))
     transfer_list = []
 
     for exp_dir in experiment_dirs:
@@ -322,6 +322,10 @@ def setup_transfer_dict_12_13_insights(base_dir=None, output_dir=None):
             insights = graph.nodes[node].get('insights', '')
             node_stats.append((node, neighbor_count, visit_count, insights))
 
+        # Top 10: at least 5 neighbors, sorted by visit count descending
+        # hub_pages = sorted(
+        #     [s for s in node_stats if s[1] >= 5 and s[3]],
+        #     key=lambda x: x[2], reverse=True)[:10]
         # Top 10: most neighbors, visit_count > 1
         hub_pages = sorted(
             [s for s in node_stats if s[2] > 1 and s[3]],
@@ -346,12 +350,12 @@ def setup_transfer_dict_12_13_insights(base_dir=None, output_dir=None):
                     f.write("-" * 80 + "\n\n")
 
             transfer_list.append({
-                'caesar_sources': f'12_13_insights/{filename}',
+                'caesar_sources': f'hub_leaf_insights/{filename}',
                 'other_sources': '12_4_answers/*/',
                 'caesar_filename': f'answer_cat_{suffix}.txt',
             })
 
-    overrides = {"CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
+    overrides = {"CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
     return transfer_list, overrides
 
 
