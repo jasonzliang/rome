@@ -223,7 +223,8 @@ def setup_transfer_dict_3_28_graph_ablation(
         # ('3_28_{cat}',),
         # ('exp_03_2026/3_29_{cat}', '04031'),
         # ('4_1_{cat}', '04031', 'answer_cat_cam.txt'),
-        ('4_5_{cat}', '040406', 'answer_cat_cam.txt')
+        # ('4_5_{cat}', '040406', 'answer_cat_cam.txt')
+        ('4_5_{cat}', '040408', 'answer_cat_cam.txt')
         # ('4_2_{cat}_qe',),
         # ('4_3_{cat}', '040311'),
         # ('4_3_{cat}', '04030'),
