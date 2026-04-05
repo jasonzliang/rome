@@ -187,7 +187,7 @@ def _build_draft_patterns(num_drafts, has_merged):
     return patterns
 
 
-def setup_transfer_dict_compare_experiments(
+def setup_transfer_dict_compare_artifacts(
     categories=CATEGORIES,  # Query categories
     compare_all=False,      # Compare every artifact draft
     caesar_only=False):     # Compare against baseline agents
@@ -331,6 +331,6 @@ TRANSFER_CONFIGS = {
     '12_13_v2': setup_transfer_dict_12_13_v2,
     '12_13_syn': setup_transfer_dict_12_13_syn_ablation,
     '12_13_iter': setup_transfer_dict_12_13_iter_ablation,
-    'compare_experiments': setup_transfer_dict_compare_experiments,
+    'compare_artifacts': setup_transfer_dict_compare_experiments,
     'compare_insights': setup_transfer_dict_compare_insights,
 }
