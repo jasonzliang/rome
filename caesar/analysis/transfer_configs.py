@@ -7,166 +7,140 @@ import networkx as nx
 
 from prepare_artifact import find_synthesis, DEFAULT_CONFIG, CATEGORIES
 
+
+# ---------------------------------------------------------------------------
+# Shared builders
+# ---------------------------------------------------------------------------
+
+OTHER_SOURCES = {
+    'full':     'full_answers/*/',
+    'eli5':     'eli5_answers/*/',
+    'eli5_450': 'eli5_450w_answers/*/',
+}
+
+
+def _transfer(caesar_sources, other_sources, caesar_filename=None):
+    """Build a single transfer dict."""
+    d = {'caesar_sources': caesar_sources, 'other_sources': other_sources}
+    if caesar_filename:
+        d['caesar_filename'] = caesar_filename
+    return d
+
+
+def _ablation_overrides(**extra):
+    """Overrides for ablation configs (empty baseline + no clearing)."""
+    return {
+        "OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
+        "CLEAR_OUTPUT_DIR": False, **extra}
+
+
+def _build_simple(variants, overrides=None):
+    """Build transfer config from (format_key, caesar_glob) pairs.
+
+    format_key indexes into OTHER_SOURCES for the baseline comparison dir.
+    """
+    return (
+        [_transfer(src, OTHER_SOURCES[fmt]) for fmt, src in variants],
+        overrides or {},
+    )
+
+
+def _resolve_transfers(variants, categories=CATEGORIES, allow_missing=False):
+    """Build transfer list by resolving variants across categories via find_synthesis.
+
+    Args:
+        variants: list of (exp_template, synthesis_id, filename, file_patterns) where:
+            exp_template: experiment glob with {cat} placeholder for category
+            synthesis_id: synthesis folder ID (or None for latest)
+            filename: caesar_filename for output
+            file_patterns: list of (other_sources, file_glob) tuples
+        categories: category names to substitute into {cat}
+        allow_missing: if True, skip FileNotFoundError instead of raising
+    """
+    transfer_list = []
+    for exp_template, synthesis_id, filename, file_patterns in variants:
+        for cat in categories:
+            exp = exp_template.format(cat=cat)
+            for other_sources, pattern in file_patterns:
+                try:
+                    source = find_synthesis(exp, pattern, synthesis_id=synthesis_id)
+                except FileNotFoundError:
+                    if allow_missing:
+                        continue
+                    raise
+                transfer_list.append(_transfer(source, other_sources, filename))
+    return transfer_list
+
+
+# ---------------------------------------------------------------------------
+# Simple configs: full / eli5 / eli5-sized variants
+# ---------------------------------------------------------------------------
+
 # Outdated, do not use
 def setup_transfer_dict_11_17():
-    full = {
-        'caesar_sources': '11_17_*/*12130155/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-    }
-    eli5 = {
-        'caesar_sources': '11_17_*/*12130155/*merged-eli5-3*',
-        'other_sources': '12_4_answers_eli5/*/',
-    }
-    eli5_600 = {
-        'caesar_sources': '11_17_*/*12130327/*merged-eli5-3*',
-        'other_sources': '12_4_answers_eli5_600t/*/',
-    }
-    # Returns (transfer_list, config_overrides)
-    return [full, eli5, eli5_600], {}
+    return _build_simple([
+        ('full',      '11_17_*/*12130155/*merged-3*'),
+        ('eli5',      '11_17_*/*12130155/*merged-eli5-3*'),
+        ('eli5_600', '11_17_*/*12130327/*merged-eli5-3*'),
+    ])
 
 
 def setup_transfer_dict_12_13():
-    full = {
-        'caesar_sources': '12_13_*/*12160*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-    }
-    eli5 = {
-        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.1*',
-        'other_sources': '12_4_answers_eli5/*/',
-    }
-    eli5_450 = {
-        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.450w.1*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-    }
-
-    overrides = {"CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return [full, eli5, eli5_450], overrides
+    return _build_simple([
+        ('full',      '12_13_*/*12160*/*merged-3*'),
+        ('eli5',      '12_13_*/*12160*/*merged-eli5-3.1*'),
+        ('eli5_450', '12_13_*/*12160*/*merged-eli5-3.450w.1*'),
+    ])
 
 
 # Outdated, do not use
 def setup_transfer_dict_12_13_v2():
-    full = {
-        'caesar_sources': '12_13_*/*12161*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-    }
-    eli5 = {
-        'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.1*',
-        'other_sources': '12_4_answers_eli5/*/',
-    }
-    eli5_450 = {
-        'caesar_sources': '12_13_*/*12161*/*merged-eli5-3.450w.1*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-    }
+    return _build_simple([
+        ('full',      '12_13_*/*12161*/*merged-3*'),
+        ('eli5',      '12_13_*/*12161*/*merged-eli5-3.1*'),
+        ('eli5_450', '12_13_*/*12161*/*merged-eli5-3.450w.1*'),
+    ])
 
-    overrides = {"CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return [full, eli5, eli5_450], overrides
 
+# ---------------------------------------------------------------------------
+# Ablation configs
+# ---------------------------------------------------------------------------
 
 def setup_transfer_dict_12_13_syn_ablation():
-    syn1 = {
-        'caesar_sources': '12_13_*/*12160*/*synthesis-1*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_syn1.txt'
-    }
-    syn3 = {
-        'caesar_sources': '12_13_*/*12160*/*synthesis-3*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_syn3.txt'
-    }
-    merged = {
-        'caesar_sources': '12_13_*/*12160*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_merge.txt'
-    }
-
-    syn1_eli5 = {
-        'caesar_sources': '12_13_*/*12160*/*synth-eli5-1.1*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_syn1.txt'
-    }
-    syn3_eli5 = {
-        'caesar_sources': '12_13_*/*12160*/*synth-eli5-3.1*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_syn3.txt'
-    }
-    merged_eli5 = {
-        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.1*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_merge.txt'
-    }
-
-    syn1_eli5_450w = {
-        'caesar_sources': '12_13_*/*12160*/*synth-eli5-1.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_syn1.txt'
-    }
-    syn3_eli5_450w = {
-        'caesar_sources': '12_13_*/*12160*/*synth-eli5-3.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_syn3.txt'
-    }
-    merged_eli5_450w = {
-        'caesar_sources': '12_13_*/*12160*/*merged-eli5-3.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_merge.txt'
-    }
-    overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
-        "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return [syn1, syn3, merged, syn1_eli5, syn3_eli5, merged_eli5, syn1_eli5_450w, syn3_eli5_450w, merged_eli5_450w], overrides
+    """Synthesis method ablation: syn1 vs syn3 vs merged, across full/eli5/eli5_450."""
+    baselines = [OTHER_SOURCES['full'], OTHER_SOURCES['eli5'], OTHER_SOURCES['eli5_450']]
+    # (label, full_pattern, eli5_pattern, eli5_450_pattern)
+    specs = [
+        ('syn1',  '*synthesis-1*', '*synth-eli5-1.1*',  '*synth-eli5-1.450w*'),
+        ('syn3',  '*synthesis-3*', '*synth-eli5-3.1*',  '*synth-eli5-3.450w*'),
+        ('merge', '*merged-3*',    '*merged-eli5-3.1*', '*merged-eli5-3.450w*'),
+    ]
+    variants = [
+        ('12_13_{cat}', '12160', f'answer_cat_{label}.txt', list(zip(baselines, patterns)))
+        for label, *patterns in specs
+    ]
+    return _resolve_transfers(variants), _ablation_overrides()
 
 
 def setup_transfer_dict_12_13_iter_ablation():
-    iter250 = {
-        'caesar_sources': '12_13_*/*01072*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_250.txt'
-    }
-    iter500 = {
-        'caesar_sources': '12_13_*/*01071*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_500.txt'
-    }
-    iter1000 = {
-        'caesar_sources': '12_13_*/*01110646*/*merged-3*',
-        'other_sources': '12_4_answers/*/',
-        'caesar_filename': 'answer_cat_1000.txt'
-    }
+    """Iteration count ablation: 250 vs 500 vs 1000, across full/eli5/eli5_450."""
+    file_patterns = [
+        (OTHER_SOURCES['full'],     '*merged-3*'),
+        (OTHER_SOURCES['eli5'],     '*merged-eli5-3.0*'),
+        (OTHER_SOURCES['eli5_450'], '*merged-eli5-3.450w*'),
+    ]
+    # (label, synthesis_id)
+    variants = [
+        ('12_13_{cat}', '01072',    'answer_cat_250.txt',  file_patterns),
+        ('12_13_{cat}', '01071',    'answer_cat_500.txt',  file_patterns),
+        ('12_13_{cat}', '01110646', 'answer_cat_1000.txt', file_patterns),
+    ]
+    return _resolve_transfers(variants), _ablation_overrides()
 
-    iter250_eli5 = {
-        'caesar_sources': '12_13_*/*01072*/*merged-eli5-3.0*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_250.txt'
-    }
-    iter500_eli5 = {
-        'caesar_sources': '12_13_*/*01071*/*merged-eli5-3.0*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_500.txt'
-    }
-    iter1000_eli5 = {
-        'caesar_sources': '12_13_*/*01110646*/*merged-eli5-3.0*',
-        'other_sources': '12_4_answers_eli5/*/',
-        'caesar_filename': 'answer_cat_1000.txt'
-    }
 
-    iter250_eli5_450w = {
-        'caesar_sources': '12_13_*/*01072*/*merged-eli5-3.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_250.txt'
-    }
-    iter500_eli5_450w = {
-        'caesar_sources': '12_13_*/*01071*/*merged-eli5-3.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_500.txt'
-    }
-    iter1000_eli5_450w = {
-        'caesar_sources': '12_13_*/*01110646*/*merged-eli5-3.450w*',
-        'other_sources': '12_4_answers_eli5_450w/*/',
-        'caesar_filename': 'answer_cat_1000.txt'
-    }
-    overrides = {"OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/empty_agent_answers"),
-        "CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return [iter250, iter500, iter1000, iter250_eli5, iter500_eli5, iter1000_eli5, iter250_eli5_450w, iter500_eli5_450w, iter1000_eli5_450w], overrides
-
+# ---------------------------------------------------------------------------
+# Dynamic graph ablation config
+# ---------------------------------------------------------------------------
 
 def _count_drafts(exp_glob, synthesis_id=None, base=None):
     """Count synthesis draft files in the latest (or specified) synthesis folder."""
@@ -188,12 +162,11 @@ def _has_merged(exp_glob, base=None):
 
 def _variant_filename(variant):
     """Derive base filename from a variant tuple."""
-    exp_template = variant[0]
-    custom = variant[2] if len(variant) > 2 else None
-    if custom:
-        return custom
-    name = exp_template.rsplit('/', 1)[-1].replace('{cat}', '').strip('_')
-    while '__' in name: name = name.replace('__', '_')
+    if len(variant) > 2 and variant[2]:
+        return variant[2]
+    name = variant[0].rsplit('/', 1)[-1].replace('{cat}', '').strip('_')
+    while '__' in name:
+        name = name.replace('__', '_')
     return f"answer_cat_{name}.txt"
 
 
@@ -208,18 +181,18 @@ def _draft_filename(base_filename, pattern):
 
 def _build_draft_patterns(num_drafts, has_merged):
     """Build file pattern list for all drafts and optionally merged."""
-    patterns = [('12_4_answers/*/', f'*synthesis-{i}*') for i in range(1, num_drafts + 1)]
+    patterns = [(OTHER_SOURCES['full'], f'*synthesis-{i}*') for i in range(1, num_drafts + 1)]
     if has_merged:
-        patterns.append(('12_4_answers/*/', f'*merged-{num_drafts}*'))
+        patterns.append((OTHER_SOURCES['full'], f'*merged-{num_drafts}*'))
     return patterns
 
 
 def setup_transfer_dict_3_28_graph_ablation(
-    categories=CATEGORIES, # Query categories
-    compare_all=False, # Compare every artifact draft
-    caesar_only=False): # Compare against baseline agents
+    categories=CATEGORIES,  # Query categories
+    compare_all=False,      # Compare every artifact draft
+    caesar_only=False):     # Compare against baseline agents
 
-    variants = [
+    raw_variants = [
         # ('3_28_{cat}',),
         # ('exp_03_2026/3_29_{cat}', '04031'),
         # ('4_1_{cat}', '04031', 'answer_cat_cam.txt'),
@@ -235,34 +208,29 @@ def setup_transfer_dict_3_28_graph_ablation(
         # ('12_13_{cat}', '01072', 'answer_cat_250.txt'),
     ]
     file_patterns = [
-        # ('full_draft_1/*/',           '*synthesis-1*'),
-        ('full_answers/*/',         '*merged-?.*'),
+        ('full_answers/*/',           '*merged-?.*'),
         # ('eli5_answers/*/',         '*merged-eli5-?.[01]*'),
         # ('eli5_450w_answers/*/',    '*merged-eli5-?.450w*'),
     ]
 
-    overrides = {
-        "CLEAR_OUTPUT_DIR": False,
-        "CATEGORY_NEW_FILES": [],
-        "META_CATEGORY_NEW_FILES": [],
-        "OUTPUT_DIR_FROM_PATTERN": True if compare_all else False
-    }
     if caesar_only:
-        overrides["OTHER_AGENT_BASE_DIR"] = os.path.abspath("query_result/empty_agent_answers")
+        overrides = _ablation_overrides(OUTPUT_DIR_FROM_PATTERN=bool(compare_all))
+    else:
+        overrides = {"CLEAR_OUTPUT_DIR": False, "OUTPUT_DIR_FROM_PATTERN": bool(compare_all)}
 
     # Auto-detect drafts from the first variant
     num_drafts = 0
     all_draft_patterns = []
     if compare_all:
-        first_exp = variants[0][0].format(cat=categories[0])
-        first_synth_id = variants[0][1] if len(variants[0]) > 1 else None
+        first_exp = raw_variants[0][0].format(cat=categories[0])
+        first_synth_id = raw_variants[0][1] if len(raw_variants[0]) > 1 else None
         num_drafts = _count_drafts(first_exp, first_synth_id)
-        merged = _has_merged(first_exp)
-        all_draft_patterns = _build_draft_patterns(num_drafts, merged)
+        has_merged = _has_merged(first_exp)
+        all_draft_patterns = _build_draft_patterns(num_drafts, has_merged)
         print(f"Auto-detected {num_drafts} synthesis drafts from {first_exp}")
 
     transfer_list = []
-    for variant in variants:
+    for variant in raw_variants:
         exp_template = variant[0]
         synthesis_id = variant[1] if len(variant) > 1 else None
         base_filename = _variant_filename(variant)
@@ -276,27 +244,26 @@ def setup_transfer_dict_3_28_graph_ablation(
                 print(f"Skipping comparison for {exp_template} ({variant_drafts} drafts != {num_drafts})")
                 use_comparison = False
 
-        patterns = all_draft_patterns if use_comparison else file_patterns
-        for cat in categories:
-            exp = exp_template.format(cat=cat)
-            for other_sources, merged_pattern in patterns:
-                filename = _draft_filename(base_filename, merged_pattern) if use_comparison else base_filename
-                try:
-                    source = find_synthesis(exp, merged_pattern, synthesis_id=synthesis_id)
-                except FileNotFoundError:
-                    if use_comparison:
-                        continue
-                    raise
-                transfer_list.append({
-                    'caesar_sources': source,
-                    'other_sources': other_sources,
-                    'caesar_filename': filename})
+        if use_comparison:
+            # Each draft pattern gets its own derived filename
+            expanded = [
+                (exp_template, synthesis_id, _draft_filename(base_filename, pat), [(other, pat)])
+                for other, pat in all_draft_patterns
+            ]
+            transfer_list.extend(_resolve_transfers(expanded, categories, allow_missing=True))
+        else:
+            resolved = [(exp_template, synthesis_id, base_filename, file_patterns)]
+            transfer_list.extend(_resolve_transfers(resolved, categories))
 
     return transfer_list, overrides
 
 
+# ---------------------------------------------------------------------------
+# Graph insight extraction
+# ---------------------------------------------------------------------------
+
 def setup_transfer_dict_12_13_insights(base_dir=None, output_dir=None, exp_glob='4_3_*'):
-    """Parse 12_13 checkpoint graphs, find top/bottom pages by neighbor count, write to files.
+    """Parse checkpoint graphs, find top/bottom pages by neighbor count, write to files.
 
     Top 10: pages with most neighbors (visit_count > 1) — high-connectivity hubs.
     Bottom 10: pages with fewest neighbors (visit_count = 1) — leaf/dead-end pages.
@@ -325,15 +292,10 @@ def setup_transfer_dict_12_13_insights(base_dir=None, output_dir=None, exp_glob=
         node_stats = []
         for node in graph.nodes:
             visit_count = graph.nodes[node].get('visit_count', 1)
-            neighbors = set(graph.successors(node)) | set(graph.predecessors(node)) - {node}
-            neighbor_count = len(neighbors)
+            neighbors = (set(graph.successors(node)) | set(graph.predecessors(node))) - {node}
             insights = graph.nodes[node].get('insights', '')
-            node_stats.append((node, neighbor_count, visit_count, insights))
+            node_stats.append((node, len(neighbors), visit_count, insights))
 
-        # Top 10: at least 5 neighbors, sorted by visit count descending
-        # hub_pages = sorted(
-        #     [s for s in node_stats if s[1] >= 5 and s[3]],
-        #     key=lambda x: x[2], reverse=True)[:10]
         # Top 10: most neighbors, visit_count > 1
         hub_pages = sorted(
             [s for s in node_stats if s[2] > 1 and s[3]],
@@ -344,28 +306,24 @@ def setup_transfer_dict_12_13_insights(base_dir=None, output_dir=None, exp_glob=
             [s for s in node_stats if s[2] == 1 and s[3]],
             key=lambda x: x[1])[:10]
 
-        # Write files
-        for label, pages, suffix in [('top10', hub_pages, 'hubs'), ('bottom10', leaf_pages, 'leaves')]:
+        for _, pages, suffix in [('top10', hub_pages, 'hubs'), ('bottom10', leaf_pages, 'leaves')]:
             filename = f'{exp_name}_{suffix}.txt'
             filepath = os.path.join(output_dir, filename)
             with open(filepath, 'w') as f:
-                # f.write(f"# {label.upper()} pages for {exp_name}\n")
-                # f.write(f"# Sorted by neighbor count ({'desc' if label == 'top10' else 'asc'})\n\n")
-                for url, n_neighbors, visit_count, insights in pages:
-                    # f.write(f"URL: {url}\n")
-                    # f.write(f"Neighbors: {n_neighbors} | Visits: {visit_count}\n")
-                    f.write(f"Insights: {insights if insights else '(none)'}\n")
+                for _, _, _, insights in pages:
+                    f.write(f"Insights: {insights or '(none)'}\n")
                     f.write("-" * 80 + "\n\n")
 
-            transfer_list.append({
-                'caesar_sources': f'hub_leaf_insights/{filename}',
-                'other_sources': '12_4_answers/*/',
-                'caesar_filename': f'answer_cat_{suffix}.txt',
-            })
+            transfer_list.append(_transfer(
+                f'hub_leaf_insights/{filename}', OTHER_SOURCES['full'],
+                caesar_filename=f'answer_cat_{suffix}.txt'))
 
-    overrides = {"CLEAR_OUTPUT_DIR": False, "CATEGORY_NEW_FILES": [], "META_CATEGORY_NEW_FILES": []}
-    return transfer_list, overrides
+    return transfer_list, {"CLEAR_OUTPUT_DIR": False}
 
+
+# ---------------------------------------------------------------------------
+# Registry
+# ---------------------------------------------------------------------------
 
 TRANSFER_CONFIGS = {
     '11_17': setup_transfer_dict_11_17,

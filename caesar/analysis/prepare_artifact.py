@@ -15,6 +15,7 @@ DEFAULT_CONFIG = {
     "CAESAR_AGENT_FILENAME": "answer_cat_cam.txt",
     # Base directory filled with answers from other agents
     "OTHER_AGENT_BASE_DIR": os.path.abspath("query_result/other_agent_answers"),
+
     # Clean up the output directory before answer file is copied
     "CLEAR_OUTPUT_DIR": True,
     # Strip ABSTRACT section from start and SOURCES section from end of artifact
@@ -22,10 +23,6 @@ DEFAULT_CONFIG = {
 
     # Base directory to output all agent answers
     "ALL_AGENT_BASE_DIR": os.path.abspath("query_result/all_agent_answers"),
-    # Empty files to create in the category level output directory
-    "CATEGORY_NEW_FILES": ['judge_claude.txt', 'judge_gemini.txt', 'judge_gpt.txt'],
-    # Empty files to create in the meta-category level output directory
-    "META_CATEGORY_NEW_FILES": ['judge_summary.txt', 'judge_csv.txt'],
     # Whether to determine output format directory from artifact draft names
     "OUTPUT_DIR_FROM_PATTERN": False
     }
@@ -170,9 +167,6 @@ def prepare_artifact(transfer_func):
                 os.makedirs(output_dir, exist_ok=True)
 
             _ensure_query_file(output_dir)
-            _touch_files(output_dir, config['CATEGORY_NEW_FILES'])
-            _touch_files(meta_dir, config['META_CATEGORY_NEW_FILES'])
-
             caesar_filename = td.get("caesar_filename") or config['CAESAR_AGENT_FILENAME']
             dst = os.path.join(output_dir, caesar_filename)
             print(f'cp {caesar_file} {dst}\n')
