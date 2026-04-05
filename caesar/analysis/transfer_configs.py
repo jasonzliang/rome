@@ -187,7 +187,7 @@ def _build_draft_patterns(num_drafts, has_merged):
     return patterns
 
 
-def setup_transfer_dict_3_28_graph_ablation(
+def setup_transfer_dict_compare_experiments(
     categories=CATEGORIES,  # Query categories
     compare_all=False,      # Compare every artifact draft
     caesar_only=False):     # Compare against baseline agents
@@ -262,7 +262,7 @@ def setup_transfer_dict_3_28_graph_ablation(
 # Graph insight extraction
 # ---------------------------------------------------------------------------
 
-def setup_transfer_dict_12_13_insights(base_dir=None, output_dir=None, exp_glob='4_3_*'):
+def setup_transfer_dict_compare_insights(base_dir=None, output_dir=None, exp_glob='4_3_*'):
     """Parse checkpoint graphs, find top/bottom pages by neighbor count, write to files.
 
     Top 10: pages with most neighbors (visit_count > 1) — high-connectivity hubs.
@@ -331,6 +331,6 @@ TRANSFER_CONFIGS = {
     '12_13_v2': setup_transfer_dict_12_13_v2,
     '12_13_syn': setup_transfer_dict_12_13_syn_ablation,
     '12_13_iter': setup_transfer_dict_12_13_iter_ablation,
-    '3_28_graph': setup_transfer_dict_3_28_graph_ablation,
-    '12_13_insights': setup_transfer_dict_12_13_insights,
+    'compare_experiments': setup_transfer_dict_compare_experiments,
+    'compare_insights': setup_transfer_dict_compare_insights,
 }
