@@ -76,10 +76,8 @@ CAESAR_CONFIG = {
         # Save checkpoint every N iterations for resumption
         "checkpoint_interval": 1,
 
-        # Whether to enable graph augmented insight generation (removed)
-        # "graph_augmented_insights": True,
         # Whether to use new think which increases graph neighbor size
-        "new_think": False,
+        "new_think": True,
         # Whether to follow links that point to the same page (different fragments)
         "same_page_links": False,
         # Maximum times to revisiting page it has seen before during exploration
@@ -92,10 +90,10 @@ CAESAR_CONFIG = {
         "max_web_searches": 0,
         # Whether to enable quick exploration, analyze all search results instead
         "use_quick_explore": False,
-        # Whether to disable insight generation for quick explore mode
-        "quick_explore_insights": True,
+        # Whether to use insight generation for quick explore mode
+        "quick_explore_insights": False,
         # Number of parallel workers for quick explore mode
-        "quick_explore_workers": 10,
+        "quick_explore_workers": 20,
         # LLM config for agent's ACT/THINK phases to encourage exploration
         "exploration_llm_config": {
             "model": "gpt-5.2",
