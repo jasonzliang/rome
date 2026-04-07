@@ -21,7 +21,7 @@ CaesarAgent:
   save_graph_interval: 50
 
   exploration_llm_config:
-    model: gpt-5.1
+    model: gpt-5.2
 
   # overwrite_role_file: config/role/self_transcend_role.txt
   # adapt_role_file: config/role/self_transcend_insights_v1.txt
@@ -29,21 +29,20 @@ CaesarAgent:
 
 ArtifactSynthesizer:
   synthesis_iterations: 30
-  synthesis_rounds: 3
+  synthesis_drafts: 3
   synthesis_merge_artifacts: true
   synthesis_eli5: true
-  synthesis_eli5_tokens: [None, "600 or less", "1200 or less"]
-  synthesis_max_tokens: None
+  synthesis_eli5_length: [null, 450]
+  synthesis_human_eval: false
+  synthesis_max_length: null
+  synthesis_iteration_filter: null
 
 # ============================================================================
 # LLM CONFIGURATION
 # ============================================================================
 OpenAIHandler:
-  cost_limit: 300.0
-  model: gpt-5.1
-  reasoning_effort: medium
-  temperature: 0.1
-  timeout: 10000
+  model: gpt-5.2
+  reasoning_effort: low
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
@@ -51,6 +50,10 @@ OpenAIHandler:
 AgentMemory:
   enabled: true
   use_graph: true
+
+ChromaClientManager:
+  model: gpt-5-mini
+  reasoning_effort: low
 
 # ============================================================================
 # LOGGING CONFIGURATION

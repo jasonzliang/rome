@@ -183,11 +183,11 @@ CAESAR_CONFIG = {
     # Default config for vector store knowledge base
     "ChromaClientManager": {
         # Model name for LLM
-        "llm_model": "gpt-5.2",
+        "model": "gpt-5.2",
         # Reasoning effort for GPT-5/O models (ignored for non-reasoning models)
-        "llm_reasoning_effort": "low",
+        "reasoning_effort": "low",
          # LLM model temperature (for query/reranking)
-        "llm_temperature": 0.1,
+        "temperature": 0.1,
         # Maximum number of words for query response
         "response_max_length": 350,
     }

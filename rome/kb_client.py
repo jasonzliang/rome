@@ -182,11 +182,11 @@ class ChromaClientManager:
         # Use agent's OpenAI configuration if available, otherwise use defaults
         if self.agent:
             self.llm = OpenAI(
-                model=self.llm_model,
-                temperature=self.llm_temperature,
+                model=self.model,
+                temperature=self.temperature,
                 max_tokens=DEFAULT_CONFIG['OpenAIHandler']['max_completion_tokens'],
-                additional_kwargs={"reasoning_effort": self.llm_reasoning_effort} \
-                    if (self.llm_reasoning_effort and self.llm_model in REASONING_MODELS) else None
+                additional_kwargs={"reasoning_effort": self.reasoning_effort} \
+                    if (self.reasoning_effort and self.model in REASONING_MODELS) else None
             )
             self.embed_model = OpenAIEmbedding(model=self.embedding_model)
 

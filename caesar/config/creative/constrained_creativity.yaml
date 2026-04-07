@@ -54,8 +54,8 @@ AgentMemory:
   use_graph: true
 
 ChromaClientManager:
-  llm_model: gpt-5-mini
-  llm_reasoning_effort: low
+  model: gpt-5-mini
+  reasoning_effort: low
 
 # ============================================================================
 # LOGGING CONFIGURATION

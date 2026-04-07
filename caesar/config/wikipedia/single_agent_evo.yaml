@@ -16,22 +16,29 @@ CaesarAgent:
   # starting_query: "How can multi-agent AI systems use LLMs to solve complex enterprise decision-making problems?"
   max_iterations: 1000
   save_graph_interval: 50
-  synthesis_iterations: 25
 
   exploration_llm_config:
-    model: gpt-5
+    model: gpt-5.2
 
   adapt_role: True
   adapt_role_file: config/role/self_transcend_insights_v1.txt
+
+ArtifactSynthesizer:
+  synthesis_iterations: 25
+  synthesis_drafts: 3
+  synthesis_merge_artifacts: true
+  synthesis_eli5: false
+  synthesis_eli5_length: [null, 450]
+  synthesis_human_eval: false
+  synthesis_max_length: null
+  synthesis_iteration_filter: null
 
 # ============================================================================
 # LLM CONFIGURATION
 # ============================================================================
 OpenAIHandler:
-  cost_limit: 300.0
-  model: gpt-5
-  temperature: 0.1
-  timeout: 300
+  model: gpt-5.2
+  reasoning_effort: low
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
@@ -39,6 +46,10 @@ OpenAIHandler:
 AgentMemory:
   enabled: true
   use_graph: true
+
+ChromaClientManager:
+  model: gpt-5-mini
+  reasoning_effort: low
 
 # ============================================================================
 # LOGGING CONFIGURATION
