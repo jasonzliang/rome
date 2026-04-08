@@ -51,7 +51,7 @@ def resolve_experiment_repository(query=None, max_iterations=None, exp_id=None):
     exp_id is included in batch mode to avoid collisions between experiments.
     The path is resolved once and stored so restarts use the same directory.
     """
-    date_str = datetime.now().strftime("%m%d")
+    date_str = datetime.now().strftime("%m_%d_%y")
     query = query or ''
     query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
     dir_name = f"{date_str}_Q-{query_hash}_T-{max_iterations}"

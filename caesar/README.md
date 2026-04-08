@@ -229,21 +229,25 @@ Run from the **`caesar/` directory** (config paths are relative to this location
 
 ```bash
 cd /path/to/caesar
-python run_agent.py <repository_path> <config_path> [--max-iterations N]
+python run_agent.py [repository] config [-q QUERY] [--max-iterations N]
 ```
 
 **Arguments:**
-- `repository_path` - Directory to store exploration results (created if needed)
-- `config_path` - Path to YAML configuration file (relative to caesar/)
-- `--max-iterations` - Override max iterations from config (optional)
+- `repository` - Directory to store exploration results (optional, auto-generated if omitted)
+- `config` - Path to YAML config file, or a preset name: `regular`, `mini`, `nano`
+- `-q, --query` - Override starting_query from config
+- `--max-iterations` - Override max iterations from config
 
 ### Example: Simple Test Run
 
 ```bash
 cd /path/to/caesar
 
-# Quick test run (5 pages)
-python run_agent.py ./results/test config/single_agent_test.yaml
+# Quick test using nano preset
+python run_agent.py nano -q "Novel way to solve ARC-AGI benchmark" --max-iterations 5
+
+# Or with explicit directory and config file
+python run_agent.py ./result/test config/single_agent_test.yaml
 ```
 
 ### Example: Deep Web Search
@@ -252,8 +256,35 @@ python run_agent.py ./results/test config/single_agent_test.yaml
 cd /path/to/caesar
 
 # Creative exploration starting from web search
-python run_agent.py ./results/creativity config/creative/openended_creativity.yaml
+python run_agent.py regular -q "Cross-domain creativity research"
+
+# With explicit output directory
+python run_agent.py ./result/creativity config/creative/openended_creativity.yaml
 ```
+
+### Batch Mode
+
+Run multiple experiments in parallel using a JSONL file:
+
+```bash
+# Run batch with 4 parallel workers
+python run_agent.py -b experiments.jsonl -n 4
+
+# Check experiment status
+python run_agent.py -b experiments.jsonl --status
+
+# Stop/restart individual experiments
+python run_agent.py -b experiments.jsonl --stop 3
+python run_agent.py -b experiments.jsonl --restart 3
+```
+
+**JSONL format** (one JSON object per line, `config` is required):
+```jsonl
+{"config": "nano", "query": "what is photosynthesis", "max_iterations": 50}
+{"config": "config/creative/openended_creativity.yaml", "query": "emergent behavior", "repository": "result/custom_dir"}
+```
+
+Each experiment runs as a separate subprocess. Status is tracked in a `.status.json` file. Stopped/failed experiments resume from Caesar's checkpoint on restart.
 
 ## Configuration
 
@@ -480,6 +511,12 @@ Located in `config/creative_ai/`:
 
 Exploration automatically resumes from the last checkpoint if one exists in the repository directory. To start fresh, delete or rename the checkpoint file.
 
+For batch experiments, use `--restart` to re-queue a stopped/failed experiment (it resumes from its checkpoint):
+```bash
+python run_agent.py -b experiments.jsonl --restart 3
+python run_agent.py -b experiments.jsonl  # re-run to pick up pending experiments
+```
+
 ### Custom Role Definition
 
 Create a custom role file and reference it (paths are relative to working directory):
@@ -511,9 +548,9 @@ CaesarAgent:
 ### Verbose Logging
 
 ```bash
-cd /path/to/rome
+cd /path/to/caesar
 export PYTHONUNBUFFERED=1
-python run_agent.py ./repo config/single_agent_test.yaml 2>&1 | tee exploration.log
+python run_agent.py nano -q "my query" 2>&1 | tee exploration.log
 ```
 
 ### Cost Management
@@ -587,7 +624,7 @@ See parent rome repository for license information.
 
 ```bash
 git fetch rome
-git subtree pull --prefix caesar rome main --squash
+git subtree pull --prefix tool_caesar rome main --squash
 
 ```
 
