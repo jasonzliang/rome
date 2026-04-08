@@ -30,23 +30,9 @@ from rome.config import load_config, format_yaml_like
 from rome.logger import get_logger
 
 
-def generate_experiment_dir(config, logger) -> str:
-    """Generate an experiment directory name: [date]_[query_hash]_[iterations]"""
-    date_str = datetime.now().strftime("%Y%m%d")
-
-    caesar_cfg = config.get('CaesarAgent', {})
-    query = caesar_cfg.get('starting_query', '') or ''
-    query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
-
-    iterations = caesar_cfg.get('max_iterations', 1000)
-
-    dir_name = f"{date_str}_{query_hash}_{iterations}"
-    result_dir = Path(__file__).resolve().parent / "result"
-    repo_path = result_dir / dir_name
-
-    logger.info(f"Auto-generated experiment directory: {repo_path}")
-    return str(repo_path)
-
+# =============================================================================
+# Path and config resolution
+# =============================================================================
 
 CONFIG_PRESETS = {'regular', 'mini', 'nano'}
 
@@ -58,8 +44,25 @@ def resolve_config_path(config_path):
     return config_path
 
 
+def resolve_experiment_repository(query=None, max_iterations=None, exp_id=None):
+    """Generate an experiment directory path from query/iterations.
+
+    Returns: result/<date>_Q-<hash>_T-<iters>[_ID-<id>]
+    exp_id is included in batch mode to avoid collisions between experiments.
+    The path is resolved once and stored so restarts use the same directory.
+    """
+    date_str = datetime.now().strftime("%m%d")
+    query = query or ''
+    query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
+    dir_name = f"{date_str}_Q-{query_hash}_T-{max_iterations}"
+    if exp_id is not None:
+        dir_name += f"_ID-{exp_id}"
+    result_dir = Path(__file__).resolve().parent / "result"
+    return str(result_dir / dir_name)
+
+
 def validate_repository(repo_path: str, logger) -> str:
-    """Validate and return absolute repository path, creating if needed"""
+    """Validate and return absolute repository path, creating if needed."""
     path = Path(repo_path).resolve()
 
     if not path.exists():
@@ -76,15 +79,19 @@ def validate_repository(repo_path: str, logger) -> str:
     return str(path)
 
 
+# =============================================================================
+# CLI argument parsing
+# =============================================================================
+
 def parse_args():
-    """Parse command line arguments"""
+    """Parse command line arguments."""
     parser = argparse.ArgumentParser(
         description="Run CaesarAgent for web exploration and insight synthesis",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Single experiment:
   python run_agent.py ./result/my_exp config.yaml             # explicit output directory
-  python run_agent.py config.yaml                              # auto-names: result/YYYYMMDD_<hash>_<iters>
+  python run_agent.py config.yaml                              # auto-names: result/MMDD_<hash>_<iters>
   python run_agent.py mini -q "my query"                       # use preset config (regular, mini, nano)
   python run_agent.py config.yaml -q "my query" --max-iterations 50
 
@@ -142,8 +149,12 @@ JSONL format (one JSON object per line, "config" is required):
     return args
 
 
+# =============================================================================
+# Display helpers
+# =============================================================================
+
 def print_config_summary(agent, logger):
-    """Print configuration summary before starting"""
+    """Print configuration summary before starting."""
     memory = agent.agent_memory
     synth = agent.synthesizer
 
@@ -190,7 +201,7 @@ def print_config_summary(agent, logger):
 
 
 def print_final_summary(agent, artifact, logger):
-    """Print exploration completion summary"""
+    """Print exploration completion summary."""
     cost = agent.openai_handler.get_cost_summary()
 
     logger.info("\n" + "="*80)
@@ -212,8 +223,12 @@ def print_final_summary(agent, artifact, logger):
     logger.info("Exploration completed successfully!")
 
 
+# =============================================================================
+# Single experiment
+# =============================================================================
+
 def run_single(config_path, logger, repository=None, query=None, max_iterations=None):
-    """Run a single experiment. Returns 0 on success, 1 on error."""
+    """Run a single experiment. Returns 0 on success, 1 on error, 130 on interrupt."""
     agent = None
     try:
         # Load configuration
@@ -239,8 +254,12 @@ def run_single(config_path, logger, repository=None, query=None, max_iterations=
         if repository is not None:
             repository = validate_repository(repository, logger)
         else:
+            caesar_cfg = config.get('CaesarAgent', {})
             repository = validate_repository(
-                generate_experiment_dir(config, logger), logger
+                resolve_experiment_repository(
+                    query=caesar_cfg.get('starting_query'),
+                    max_iterations=caesar_cfg.get('max_iterations'),
+                ), logger
             )
 
         # Get agent name from config
@@ -283,12 +302,16 @@ def run_single(config_path, logger, repository=None, query=None, max_iterations=
         return 1
 
 
-def _get_status_path(batch_path):
+# =============================================================================
+# Batch status file helpers
+# =============================================================================
+
+def get_status_path(batch_path):
     """Derive status file path from batch JSONL path."""
     return str(Path(batch_path).with_suffix('.status.json'))
 
 
-def _load_status(status_path):
+def load_status(status_path):
     """Load batch status from file. Returns empty dict if missing or corrupt."""
     if os.path.exists(status_path):
         try:
@@ -299,7 +322,7 @@ def _load_status(status_path):
     return {}
 
 
-def _save_status(status_path, status_data):
+def save_status(status_path, status_data):
     """Save batch status to file atomically."""
     tmp_path = status_path + '.tmp'
     with open(tmp_path, 'w') as f:
@@ -307,7 +330,11 @@ def _save_status(status_path, status_data):
     os.replace(tmp_path, status_path)
 
 
-def _parse_batch_file(batch_path, logger):
+# =============================================================================
+# Batch helpers
+# =============================================================================
+
+def parse_batch_file(batch_path, logger):
     """Parse JSONL batch file. Returns list of entries or None on error."""
     experiments = []
     with open(batch_path) as f:
@@ -327,29 +354,7 @@ def _parse_batch_file(batch_path, logger):
     return experiments
 
 
-def _resolve_experiment_repository(entry, exp_id):
-    """Resolve the experiment repository path, generating one if not specified.
-
-    Called once when first creating a status entry so that restarts
-    always use the same directory (even across different days).
-    exp_id is appended to avoid collisions between experiments with
-    identical query/iterations in the same batch.
-    """
-    if entry.get('repository'):
-        return entry['repository']
-
-    # Reproduce the logic from generate_experiment_dir without needing
-    # to load the full config — use the JSONL entry fields directly.
-    date_str = datetime.now().strftime("%m%d")
-    query = entry.get('query') or ''
-    query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
-    iterations = entry.get('max_iterations')
-    dir_name = f"{date_str}_Q-{query_hash}_T-{iterations}_ID-{exp_id}"
-    result_dir = Path(__file__).resolve().parent / "result"
-    return str(result_dir / dir_name)
-
-
-def _build_experiment_cmd(entry):
+def build_experiment_cmd(entry):
     """Build the run_agent.py command for a single experiment subprocess."""
     cmd = [sys.executable, os.path.abspath(__file__)]
     # repository is always present — resolved at status init time
@@ -362,6 +367,10 @@ def _build_experiment_cmd(entry):
     return cmd
 
 
+# =============================================================================
+# Batch execution and management
+# =============================================================================
+
 def run_batch(batch_path, num_workers, logger):
     """Run batch experiments as parallel subprocesses. Returns number of failures."""
     batch_file = Path(batch_path)
@@ -369,13 +378,13 @@ def run_batch(batch_path, num_workers, logger):
         logger.error(f"Batch file not found: {batch_path}")
         return 1
 
-    experiments = _parse_batch_file(batch_file, logger)
+    experiments = parse_batch_file(batch_file, logger)
     if experiments is None:
         return 1
 
     total = len(experiments)
-    status_path = _get_status_path(batch_path)
-    status = _load_status(status_path)
+    status_path = get_status_path(batch_path)
+    status = load_status(status_path)
 
     # Initialize status for new or stale (interrupted while running) experiments
     for i, entry in enumerate(experiments, 1):
@@ -390,9 +399,13 @@ def run_batch(batch_path, num_workers, logger):
         else:
             # New experiment — resolve repository once so restarts use the same directory
             entry = dict(entry)
-            entry['repository'] = _resolve_experiment_repository(entry, exp_id)
+            entry['repository'] = entry.get('repository') or resolve_experiment_repository(
+                query=entry.get('query'),
+                max_iterations=entry.get('max_iterations'),
+                exp_id=exp_id,
+            )
             status[exp_id] = {'status': 'pending', 'pid': None, 'entry': entry}
-    _save_status(status_path, status)
+    save_status(status_path, status)
 
     pending = [str(i) for i in range(1, total + 1) if status[str(i)]['status'] == 'pending']
     skipped = total - len(pending)
@@ -422,25 +435,25 @@ def run_batch(batch_path, num_workers, logger):
                     status[exp_id]['status'] = 'failed'
                     logger.error(f"Experiment {exp_id}/{total} failed (exit code {ret})")
                 status[exp_id]['pid'] = None
-                _save_status(status_path, status)
+                save_status(status_path, status)
 
             # Start new processes up to worker limit
             while pending and len(running) < effective_workers:
                 exp_id = pending.pop(0)
                 entry = status[exp_id]['entry']
-                cmd = _build_experiment_cmd(entry)
+                cmd = build_experiment_cmd(entry)
                 try:
                     proc = subprocess.Popen(cmd)
                 except OSError as e:
                     logger.error(f"Failed to start experiment {exp_id}/{total}: {e}")
                     status[exp_id]['status'] = 'failed'
                     status[exp_id]['pid'] = None
-                    _save_status(status_path, status)
+                    save_status(status_path, status)
                     continue
                 running[exp_id] = proc
                 status[exp_id]['status'] = 'running'
                 status[exp_id]['pid'] = proc.pid
-                _save_status(status_path, status)
+                save_status(status_path, status)
                 logger.info(f"Started experiment {exp_id}/{total} (PID {proc.pid})")
 
             time.sleep(1)
@@ -456,9 +469,9 @@ def run_batch(batch_path, num_workers, logger):
                 proc.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 proc.kill()
-        _save_status(status_path, status)
+        save_status(status_path, status)
         logger.info(f"Stopped {len(running)} experiments. Resume with: python run_agent.py -b {batch_path}")
-        return 130
+        return -1  # signal interrupted
 
     # Final summary
     completed = sum(1 for s in status.values() if s['status'] == 'completed')
@@ -468,13 +481,13 @@ def run_batch(batch_path, num_workers, logger):
     logger.info("\n" + "#"*80)
     logger.info(f"BATCH COMPLETE: {completed} completed, {failed} failed, {stopped} stopped (of {total})")
     logger.info("#"*80)
-    return failed
+    return failed  # 0 = all succeeded, >0 = number of failures
 
 
 def batch_stop(batch_path, experiment_id, logger):
     """Stop a running batch experiment by ID."""
-    status_path = _get_status_path(batch_path)
-    status = _load_status(status_path)
+    status_path = get_status_path(batch_path)
+    status = load_status(status_path)
 
     exp_id = str(experiment_id)
     if exp_id not in status:
@@ -496,14 +509,14 @@ def batch_stop(batch_path, experiment_id, logger):
 
     status[exp_id]['status'] = 'stopped'
     status[exp_id]['pid'] = None
-    _save_status(status_path, status)
+    save_status(status_path, status)
     return 0
 
 
 def batch_restart(batch_path, experiment_id, logger):
     """Mark a stopped/failed experiment for restart."""
-    status_path = _get_status_path(batch_path)
-    status = _load_status(status_path)
+    status_path = get_status_path(batch_path)
+    status = load_status(status_path)
 
     exp_id = str(experiment_id)
     if exp_id not in status:
@@ -520,7 +533,7 @@ def batch_restart(batch_path, experiment_id, logger):
 
     status[exp_id]['status'] = 'pending'
     status[exp_id]['pid'] = None
-    _save_status(status_path, status)
+    save_status(status_path, status)
     logger.info(f"Experiment {exp_id} marked for restart (will resume from checkpoint)")
     logger.info(f"Run: python run_agent.py -b {batch_path}")
     return 0
@@ -528,8 +541,8 @@ def batch_restart(batch_path, experiment_id, logger):
 
 def batch_status(batch_path, logger):
     """Show status of all batch experiments."""
-    status_path = _get_status_path(batch_path)
-    status = _load_status(status_path)
+    status_path = get_status_path(batch_path)
+    status = load_status(status_path)
 
     if not status:
         logger.info("No batch status found. Run a batch first.")
@@ -554,8 +567,12 @@ def batch_status(batch_path, logger):
     return 0
 
 
+# =============================================================================
+# Entry point
+# =============================================================================
+
 def main():
-    """Main execution function"""
+    """Main execution function."""
     # Configure logger
     logger = get_logger()
     logger.configure({
@@ -575,8 +592,8 @@ def main():
             if args.restart is not None:
                 return batch_restart(args.batch, args.restart, logger)
             result = run_batch(args.batch, args.num_workers, logger)
-            if result == 130:
-                return 130
+            if result < 0:
+                return 130  # interrupted
             return 1 if result else 0
 
         rc = run_single(
