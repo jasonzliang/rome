@@ -41,7 +41,7 @@ ArtifactSynthesizer:
 # ============================================================================
 OpenAIHandler:
   model: gpt-5.4-mini
-  reasoning_effort: medium
+  reasoning_effort: low
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
