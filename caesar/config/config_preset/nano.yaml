@@ -12,12 +12,12 @@ Agent:
 # CAESAR-SPECIFIC CONFIGURATION
 # ============================================================================
 CaesarAgent:
-  additional_starting_queries: 12
-  max_iterations: 250
+  additional_starting_queries: 9
+  max_iterations: 200
   save_graph_interval: 50
 
   use_quick_explore: True
-  quick_explore_insights: False
+  quick_explore_insights: True
   exploration_llm_config:
     model: gpt-5.4-mini
     reasoning_effort: low
