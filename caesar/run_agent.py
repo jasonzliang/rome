@@ -41,11 +41,21 @@ def generate_experiment_dir(config, logger) -> str:
     iterations = caesar_cfg.get('max_iterations', 1000)
 
     dir_name = f"{date_str}_{query_hash}_{iterations}"
-    results_dir = Path(__file__).resolve().parent / "results"
-    repo_path = results_dir / dir_name
+    result_dir = Path(__file__).resolve().parent / "result"
+    repo_path = result_dir / dir_name
 
     logger.info(f"Auto-generated experiment directory: {repo_path}")
     return str(repo_path)
+
+
+CONFIG_PRESETS = {'regular', 'mini', 'nano'}
+
+
+def resolve_config_path(config_path):
+    """Resolve preset names ('regular', 'mini', 'nano') to their YAML paths."""
+    if config_path in CONFIG_PRESETS:
+        return str(Path(__file__).resolve().parent / "config" / "config_preset" / f"{config_path}.yaml")
+    return config_path
 
 
 def validate_repository(repo_path: str, logger) -> str:
@@ -73,9 +83,9 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Single experiment:
-  python run_agent.py ./results/my_exp config.yaml             # explicit output directory
-  python run_agent.py config.yaml                              # auto-names: results/YYYYMMDD_<hash>_<iters>
-  python run_agent.py config.yaml -q "my query"                # override query from config
+  python run_agent.py ./result/my_exp config.yaml             # explicit output directory
+  python run_agent.py config.yaml                              # auto-names: result/YYYYMMDD_<hash>_<iters>
+  python run_agent.py mini -q "my query"                       # use preset config (regular, mini, nano)
   python run_agent.py config.yaml -q "my query" --max-iterations 50
 
 Batch mode (runs experiments as parallel subprocesses):
@@ -88,13 +98,13 @@ Batch management (requires -b to identify the batch):
   python run_agent.py -b experiments.jsonl --restart 3         # restart experiment 3 (resumes from checkpoint)
 
 JSONL format (one JSON object per line, "config" is required):
-  {"config": "config.yaml", "query": "topic A", "max_iterations": 50, "repository": "results/exp1"}
+  {"config": "config.yaml", "query": "topic A", "max_iterations": 50, "repository": "result/exp1"}
   {"config": "config.yaml", "query": "topic B"}
         """
     )
 
     parser.add_argument('positional', type=str, nargs='*',
-                       help='[repository] config — repository is auto-generated under results/ if omitted')
+                       help='[repository] config — repository is auto-generated under result/ if omitted')
     parser.add_argument('--max-iterations', type=int, default=None,
                        help='Override max_iterations from config (default: use config value)')
     parser.add_argument('-q', '--query', type=str, default=None,
@@ -165,7 +175,7 @@ def print_config_summary(agent, logger):
             "Max Length (Words)": synth.synthesis_max_length,
             "Max ELI5 Length (Words)": synth.synthesis_eli5_length,
         },
-        "OpenAI": {
+        "Usage": {
             "Model": agent.openai_handler.model,
             "Cost Limit": f"${agent.openai_handler.cost_limit:.2f}" if agent.openai_handler.cost_limit else "None",
         }
@@ -207,6 +217,7 @@ def run_single(config_path, logger, repository=None, query=None, max_iterations=
     agent = None
     try:
         # Load configuration
+        config_path = resolve_config_path(config_path)
         config = load_config(config_path)
         logger.info(f"Configuration loaded: {config_path}")
         logger.info(pprint.pformat(config))
@@ -329,13 +340,13 @@ def _resolve_experiment_repository(entry, exp_id):
 
     # Reproduce the logic from generate_experiment_dir without needing
     # to load the full config — use the JSONL entry fields directly.
-    date_str = datetime.now().strftime("%Y%m%d")
-    query = entry.get('query', '') or ''
+    date_str = datetime.now().strftime("%m%d")
+    query = entry.get('query') or ''
     query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
-    iterations = entry.get('max_iterations', 1000)
-    dir_name = f"{date_str}_{query_hash}_{iterations}_{exp_id}"
-    results_dir = Path(__file__).resolve().parent / "results"
-    return str(results_dir / dir_name)
+    iterations = entry.get('max_iterations')
+    dir_name = f"{date_str}_Q-{query_hash}_T-{iterations}_ID-{exp_id}"
+    result_dir = Path(__file__).resolve().parent / "result"
+    return str(result_dir / dir_name)
 
 
 def _build_experiment_cmd(entry):
