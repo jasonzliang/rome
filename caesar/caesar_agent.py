@@ -1119,6 +1119,10 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
 
     def quick_explore(self) -> str:
         """Fast parallel exploration: perceive+think all search result links, skip the act phase."""
+        if self.current_iteration > 0 and self.visited_urls:
+            self.logger.info("[QUICK_EXPLORE] Checkpoint found — skipping exploration, going straight to synthesis")
+            return self.synthesizer.synthesize_artifact()
+
         self.logger.info("[QUICK_EXPLORE] Starting parallel exploration of search result links")
 
         # Perceive the starting page (search results) to get all links
@@ -1133,9 +1137,7 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
         # Filter to max_iterations links
         links_to_explore = [(url, text) for url, text in links
                             if url not in self.visited_urls
-                            and url not in self.failed_urls]
-        if self.max_iterations > 0:
-            links_to_explore = links_to_explore[:self.max_iterations]
+                            and url not in self.failed_urls][:self.max_iterations]
 
         # Parallel perceive+think
         results = []

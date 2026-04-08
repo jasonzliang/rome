@@ -86,7 +86,7 @@ CAESAR_CONFIG = {
         "fancy_link_display": True,
         # Whether to dynamically determine to explore or go back to visited pages
         "use_explore_strategy": True,
-        # Maximum web searches allowed during exploration (including starting search)
+        # Maximum web searches allowed during exploration (not including starting search)
         "max_web_searches": 0,
         # Whether to enable quick exploration, analyze all search results instead
         "use_quick_explore": False,
