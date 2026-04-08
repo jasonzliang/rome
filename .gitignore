@@ -173,20 +173,19 @@ cython_debug/
 # PyPI configuration file
 .pypirc
 
-####################
-
-# Rome library files
+# Rome library ignore files
 benchmark/result
-test/result
 caesar/*result
-query_result.zip
-CLAUDE.md
+test/result
+
+.claude
 .DS_Store
 .tags*
+CLAUDE.md
+
 *.log
 *.jpg
 *.png
 *.avif
 *.heic
 *.test.yaml
-.claude
