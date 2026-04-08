@@ -2,18 +2,23 @@
 """
 CaesarAgent CLI Runner
 
-Usage:
-    python run_agent.py <repository_path> <config_path> [--max-iterations N]
+Single experiment:
+    python run_agent.py [repository] config [--max-iterations N] [-q QUERY]
 
-Example:
-    python run_agent.py ./my_project config.yaml
-    python run_agent.py ./my_project config.yaml --max-iterations 50
+Batch experiments (parallel):
+    python run_agent.py -b batch.jsonl [-n NUM_WORKERS]
 """
 
 import argparse
-import sys
+import hashlib
+import json
 import os
 import pprint
+import signal
+import subprocess
+import sys
+import time
+from datetime import datetime
 from pathlib import Path
 import traceback
 
@@ -23,6 +28,24 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from caesar.caesar_agent import CaesarAgent
 from rome.config import load_config, format_yaml_like
 from rome.logger import get_logger
+
+
+def generate_experiment_dir(config, logger) -> str:
+    """Generate an experiment directory name: [date]_[query_hash]_[iterations]"""
+    date_str = datetime.now().strftime("%Y%m%d")
+
+    caesar_cfg = config.get('CaesarAgent', {})
+    query = caesar_cfg.get('starting_query', '') or ''
+    query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
+
+    iterations = caesar_cfg.get('max_iterations', 1000)
+
+    dir_name = f"{date_str}_{query_hash}_{iterations}"
+    results_dir = Path(__file__).resolve().parent / "results"
+    repo_path = results_dir / dir_name
+
+    logger.info(f"Auto-generated experiment directory: {repo_path}")
+    return str(repo_path)
 
 
 def validate_repository(repo_path: str, logger) -> str:
@@ -49,19 +72,64 @@ def parse_args():
         description="Run CaesarAgent for web exploration and insight synthesis",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-Examples:
-  python run_agent.py ./my_project config.yaml
-  python run_agent.py ./my_project config.yaml --max-iterations 50
-  python run_agent.py ./other_project another_config.yaml --max-iterations 100
+Single experiment:
+  python run_agent.py ./results/my_exp config.yaml             # explicit output directory
+  python run_agent.py config.yaml                              # auto-names: results/YYYYMMDD_<hash>_<iters>
+  python run_agent.py config.yaml -q "my query"                # override query from config
+  python run_agent.py config.yaml -q "my query" --max-iterations 50
+
+Batch mode (runs experiments as parallel subprocesses):
+  python run_agent.py -b experiments.jsonl                     # 10 workers (default)
+  python run_agent.py -b experiments.jsonl -n 4                # 4 workers
+
+Batch management (requires -b to identify the batch):
+  python run_agent.py -b experiments.jsonl --status            # show status of all experiments
+  python run_agent.py -b experiments.jsonl --stop 3            # stop experiment 3
+  python run_agent.py -b experiments.jsonl --restart 3         # restart experiment 3 (resumes from checkpoint)
+
+JSONL format (one JSON object per line, "config" is required):
+  {"config": "config.yaml", "query": "topic A", "max_iterations": 50, "repository": "results/exp1"}
+  {"config": "config.yaml", "query": "topic B"}
         """
     )
 
-    parser.add_argument('repository', type=str, help='Path to repository directory')
-    parser.add_argument('config', type=str, help='Path to YAML configuration file')
+    parser.add_argument('positional', type=str, nargs='*',
+                       help='[repository] config — repository is auto-generated under results/ if omitted')
     parser.add_argument('--max-iterations', type=int, default=None,
                        help='Override max_iterations from config (default: use config value)')
+    parser.add_argument('-q', '--query', type=str, default=None,
+                       help='Override starting_query from config')
+    parser.add_argument('-b', '--batch', type=str, default=None,
+                       help='Path to JSONL file for batch experiments')
+    parser.add_argument('-n', '--num-workers', type=int, default=10,
+                       help='Number of parallel workers for batch mode (default: 10, minimum: 1)')
+    parser.add_argument('--stop', type=int, default=None, metavar='ID',
+                       help='Stop a running batch experiment by ID (requires -b)')
+    parser.add_argument('--restart', type=int, default=None, metavar='ID',
+                       help='Restart a stopped/failed batch experiment by ID (requires -b)')
+    parser.add_argument('--status', action='store_true',
+                       help='Show status of all batch experiments (requires -b)')
 
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    if args.batch:
+        # Batch mode takes priority — ignore positional arguments
+        args.repository = None
+        args.config = None
+        if args.num_workers < 1:
+            parser.error("-n/--num-workers must be at least 1")
+    elif args.stop is not None or args.restart is not None or args.status:
+        parser.error("--stop, --restart, and --status require -b")
+    elif len(args.positional) == 1:
+        args.repository = None
+        args.config = args.positional[0]
+    elif len(args.positional) == 2:
+        args.repository = args.positional[0]
+        args.config = args.positional[1]
+    else:
+        parser.error("Expected 1 or 2 positional arguments: [repository] config")
+
+    return args
 
 
 def print_config_summary(agent, logger):
@@ -134,38 +202,35 @@ def print_final_summary(agent, artifact, logger):
     logger.info("Exploration completed successfully!")
 
 
-def main():
-    """Main execution function"""
-    # Configure logger
-    logger = get_logger()
-    logger.configure({
-        "level": "INFO",
-        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        "console": True
-    })
-
+def run_single(config_path, logger, repository=None, query=None, max_iterations=None):
+    """Run a single experiment. Returns 0 on success, 1 on error."""
+    agent = None
     try:
-        # Parse arguments
-        args = parse_args()
-
-        # Validate repository
-        repository = validate_repository(args.repository, logger)
-
         # Load configuration
-        try:
-            config = load_config(args.config)
-            logger.info(f"Configuration loaded: {args.config}")
-            logger.info(pprint.pformat(config))
-        except Exception as e:
-            logger.error(f"Failed to load config: {e}")
-            sys.exit(1)
+        config = load_config(config_path)
+        logger.info(f"Configuration loaded: {config_path}")
+        logger.info(pprint.pformat(config))
 
-        # Override max_iterations if provided via CLI
-        if args.max_iterations is not None:
+        # Apply overrides
+        if max_iterations is not None:
             if 'CaesarAgent' not in config:
                 config['CaesarAgent'] = {}
-            config['CaesarAgent']['max_iterations'] = args.max_iterations
-            logger.info(f"Overriding max_iterations from CLI: {args.max_iterations}")
+            config['CaesarAgent']['max_iterations'] = max_iterations
+            logger.info(f"Overriding max_iterations: {max_iterations}")
+
+        if query is not None:
+            if 'CaesarAgent' not in config:
+                config['CaesarAgent'] = {}
+            config['CaesarAgent']['starting_query'] = query
+            logger.info(f"Overriding starting_query: {query}")
+
+        # Resolve repository path (auto-generate if not provided)
+        if repository is not None:
+            repository = validate_repository(repository, logger)
+        else:
+            repository = validate_repository(
+                generate_experiment_dir(config, logger), logger
+            )
 
         # Get agent name from config
         agent_name = config.get('Agent', {}).get('name', 'CaesarAgent')
@@ -184,22 +249,337 @@ def main():
         # Print final summary
         print_final_summary(agent, artifact, logger)
 
-        # Shutdown
         agent.shutdown()
         return 0
 
     except KeyboardInterrupt:
         logger.error("\nExploration interrupted by user")
-        if 'agent' in locals():
-            agent.shutdown()
+        if agent is not None:
+            try:
+                agent.shutdown()
+            except Exception:
+                pass
         return 130
 
     except Exception as e:
         logger.error(f"\nAgent stopped due to error: {e}")
         traceback.print_exc()
-        if 'agent' in locals():
-            agent.shutdown()
+        if agent is not None:
+            try:
+                agent.shutdown()
+            except Exception:
+                pass
         return 1
+
+
+def _get_status_path(batch_path):
+    """Derive status file path from batch JSONL path."""
+    return str(Path(batch_path).with_suffix('.status.json'))
+
+
+def _load_status(status_path):
+    """Load batch status from file. Returns empty dict if missing or corrupt."""
+    if os.path.exists(status_path):
+        try:
+            with open(status_path) as f:
+                return json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            return {}
+    return {}
+
+
+def _save_status(status_path, status_data):
+    """Save batch status to file atomically."""
+    tmp_path = status_path + '.tmp'
+    with open(tmp_path, 'w') as f:
+        json.dump(status_data, f, indent=2)
+    os.replace(tmp_path, status_path)
+
+
+def _parse_batch_file(batch_path, logger):
+    """Parse JSONL batch file. Returns list of entries or None on error."""
+    experiments = []
+    with open(batch_path) as f:
+        for line_num, line in enumerate(f, 1):
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON on line {line_num}: {e}")
+                return None
+            if 'config' not in entry:
+                logger.error(f"Missing required 'config' field on line {line_num}")
+                return None
+            experiments.append(entry)
+    return experiments
+
+
+def _resolve_experiment_repository(entry, exp_id):
+    """Resolve the experiment repository path, generating one if not specified.
+
+    Called once when first creating a status entry so that restarts
+    always use the same directory (even across different days).
+    exp_id is appended to avoid collisions between experiments with
+    identical query/iterations in the same batch.
+    """
+    if entry.get('repository'):
+        return entry['repository']
+
+    # Reproduce the logic from generate_experiment_dir without needing
+    # to load the full config — use the JSONL entry fields directly.
+    date_str = datetime.now().strftime("%Y%m%d")
+    query = entry.get('query', '') or ''
+    query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
+    iterations = entry.get('max_iterations', 1000)
+    dir_name = f"{date_str}_{query_hash}_{iterations}_{exp_id}"
+    results_dir = Path(__file__).resolve().parent / "results"
+    return str(results_dir / dir_name)
+
+
+def _build_experiment_cmd(entry):
+    """Build the run_agent.py command for a single experiment subprocess."""
+    cmd = [sys.executable, os.path.abspath(__file__)]
+    # repository is always present — resolved at status init time
+    cmd.append(entry['repository'])
+    cmd.append(entry['config'])
+    if entry.get('query'):
+        cmd.extend(['-q', entry['query']])
+    if entry.get('max_iterations') is not None:
+        cmd.extend(['--max-iterations', str(entry['max_iterations'])])
+    return cmd
+
+
+def run_batch(batch_path, num_workers, logger):
+    """Run batch experiments as parallel subprocesses. Returns number of failures."""
+    batch_file = Path(batch_path)
+    if not batch_file.is_file():
+        logger.error(f"Batch file not found: {batch_path}")
+        return 1
+
+    experiments = _parse_batch_file(batch_file, logger)
+    if experiments is None:
+        return 1
+
+    total = len(experiments)
+    status_path = _get_status_path(batch_path)
+    status = _load_status(status_path)
+
+    # Initialize status for new or stale (interrupted while running) experiments
+    for i, entry in enumerate(experiments, 1):
+        exp_id = str(i)
+        existing = status.get(exp_id, {}).get('status')
+        if existing in ('completed', 'failed', 'stopped'):
+            continue
+        if exp_id in status:
+            # Entry exists (stale running or pending from --restart) — keep entry, reset status
+            status[exp_id]['status'] = 'pending'
+            status[exp_id]['pid'] = None
+        else:
+            # New experiment — resolve repository once so restarts use the same directory
+            entry = dict(entry)
+            entry['repository'] = _resolve_experiment_repository(entry, exp_id)
+            status[exp_id] = {'status': 'pending', 'pid': None, 'entry': entry}
+    _save_status(status_path, status)
+
+    pending = [str(i) for i in range(1, total + 1) if status[str(i)]['status'] == 'pending']
+    skipped = total - len(pending)
+    if skipped:
+        logger.info(f"Skipping {skipped} already completed/failed/stopped experiments")
+
+    effective_workers = min(num_workers, len(pending)) if pending else 0
+    logger.info(f"Batch: {len(pending)} pending, {total} total ({effective_workers} workers)")
+
+    running = {}  # exp_id -> Popen
+
+    try:
+        while pending or running:
+            # Poll running processes
+            for exp_id in list(running):
+                ret = running[exp_id].poll()
+                if ret is None:
+                    continue
+                del running[exp_id]
+                if ret == 0:
+                    status[exp_id]['status'] = 'completed'
+                    logger.info(f"Experiment {exp_id}/{total} completed")
+                elif ret in (-signal.SIGTERM, -signal.SIGKILL):
+                    status[exp_id]['status'] = 'stopped'
+                    logger.info(f"Experiment {exp_id}/{total} stopped")
+                else:
+                    status[exp_id]['status'] = 'failed'
+                    logger.error(f"Experiment {exp_id}/{total} failed (exit code {ret})")
+                status[exp_id]['pid'] = None
+                _save_status(status_path, status)
+
+            # Start new processes up to worker limit
+            while pending and len(running) < effective_workers:
+                exp_id = pending.pop(0)
+                entry = status[exp_id]['entry']
+                cmd = _build_experiment_cmd(entry)
+                try:
+                    proc = subprocess.Popen(cmd)
+                except OSError as e:
+                    logger.error(f"Failed to start experiment {exp_id}/{total}: {e}")
+                    status[exp_id]['status'] = 'failed'
+                    status[exp_id]['pid'] = None
+                    _save_status(status_path, status)
+                    continue
+                running[exp_id] = proc
+                status[exp_id]['status'] = 'running'
+                status[exp_id]['pid'] = proc.pid
+                _save_status(status_path, status)
+                logger.info(f"Started experiment {exp_id}/{total} (PID {proc.pid})")
+
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        logger.info("\nInterrupted — stopping all running experiments...")
+        for exp_id, proc in running.items():
+            proc.terminate()
+            status[exp_id]['status'] = 'stopped'
+            status[exp_id]['pid'] = None
+        for proc in running.values():
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        _save_status(status_path, status)
+        logger.info(f"Stopped {len(running)} experiments. Resume with: python run_agent.py -b {batch_path}")
+        return 130
+
+    # Final summary
+    completed = sum(1 for s in status.values() if s['status'] == 'completed')
+    failed = sum(1 for s in status.values() if s['status'] == 'failed')
+    stopped = sum(1 for s in status.values() if s['status'] == 'stopped')
+
+    logger.info("\n" + "#"*80)
+    logger.info(f"BATCH COMPLETE: {completed} completed, {failed} failed, {stopped} stopped (of {total})")
+    logger.info("#"*80)
+    return failed
+
+
+def batch_stop(batch_path, experiment_id, logger):
+    """Stop a running batch experiment by ID."""
+    status_path = _get_status_path(batch_path)
+    status = _load_status(status_path)
+
+    exp_id = str(experiment_id)
+    if exp_id not in status:
+        logger.error(f"Experiment {exp_id} not found")
+        return 1
+
+    exp = status[exp_id]
+    if exp['status'] != 'running':
+        logger.error(f"Experiment {exp_id} is not running (status: {exp['status']})")
+        return 1
+
+    pid = exp.get('pid')
+    if pid:
+        try:
+            os.kill(pid, signal.SIGTERM)
+            logger.info(f"Sent SIGTERM to experiment {exp_id} (PID {pid})")
+        except ProcessLookupError:
+            logger.info(f"Process {pid} already exited")
+
+    status[exp_id]['status'] = 'stopped'
+    status[exp_id]['pid'] = None
+    _save_status(status_path, status)
+    return 0
+
+
+def batch_restart(batch_path, experiment_id, logger):
+    """Mark a stopped/failed experiment for restart."""
+    status_path = _get_status_path(batch_path)
+    status = _load_status(status_path)
+
+    exp_id = str(experiment_id)
+    if exp_id not in status:
+        logger.error(f"Experiment {exp_id} not found")
+        return 1
+
+    exp = status[exp_id]
+    if exp['status'] == 'running':
+        logger.error(f"Experiment {exp_id} is still running (PID {exp.get('pid')})")
+        return 1
+    if exp['status'] == 'pending':
+        logger.info(f"Experiment {exp_id} is already pending")
+        return 0
+
+    status[exp_id]['status'] = 'pending'
+    status[exp_id]['pid'] = None
+    _save_status(status_path, status)
+    logger.info(f"Experiment {exp_id} marked for restart (will resume from checkpoint)")
+    logger.info(f"Run: python run_agent.py -b {batch_path}")
+    return 0
+
+
+def batch_status(batch_path, logger):
+    """Show status of all batch experiments."""
+    status_path = _get_status_path(batch_path)
+    status = _load_status(status_path)
+
+    if not status:
+        logger.info("No batch status found. Run a batch first.")
+        return 0
+
+    logger.info(f"\nBatch: {batch_path}")
+    logger.info(f"{'ID':>4}  {'Status':<12}  {'PID':<8}  {'Config':<30}  {'Query'}")
+    logger.info("-" * 80)
+    for exp_id in sorted(status.keys(), key=int):
+        s = status[exp_id]
+        entry = s.get('entry', {})
+        pid_str = str(s['pid']) if s.get('pid') else '-'
+        config = entry.get('config', '-')
+        query = entry.get('query') or '-'
+        logger.info(f"{exp_id:>4}  {s['status']:<12}  {pid_str:<8}  {config:<30}  {query}")
+
+    counts = {}
+    for s in status.values():
+        counts[s['status']] = counts.get(s['status'], 0) + 1
+    summary = ', '.join(f"{v} {k}" for k, v in sorted(counts.items()))
+    logger.info(f"\nTotal: {len(status)} ({summary})")
+    return 0
+
+
+def main():
+    """Main execution function"""
+    # Configure logger
+    logger = get_logger()
+    logger.configure({
+        "level": "INFO",
+        "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        "console": True
+    })
+
+    try:
+        args = parse_args()
+
+        if args.batch:
+            if args.status:
+                return batch_status(args.batch, logger)
+            if args.stop is not None:
+                return batch_stop(args.batch, args.stop, logger)
+            if args.restart is not None:
+                return batch_restart(args.batch, args.restart, logger)
+            result = run_batch(args.batch, args.num_workers, logger)
+            if result == 130:
+                return 130
+            return 1 if result else 0
+
+        rc = run_single(
+            config_path=args.config,
+            logger=logger,
+            repository=args.repository,
+            query=args.query,
+            max_iterations=args.max_iterations,
+        )
+        return rc
+
+    except KeyboardInterrupt:
+        logger.error("\nInterrupted by user")
+        return 130
 
 
 if __name__ == '__main__':

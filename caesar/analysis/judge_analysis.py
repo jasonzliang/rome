@@ -13,6 +13,16 @@ import statistics
 
 from scipy.stats import mannwhitneyu
 
+
+def cliffs_delta(x, y):
+    """Compute Cliff's delta effect size between two samples."""
+    n_x, n_y = len(x), len(y)
+    if n_x == 0 or n_y == 0:
+        return 0.0
+    more = sum(1 for xi in x for yi in y if xi > yi)
+    less = sum(1 for xi in x for yi in y if xi < yi)
+    return (more - less) / (n_x * n_y)
+
 def load_agent_mapping(mapping_file):
     """Load agent name mapping from file (code_name: real_name format)."""
     if not mapping_file or not Path(mapping_file).exists():
@@ -219,7 +229,7 @@ def print_verification(csv_data, stats, categories, total_judge_files):
     else:
         print(f"⚠️  Potential missing data: ~{int(expected_total - calc_stats['total_rows'])} rows difference")
 
-def analyze_csv(csv_file, agent_mapping, analysis_file):
+def analyze_csv(csv_file, agent_mapping, analysis_file, stat_test='mwu'):
     """Perform comprehensive analysis on the CSV with all required tables and judge bias detection."""
     print(f"\n📊 Starting analysis of {csv_file}...")
 
@@ -279,8 +289,7 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
         return "\n".join(lines)
 
     def get_significance_report(agent_stats):
-        """Sort agents by total score and run Mann-Whitney U test on Top 1 vs Top 2."""
-        # Sort agents by average total score (Descending)
+        """Run pairwise statistical tests between all agents, sorted by avg total score."""
         sorted_agents = sorted(
             agent_stats.keys(),
             key=lambda x: sum(agent_stats[x]['total']) / len(agent_stats[x]['total']),
@@ -290,16 +299,39 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
         if len(sorted_agents) < 2:
             return ""
 
-        top, second = sorted_agents[0], sorted_agents[1]
+        lines = []
+        if stat_test == 'mwu':
+            lines.append("\n\nPAIRWISE MANN-WHITNEY U TESTS (by rank):")
+            headers = ["Agent A", "Agent B", "U Stat", "P-Value", "Significant"]
+            rows = []
+            for i in range(len(sorted_agents)):
+                for j in range(i + 1, len(sorted_agents)):
+                    a, b = sorted_agents[i], sorted_agents[j]
+                    stat_val, p_val = mannwhitneyu(agent_stats[a]['total'], agent_stats[b]['total'])
+                    sig = '✅ YES' if p_val < 0.05 else '❌ NO'
+                    rows.append([a, b, f"{stat_val:.1f}", f"{p_val:.4e}", sig])
+            lines.append(format_table(headers, rows))
+        else:  # cliff's delta
+            lines.append("\n\nPAIRWISE CLIFF'S DELTA EFFECT SIZES (by rank):")
+            headers = ["Agent A", "Agent B", "Delta", "Magnitude"]
+            rows = []
+            for i in range(len(sorted_agents)):
+                for j in range(i + 1, len(sorted_agents)):
+                    a, b = sorted_agents[i], sorted_agents[j]
+                    d = cliffs_delta(agent_stats[a]['total'], agent_stats[b]['total'])
+                    abs_d = abs(d)
+                    if abs_d < 0.147:
+                        magnitude = 'NEGLIGIBLE'
+                    elif abs_d < 0.33:
+                        magnitude = 'SMALL'
+                    elif abs_d < 0.474:
+                        magnitude = 'MEDIUM'
+                    else:
+                        magnitude = 'LARGE'
+                    rows.append([a, b, f"{d:+.4f}", magnitude])
+            lines.append(format_table(headers, rows))
 
-        # Mann-Whitney U test (Default is two-sided: checks if distributions differ)
-        stat, p_val = mannwhitneyu(agent_stats[top]['total'], agent_stats[second]['total'])
-
-        report = (f"\n\n🏆 STATISTICAL SIGNIFICANCE (Top 1 vs Top 2): {top} vs {second}\n"
-                  f"   MWU Stat: {stat:.1f} | P-Value: {p_val:.4e} | "
-                  f"{'✅ SIGNIFICANT' if p_val < 0.05 else '❌ NOT SIGNIFICANT'}")
-
-        return report
+        return "\n".join(lines)
 
     # Extract unique values
     categories = sorted(set(row['Query Category'] for row in csv_data))
@@ -358,7 +390,19 @@ def analyze_csv(csv_file, agent_mapping, analysis_file):
             f"{len(scores['total'])}",
         ])
 
-    sig_report = get_significance_report(agent_metric_stats)
+    # For Cliff's delta, use per-query average totals so sample size = number of queries
+    if stat_test == 'cliffs_delta':
+        agent_query_avgs = defaultdict(lambda: {'total': []})
+        for category in categories:
+            cat_data = [row for row in csv_data if row['Query Category'] == category]
+            cat_agent_scores = defaultdict(list)
+            for row in cat_data:
+                cat_agent_scores[row['Display Name']].append(row['Total Score'])
+            for agent, scores in cat_agent_scores.items():
+                agent_query_avgs[agent]['total'].append(sum(scores) / len(scores))
+        sig_report = get_significance_report(agent_query_avgs)
+    else:
+        sig_report = get_significance_report(agent_metric_stats)
     add_section("TABLE 2: OVERALL AVERAGE SCORE FOR EACH METRIC BY AGENT (Sorted by Total)",
                 format_table(headers, rows, sort_by_col=4, reverse=True) + sig_report)
 
@@ -495,6 +539,9 @@ Examples:
     parser.add_argument('-m', '--agent-mapping',
         default=Path(__file__).resolve().parent / '../config/llm_as_judge/prompts/agent_names_all.txt',
         help='Agent name mapping file (default: config/llm_as_judge/prompts/agent_names.txt)')
+    parser.add_argument('-s', '--stat-test', choices=['mwu', 'cliffs_delta'],
+        default='cliffs_delta',
+        help="Statistical test for pairwise agent comparison: 'mwu' (Mann-Whitney U) or 'cliffs_delta' (Cliff's delta effect size). Default: cliffs_delta")
     parser.add_argument('-v', '--verbose', action='store_true',
         help='Show detailed progress information')
 
@@ -539,7 +586,7 @@ Examples:
     if args.analyze:
         agent_mapping = load_agent_mapping(args.agent_mapping)
         analysis_file = Path(args.input_dir) / Path(args.analyze)
-        analyze_csv(output_file, agent_mapping, analysis_file)
+        analyze_csv(output_file, agent_mapping, analysis_file, stat_test=args.stat_test)
 
 if __name__ == "__main__":
     main()

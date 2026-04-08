@@ -440,7 +440,7 @@ Examples:
 
     parser.add_argument("-n", "--workers", type=int, default=18, help="Number of workers (def: 18)")
     parser.add_argument("-t", "--trials", type=int, default=3, help="Number of trials (def: 3)")
-    parser.add_argument("-J", "--judges", nargs="+", choices=list(JUDGES.keys()), default=list(JUDGES.keys()), help="Specific judges to run (def: all)")
+    parser.add_argument("-j", "--judges", nargs="+", choices=list(JUDGES.keys()), default=list(JUDGES.keys()), help="Specific judges to run (def: all)")
     parser.add_argument("-b", "--batch", action="store_true", help="Treat each subdir as a separate root directory")
 
     return parser.parse_args()
