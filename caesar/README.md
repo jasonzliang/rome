@@ -601,19 +601,6 @@ The agent will stop gracefully when the limit is approached.
 4. **Domain restriction**: Limit `allowed_domains` to avoid tangents
 5. **Model selection**: Use `gpt-4o` for cost efficiency, `gpt-5.2` for quality
 
-## API Cost Estimates
-
-Rough estimates (varies by content and settings):
-
-| Configuration | ~Cost per 100 iterations |
-|---------------|-------------------------|
-| gpt-4o, basic synthesis | $2-5 |
-| gpt-4o, multi-draft synthesis | $5-15 |
-| gpt-5.2, basic synthesis | $10-30 |
-| gpt-5.2, multi-draft synthesis | $30-80 |
-
-Always set a `cost_limit` when experimenting!
-
 ## License
 
 See parent rome repository for license information.
