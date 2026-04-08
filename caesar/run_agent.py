@@ -54,9 +54,9 @@ def resolve_experiment_repository(query=None, max_iterations=None, exp_id=None):
     date_str = datetime.now().strftime("%m-%d-%y")
     query = query or ''
     query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
-    dir_name = f"{date_str}_Q-{query_hash}_T-{max_iterations}"
+    dir_name = f"{date_str}_q-{query_hash}_t-{max_iterations}"
     if exp_id is not None:
-        dir_name += f"_ID-{exp_id}"
+        dir_name += f"_id-{exp_id}"
     result_dir = Path(__file__).resolve().parent / "result"
     return str(result_dir / dir_name)
 
