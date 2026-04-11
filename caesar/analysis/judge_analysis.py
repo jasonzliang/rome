@@ -537,8 +537,8 @@ Examples:
     parser.add_argument('-a', '--analyze', default='judge_analysis.txt', metavar='FILE',
         help='Output analysis filename (default: judge_analysis.txt in input directory)')
     parser.add_argument('-m', '--agent-mapping',
-        default=Path(__file__).resolve().parent / '../config/llm_as_judge/prompts/agent_names_all.txt',
-        help='Agent name mapping file (default: config/llm_as_judge/prompts/agent_names.txt)')
+        default=Path(__file__).resolve().parent / '../config/llm_as_judge/agent_names/agent_names_all.txt',
+        help='Agent name mapping file (default: config/llm_as_judge/agent_names/agent_names_all.txt)')
     parser.add_argument('-s', '--stat-test', choices=['mwu', 'cliffs_delta'],
         default='cliffs_delta',
         help="Statistical test for pairwise agent comparison: 'mwu' (Mann-Whitney U) or 'cliffs_delta' (Cliff's delta effect size). Default: cliffs_delta")
