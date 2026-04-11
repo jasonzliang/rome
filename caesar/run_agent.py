@@ -44,17 +44,18 @@ def resolve_config_path(config_path):
     return config_path
 
 
-def resolve_experiment_repository(query=None, max_iterations=None, exp_id=None):
+def resolve_experiment_repository(query=None, max_iterations=None, exp_id=None, config_name=None):
     """Generate an experiment directory path from query/iterations.
 
-    Returns: result/<date>_Q-<hash>_T-<iters>[_ID-<id>]
+    Returns: result/<date>_<config>_Q-<hash>_T-<iters>[_ID-<id>]
     exp_id is included in batch mode to avoid collisions between experiments.
     The path is resolved once and stored so restarts use the same directory.
     """
     date_str = datetime.now().strftime("%m-%d-%y")
     query = query or ''
     query_hash = hashlib.md5(query.encode()).hexdigest()[:8]
-    dir_name = f"{date_str}_q-{query_hash}_t-{max_iterations}"
+    cfg = config_name or 'unknown'
+    dir_name = f"{date_str}_{cfg}_q-{query_hash}_t-{max_iterations}"
     if exp_id is not None:
         dir_name += f"_id-{exp_id}"
     result_dir = Path(__file__).resolve().parent / "result"
@@ -259,6 +260,7 @@ def run_single(config_path, logger, repository=None, query=None, max_iterations=
                 resolve_experiment_repository(
                     query=caesar_cfg.get('starting_query'),
                     max_iterations=caesar_cfg.get('max_iterations'),
+                    config_name=Path(config_path).stem,
                 ), logger
             )
 
@@ -403,6 +405,7 @@ def run_batch(batch_path, num_workers, logger):
                 query=entry.get('query'),
                 max_iterations=entry.get('max_iterations'),
                 exp_id=exp_id,
+                config_name=Path(entry['config']).stem,
             )
             status[exp_id] = {'status': 'pending', 'pid': None, 'entry': entry}
     save_status(status_path, status)
