@@ -91,10 +91,10 @@ class BraveSearch:
         )
         shortened = self.agent.chat_completion(prompt).strip().strip('"\'')
         if not shortened:
-            self.logger.warning("LLM returned empty summary, falling back to truncation")
+            self.logger.error("LLM returned empty summary, falling back to truncation")
             shortened = self._truncate_query(query)
         elif self._query_exceeds_limits(shortened):
-            self.logger.warning("LLM summary still exceeds limits, falling back to truncation")
+            self.logger.error("LLM summary still exceeds limits, falling back to truncation")
             shortened = self._truncate_query(shortened)
         return shortened
 
@@ -103,7 +103,7 @@ class BraveSearch:
         if not self._query_exceeds_limits(query):
             return query
         if not self.shorten_query:
-            self.logger.warning(
+            self.logger.error(
                 f"Query exceeds Brave API limits ({len(query)} chars, "
                 f"{len(query.split())} words) but shorten_query is disabled")
             return query
