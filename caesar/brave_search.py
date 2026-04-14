@@ -90,7 +90,10 @@ class BraveSearch:
             f"nothing else.\n\nOriginal query:\n{query}"
         )
         shortened = self.agent.chat_completion(prompt).strip().strip('"\'')
-        if self._query_exceeds_limits(shortened):
+        if not shortened:
+            self.logger.warning("LLM returned empty summary, falling back to truncation")
+            shortened = self._truncate_query(query)
+        elif self._query_exceeds_limits(shortened):
             self.logger.warning("LLM summary still exceeds limits, falling back to truncation")
             shortened = self._truncate_query(shortened)
         return shortened
