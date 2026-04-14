@@ -162,6 +162,9 @@ CAESAR_CONFIG = {
         "timeout": 30,
         # Filter duplicate URLs across multiple queries
         "filter_duplicates": True,
+        # Shorten long queries to fit API limits (400 chars / 50 words)
+        # Options: None (no shortening), "truncation", "summary"
+        "shorten_query": "summary",
     },
 
     # Default config for LLM outside of agent exploration

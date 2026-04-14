@@ -27,6 +27,9 @@ MAX_NUM_RESULTS = 200
 BACKOFF_MULTIPLIER = 2
 # Delay in sec between each search to avoid hitting rate limit
 SEARCH_DELAY = 1
+# Brave API query limits
+MAX_QUERY_CHARS = 400
+MAX_QUERY_WORDS = 50
 
 
 class BraveSearchError(Exception):
@@ -63,6 +66,61 @@ class BraveSearch:
         self.output_dir = os.path.join(self.agent.get_log_dir(), SEARCH_RESULT_DIR)
         os.makedirs(self.output_dir, exist_ok=True)
 
+    def _query_exceeds_limits(self, query: str) -> bool:
+        """Check if a query exceeds Brave API limits."""
+        return len(query) > MAX_QUERY_CHARS or len(query.split()) > MAX_QUERY_WORDS
+
+    def _truncate_query(self, query: str) -> str:
+        """Truncate query to fit within Brave API limits."""
+        words = query.split()
+        if len(words) > MAX_QUERY_WORDS:
+            words = words[:MAX_QUERY_WORDS]
+        truncated = ' '.join(words)
+        if len(truncated) > MAX_QUERY_CHARS:
+            truncated = truncated[:MAX_QUERY_CHARS].rsplit(' ', 1)[0]
+        return truncated
+
+    def _summarize_query(self, query: str) -> str:
+        """Use the agent's LLM to summarize a query to fit Brave API limits."""
+        prompt = (
+            f"Condense the following search query into a shorter search query "
+            f"that preserves the key intent and important keywords. "
+            f"The result MUST be under {MAX_QUERY_CHARS} characters and "
+            f"under {MAX_QUERY_WORDS} words. Return ONLY the shortened query, "
+            f"nothing else.\n\nOriginal query:\n{query}"
+        )
+        shortened = self.agent.chat_completion(prompt).strip().strip('"\'')
+        if self._query_exceeds_limits(shortened):
+            self.logger.warning("LLM summary still exceeds limits, falling back to truncation")
+            shortened = self._truncate_query(shortened)
+        return shortened
+
+    def _shorten_query(self, query: str) -> str:
+        """Shorten a query if it exceeds Brave API limits, based on config."""
+        if not self._query_exceeds_limits(query):
+            return query
+        if not self.shorten_query:
+            self.logger.warning(
+                f"Query exceeds Brave API limits ({len(query)} chars, "
+                f"{len(query.split())} words) but shorten_query is disabled")
+            return query
+
+        self.logger.info(
+            f"Shortening query ({len(query)} chars, {len(query.split())} words) "
+            f"using method: {self.shorten_query}")
+
+        if self.shorten_query == "truncation":
+            shortened = self._truncate_query(query)
+        elif self.shorten_query == "summary":
+            shortened = self._summarize_query(query)
+        else:
+            self.logger.error(f"Unknown shorten_query method: {self.shorten_query}, skipping")
+            return query
+
+        self.logger.info(
+            f"Shortened query: {len(shortened)} chars, {len(shortened.split())} words")
+        return shortened
+
     def _generate_filename(self, query) -> str:
         """Generate filename from query and timestamp"""
         # Sanitize query for filename (remove special chars, limit length)
@@ -94,6 +152,9 @@ class BraveSearch:
         if os.path.exists(html_file):
             self.logger.debug(f"Using cached search results html file: {html_file}")
             return f"file://{html_file}"
+
+        # Shorten queries that exceed Brave API limits
+        query_list = [self._shorten_query(q) for q in query_list]
 
         # Execute all searches
         all_results = []
