@@ -1,5 +1,6 @@
 import copy
 from collections import defaultdict
+import gzip
 import json
 import multiprocessing
 import os
@@ -65,15 +66,22 @@ def extract_label_from_url(url):
     return url_parts[-1] if url_parts else url
 
 @st.cache_data
-def load_graphs(directory, pattern='*.graph_iter*.json'):
-    """Load all graph JSON files from directory."""
+def load_graphs(directory, pattern='*.graph_iter*.json*'):
+    """Load all graph JSON/JSON.GZ files from directory."""
     graphs = {}
-    iter_pattern = re.compile(r'graph_iter(\d+)\.json')
+    iter_pattern = re.compile(r'graph_iter(\d+)\.json(?:\.gz)?$')
     for file in Path(directory).glob(pattern):
         if match := iter_pattern.search(file.name):
+            iteration = int(match.group(1))
+            if iteration in graphs:
+                continue
             try:
-                with open(file, 'r', encoding='utf-8') as f:
-                    graphs[int(match.group(1))] = json.load(f)
+                if file.suffix == '.gz':
+                    with gzip.open(file, 'rt', encoding='utf-8') as f:
+                        graphs[iteration] = json.load(f)
+                else:
+                    with open(file, 'r', encoding='utf-8') as f:
+                        graphs[iteration] = json.load(f)
             except Exception as e:
                 st.warning(f"Failed to load {file.name}: {e}")
     return dict(sorted(graphs.items()))
@@ -545,7 +553,7 @@ st.sidebar.markdown("**Current Directory:**")
 st.sidebar.code(directory, language=None)
 
 with st.sidebar.expander("⚙️ Advanced Options"):
-    file_pattern = st.text_input("File Pattern", value="*.graph_iter*.json", help="Glob pattern to match JSON files")
+    file_pattern = st.text_input("File Pattern", value="*.graph_iter*.json*", help="Glob pattern to match JSON/JSON.GZ files")
     if st.button("🔄 Reload Files"):
         st.cache_data.clear()
         st.rerun()
@@ -557,7 +565,7 @@ if not graphs:
     st.error("❌ No graph files found in directory")
     st.info(f"Looking for files matching pattern: `{file_pattern}`")
     try:
-        all_files = [f for f in os.listdir(directory) if f.endswith('.json')]
+        all_files = [f for f in os.listdir(directory) if f.endswith('.json') or f.endswith('.json.gz')]
         if all_files:
             st.write("**JSON files found in directory:**")
             for f in sorted(all_files)[:20]:

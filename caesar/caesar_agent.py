@@ -3,6 +3,7 @@ from collections import Counter
 import concurrent.futures
 import copy
 from datetime import datetime
+import gzip
 import io
 import json
 import os
@@ -359,8 +360,8 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
                 knowledge_graph = checkpoint_data['graph']
                 knowledge_graph['iteration'] = iteration
                 knowledge_graph['starting_url'] = self.starting_url
-                with open(os.path.join(self.get_repo(),
-                    f"{self.get_id()}.graph_iter{iteration}.json"), 'w', encoding='utf-8') as f:
+                with gzip.open(os.path.join(self.get_repo(),
+                    f"{self.get_id()}.graph_iter{iteration}.json.gz"), 'wt', encoding='utf-8') as f:
                     json.dump(knowledge_graph, f, indent=4, ensure_ascii=False)
                 self.logger.info(f"Knowledge graph saved on iteration {iteration}")
 
