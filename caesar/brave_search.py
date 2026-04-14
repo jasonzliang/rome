@@ -28,8 +28,7 @@ BACKOFF_MULTIPLIER = 2
 # Delay in sec between each search to avoid hitting rate limit
 SEARCH_DELAY = 1
 # Brave API query limits
-MAX_QUERY_CHARS = 400
-MAX_QUERY_WORDS = 50
+MAX_QUERY_CHARS = 400; MAX_QUERY_WORDS = 50
 
 
 class BraveSearchError(Exception):
