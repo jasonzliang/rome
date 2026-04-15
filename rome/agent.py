@@ -91,9 +91,9 @@ class Agent(BaseAgent):
                 self.logger.info("No summary history file found, starting with empty history")
 
             if accumulated_cost is not None and call_count is not None:
-                self.openai_handler.accumulated_cost = accumulated_cost
-                self.openai_handler.call_count = call_count
-                self.logger.info(f"Loaded OpenAI API cost from summary: ${accumulated_cost:.4f}")
+                self.llm_handler.accumulated_cost = accumulated_cost
+                self.llm_handler.call_count = call_count
+                self.logger.info(f"Loaded LLM API cost from summary: ${accumulated_cost:.4f}")
 
             self.curr_iteration = iteration if iteration else 1
 
@@ -303,8 +303,8 @@ class Agent(BaseAgent):
         # Repository completion stats
         completion = self.repository_manager.get_repository_completion_stats(self)
 
-        # OpenAI cost summary
-        cost_summary = self.openai_handler.get_cost_summary()
+        # LLM cost summary
+        cost_summary = self.llm_handler.get_cost_summary()
 
         return {
             "agent_info": {

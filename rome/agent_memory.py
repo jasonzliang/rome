@@ -17,9 +17,9 @@ OPENAI_CONFIG =  {
     # "reasoning_effort": "low",
     "model": "gpt-4o",
     "temperature": 0.1,
-    "max_tokens": DEFAULT_CONFIG['OpenAIHandler']['max_completion_tokens'],
+    "max_tokens": DEFAULT_CONFIG['LLMHandler']['max_completion_tokens'],
     "api_key": os.environ.get("OPENAI_API_KEY"),
-    "openai_base_url": DEFAULT_CONFIG['OpenAIHandler']['base_url'],
+    "openai_base_url": DEFAULT_CONFIG['LLMHandler']['base_url'],
 }
 
 
@@ -371,7 +371,7 @@ SUMMARY:"""
                 self.logger.debug(f"Injected memory: {len(memory_context)} chars")
 
         # Call original chat completion
-        response = self.agent.openai_handler.chat_completion(
+        response = self.agent.llm_handler.chat_completion(
             prompt=prompt,
             system_message=system_message,
             override_config=override_config,

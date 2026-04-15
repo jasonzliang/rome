@@ -168,7 +168,7 @@ CAESAR_CONFIG = {
     },
 
     # Default config for LLM outside of agent exploration
-    "OpenAIHandler": {
+    "LLMHandler": {
         # Total API cost limit in dollars
         "cost_limit": 300.0,
         # Model name for LLM

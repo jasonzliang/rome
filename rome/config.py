@@ -102,12 +102,13 @@ DEFAULT_CONFIG = {
 
     # LLM HANDLER CONFIGURATION
 
-    "OpenAIHandler": {
+    "LLMHandler": {
         # API Configuration
+        "provider": "openai",  # LLM provider: "openai", "anthropic", "gemini"
         "base_url": "https://api.openai.com/v1",  # Url for chat completion API
         "key_name": "OPENAI_API_KEY",  # API key name to find in env
         "timeout": 60,  # Time for allowing responses from API
-        "cost_limit": 500.0,  # Max budget ($) for running OpenAI chat completion
+        "cost_limit": 500.0,  # Max budget ($) for running LLM chat completion
         "max_retries": 10,  # Maximum number of retries when API fails
 
         # Model Parameters
@@ -239,7 +240,7 @@ DEFAULT_CONFIG = {
     # KNOWLEDGE BASE MANAGEMENT
 
     "ChromaClientManager": {
-        # Note: LLM model and temperature are inherited from agent's OpenAIHandler config
+        # Note: LLM model and temperature are inherited from agent's LLMHandler config
         "collection_name": None,  # ChromaDB collection name, set to None to use agent repo
         "enable_reranking": True,  # Enable LLMRerank reranking
         "use_shared_server": True,  # Use shared server instance across KB instances
@@ -409,6 +410,11 @@ def merge_with_default_config(custom_config):
         return d
 
     logger = get_logger()
+
+    # Backward compat: map old config key to new one
+    if "OpenAIHandler" in custom_config and "LLMHandler" not in custom_config:
+        custom_config["LLMHandler"] = custom_config.pop("OpenAIHandler")
+
     merged_config = copy.deepcopy(DEFAULT_CONFIG)
     result = update_dict(merged_config, custom_config)
     logger.info("Configuration merged with defaults")

@@ -81,7 +81,7 @@ def setup_test_environment():
 def create_config():
     """Create compact configuration for multi-agent system"""
     return {
-        "OpenAIHandler": {
+        "LLMHandler": {
             "model": "gpt-4o",
             "temperature": 0.1,
             "max_tokens": 8192

@@ -8,7 +8,7 @@ from typing import Dict, List
 
 # Assuming your modules are structured like this - adjust imports as needed
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from rome.openai import OpenAIHandler, CostLimitExceededException
+from rome.llm_handler import LLMHandler, CostLimitExceededException
 from rome.config import DEFAULT_CONFIG
 
 
@@ -19,7 +19,7 @@ class TestRealContextCompression:
     def get_config():
         """Configuration optimized for testing compression"""
         return {
-            "model": "gpt-3.5-turbo-0613",  # 4K context model
+            "provider": "openai", "model": "gpt-3.5-turbo-0613",  # 4K context model
             "temperature": 0.1, "max_tokens": 1000, "timeout": 60, "top_p": 1.0,
             "base_url": "https://api.openai.com/v1", "system_message": "You are a helpful assistant",
             "manage_context": True, "max_input_tokens": None, "token_count_thres": 0.5,
@@ -54,8 +54,8 @@ class TestRealContextCompression:
         config.update(config_overrides)
 
         with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
-            with patch('openai.OpenAI', return_value=self.get_mock_client()):
-                return OpenAIHandler(config)
+            with patch('litellm.get_max_tokens', return_value=4096):
+                return LLMHandler(config)
 
     def run_test(self, test_name: str, test_func, **kwargs):
         """Generic test runner with error handling"""

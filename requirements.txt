@@ -1,5 +1,6 @@
 # Rome Core Packages
 colorama
+litellm
 networkx
 numpy
 openai

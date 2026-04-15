@@ -64,7 +64,7 @@ def setup_test_dir():
 def create_config():
     """Compact, efficient configuration"""
     return {
-        "OpenAIHandler": {
+        "LLMHandler": {
             "model": "gpt-4o",
             "temperature": 0.1,
             "max_tokens": 8192,

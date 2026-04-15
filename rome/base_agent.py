@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Dict, Optional, Callable
 import yaml
 
-from .openai import OpenAIHandler
+from .llm_handler import LLMHandler
 from .config import (DEFAULT_CONFIG, LOG_DIR_NAME, AGENT_NAME_LENGTH, LONGEST_SUMMARY_LEN,
                      set_attributes_from_config, merge_with_default_config, format_yaml_like)
 from .logger import get_logger
@@ -30,7 +30,7 @@ class BaseAgent:
         self._setup_config(config)
         self._validate_name_role(name, role)
         self._setup_repository_and_logging(repository)
-        self._setup_openai_handler()
+        self._setup_llm_handler()
         self._setup_agent_memory()
         self._register_cleanup()
         self.export_config()
@@ -79,11 +79,16 @@ class BaseAgent:
 
         self.logger.info(f"Logging configured: {log_config['base_dir']}")
 
-    def _setup_openai_handler(self) -> None:
-        """Initialize OpenAI handler"""
-        openai_config = self.config.get('OpenAIHandler', {})
-        self.openai_handler = OpenAIHandler(config=openai_config)
-        self.logger.debug("OpenAI handler initialized")
+    def _setup_llm_handler(self) -> None:
+        """Initialize LLM handler"""
+        llm_config = self.config.get('LLMHandler', {})
+        self.llm_handler = LLMHandler(config=llm_config)
+        self.logger.debug("LLM handler initialized")
+
+    @property
+    def openai_handler(self):
+        """Backward compatibility alias for llm_handler."""
+        return self.llm_handler
 
     def _setup_agent_memory(self) -> None:
         """Initialize agent memory system"""
@@ -177,6 +182,6 @@ class BaseAgent:
                 override_config=override_config, response_format=response_format)
         else:
             system_message = system_message or self.role
-            return self.openai_handler.chat_completion(
+            return self.llm_handler.chat_completion(
                 prompt=prompt, system_message=system_message,
                 override_config=override_config, response_format=response_format)

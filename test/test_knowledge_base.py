@@ -32,7 +32,7 @@ def test_save_kb_action_execute():
         config['Agent']['role'] = 'Test role for SaveKBAction'
         config['Agent']['repository'] = temp_dir
         config['Agent']['agent_api'] = False  # Disable API for testing
-        config['OpenAIHandler']['cost_limit'] = 1.0  # Low limit for testing
+        config['LLMHandler']['cost_limit'] = 1.0  # Low limit for testing
 
         # Configure knowledge base settings
         config['ChromaClientManager']['enable_reranking'] = False
@@ -160,7 +160,7 @@ def test_factorial():
         config['Agent']['role'] = 'Test role for EditCodeAction with KB querying'
         config['Agent']['repository'] = temp_dir
         config['Agent']['agent_api'] = False
-        config['OpenAIHandler']['cost_limit'] = 5.0  # Higher limit for this test
+        config['LLMHandler']['cost_limit'] = 5.0  # Higher limit for this test
 
         # Configure knowledge base settings
         config['ChromaClientManager']['enable_reranking'] = False

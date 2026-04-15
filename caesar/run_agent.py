@@ -188,8 +188,8 @@ def print_config_summary(agent, logger):
             "Max ELI5 Length (Words)": synth.synthesis_eli5_length,
         },
         "Usage": {
-            "Model": agent.openai_handler.model,
-            "Cost Limit": f"${agent.openai_handler.cost_limit:.2f}" if agent.openai_handler.cost_limit else "None",
+            "Model": agent.llm_handler.model,
+            "Cost Limit": f"${agent.llm_handler.cost_limit:.2f}" if agent.llm_handler.cost_limit else "None",
         }
     }
 
@@ -203,7 +203,7 @@ def print_config_summary(agent, logger):
 
 def print_final_summary(agent, artifact, logger):
     """Print exploration completion summary."""
-    cost = agent.openai_handler.get_cost_summary()
+    cost = agent.llm_handler.get_cost_summary()
 
     logger.info("\n" + "="*80)
     logger.info("EXPLORATION COMPLETE - FINAL SYNTHESIS")

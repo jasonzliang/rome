@@ -88,7 +88,7 @@ class AgentApi:
             try:
                 agent, fsm, hist = self.agent, self.agent.fsm, self.agent.history
                 summary = agent.get_summary()
-                cost = agent.openai_handler.get_cost_summary()
+                cost = agent.llm_handler.get_cost_summary()
 
                 return {
                     "status": {

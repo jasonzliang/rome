@@ -1,12 +1,15 @@
 from functools import lru_cache
 import json
 import logging
-import openai
+import litellm
 import os
 from typing import Dict, Optional, Any, Union, List
 
 from .logger import get_logger
 from .config import set_attributes_from_config, DEFAULT_CONFIG
+
+# Suppress litellm's verbose logging
+litellm.suppress_debug_info = True
 
 
 class CostLimitExceededException(Exception):
@@ -21,12 +24,28 @@ class CostLimitExceededException(Exception):
             super().__init__(f"Estimated cost ${estimated_cost:.4f} exceeds limit ${cost_limit:.2f}")
 
 
-class OpenAIHandler:
-    """Handler class for OpenAI API interactions with configuration dictionary and cost limiting"""
+# Default API key environment variable per provider
+PROVIDER_KEY_MAP = {
+    "openai": "OPENAI_API_KEY",
+    "anthropic": "ANTHROPIC_API_KEY",
+    "gemini": "GOOGLE_API_KEY",
+}
 
-    # OpenAI model pricing (per 1M tokens) - Updated with latest models
+# Reasoning effort to Anthropic thinking budget mapping
+ANTHROPIC_THINKING_BUDGET = {
+    "low": 5000,
+    "minimal": 5000,
+    "medium": 10000,
+    "high": 25000,
+}
+
+
+class LLMHandler:
+    """Handler for LLM API interactions via litellm with multi-provider support"""
+
+    # Model pricing (per 1M tokens) - fallback when litellm doesn't have pricing
     MODEL_PRICING = {
-        # GPT-5 series (as of November 2025)
+        # OpenAI GPT-5 series
         "gpt-5.4": {"input": 2.5, "output": 15.0},
         "gpt-5.2": {"input": 1.75, "output": 14.0},
         "gpt-5.1": {"input": 1.25, "output": 10.0},
@@ -35,31 +54,35 @@ class OpenAIHandler:
         "gpt-5-mini": {"input": 0.25, "output": 2.0},
         "gpt-5-nano": {"input": 0.05, "output": 0.40},
         "gpt-5-pro": {"input": 15.0, "output": 120.0},
-
-        # GPT-4.1 series (as of April 2025)
+        # OpenAI GPT-4.1 series
         "gpt-4.1": {"input": 2.0, "output": 8.0},
         "gpt-4.1-mini": {"input": 0.40, "output": 1.60},
         "gpt-4.1-nano": {"input": 0.10, "output": 0.40},
-
-        # GPT-4o series (standard text)
+        # OpenAI GPT-4o series
         "gpt-4o": {"input": 2.5, "output": 10.0},
         "gpt-4o-mini": {"input": 0.15, "output": 0.6},
-
-        # o-series reasoning models (note: pricing fluctuates)
+        # OpenAI o-series reasoning models
         "o1": {"input": 15.0, "output": 60.0},
         "o1-mini": {"input": 1.10, "output": 4.40},
         "o1-pro": {"input": 150.0, "output": 600.0},
         "o3": {"input": 2.0, "output": 8.0},
         "o3-mini": {"input": 1.10, "output": 4.40},
         "o4-mini": {"input": 1.10, "output": 4.40},
-
-        # Realtime models (text)
+        # OpenAI Realtime models
         "gpt-realtime": {"input": 4.0, "output": 16.0},
         "gpt-realtime-mini": {"input": 0.60, "output": 2.40},
+        # Anthropic models
+        "claude-opus-4-20250514": {"input": 15.0, "output": 75.0},
+        "claude-sonnet-4-20250514": {"input": 3.0, "output": 15.0},
+        "claude-haiku-4-20250514": {"input": 0.80, "output": 4.0},
+        # Google Gemini models
+        "gemini-2.5-pro": {"input": 1.25, "output": 10.0},
+        "gemini-2.5-flash": {"input": 0.15, "output": 0.60},
+        "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
     }
 
     MODEL_CONTEXT_SIZE = {
-        # GPT-5 series
+        # OpenAI GPT-5 series
         "gpt-5.4": 922000,
         "gpt-5.2": 272000,
         "gpt-5.1": 272000,
@@ -68,30 +91,34 @@ class OpenAIHandler:
         "gpt-5-mini": 272000,
         "gpt-5-nano": 272000,
         "gpt-5-pro": 272000,
-
-        # GPT-4.1 series
+        # OpenAI GPT-4.1 series
         "gpt-4.1": 1047576,
         "gpt-4.1-mini": 1047576,
         "gpt-4.1-nano": 1047576,
-
-        # GPT-4o series
+        # OpenAI GPT-4o series
         "gpt-4o": 128000,
         "gpt-4o-mini": 128000,
-
-        # o-series reasoning models
+        # OpenAI o-series reasoning models
         "o1": 200000,
         "o1-mini": 128000,
         "o1-pro": 200000,
         "o3": 200000,
         "o3-mini": 200000,
         "o4-mini": 200000,
-
-        # Realtime models
+        # OpenAI Realtime models
         "gpt-realtime": 128000,
         "gpt-realtime-mini": 128000,
+        # Anthropic models
+        "claude-opus-4-20250514": 200000,
+        "claude-sonnet-4-20250514": 200000,
+        "claude-haiku-4-20250514": 200000,
+        # Google Gemini models
+        "gemini-2.5-pro": 1048576,
+        "gemini-2.5-flash": 1048576,
+        "gemini-2.0-flash": 1048576,
     }
 
-    # Newer models with different API
+    # Models that support reasoning_effort or equivalent thinking parameters
     REASONING_MODELS = {
         "gpt-5.4", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5.4-mini", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro",
         "o1", "o1-mini", "o1-pro", "o3", "o3-mini", "o4-mini",
@@ -110,71 +137,69 @@ class OpenAIHandler:
         self.cost_history = []
 
         # Set attributes from config
-        set_attributes_from_config(self, self.config, DEFAULT_CONFIG['OpenAIHandler'].keys())
+        set_attributes_from_config(self, self.config, DEFAULT_CONFIG['LLMHandler'].keys())
 
-        # Initialize client
-        api_key = os.getenv(self.key_name or 'OPENAI_API_KEY')
-        if not api_key:
-            raise ValueError("OpenAI API key not found in environment")
+        # Resolve API key based on provider
+        # Auto-detect key name if user didn't explicitly override it for a non-OpenAI provider
+        if self.provider != "openai" and self.key_name == "OPENAI_API_KEY":
+            env_key = PROVIDER_KEY_MAP.get(self.provider, "OPENAI_API_KEY")
+        else:
+            env_key = self.key_name or PROVIDER_KEY_MAP.get(self.provider, "OPENAI_API_KEY")
+        self.api_key = os.getenv(env_key)
+        if not self.api_key:
+            raise ValueError(f"API key not found in environment (looked for {env_key})")
 
-        self.client = openai.OpenAI(
-            api_key=api_key,
-            base_url=self.base_url,
-            timeout=self.timeout,
-            max_retries=self.max_retries,
-        )
-
-        self.logger.info(f"OpenAI handler initialized with model: {self.model}")
+        self.logger.info(f"LLM handler initialized: provider={self.provider}, model={self.model}")
         if self.cost_limit:
             self.logger.info(f"Cost limit enabled: ${self.cost_limit:.2f}")
 
-    def _is_reasoning_model(self, model: str = None) -> bool:
-        """Check if model is older one."""
+    def _get_litellm_model(self, model: str = None) -> str:
+        """Get litellm-formatted model string with provider prefix."""
         model = model or self.model
+        if "/" in model:
+            return model
+        if self.provider == "openai":
+            return model
+        return f"{self.provider}/{model}"
+
+    def _get_base_model(self, model: str = None) -> str:
+        """Strip provider prefix to get base model name for lookups."""
+        model = model or self.model
+        return model.split("/", 1)[-1] if "/" in model else model
+
+    def _is_reasoning_model(self, model: str = None) -> bool:
+        """Check if model supports reasoning parameters."""
+        model = self._get_base_model(model)
         return model in self.REASONING_MODELS
 
     def _get_max_input_tokens(self) -> int:
         """Get max input tokens."""
         return max(self.max_input_tokens or (self._get_model_context_length() - self.max_completion_tokens), 0)
 
-    @lru_cache(maxsize=128)
-    def _get_encoding(self, model: str = None):
-        """Get tiktoken encoding for the model."""
-        try:
-            import tiktoken
-            # Hack to ensure Tiktoken support for latest models
-            if model.startswith(("gpt-5", "o4")):
-                return tiktoken.get_encoding("o200k_base")
-
-            return tiktoken.encoding_for_model(model)
-        except (ImportError, KeyError):
-            self.logger.error("Tiktoken not available or model unknown, using character estimation")
-            return None
-
     @lru_cache(maxsize=1)
     def _get_model_context_length(self) -> int:
         """Get context length for the current model."""
         try:
-            models = self.client.models.list()
-            model_info = next((m for m in models.data if m.id == self.model), None)
-            if model_info and hasattr(model_info, 'context_length'):
-                return model_info.context_length
-            else:
-                return self.MODEL_CONTEXT_SIZE[self.model]
+            return litellm.get_max_tokens(self._get_litellm_model())
         except Exception:
-            self.logger.error(f"Unknown model {self.model}, using gpt-4o context size as fallback")
-        return self.MODEL_CONTEXT_SIZE['gpt-4o']
+            pass
+        base_model = self._get_base_model()
+        if base_model in self.MODEL_CONTEXT_SIZE:
+            return self.MODEL_CONTEXT_SIZE[base_model]
+        self.logger.error(f"Unknown model {self.model}, using 128000 as fallback context size")
+        return 128000
 
     def _count_tokens(self, messages: List[Dict], precise: bool = False) -> int:
         """Count tokens in messages with optional precision."""
-        encoding = self._get_encoding(self.model)
-
-        if not encoding or not precise:
+        if not precise:
             total_chars = sum(len(str(msg.get('content', ''))) + len(str(msg.get('role', ''))) + 10 for msg in messages)
             return total_chars // self.chars_per_token
 
-        total = sum(4 + sum(len(encoding.encode(str(v))) for v in msg.values()) for msg in messages)
-        return total + 2
+        try:
+            return litellm.token_counter(model=self._get_litellm_model(), messages=messages)
+        except Exception:
+            total_chars = sum(len(str(msg.get('content', ''))) + len(str(msg.get('role', ''))) + 10 for msg in messages)
+            return total_chars // self.chars_per_token
 
     def _should_use_precise_counting(self, messages: List[Dict]) -> bool:
         """Decide if precise token counting is needed."""
@@ -262,7 +287,7 @@ class OpenAIHandler:
         compressed_msg['content'] = result['compressed_prompt']
 
         if self._count_tokens([compressed_msg], precise=True) <= remaining_tokens:
-            self.logger.debug(f"Compressed: {msg_tokens}→{self._count_tokens([compressed_msg], precise=True)} ({result.get('ratio', 'N/A')})")
+            self.logger.debug(f"Compressed: {msg_tokens}->{self._count_tokens([compressed_msg], precise=True)} ({result.get('ratio', 'N/A')})")
             return compressed_msg
 
         return None
@@ -278,17 +303,25 @@ class OpenAIHandler:
             self.logger.info(f"Context management: {', '.join(parts)} messages")
 
     def _get_model_pricing(self, model: str = None) -> Dict[str, float]:
-        """Get pricing for a model (internal method)."""
-        model = model or self.model
+        """Get pricing for a model."""
+        model = self._get_base_model(model)
 
         if model in self.MODEL_PRICING:
             return self.MODEL_PRICING[model]
+
+        # Try litellm's pricing database
+        try:
+            litellm_model = self._get_litellm_model(model)
+            input_cost, output_cost = litellm.cost_per_token(model=litellm_model, prompt_tokens=1, completion_tokens=1)
+            return {"input": input_cost * 1_000_000, "output": output_cost * 1_000_000}
+        except Exception:
+            pass
 
         self.logger.error(f"Unknown model {model}, using gpt-4o pricing as fallback")
         return self.MODEL_PRICING["gpt-4o"]
 
     def _add_cost(self, actual_cost: float, input_tokens: int = 0, output_tokens: int = 0):
-        """Add actual cost to accumulated total and update tracking (internal method)."""
+        """Add actual cost to accumulated total and update tracking."""
         import time
 
         self.accumulated_cost += actual_cost
@@ -303,7 +336,7 @@ class OpenAIHandler:
         })
 
     def _check_and_log_cost(self, messages: List[Dict], max_completion_tokens: int, model: str):
-        """Check cost limit including accumulated costs and log estimation."""
+        """Check cost limit including accumulated costs."""
         if not self.cost_limit:
             return
 
@@ -315,7 +348,7 @@ class OpenAIHandler:
             raise CostLimitExceededException(estimated_cost, self.cost_limit, self.accumulated_cost)
 
     def _log_messages_with_multiline_support(self, messages):
-        """Log messages with proper multiline string formatting"""
+        """Log messages with proper multiline string formatting."""
         self.logger.debug("Request messages:")
 
         for i, msg in enumerate(messages):
@@ -337,6 +370,29 @@ class OpenAIHandler:
         """Estimate cost based on token usage (does not modify accumulated cost)."""
         pricing = self._get_model_pricing(model)
         return (input_tokens * pricing["input"] + output_tokens * pricing["output"]) / 1_000_000
+
+    def _map_reasoning_params(self, kwargs: Dict) -> Dict:
+        """Map reasoning_effort to provider-specific parameters."""
+        reasoning_effort = kwargs.pop("reasoning_effort", None)
+        if not reasoning_effort:
+            return kwargs
+
+        if self.provider == "openai":
+            if reasoning_effort == "minimal" and self._get_base_model(kwargs.get("model")).startswith("o"):
+                reasoning_effort = "low"
+            kwargs["reasoning_effort"] = reasoning_effort
+        elif self.provider == "anthropic":
+            budget = ANTHROPIC_THINKING_BUDGET.get(reasoning_effort, 10000)
+            kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
+        elif self.provider == "gemini":
+            kwargs["thinking"] = {"type": "enabled", "budget_tokens":
+                ANTHROPIC_THINKING_BUDGET.get(reasoning_effort, 10000)}
+
+        # Remove temperature for reasoning models (most providers don't support it)
+        if "temperature" in kwargs:
+            del kwargs["temperature"]
+
+        return kwargs
 
     # Public methods
 
@@ -372,55 +428,72 @@ class OpenAIHandler:
 
         # Build API parameters
         kwargs = {
-            "model": self.model,
+            "model": self._get_litellm_model(),
             "messages": messages,
             "top_p": self.top_p,
             "max_completion_tokens": self.max_completion_tokens,
             "temperature": self.temperature,
             "user": self.USER_ID,
+            "api_key": self.api_key,
         }
+
+        # Apply override config (may contain bare model names)
         if override_config:
             kwargs.update(override_config)
+            if "model" in override_config:
+                kwargs["model"] = self._get_litellm_model(override_config["model"])
+
+        # Pass custom base_url only if explicitly configured to non-default
+        if self.base_url and self.base_url != "https://api.openai.com/v1":
+            kwargs["api_base"] = self.base_url
 
         if self.seed:
             kwargs["seed"] = self.seed
         if response_format:
             kwargs["response_format"] = response_format
-        if self.reasoning_effort and "reasoning_effort" not in kwargs \
-            and self._is_reasoning_model(kwargs['model']):
-            if self.model.startswith("o") and self.reasoning_effort == "minimal":
-                self.reasoning_effort = "low"
+
+        # Handle reasoning parameters
+        # For OpenAI: only apply reasoning_effort to known reasoning models
+        # For other providers: apply if set (they handle thinking params differently)
+        is_reasoning = self._is_reasoning_model(kwargs['model']) or self.provider != "openai"
+        if self.reasoning_effort and "reasoning_effort" not in kwargs and is_reasoning:
             kwargs["reasoning_effort"] = self.reasoning_effort
-        if "reasoning_effort" in kwargs and not self._is_reasoning_model(kwargs['model']):
+        if "reasoning_effort" in kwargs and not is_reasoning:
             del kwargs["reasoning_effort"]
-        if self._is_reasoning_model(kwargs["model"]):
-            if "temperature" in kwargs:
-                del kwargs["temperature"]
+        if "reasoning_effort" in kwargs:
+            kwargs = self._map_reasoning_params(kwargs)
+        elif "temperature" not in kwargs:
+            kwargs["temperature"] = self.temperature
 
         # Check cost limit (including accumulated costs)
         self._check_and_log_cost(messages, self.max_completion_tokens, kwargs["model"])
 
         # Log request
-        self.logger.debug(f"OpenAI API request parameters: {json.dumps({k: v for k, v in kwargs.items() if k != 'messages'}, indent=4)}")
+        self.logger.debug(f"LLM API request parameters: {json.dumps({k: v for k, v in kwargs.items() if k not in ('messages', 'api_key')}, indent=4)}")
         self._log_messages_with_multiline_support(messages)
 
-        # Make API call
+        # Make API call via litellm
         try:
-            response = self.client.chat.completions.create(**kwargs)
-        except openai.APIError as e:
+            response = litellm.completion(**kwargs)
+        except litellm.APIError as e:
             if "maximum context length" in str(e).lower():
                 self.logger.error("Context length exceeded")
             else:
-                self.logger.error(f"OpenAI API error: {e}")
+                self.logger.error(f"LLM API error: {e}")
             raise
 
-        content = response.choices[0].message.content.strip()
-        if content is None: content = ""
+        content = response.choices[0].message.content
+        content = content.strip() if content else ""
 
-        # Log usage and cost, and add to accumulated cost
+        # Log usage and cost
         if hasattr(response, 'usage') and response.usage:
             usage = response.usage
-            actual_cost = self._estimate_cost(usage.prompt_tokens, usage.completion_tokens, kwargs["model"])
+
+            # Try litellm's cost calculation first, fall back to manual estimation
+            try:
+                actual_cost = litellm.completion_cost(completion_response=response)
+            except Exception:
+                actual_cost = self._estimate_cost(usage.prompt_tokens, usage.completion_tokens, kwargs["model"])
 
             self._add_cost(actual_cost, usage.prompt_tokens, usage.completion_tokens)
 
@@ -428,8 +501,8 @@ class OpenAIHandler:
             input_cost = (usage.prompt_tokens * pricing["input"]) / 1_000_000
             output_cost = (usage.completion_tokens * pricing["output"]) / 1_000_000
 
-            self.logger.debug(f"Tokens: {usage.prompt_tokens}→{usage.completion_tokens}, Sum: {usage.total_tokens}")
-            self.logger.debug(f"Cost: ${actual_cost:.4f} ({input_cost:.4f}→{output_cost:.4f}), Total: ${self.accumulated_cost:.2f}/{self.cost_limit:.2f}")
+            self.logger.debug(f"Tokens: {usage.prompt_tokens}->{usage.completion_tokens}, Sum: {usage.total_tokens}")
+            self.logger.debug(f"Cost: ${actual_cost:.4f} ({input_cost:.4f}->{output_cost:.4f}), Total: ${self.accumulated_cost:.2f}/{f'${self.cost_limit:.2f}' if self.cost_limit else 'unlimited'}")
 
         self.logger.debug(f"Response: {content}")
         return content
@@ -442,8 +515,13 @@ class OpenAIHandler:
             "remaining_budget": self.cost_limit - self.accumulated_cost if self.cost_limit else None,
             "call_count": self.call_count,
             "average_cost_per_call": self.accumulated_cost / self.call_count if self.call_count > 0 else 0.0,
+            "provider": self.provider,
             "model": self.model,
             "model_pricing": self._get_model_pricing(),
             "pricing_per_1m_tokens": True,
             "cost_history": self.cost_history[-10:]
         }
+
+
+# Backward compatibility alias
+OpenAIHandler = LLMHandler

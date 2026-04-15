@@ -184,13 +184,13 @@ class ChromaClientManager:
             self.llm = OpenAI(
                 model=self.model,
                 temperature=self.temperature,
-                max_tokens=DEFAULT_CONFIG['OpenAIHandler']['max_completion_tokens'],
+                max_tokens=DEFAULT_CONFIG['LLMHandler']['max_completion_tokens'],
                 additional_kwargs={"reasoning_effort": self.reasoning_effort} \
                     if (self.reasoning_effort and self.model in REASONING_MODELS) else None
             )
             self.embed_model = OpenAIEmbedding(model=self.embedding_model)
 
-            self.logger.debug(f"Using agent's OpenAI config: model={self.agent.openai_handler.model}")
+            self.logger.debug(f"Using agent's OpenAI config: model={self.agent.llm_handler.model}")
         else:
             # Fallback to default LlamaIndex settings
             self.llm = OpenAI()  # Instance-specific LLM

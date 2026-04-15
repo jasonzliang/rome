@@ -340,11 +340,11 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
                 },
                 'timestamp': datetime.now().isoformat(),
                 'cost': {
-                    'accumulated_cost': self.openai_handler.accumulated_cost,
-                    'call_count': self.openai_handler.call_count,
+                    'accumulated_cost': self.llm_handler.accumulated_cost,
+                    'call_count': self.llm_handler.call_count,
                     'sessions': self.session_costs + [{
-                        'session_cost': self.openai_handler.accumulated_cost - self.session_start_cost,
-                        'session_calls': self.openai_handler.call_count - self.session_start_calls,
+                        'session_cost': self.llm_handler.accumulated_cost - self.session_start_cost,
+                        'session_calls': self.llm_handler.call_count - self.session_start_calls,
                         'timestamp': datetime.now().isoformat(),
                     }],
                 },
@@ -407,11 +407,11 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
 
             # Restore accumulated cost from checkpoint
             cost_data = data.get('cost', {})
-            self.openai_handler.accumulated_cost = cost_data.get('accumulated_cost', 0.0)
-            self.openai_handler.call_count = cost_data.get('call_count', 0)
+            self.llm_handler.accumulated_cost = cost_data.get('accumulated_cost', 0.0)
+            self.llm_handler.call_count = cost_data.get('call_count', 0)
             self.session_costs = cost_data.get('sessions', [])
-            self.session_start_cost = self.openai_handler.accumulated_cost
-            self.session_start_calls = self.openai_handler.call_count
+            self.session_start_cost = self.llm_handler.accumulated_cost
+            self.session_start_calls = self.llm_handler.call_count
 
             # Restore role from checkpoint if enabled
             if self.load_saved_role:
@@ -1240,7 +1240,7 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
         self.shutdown_called = True
 
         # Save final checkpoint with session cost
-        if hasattr(self, 'current_iteration') and hasattr(self, 'openai_handler') and self.url_stack:
+        if hasattr(self, 'current_iteration') and hasattr(self, 'llm_handler') and self.url_stack:
             self._save_checkpoint(self.current_iteration)
             self.logger.info("Final checkpoint saved on shutdown")
 

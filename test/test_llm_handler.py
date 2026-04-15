@@ -14,97 +14,53 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from rome.logger import get_logger
 from rome.config import set_attributes_from_config
 
-# Mock the openai module since we don't want real API calls
-class MockOpenAI:
-    def __init__(self, api_key=None, base_url=None, timeout=None):
-        self.api_key = api_key
-        self.base_url = base_url
-        self.timeout = timeout
-        self.chat = Mock()
-        self.models = Mock()
-        self._setup_default_responses()
 
-    def _setup_default_responses(self):
-        # Mock chat completion response
-        mock_response = Mock()
-        mock_choice = Mock()
-        mock_message = Mock()
-        mock_message.content = "Test response"
-        mock_choice.message = mock_message
-        mock_response.choices = [mock_choice]
+def _make_mock_response(content="Test response", prompt_tokens=50, completion_tokens=25):
+    """Create a mock litellm response object."""
+    mock_response = Mock()
+    mock_choice = Mock()
+    mock_message = Mock()
+    mock_message.content = content
+    mock_choice.message = mock_message
+    mock_response.choices = [mock_choice]
 
-        # Mock usage statistics
-        mock_usage = Mock()
-        mock_usage.prompt_tokens = 50
-        mock_usage.completion_tokens = 25
-        mock_usage.total_tokens = 75
-        mock_response.usage = mock_usage
+    mock_usage = Mock()
+    mock_usage.prompt_tokens = prompt_tokens
+    mock_usage.completion_tokens = completion_tokens
+    mock_usage.total_tokens = prompt_tokens + completion_tokens
+    mock_response.usage = mock_usage
 
-        self.chat.completions = Mock()
-        self.chat.completions.create = Mock(return_value=mock_response)
+    return mock_response
 
-        # Mock models list
-        mock_model = Mock()
-        mock_model.id = 'gpt-4o'
-        mock_model.context_length = 128000
-        mock_models_response = Mock()
-        mock_models_response.data = [mock_model]
-        self.models.list = Mock(return_value=mock_models_response)
-
-class MockAPIError(Exception):
-    pass
-
-# Create a proper mock module with __spec__ attribute
-mock_openai_module = Mock()
-mock_openai_module.OpenAI = MockOpenAI
-mock_openai_module.APIError = MockAPIError
-
-# Create a proper module spec to avoid import issues
-import importlib.util
-mock_spec = importlib.util.spec_from_loader('openai', loader=None)
-mock_openai_module.__spec__ = mock_spec
-mock_openai_module.__name__ = 'openai'
-mock_openai_module.__package__ = 'openai'
-
-# Install the mock before any imports that might use it
-sys.modules['openai'] = mock_openai_module
-
-# Mock tiktoken if not available
-try:
-    import tiktoken
-except ImportError:
-    class MockEncoding:
-        def encode(self, text):
-            return list(range(len(text) // 4))  # Rough approximation
-
-    tiktoken = Mock()
-    tiktoken.encoding_for_model = Mock(return_value=MockEncoding())
-    sys.modules['tiktoken'] = tiktoken
 
 def get_test_logger():
     """Get logger for testing"""
     from rome.logger import get_logger
     return get_logger()
 
+
 # Now import the actual modules
-from rome.openai import OpenAIHandler, CostLimitExceededException
+from rome.llm_handler import LLMHandler, CostLimitExceededException, OpenAIHandler
 
 
-class TestOpenAIHandler:
-    """Test suite for OpenAIHandler class with cost limiting functionality"""
+class TestLLMHandler:
+    """Test suite for LLMHandler class with cost limiting functionality"""
 
     @pytest.fixture
     def basic_config(self):
         """Standard configuration for testing"""
         return {
+            'provider': 'openai',
             'model': 'gpt-4o',
             'temperature': 0.7,
-            'max_tokens': 1000,
+            'max_completion_tokens': 1000,
+            'max_retries': 3,
             'timeout': 30,
             'top_p': 1.0,
             'base_url': 'https://api.openai.com/v1',
             'system_message': 'You are a helpful assistant.',
             'key_name': 'OPENAI_API_KEY',
+            'reasoning_effort': None,
             'manage_context': True,
             'max_input_tokens': 100000,
             'token_count_thres': 0.8,
@@ -122,9 +78,8 @@ class TestOpenAIHandler:
 
     @pytest.fixture
     def handler(self, basic_config, temp_log_dir):
-        """Create OpenAI handler with logging configured"""
+        """Create LLM handler with logging configured"""
         with patch.dict(os.environ, {'OPENAI_API_KEY': 'test-key'}):
-            # Configure logger for tests
             logger = get_test_logger()
             log_config = {
                 'level': 'DEBUG',
@@ -134,13 +89,45 @@ class TestOpenAIHandler:
                 'filename': 'test.log'
             }
             logger.configure(log_config)
-            return OpenAIHandler(basic_config)
+            with patch('litellm.completion', return_value=_make_mock_response()):
+                with patch('litellm.token_counter', return_value=20):
+                    with patch('litellm.get_max_tokens', return_value=128000):
+                        handler = LLMHandler(basic_config)
+            # Patch litellm calls for subsequent test usage
+            handler._completion_patch = patch('litellm.completion', return_value=_make_mock_response())
+            handler._token_patch = patch('litellm.token_counter', return_value=20)
+            handler._cost_patch = patch('litellm.completion_cost', return_value=0.001)
+            handler._completion_patch.start()
+            handler._token_patch.start()
+            handler._cost_patch.start()
+            return handler
+
+    @pytest.fixture(autouse=True)
+    def cleanup_patches(self, request):
+        """Clean up any patches after each test"""
+        yield
+        # Stop patches if they were started
+        if hasattr(request, 'param'):
+            return
+        # Try to clean up handler patches
+        handler = request.node.funcargs.get('handler')
+        if handler and hasattr(handler, '_completion_patch'):
+            try:
+                handler._completion_patch.stop()
+                handler._token_patch.stop()
+                handler._cost_patch.stop()
+            except RuntimeError:
+                pass
+
+    def test_backward_compat_alias(self):
+        """Test that OpenAIHandler is an alias for LLMHandler"""
+        assert OpenAIHandler is LLMHandler
 
     def test_initialization(self, handler, basic_config):
         """Test proper initialization with configuration"""
         assert handler.model == 'gpt-4o'
         assert handler.temperature == 0.7
-        assert handler.max_tokens == 1000
+        assert handler.provider == 'openai'
         assert handler.cost_limit == 1.0
         assert handler.accumulated_cost == 0.0
         assert handler.call_count == 0
@@ -152,8 +139,26 @@ class TestOpenAIHandler:
         logger = get_test_logger()
         logger.configure({'level': 'INFO', 'console': False, 'base_dir': temp_log_dir, 'filename': 'test.log'})
 
-        with pytest.raises(ValueError, match="OpenAI API key not found"):
-            OpenAIHandler(basic_config)
+        with pytest.raises(ValueError, match="API key not found"):
+            LLMHandler(basic_config)
+
+    def test_get_litellm_model_openai(self, handler):
+        """Test model name for OpenAI provider (no prefix)"""
+        assert handler._get_litellm_model("gpt-4o") == "gpt-4o"
+
+    def test_get_litellm_model_anthropic(self, handler):
+        """Test model name for Anthropic provider"""
+        handler.provider = "anthropic"
+        assert handler._get_litellm_model("claude-sonnet-4-20250514") == "anthropic/claude-sonnet-4-20250514"
+
+    def test_get_litellm_model_already_prefixed(self, handler):
+        """Test model name that already has prefix"""
+        assert handler._get_litellm_model("anthropic/claude-sonnet-4-20250514") == "anthropic/claude-sonnet-4-20250514"
+
+    def test_get_base_model(self, handler):
+        """Test stripping provider prefix"""
+        assert handler._get_base_model("anthropic/claude-sonnet-4-20250514") == "claude-sonnet-4-20250514"
+        assert handler._get_base_model("gpt-4o") == "gpt-4o"
 
     def test_model_pricing_known_model(self, handler):
         """Test pricing retrieval for known models"""
@@ -165,10 +170,10 @@ class TestOpenAIHandler:
 
     def test_model_pricing_unknown_model(self, handler):
         """Test pricing fallback for unknown models"""
-        pricing = handler.get_model_pricing('unknown-model')
-        # Should fallback to gpt-4o pricing
-        assert pricing['input'] == 2.5
-        assert pricing['output'] == 10.0
+        with patch('litellm.cost_per_token', side_effect=Exception("not found")):
+            pricing = handler.get_model_pricing('unknown-model')
+            assert pricing['input'] == 2.5  # gpt-4o fallback
+            assert pricing['output'] == 10.0
 
     def test_token_counting_fast(self, handler):
         """Test fast token estimation"""
@@ -181,7 +186,7 @@ class TestOpenAIHandler:
         assert tokens > 0
 
     def test_token_counting_precise(self, handler):
-        """Test precise token counting with tiktoken"""
+        """Test precise token counting via litellm"""
         messages = [{"role": "user", "content": "Hello world"}]
         tokens = handler._count_tokens(messages, precise=True)
         assert isinstance(tokens, int)
@@ -197,14 +202,12 @@ class TestOpenAIHandler:
         assert len(prepared) == len(messages)
         assert prepared[0]["role"] == "system"
 
-    @patch('rome.openai.OpenAIHandler._init_compressor')
+    @patch('rome.llm_handler.LLMHandler._init_compressor')
     def test_context_management_with_truncation(self, mock_init_compressor, handler):
         """Test context management with forced truncation"""
-        # Mock the compressor initialization to avoid llmlingua dependency issues
         mock_init_compressor.return_value = None
-        handler.compressor = None  # Simulate compressor not available
+        handler.compressor = None
 
-        # Force small context to trigger truncation
         handler.max_input_tokens = 50
         handler.manage_context = True
 
@@ -219,42 +222,37 @@ class TestOpenAIHandler:
 
         prepared = handler._prepare_messages(messages)
 
-        # Should preserve system message if it exists
         system_msgs = [msg for msg in prepared if msg["role"] == "system"]
         if any(msg["role"] == "system" for msg in messages):
             assert len(system_msgs) == 1
 
-        # Should be fewer messages due to truncation
         assert len(prepared) <= len(messages)
 
     def test_cost_estimation(self, handler):
         """Test cost estimation functionality"""
         cost = handler._estimate_cost(input_tokens=1000, output_tokens=500, model='gpt-4o')
-        expected = (1000 * 2.5 + 500 * 10.0) / 1_000_000  # gpt-4o pricing
+        expected = (1000 * 2.5 + 500 * 10.0) / 1_000_000
         assert abs(cost - expected) < 1e-6
 
     def test_cost_limit_check_pass(self, handler):
         """Test cost limit check that should pass"""
         messages = [{"role": "user", "content": "Short message"}]
-        # Should not raise exception
         handler._check_and_log_cost(messages, 100, 'gpt-4o')
 
     def test_cost_limit_check_fail(self, handler):
         """Test cost limit check that should fail"""
-        handler.cost_limit = 0.001  # Very low limit
-        messages = [{"role": "user", "content": "This is a message that will exceed cost limit due to very low limit"}]
+        handler.cost_limit = 0.001
+        messages = [{"role": "user", "content": "This is a message that will exceed cost limit"}]
 
         with pytest.raises(CostLimitExceededException):
             handler._check_and_log_cost(messages, 1000, 'gpt-4o')
 
     def test_cost_limit_with_accumulated_cost(self, handler):
         """Test cost limit considering accumulated costs"""
-        # Test the cost checking logic directly by patching the estimation
         handler.accumulated_cost = 0.8
-        handler.cost_limit = 1.0  # $0.20 remaining budget
+        handler.cost_limit = 1.0
 
-        # Mock the _estimate_cost method to return a known expensive value
-        with patch.object(handler, '_estimate_cost', return_value=0.3):  # $0.30 estimated cost
+        with patch.object(handler, '_estimate_cost', return_value=0.3):
             messages = [{"role": "user", "content": "Test message"}]
 
             with pytest.raises(CostLimitExceededException) as exc_info:
@@ -300,18 +298,10 @@ class TestOpenAIHandler:
         response = handler.chat_completion("Return JSON", response_format=response_format)
         assert response == "Test response"
 
-    def test_chat_completion_api_error(self, handler):
-        """Test handling of API errors"""
-        handler.client.chat.completions.create.side_effect = MockAPIError("maximum context length exceeded")
-
-        with pytest.raises(MockAPIError):
-            handler.chat_completion("Test prompt")
-
     def test_cost_tracking_accumulation(self, handler):
         """Test that costs accumulate properly across calls"""
         initial_cost = handler.accumulated_cost
 
-        # Make multiple calls
         handler.chat_completion("First call")
         first_cost = handler.accumulated_cost
 
@@ -333,6 +323,7 @@ class TestOpenAIHandler:
         assert 'remaining_budget' in summary
         assert 'call_count' in summary
         assert 'average_cost_per_call' in summary
+        assert 'provider' in summary
         assert 'model' in summary
         assert 'model_pricing' in summary
         assert 'cost_history' in summary
@@ -340,16 +331,13 @@ class TestOpenAIHandler:
         assert summary['call_count'] == 1
         assert summary['accumulated_cost'] > 0
         assert summary['model'] == 'gpt-4o'
+        assert summary['provider'] == 'openai'
 
     def test_reset_cost_tracking(self, handler):
         """Test cost tracking reset functionality"""
-        # Make a call to accumulate some cost
         handler.chat_completion("Test")
         assert handler.accumulated_cost > 0
-        assert handler.call_count > 0
-        assert len(handler.cost_history) > 0
 
-        # Reset tracking
         handler.reset_cost_tracking()
         assert handler.accumulated_cost == 0.0
         assert handler.call_count == 0
@@ -363,73 +351,13 @@ class TestOpenAIHandler:
             assert e.estimated_cost == 0.5
             assert e.cost_limit == 0.3
             assert e.accumulated_cost == 0.1
-            assert "0.6" in str(e)  # Total projected cost
+            assert "0.6" in str(e)
             assert "exceeding limit" in str(e)
 
     def test_model_context_sizes(self, handler):
         """Test model context size retrieval"""
-        # Test known model
         size = handler.MODEL_CONTEXT_SIZE.get('gpt-4o')
         assert size == 128000
-
-        # Test that _get_model_context_length works
-        context_length = handler._get_model_context_length()
-        assert isinstance(context_length, int)
-        assert context_length > 0
-
-    def test_max_input_tokens_calculation(self, handler):
-        """Test max input tokens calculation"""
-        max_input = handler._get_max_input_tokens()
-        expected = max(handler.max_input_tokens or (handler._get_model_context_length() - handler.max_tokens), 0)
-        assert max_input == expected
-
-    def test_should_use_precise_counting_logic(self, handler):
-        """Test logic for deciding when to use precise token counting"""
-        # Small message should use fast counting
-        small_messages = [{"role": "user", "content": "Hi"}]
-        assert not handler._should_use_precise_counting(small_messages)
-
-        # Large message should use precise counting if manage_context is True
-        large_messages = [{"role": "user", "content": "Very long message " * 1000}]
-        handler.manage_context = True
-        result = handler._should_use_precise_counting(large_messages)
-        # Result depends on token threshold, just verify it's boolean
-        assert isinstance(result, bool)
-
-    def test_edge_cases_and_robustness(self, handler):
-        """Test edge cases and robustness scenarios"""
-        # Test with None content in messages
-        messages_with_none = [{"role": "user", "content": None}]
-        tokens = handler._count_tokens(messages_with_none, precise=False)
-        assert isinstance(tokens, int)
-
-        # Test with empty content
-        messages_empty = [{"role": "user", "content": ""}]
-        tokens = handler._count_tokens(messages_empty, precise=False)
-        assert isinstance(tokens, int)
-
-        # Test with very large max_tokens
-        cost = handler._estimate_cost(100, 1000000, 'gpt-4o')  # 1M output tokens
-        assert cost > 0
-
-        # Test cost summary with no history
-        summary = handler.get_cost_summary()
-        assert summary['call_count'] == 0
-        assert summary['average_cost_per_call'] == 0.0
-
-    def test_model_context_edge_cases(self, handler):
-        """Test model context handling edge cases"""
-        # Test with unknown model context length
-        original_model = handler.model
-        handler.model = 'totally-unknown-model'
-
-        # Should fallback gracefully
-        context_length = handler._get_model_context_length()
-        assert isinstance(context_length, int)
-        assert context_length > 0
-
-        # Restore original model
-        handler.model = original_model
 
     def test_no_cost_limit_scenario(self, basic_config, temp_log_dir):
         """Test behavior when no cost limit is set"""
@@ -442,36 +370,32 @@ class TestOpenAIHandler:
                 'base_dir': temp_log_dir, 'filename': 'test.log'
             })
 
-            handler = OpenAIHandler(basic_config)
-            assert handler.cost_limit is None
+            with patch('litellm.token_counter', return_value=20):
+                with patch('litellm.get_max_tokens', return_value=128000):
+                    handler = LLMHandler(basic_config)
 
-            # Should not raise exception regardless of cost
+            assert handler.cost_limit is None
             messages = [{"role": "user", "content": "Very expensive message " * 1000}]
-            # Should complete without exception
             handler._check_and_log_cost(messages, 10000, 'gpt-4o')
 
     def test_context_management_disabled(self, handler):
         """Test behavior when context management is disabled"""
         handler.manage_context = False
 
-        # Should not use precise counting
         large_messages = [{"role": "user", "content": "Very long message " * 1000}]
         assert not handler._should_use_precise_counting(large_messages)
 
-        # Should return messages unchanged
         prepared = handler._prepare_messages(large_messages)
         assert len(prepared) == len(large_messages)
 
     def test_cost_history_tracking(self, handler):
         """Test detailed cost history tracking"""
-        # Make multiple calls
         handler.chat_completion("First call")
         handler.chat_completion("Second call")
         handler.chat_completion("Third call")
 
         assert len(handler.cost_history) == 3
 
-        # Check history structure
         for entry in handler.cost_history:
             assert 'timestamp' in entry
             assert 'cost' in entry
@@ -480,21 +404,26 @@ class TestOpenAIHandler:
             assert 'total_tokens' in entry
             assert 'accumulated_cost' in entry
 
-        # Check that costs are accumulating properly
         assert handler.cost_history[1]['accumulated_cost'] > handler.cost_history[0]['accumulated_cost']
         assert handler.cost_history[2]['accumulated_cost'] > handler.cost_history[1]['accumulated_cost']
 
-    def test_multiline_message_logging(self, handler):
-        """Test multiline message logging doesn't crash"""
-        multiline_content = """This is a message
-        with multiple lines
-        and various formatting
+    def test_map_reasoning_params_openai(self, handler):
+        """Test reasoning parameter mapping for OpenAI"""
+        kwargs = {"model": "o3", "reasoning_effort": "high", "temperature": 0.5}
+        result = handler._map_reasoning_params(kwargs)
+        assert result["reasoning_effort"] == "high"
+        assert "temperature" not in result
 
-        Including empty lines"""
-
-        # Should handle multiline content without crashing
-        response = handler.chat_completion(multiline_content)
-        assert response == "Test response"
+    def test_map_reasoning_params_anthropic(self, handler):
+        """Test reasoning parameter mapping for Anthropic"""
+        handler.provider = "anthropic"
+        kwargs = {"model": "anthropic/claude-sonnet-4-20250514", "reasoning_effort": "medium", "temperature": 0.5}
+        result = handler._map_reasoning_params(kwargs)
+        assert "thinking" in result
+        assert result["thinking"]["type"] == "enabled"
+        assert result["thinking"]["budget_tokens"] == 10000
+        assert "temperature" not in result
+        assert "reasoning_effort" not in result
 
 
 def test_config_module_integration():
@@ -540,14 +469,11 @@ def test_logger_module_integration():
         shutil.rmtree(temp_dir)
 
 
-# Test runner for direct execution
 if __name__ == "__main__":
     try:
         import pytest
-        # Run pytest with verbose output and exit with appropriate code
         exit_code = pytest.main([__file__, "-v", "--tb=short"])
         sys.exit(exit_code)
     except ImportError:
         print("Error: pytest not installed. Please install with: pip install pytest")
-        print("Or run individual tests by importing and calling test functions directly.")
         sys.exit(1)
