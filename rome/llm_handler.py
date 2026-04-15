@@ -33,10 +33,10 @@ PROVIDER_KEY_MAP = {
 
 # Reasoning effort to Anthropic thinking budget mapping
 ANTHROPIC_THINKING_BUDGET = {
-    "minimal": 2000,
-    "low": 10000,
-    "medium": 20000,
-    "high": 30000,
+    # "minimal": 8000,
+    "low": 8000,
+    "medium": 16000,
+    "high": 32000,
 }
 
 
@@ -387,14 +387,16 @@ class LLMHandler:
                 reasoning_effort = "low"
             kwargs["reasoning_effort"] = reasoning_effort
         elif self.provider == "anthropic":
-            budget = ANTHROPIC_THINKING_BUDGET.get(reasoning_effort, 10000)
+            budget = ANTHROPIC_THINKING_BUDGET.get(reasoning_effort,
+                ANTHROPIC_THINKING_BUDGET['low'])
             kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
             # max_completion_tokens is total (thinking + visible output), must exceed budget
             current_max = kwargs.get("max_completion_tokens") or self.max_completion_tokens
             if current_max <= budget:
                 kwargs["max_completion_tokens"] = budget + current_max
         elif self.provider == "gemini":
-            budget = ANTHROPIC_THINKING_BUDGET.get(reasoning_effort, 10000)
+            budget = ANTHROPIC_THINKING_BUDGET.get(reasoning_effort,
+                ANTHROPIC_THINKING_BUDGET['low'])
             kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
             current_max = kwargs.get("max_completion_tokens") or self.max_completion_tokens
             if current_max <= budget:
@@ -485,9 +487,13 @@ class LLMHandler:
         self.logger.debug(f"LLM API request parameters: {json.dumps({k: v for k, v in kwargs.items() if k not in ('messages', 'api_key')}, indent=4)}")
         self._log_messages_with_multiline_support(messages)
 
+        # Add retry/timeout (setdefault so override_config can override them)
+        kwargs.setdefault("num_retries", self.max_retries)
+        kwargs.setdefault("timeout", self.timeout)
+
         # Make API call via litellm
         try:
-            response = litellm.completion(**kwargs, num_retries=self.max_retries, timeout=self.timeout)
+            response = litellm.completion(**kwargs)
         except litellm.APIError as e:
             if "maximum context length" in str(e).lower():
                 self.logger.error("Context length exceeded")
