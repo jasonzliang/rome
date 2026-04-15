@@ -71,14 +71,19 @@ class LLMHandler:
         # OpenAI Realtime models
         "gpt-realtime": {"input": 4.0, "output": 16.0},
         "gpt-realtime-mini": {"input": 0.60, "output": 2.40},
-        # Anthropic models
+        # Anthropic Claude models
         "claude-opus-4-20250514": {"input": 15.0, "output": 75.0},
         "claude-sonnet-4-20250514": {"input": 3.0, "output": 15.0},
-        "claude-haiku-4-20250514": {"input": 0.80, "output": 4.0},
+        "claude-3-7-sonnet-20250219": {"input": 3.0, "output": 15.0},
+        "claude-3-5-sonnet-20241022": {"input": 3.0, "output": 15.0},
+        "claude-3-5-haiku-20241022": {"input": 0.80, "output": 4.0},
         # Google Gemini models
         "gemini-2.5-pro": {"input": 1.25, "output": 10.0},
         "gemini-2.5-flash": {"input": 0.15, "output": 0.60},
         "gemini-2.0-flash": {"input": 0.10, "output": 0.40},
+        "gemini-2.0-flash-lite": {"input": 0.075, "output": 0.30},
+        "gemini-1.5-pro": {"input": 1.25, "output": 5.0},
+        "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
     }
 
     MODEL_CONTEXT_SIZE = {
@@ -108,14 +113,19 @@ class LLMHandler:
         # OpenAI Realtime models
         "gpt-realtime": 128000,
         "gpt-realtime-mini": 128000,
-        # Anthropic models
+        # Anthropic Claude models
         "claude-opus-4-20250514": 200000,
         "claude-sonnet-4-20250514": 200000,
-        "claude-haiku-4-20250514": 200000,
+        "claude-3-7-sonnet-20250219": 200000,
+        "claude-3-5-sonnet-20241022": 200000,
+        "claude-3-5-haiku-20241022": 200000,
         # Google Gemini models
         "gemini-2.5-pro": 1048576,
         "gemini-2.5-flash": 1048576,
         "gemini-2.0-flash": 1048576,
+        "gemini-2.0-flash-lite": 1048576,
+        "gemini-1.5-pro": 2097152,
+        "gemini-1.5-flash": 1048576,
     }
 
     # Models that support reasoning_effort or equivalent thinking parameters
@@ -353,7 +363,7 @@ class LLMHandler:
 
         for i, msg in enumerate(messages):
             role = msg.get('role', 'unknown')
-            content = msg.get('content', '')
+            content = msg.get('content') or ''
 
             self.logger.debug(f"[{i}] {role}:")
 
@@ -384,9 +394,14 @@ class LLMHandler:
         elif self.provider == "anthropic":
             budget = ANTHROPIC_THINKING_BUDGET.get(reasoning_effort, 10000)
             kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
+            # max_completion_tokens must exceed budget_tokens for Anthropic thinking
+            if kwargs.get("max_completion_tokens", 0) <= budget:
+                kwargs["max_completion_tokens"] = budget + 10000
         elif self.provider == "gemini":
-            kwargs["thinking"] = {"type": "enabled", "budget_tokens":
-                ANTHROPIC_THINKING_BUDGET.get(reasoning_effort, 10000)}
+            budget = ANTHROPIC_THINKING_BUDGET.get(reasoning_effort, 10000)
+            kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
+            if kwargs.get("max_completion_tokens", 0) <= budget:
+                kwargs["max_completion_tokens"] = budget + 10000
 
         # Remove temperature for reasoning models (most providers don't support it)
         if "temperature" in kwargs:
@@ -462,8 +477,9 @@ class LLMHandler:
             del kwargs["reasoning_effort"]
         if "reasoning_effort" in kwargs:
             kwargs = self._map_reasoning_params(kwargs)
-        elif "temperature" not in kwargs:
-            kwargs["temperature"] = self.temperature
+        elif self._is_reasoning_model(kwargs['model']):
+            # OpenAI reasoning models don't support temperature even without reasoning_effort
+            kwargs.pop("temperature", None)
 
         # Check cost limit (including accumulated costs)
         self._check_and_log_cost(messages, self.max_completion_tokens, kwargs["model"])
@@ -474,7 +490,7 @@ class LLMHandler:
 
         # Make API call via litellm
         try:
-            response = litellm.completion(**kwargs)
+            response = litellm.completion(**kwargs, num_retries=self.max_retries, timeout=self.timeout)
         except litellm.APIError as e:
             if "maximum context length" in str(e).lower():
                 self.logger.error("Context length exceeded")
