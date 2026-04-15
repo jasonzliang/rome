@@ -14,8 +14,8 @@ from tinydb.storages import JSONStorage
 from tinydb.middlewares import CachingMiddleware
 import portalocker
 
-from .config import set_attributes_from_config
-from .logger import get_logger
+from rome.config import set_attributes_from_config
+from rome.logger import get_logger
 
 
 class LockingConfig:

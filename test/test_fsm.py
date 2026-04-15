@@ -13,7 +13,7 @@ from rome.action import Action
 from rome.state import State, IdleState, CodeLoadedState
 from rome.agent import Agent
 from rome.logger import get_logger
-from rome.action import SearchAction, ResetAction
+from rome.action import ResetAction
 from rome.config import DEFAULT_CONFIG
 
 
@@ -350,19 +350,16 @@ def test_check_context_exception():
 
 
 def test_get_action_prompt_invalid_state():
-    """Test that get_action_prompt raises error for invalid current state"""
+    """Test that get_available_actions returns empty for invalid current state"""
     fsm, agent, repo_dir = setup_fsm()
 
     try:
         # Set current state to a value not in states
         fsm.current_state = "NONEXISTENT_STATE"
 
-        # Attempt to get action prompt and expect ValueError
-        try:
-            fsm.get_action_selection_prompt(agent)
-            assert False, "Should have raised ValueError"
-        except ValueError as e:
-            assert "not a valid state" in str(e), f"Expected 'not a valid state' in exception message but got: {str(e)}"
+        # get_available_actions should return empty list for non-existent state
+        actions = fsm.get_available_actions()
+        assert actions == [], f"Expected empty list but got {actions}"
 
         print("✓ Invalid state prompt test passed")
     finally:

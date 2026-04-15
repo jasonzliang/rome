@@ -236,8 +236,7 @@ def factorial(n):
 
         kb_query_result = agent.kb_manager.query(
             question="How to handle division by zero in Python?",
-            top_k=3,
-            show_scores=False
+            top_k=3
         )
         print(f"KB query result: {kb_query_result}")
 

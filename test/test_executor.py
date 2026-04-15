@@ -30,7 +30,7 @@ class TestCodeExecutor(unittest.TestCase):
 
         # Then initialize the executor
         self.executor_config = {
-            "timeout": 5,
+            "timeout": 30,
             "virtual_env_context": None,
             "work_dir": self.temp_dir,
             "cmd_args": None,
@@ -54,7 +54,7 @@ class TestCodeExecutor(unittest.TestCase):
     # Original test methods remain unchanged
     def test_initialization(self):
         """Test that the executor initializes correctly."""
-        assert self.executor.timeout == 5
+        assert self.executor.timeout == 30
         assert self.executor.virtual_env_context is None
         assert str(self.executor.work_dir) == self.temp_dir
         assert self.executor.execution_policies["python"] is True

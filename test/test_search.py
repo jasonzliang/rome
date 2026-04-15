@@ -56,7 +56,7 @@ def print_rate_limit_info(headers):
         print(f"Reset (seconds): {headers.get('X-RateLimit-Reset', 'N/A')}")
 
 
-def test_brave_api(key, endpoint, query):
+def brave_api_test(key, endpoint, query):
     """
     Sends a GET request to the Brave Search API and prints the results and rate limits.
 

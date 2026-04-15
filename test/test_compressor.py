@@ -20,10 +20,11 @@ class TestRealContextCompression:
         """Configuration optimized for testing compression"""
         return {
             "provider": "openai", "model": "gpt-3.5-turbo-0613",  # 4K context model
-            "temperature": 0.1, "max_tokens": 1000, "timeout": 60, "top_p": 1.0,
+            "temperature": 0.1, "max_completion_tokens": 1000, "timeout": 60, "top_p": 1.0,
             "base_url": "https://api.openai.com/v1", "system_message": "You are a helpful assistant",
             "manage_context": True, "max_input_tokens": None, "token_count_thres": 0.5,
-            "chars_per_token": 4, "cost_limit": None, "key_name": "OPENAI_API_KEY", "seed": None
+            "chars_per_token": 4, "cost_limit": None, "key_name": "OPENAI_API_KEY", "seed": None,
+            "max_retries": 3, "reasoning_effort": None
         }
 
     @staticmethod
