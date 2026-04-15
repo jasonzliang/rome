@@ -108,6 +108,7 @@ DEFAULT_CONFIG = {
         "key_name": "OPENAI_API_KEY",  # API key name to find in env
         "timeout": 60,  # Time for allowing responses from API
         "cost_limit": 500.0,  # Max budget ($) for running OpenAI chat completion
+        "max_retries": 10,  # Maximum number of retries when API fails
 
         # Model Parameters
         "model": "gpt-4o",  # LLM model name

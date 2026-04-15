@@ -1172,7 +1172,7 @@ Depending on the complexity of the content, provide anywhere from 1 to 6 concise
             try:
                 self.kb_manager.add_text(insights, metadata={
                     'url': url, 'depth': 1, 'iteration': iteration})
-                self.info(f"[QUICK_EXPLORE] Added insights ({len(insights)} length) for {url} to knowledge base")
+                self.logger.info(f"[QUICK_EXPLORE] Added insights ({len(insights)} length) for {url} to knowledge base")
             except Exception as e:
                 self.logger.error(f"[QUICK_EXPLORE] KB add_text failed for {url}: {e}")
 

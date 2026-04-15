@@ -121,7 +121,7 @@ class OpenAIHandler:
             api_key=api_key,
             base_url=self.base_url,
             timeout=self.timeout,
-            max_retries=5
+            max_retries=self.max_retries,
         )
 
         self.logger.info(f"OpenAI handler initialized with model: {self.model}")
