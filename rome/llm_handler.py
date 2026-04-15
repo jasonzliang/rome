@@ -33,10 +33,10 @@ PROVIDER_KEY_MAP = {
 
 # Reasoning effort to Anthropic thinking budget mapping
 ANTHROPIC_THINKING_BUDGET = {
-    "minimal": 1000,
-    "low": 5000,
-    "medium": 10000,
-    "high": 20000,
+    "minimal": 2000,
+    "low": 10000,
+    "medium": 20000,
+    "high": 30000,
 }
 
 
@@ -126,8 +126,7 @@ class LLMHandler:
 
     # Models that support reasoning_effort or equivalent thinking parameters
     REASONING_MODELS = {
-        "gpt-5.4", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5.4-mini", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro",
-        "o1", "o1-mini", "o1-pro", "o3", "o3-mini", "o4-mini",
+        "gpt-5.4", "gpt-5.2", "gpt-5.1", "gpt-5", "gpt-5.4-mini", "gpt-5-mini", "gpt-5-nano", "gpt-5-pro", "o1", "o1-mini", "o1-pro", "o3", "o3-mini", "o4-mini",
     }
 
     # Unique identifier for chat completion requests
@@ -390,14 +389,16 @@ class LLMHandler:
         elif self.provider == "anthropic":
             budget = ANTHROPIC_THINKING_BUDGET.get(reasoning_effort, 10000)
             kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
-            # max_completion_tokens must exceed budget_tokens for Anthropic thinking
-            if kwargs.get("max_completion_tokens", 0) <= budget:
-                kwargs["max_completion_tokens"] = budget + 10000
+            # max_completion_tokens is total (thinking + visible output), must exceed budget
+            current_max = kwargs.get("max_completion_tokens") or self.max_completion_tokens
+            if current_max <= budget:
+                kwargs["max_completion_tokens"] = budget + current_max
         elif self.provider == "gemini":
             budget = ANTHROPIC_THINKING_BUDGET.get(reasoning_effort, 10000)
             kwargs["thinking"] = {"type": "enabled", "budget_tokens": budget}
-            if kwargs.get("max_completion_tokens", 0) <= budget:
-                kwargs["max_completion_tokens"] = budget + 10000
+            current_max = kwargs.get("max_completion_tokens") or self.max_completion_tokens
+            if current_max <= budget:
+                kwargs["max_completion_tokens"] = budget + current_max
 
         # Remove temperature for reasoning models (most providers don't support it)
         if "temperature" in kwargs:

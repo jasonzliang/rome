@@ -421,7 +421,7 @@ class TestLLMHandler:
         result = handler._map_reasoning_params(kwargs)
         assert "thinking" in result
         assert result["thinking"]["type"] == "enabled"
-        assert result["thinking"]["budget_tokens"] == 10000
+        assert result["thinking"]["budget_tokens"] == 20000
         assert "temperature" not in result
         assert "reasoning_effort" not in result
 
