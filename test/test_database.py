@@ -1,441 +1,347 @@
-"""
-Unified, deadlock-safe TinyDB management with centralized locking configuration.
-All locking operations now use consistent timeout and retry logic.
-"""
-import datetime
+"""Tests for rome.database — DatabaseManager, LockingConfig, and locked file helpers."""
 import json
 import os
+import sys
+import tempfile
 import time
-from typing import List, Dict, Any, Optional, Callable
-from contextlib import contextmanager
+import unittest
 
-from tinydb import TinyDB, Query
-from tinydb.storages import JSONStorage
-from tinydb.middlewares import CachingMiddleware
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import portalocker
 
-from rome.config import set_attributes_from_config
-from rome.logger import get_logger
+import rome.database as database_module
+from rome.database import (
+    DatabaseManager,
+    LockingConfig,
+    TimeoutLockedJSONStorage,
+    ensure_dir,
+    get_locking_config,
+    locked_file_operation,
+    locked_json_operation,
+    set_locking_config,
+)
+
+DB_CONFIG = {"lock_timeout": 2.0, "max_retries": 3, "retry_delay": 0.01}
 
 
-class LockingConfig:
-    """Centralized locking configuration that can be shared across components"""
+def _make_manager(tmpdir):
+    """Build a DatabaseManager whose dbs live inside tmpdir."""
+    def get_db_path(file_path):
+        safe = file_path.replace(os.sep, "_").lstrip("_")
+        return os.path.join(tmpdir, f"{safe}.json")
+    return DatabaseManager(get_db_path, DB_CONFIG)
 
-    def __init__(self, config: Dict = None):
-        self.config = config or {}
-        set_attributes_from_config(self, self.config, ['lock_timeout', 'max_retries', 'retry_delay'])
 
-    def with_retry(self, operation: Callable, logger=None, operation_name: str = "operation"):
-        """Execute operation with retry logic using configured values"""
-        last_exception = None
+class TestLockingConfig(unittest.TestCase):
+    def test_config_attributes_applied(self):
+        cfg = LockingConfig({"lock_timeout": 1.5, "max_retries": 7, "retry_delay": 0.02})
+        self.assertEqual(cfg.lock_timeout, 1.5)
+        self.assertEqual(cfg.max_retries, 7)
+        self.assertEqual(cfg.retry_delay, 0.02)
 
-        for attempt in range(self.max_retries):
+    def test_with_retry_returns_value_on_success(self):
+        cfg = LockingConfig(DB_CONFIG)
+        self.assertEqual(cfg.with_retry(lambda: 42), 42)
+
+    def test_with_retry_retries_on_lock_exception(self):
+        cfg = LockingConfig({"lock_timeout": 1.0, "max_retries": 3, "retry_delay": 0.001})
+        calls = {"n": 0}
+
+        def op():
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise portalocker.LockException("busy")
+            return "ok"
+
+        self.assertEqual(cfg.with_retry(op), "ok")
+        self.assertEqual(calls["n"], 3)
+
+    def test_with_retry_raises_after_exhaustion(self):
+        cfg = LockingConfig({"lock_timeout": 1.0, "max_retries": 2, "retry_delay": 0.001})
+
+        def op():
+            raise TimeoutError("nope")
+
+        with self.assertRaises(TimeoutError):
+            cfg.with_retry(op)
+
+    def test_with_retry_reraises_other_exceptions(self):
+        cfg = LockingConfig(DB_CONFIG)
+
+        def op():
+            raise ValueError("boom")
+
+        with self.assertRaises(ValueError):
+            cfg.with_retry(op)
+
+
+class TestGlobalLockingConfig(unittest.TestCase):
+    def setUp(self):
+        database_module._locking_config = None
+
+    def tearDown(self):
+        database_module._locking_config = None
+
+    def test_get_without_set_raises(self):
+        with self.assertRaises(RuntimeError):
+            get_locking_config()
+
+    def test_set_and_get_roundtrip(self):
+        cfg = LockingConfig(DB_CONFIG)
+        set_locking_config(cfg)
+        self.assertIs(get_locking_config(), cfg)
+
+
+class TestEnsureDir(unittest.TestCase):
+    def test_creates_parent_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = os.path.join(tmp, "a", "b", "c", "file.json")
+            ensure_dir(target)
+            self.assertTrue(os.path.isdir(os.path.dirname(target)))
+
+    def test_idempotent_on_existing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            target = os.path.join(tmp, "file.json")
+            ensure_dir(target)
+            ensure_dir(target)  # should not raise
+
+
+class TestLockedFileOperations(unittest.TestCase):
+    def setUp(self):
+        set_locking_config(LockingConfig(DB_CONFIG))
+
+    def tearDown(self):
+        database_module._locking_config = None
+
+    def test_locked_file_operation_writes_and_reads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "nested", "f.txt")
+            with locked_file_operation(path, mode="w") as f:
+                f.write("hello")
+            with open(path) as f:
+                self.assertEqual(f.read(), "hello")
+
+    def test_locked_json_operation_creates_and_mutates(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "data.json")
+            with locked_json_operation(path, default_data={"count": 0}) as data:
+                data["count"] = 5
+            with open(path) as f:
+                self.assertEqual(json.load(f), {"count": 5})
+
+            with locked_json_operation(path) as data:
+                self.assertEqual(data["count"], 5)
+                data["count"] += 1
+            with open(path) as f:
+                self.assertEqual(json.load(f), {"count": 6})
+
+    def test_locked_json_operation_recovers_from_corrupt_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "bad.json")
+            with open(path, "w") as f:
+                f.write("{not valid json")
+            with locked_json_operation(path, default_data={"fresh": True}) as data:
+                self.assertEqual(data, {"fresh": True})
+                data["fresh"] = False
+            with open(path) as f:
+                self.assertEqual(json.load(f), {"fresh": False})
+
+
+class TestTimeoutLockedJSONStorage(unittest.TestCase):
+    def setUp(self):
+        set_locking_config(LockingConfig(DB_CONFIG))
+
+    def tearDown(self):
+        database_module._locking_config = None
+
+    def test_read_missing_file_returns_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "missing.json")
+            storage = TimeoutLockedJSONStorage(path, lock_timeout=1.0)
             try:
-                return operation()
-            except (TimeoutError, portalocker.LockException) as e:
-                last_exception = e
-                if attempt < self.max_retries - 1:
-                    if logger:
-                        logger.warning(f"{operation_name} lock timeout on attempt {attempt + 1}, retrying...")
-                    time.sleep(self.retry_delay * (2 ** attempt))
-                continue
-            except Exception:
-                raise
+                self.assertEqual(storage.read(), {})
+            finally:
+                storage.close()
 
-        raise last_exception
-
-
-# Global locking config instance - will be initialized by DatabaseManager
-_locking_config = None
-
-def get_locking_config() -> LockingConfig:
-    """Get the global locking configuration"""
-    if _locking_config is None:
-        raise RuntimeError("Locking configuration not initialized. Initialize DatabaseManager first.")
-    return _locking_config
-
-def set_locking_config(config: LockingConfig):
-    """Set the global locking configuration"""
-    global _locking_config
-    _locking_config = config
-
-
-def ensure_dir(file_path: str) -> None:
-    """Thread-safe directory creation."""
-    try:
-        os.makedirs(os.path.dirname(file_path), exist_ok=True)
-    except FileExistsError:
-        pass
-
-
-def _acquire_lock_with_timeout(file_handle, lock_type: int, timeout: float, logger=None, file_path: str = ""):
-    """Unified lock acquisition with timeout"""
-    start_time = time.time()
-    while time.time() - start_time < timeout:
-        try:
-            portalocker.lock(file_handle, lock_type | portalocker.LOCK_NB)
-            return
-        except portalocker.LockException:
-            time.sleep(0.01)
-
-    error_msg = f"Lock timeout ({timeout}s) on {file_path or 'file'}"
-    if logger:
-        logger.error(error_msg)
-    raise TimeoutError(error_msg)
-
-
-@contextmanager
-def locked_file_operation(file_path: str, mode: str = 'r',
-                         lock_type: int = portalocker.LOCK_EX,
-                         timeout: float = None, encoding: str = 'utf-8',
-                         create_dirs: bool = True, logger=None):
-    """File operation with unified timeout-based locking."""
-    if timeout is None:
-        timeout = get_locking_config().lock_timeout
-
-    if create_dirs:
-        ensure_dir(file_path)
-
-    with open(file_path, mode, encoding=encoding) as f:
-        _acquire_lock_with_timeout(f, lock_type, timeout, logger, file_path)
-        yield f
-
-
-@contextmanager
-def locked_json_operation(file_path: str, default_data: Optional[Dict] = None,
-                         timeout: float = None, create_dirs: bool = True,
-                         logger=None):
-    """JSON operation with unified timeout-based locking and atomic writes."""
-    if timeout is None:
-        timeout = get_locking_config().lock_timeout
-
-    if create_dirs:
-        ensure_dir(file_path)
-
-    with open(file_path, 'a+', encoding='utf-8') as f:
-        _acquire_lock_with_timeout(f, portalocker.LOCK_EX, timeout, logger, file_path)
-
-        # Read existing content
-        f.seek(0)
-        content = f.read()
-
-        data = default_data or {}
-        if content.strip():
+    def test_write_then_read_roundtrip(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "store.json")
+            storage = TimeoutLockedJSONStorage(path, lock_timeout=1.0)
             try:
-                data = json.loads(content)
-            except json.JSONDecodeError as e:
-                if logger:
-                    logger.error(f"Corrupted JSON file {file_path}: {e}")
-                data = default_data or {}
-
-        yield data
-
-        # Atomic write
-        f.seek(0)
-        f.truncate()
-        json.dump(data, f, indent=4)
+                storage.write({"a": [1, 2, 3]})
+                self.assertEqual(storage.read(), {"a": [1, 2, 3]})
+            finally:
+                storage.close()
 
 
-class TimeoutLockedJSONStorage(JSONStorage):
-    """TinyDB storage with unified timeout-based file locking"""
+class TestDatabaseManagerCrud(unittest.TestCase):
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmpdir = self._tmp.name
+        self.mgr = _make_manager(self.tmpdir)
+        self.file_path = "alpha"
+        self.table = "items"
 
-    def __init__(self, path: str, create_dirs: bool = True,
-                 lock_timeout: float = None, **kwargs):
-        self.path = path
-        self.lock_timeout = lock_timeout if lock_timeout is not None else get_locking_config().lock_timeout
+    def tearDown(self):
+        self.mgr.shutdown()
+        self._tmp.cleanup()
 
-        if create_dirs:
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-        super().__init__(path, **kwargs)
+    def test_init_exposes_locking_values(self):
+        self.assertEqual(self.mgr.lock_timeout, DB_CONFIG["lock_timeout"])
+        self.assertEqual(self.mgr.max_retries, DB_CONFIG["max_retries"])
+        self.assertEqual(self.mgr.retry_delay, DB_CONFIG["retry_delay"])
 
-    def read(self):
-        try:
-            with open(self.path, 'r', encoding='utf-8') as f:
-                _acquire_lock_with_timeout(f, portalocker.LOCK_SH, self.lock_timeout,
-                                         file_path=self.path)
-                content = f.read().strip()
-                return json.loads(content) if content else {}
-        except (FileNotFoundError, json.JSONDecodeError):
-            return {}
+    def test_db_exists_false_initially(self):
+        self.assertFalse(self.mgr.db_exists(self.file_path))
 
-    def write(self, data):
-        with open(self.path, 'w', encoding='utf-8') as f:
-            _acquire_lock_with_timeout(f, portalocker.LOCK_EX, self.lock_timeout,
-                                     file_path=self.path)
-            json.dump(data, f, indent=4)
+    def test_store_and_load_data(self):
+        doc_id = self.mgr.store_data(self.file_path, self.table, {"name": "x", "value": 1})
+        self.assertIsInstance(doc_id, int)
+
+        records = self.mgr.load_data(self.file_path, self.table)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["name"], "x")
+        self.assertEqual(records[0]["value"], 1)
+        self.assertEqual(records[0]["file_path"], self.file_path)
+        self.assertIn("timestamp", records[0])
+
+    def test_load_with_query_filter(self):
+        self.mgr.store_data(self.file_path, self.table, {"name": "a", "value": 1})
+        self.mgr.store_data(self.file_path, self.table, {"name": "b", "value": 2})
+        self.mgr.store_data(self.file_path, self.table, {"name": "a", "value": 3})
+
+        matches = self.mgr.load_data(self.file_path, self.table, {"name": "a"})
+        self.assertEqual(len(matches), 2)
+        self.assertTrue(all(r["name"] == "a" for r in matches))
+
+    def test_load_with_limit_and_sort(self):
+        for v in [3, 1, 2]:
+            self.mgr.store_data(self.file_path, self.table, {"value": v, "k": v})
+            time.sleep(0.002)  # ensure distinct timestamps
+
+        all_desc = self.mgr.load_data(self.file_path, self.table, order_by="k", descending=True)
+        self.assertEqual([r["k"] for r in all_desc], [3, 2, 1])
+
+        top_one = self.mgr.load_data(self.file_path, self.table, order_by="k", descending=True, limit=1)
+        self.assertEqual(len(top_one), 1)
+        self.assertEqual(top_one[0]["k"], 3)
+
+    def test_load_missing_db_returns_empty(self):
+        self.assertEqual(self.mgr.load_data("does_not_exist", self.table), [])
+
+    def test_get_latest_data(self):
+        self.mgr.store_data(self.file_path, self.table, {"n": 1})
+        time.sleep(0.005)
+        self.mgr.store_data(self.file_path, self.table, {"n": 2})
+
+        latest = self.mgr.get_latest_data(self.file_path, self.table)
+        self.assertIsNotNone(latest)
+        self.assertEqual(latest["n"], 2)
+
+    def test_get_latest_data_none_when_empty(self):
+        self.assertIsNone(self.mgr.get_latest_data("nope", self.table))
+
+    def test_update_data(self):
+        self.mgr.store_data(self.file_path, self.table, {"name": "a", "value": 1})
+        self.mgr.store_data(self.file_path, self.table, {"name": "b", "value": 2})
+
+        updated_ids = self.mgr.update_data(self.file_path, self.table, {"name": "a"}, {"value": 99})
+        self.assertEqual(len(updated_ids), 1)
+
+        rec = self.mgr.load_data(self.file_path, self.table, {"name": "a"})[0]
+        self.assertEqual(rec["value"], 99)
+
+    def test_update_missing_db_returns_empty(self):
+        self.assertEqual(self.mgr.update_data("nope", self.table, {"x": 1}, {"y": 2}), [])
+
+    def test_delete_with_query(self):
+        self.mgr.store_data(self.file_path, self.table, {"name": "a"})
+        self.mgr.store_data(self.file_path, self.table, {"name": "b"})
+
+        removed = self.mgr.delete_data(self.file_path, self.table, {"name": "a"})
+        self.assertEqual(len(removed), 1)
+        self.assertEqual(self.mgr.count_data(self.file_path, self.table), 1)
+
+    def test_delete_without_query_truncates(self):
+        self.mgr.store_data(self.file_path, self.table, {"name": "a"})
+        self.mgr.store_data(self.file_path, self.table, {"name": "b"})
+
+        result = self.mgr.delete_data(self.file_path, self.table)
+        self.assertEqual(result, [])
+        self.assertEqual(self.mgr.count_data(self.file_path, self.table), 0)
+
+    def test_delete_missing_db_returns_empty(self):
+        self.assertEqual(self.mgr.delete_data("nope", self.table), [])
+
+    def test_count_data(self):
+        self.assertEqual(self.mgr.count_data("nope", self.table), 0)
+        for i in range(3):
+            self.mgr.store_data(self.file_path, self.table, {"i": i})
+        self.assertEqual(self.mgr.count_data(self.file_path, self.table), 3)
+        self.assertEqual(self.mgr.count_data(self.file_path, self.table, {"i": 1}), 1)
+
+    def test_get_table_names_and_table_exists(self):
+        self.assertEqual(self.mgr.get_table_names("nope"), [])
+        self.mgr.store_data(self.file_path, "t1", {"x": 1})
+        self.mgr.store_data(self.file_path, "t2", {"y": 2})
+
+        tables = self.mgr.get_table_names(self.file_path)
+        self.assertIn("t1", tables)
+        self.assertIn("t2", tables)
+
+        self.assertTrue(self.mgr.table_exists(self.file_path, "t1"))
+        self.assertFalse(self.mgr.table_exists(self.file_path, "missing"))
+
+    def test_bulk_insert(self):
+        data = [{"v": i} for i in range(5)]
+        ids = self.mgr.bulk_insert(self.file_path, self.table, data)
+        self.assertEqual(len(ids), 5)
+        self.assertEqual(self.mgr.count_data(self.file_path, self.table), 5)
+
+    def test_clear_table(self):
+        for i in range(3):
+            self.mgr.store_data(self.file_path, self.table, {"i": i})
+        self.mgr.clear_table(self.file_path, self.table)
+        self.assertEqual(self.mgr.count_data(self.file_path, self.table), 0)
+
+    def test_clear_missing_db_is_noop(self):
+        self.mgr.clear_table("nope", self.table)  # should not raise
+
+    def test_drop_table(self):
+        self.mgr.store_data(self.file_path, "keep", {"x": 1})
+        self.mgr.store_data(self.file_path, "drop_me", {"y": 2})
+
+        self.mgr.drop_table(self.file_path, "drop_me")
+        self.assertFalse(self.mgr.table_exists(self.file_path, "drop_me"))
+        self.assertTrue(self.mgr.table_exists(self.file_path, "keep"))
+
+    def test_get_database_info_missing(self):
+        info = self.mgr.get_database_info("nope")
+        self.assertFalse(info["exists"])
+        self.assertEqual(info["tables"], [])
+        self.assertEqual(info["total_records"], 0)
+        self.assertIn("path", info)
+
+    def test_get_database_info_populated(self):
+        self.mgr.store_data(self.file_path, "t1", {"x": 1})
+        self.mgr.store_data(self.file_path, "t1", {"x": 2})
+        self.mgr.store_data(self.file_path, "t2", {"y": 1})
+
+        info = self.mgr.get_database_info(self.file_path)
+        self.assertTrue(info["exists"])
+        self.assertEqual(info["total_records"], 3)
+        self.assertEqual(info["table_record_counts"]["t1"], 2)
+        self.assertEqual(info["table_record_counts"]["t2"], 1)
+        self.assertGreater(info["file_size_bytes"], 0)
+
+    def test_shutdown_clears_global_locking_config(self):
+        self.assertIsNotNone(database_module._locking_config)
+        self.mgr.shutdown()
+        self.assertIsNone(database_module._locking_config)
+        # Re-initialize so tearDown's shutdown is a no-op re-run
+        self.mgr = _make_manager(self.tmpdir)
 
 
-class DatabaseManager:
-    """Unified, deadlock-safe TinyDB manager with centralized configuration"""
-
-    def __init__(self, get_db_path_func, config: Dict = None):
-        self.config = config or {}
-        self.logger = get_logger()
-        self._get_db_path = get_db_path_func
-
-        # Initialize locking configuration
-        self.locking_config = LockingConfig(self.config)
-
-        # Set global locking config for other components
-        set_locking_config(self.locking_config)
-
-        # Legacy attribute access for backward compatibility
-        self.lock_timeout = self.locking_config.lock_timeout
-        self.max_retries = self.locking_config.max_retries
-        self.retry_delay = self.locking_config.retry_delay
-
-    def _timestamp(self) -> str:
-        """Generate ISO timestamp"""
-        return datetime.datetime.now().isoformat()
-
-    @contextmanager
-    def _db_context(self, file_path: str, table_name: str = None):
-        """Database context with automatic cleanup using unified locking"""
-        db_path = self._get_db_path(file_path)
-        storage = CachingMiddleware(
-            lambda path: TimeoutLockedJSONStorage(path, lock_timeout=self.lock_timeout)
-        )
-        db = TinyDB(db_path, storage=storage)
-
-        try:
-            yield db.table(table_name) if table_name else db
-        finally:
-            try:
-                db.close()
-            except Exception as e:
-                self.logger.error(f"Error closing database: {e}")
-
-    def _with_retry(self, operation: Callable, operation_name: str = "database operation"):
-        """Execute operation with unified retry logic"""
-        return self.locking_config.with_retry(operation, self.logger, operation_name)
-
-    def _enrich_data(self, data: Dict[str, Any], file_path: str) -> Dict[str, Any]:
-        """Add metadata to data"""
-        return {'timestamp': self._timestamp(), 'file_path': file_path, **data}
-
-    def _build_query(self, query_filter: Dict[str, Any]) -> Optional[Query]:
-        """Build TinyDB query from filter dict"""
-        if not query_filter:
-            return None
-
-        query = Query()
-        conditions = [query[key] == value for key, value in query_filter.items()]
-        result = conditions[0]
-        for condition in conditions[1:]:
-            result = result & condition
-        return result
-
-    def _sort_and_limit(self, results: List[Dict], order_by: str = None,
-                       descending: bool = True, limit: int = None) -> List[Dict]:
-        """Apply sorting and limiting"""
-        if order_by and results:
-            results.sort(key=lambda x: x.get(order_by, ''), reverse=descending)
-        return results[:limit] if limit else results
-
-    def _safe_len(self, obj) -> int:
-        """Safe length calculation"""
-        return len(obj) if obj is not None else 0
-
-    # Core database operations with unified error handling
-    def db_exists(self, file_path: str) -> bool:
-        """Check if database exists"""
-        return os.path.exists(self._get_db_path(file_path))
-
-    def store_data(self, file_path: str, table_name: str, data: Dict[str, Any]) -> int:
-        """Store data with automatic retry"""
-        def _store():
-            enriched_data = self._enrich_data(data, file_path)
-            with self._db_context(file_path, table_name) as table:
-                return table.insert(enriched_data)
-
-        doc_id = self._with_retry(_store, f"store_data in {table_name}")
-        self.logger.debug(f"Stored data with ID {doc_id} in '{table_name}'")
-        return doc_id
-
-    def load_data(self, file_path: str, table_name: str, query_filter: Optional[Dict[str, Any]] = None,
-                  limit: Optional[int] = None, order_by: Optional[str] = None,
-                  descending: bool = True) -> List[Dict[str, Any]]:
-        """Load data with filtering and sorting"""
-        def _load():
-            if not self.db_exists(file_path):
-                return []
-
-            with self._db_context(file_path, table_name) as table:
-                query = self._build_query(query_filter)
-                results = table.search(query) if query else table.all()
-
-            return self._sort_and_limit(results, order_by, descending, limit)
-
-        results = self._with_retry(_load, f"load_data from {table_name}")
-        self.logger.debug(f"Loaded {len(results)} records from '{table_name}'")
-        return results
-
-    def get_latest_data(self, file_path: str, table_name: str,
-                       query_filter: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
-        """Get most recent record"""
-        results = self.load_data(file_path, table_name, query_filter, limit=1, order_by='timestamp')
-        return results[0] if results else None
-
-    def update_data(self, file_path: str, table_name: str, query_filter: Dict[str, Any],
-                   updates: Dict[str, Any]) -> List[int]:
-        """Update records"""
-        def _update():
-            if not self.db_exists(file_path):
-                return []
-
-            with self._db_context(file_path, table_name) as table:
-                query = self._build_query(query_filter)
-                doc_ids = table.update(updates, query) if query else table.update(updates)
-                return doc_ids or []
-
-        doc_ids = self._with_retry(_update, f"update_data in {table_name}")
-        self.logger.debug(f"Updated {self._safe_len(doc_ids)} records in '{table_name}'")
-        return doc_ids
-
-    def delete_data(self, file_path: str, table_name: str,
-                   query_filter: Optional[Dict[str, Any]] = None) -> List[int]:
-        """Delete records"""
-        def _delete():
-            if not self.db_exists(file_path):
-                return []
-
-            with self._db_context(file_path, table_name) as table:
-                query = self._build_query(query_filter)
-                if query:
-                    doc_ids = table.remove(query) or []
-                    self.logger.debug(f"Deleted {self._safe_len(doc_ids)} records from '{table_name}'")
-                    return doc_ids
-                else:
-                    # Handle truncate separately since it returns None
-                    count = len(table.all())
-                    table.truncate()
-                    self.logger.debug(f"Truncated {count} records from '{table_name}'")
-                    return []
-
-        return self._with_retry(_delete, f"delete_data from {table_name}")
-
-    def count_data(self, file_path: str, table_name: str,
-                  query_filter: Optional[Dict[str, Any]] = None) -> int:
-        """Count records"""
-        def _count():
-            if not self.db_exists(file_path):
-                return 0
-
-            with self._db_context(file_path, table_name) as table:
-                query = self._build_query(query_filter)
-                return len(table.search(query) if query else table.all())
-
-        return self._with_retry(_count, f"count_data in {table_name}")
-
-    def get_table_names(self, file_path: str) -> List[str]:
-        """Get all table names"""
-        def _get_tables():
-            if not self.db_exists(file_path):
-                return []
-            with self._db_context(file_path) as db:
-                return db.tables()
-
-        return self._with_retry(_get_tables, "get_table_names")
-
-    def table_exists(self, file_path: str, table_name: str) -> bool:
-        """Check if table exists"""
-        return table_name in self.get_table_names(file_path)
-
-    def bulk_insert(self, file_path: str, table_name: str, data_list: List[Dict[str, Any]]) -> List[int]:
-        """Bulk insert records"""
-        def _bulk_insert():
-            enriched_data = [self._enrich_data(data, file_path) for data in data_list]
-            with self._db_context(file_path, table_name) as table:
-                return table.insert_multiple(enriched_data)
-
-        doc_ids = self._with_retry(_bulk_insert, f"bulk_insert into {table_name}")
-        self.logger.debug(f"Bulk inserted {len(doc_ids)} records into '{table_name}'")
-        return doc_ids
-
-    def clear_table(self, file_path: str, table_name: str) -> None:
-        """Clear all records from table"""
-        def _clear():
-            if self.db_exists(file_path):
-                with self._db_context(file_path, table_name) as table:
-                    table.truncate()
-
-        self._with_retry(_clear, f"clear_table {table_name}")
-        self.logger.debug(f"Cleared table '{table_name}'")
-
-    def drop_table(self, file_path: str, table_name: str) -> None:
-        """Drop table entirely"""
-        def _drop():
-            if self.db_exists(file_path):
-                with self._db_context(file_path) as db:
-                    db.drop_table(table_name)
-
-        self._with_retry(_drop, f"drop_table {table_name}")
-        self.logger.debug(f"Dropped table '{table_name}'")
-
-    def get_database_info(self, file_path: str) -> Dict[str, Any]:
-        """Get database information"""
-        if not self.db_exists(file_path):
-            return {
-                'exists': False,
-                'path': self._get_db_path(file_path),
-                'tables': [],
-                'total_records': 0
-            }
-
-        def _get_info():
-            tables = self.get_table_names(file_path)
-            table_info = {table: self.count_data(file_path, table) for table in tables}
-            return {
-                'exists': True,
-                'path': self._get_db_path(file_path),
-                'tables': tables,
-                'table_record_counts': table_info,
-                'total_records': sum(table_info.values()),
-                'file_size_bytes': os.path.getsize(self._get_db_path(file_path))
-            }
-
-        return self._with_retry(_get_info, "get_database_info")
-
-    def backup_database(self, file_path: str, backup_path: str) -> bool:
-        """Backup database"""
-        try:
-            db_path = self._get_db_path(file_path)
-            if not os.path.exists(db_path):
-                self.logger.error(f"Database does not exist: {db_path}")
-                return False
-
-            os.makedirs(os.path.dirname(backup_path), exist_ok=True)
-
-            import shutil
-            shutil.copy2(db_path, backup_path)
-            self.logger.info(f"Database backed up: {db_path} -> {backup_path}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Backup failed: {e}")
-            return False
-
-    def restore_database(self, file_path: str, backup_path: str) -> bool:
-        """Restore database from backup"""
-        try:
-            if not os.path.exists(backup_path):
-                self.logger.error(f"Backup file does not exist: {backup_path}")
-                return False
-
-            db_path = self._get_db_path(file_path)
-            os.makedirs(os.path.dirname(db_path), exist_ok=True)
-
-            import shutil
-            shutil.copy2(backup_path, db_path)
-            self.logger.info(f"Database restored: {backup_path} -> {db_path}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Restore failed: {e}")
-            return False
-
-    def shutdown(self):
-        """Shutdown - no cached connections to close"""
-        self.logger.debug("DatabaseManager shutdown complete")
-
-        # Clear global locking config
-        global _locking_config
-        _locking_config = None
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

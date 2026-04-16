@@ -39,8 +39,13 @@ class Agent(BaseAgent):
 
     def _setup_agent_config(self) -> None:
         """Setup Agent-specific configuration attributes"""
-        agent_config = self.config.get('Agent', {})
-        set_attributes_from_config(self, agent_config, DEFAULT_CONFIG['Agent'].keys())
+        # Exclude keys already set by BaseAgent from constructor args;
+        # re-applying them here would clobber them with default-None values.
+        base_keys = {'name', 'role', 'repository', 'log_pid'}
+        full_agent_config = self.config.get('Agent', {})
+        agent_config = {k: v for k, v in full_agent_config.items() if k not in base_keys}
+        set_attributes_from_config(self, agent_config,
+            [k for k in DEFAULT_CONFIG['Agent'].keys() if k not in base_keys])
 
         self.logger.assert_true(self.history_context_len > 0,
             "history_context_len must be > 0")

@@ -39,7 +39,7 @@ class TestSuccessAction(Action):
         return True
 
     def summary(self, agent):
-        "This action is successful"
+        return "This action is successful"
 
 
 class TestFailAction(Action):
@@ -58,7 +58,7 @@ class TestFailAction(Action):
         return False
 
     def summary(self, agent):
-        "This action has failed"
+        return "This action has failed"
 
 
 class TestExceptionAction(Action):
@@ -75,7 +75,7 @@ class TestExceptionAction(Action):
         raise RuntimeError("Action execution failed")
 
     def summary(self, agent):
-        "This action has exception"
+        return "This action has exception"
 
 
 # Custom State for testing

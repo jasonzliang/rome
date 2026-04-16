@@ -147,4 +147,4 @@ if __name__ == "__main__":
         print("[!] For example, on Linux/macOS: export BRAVE_API_KEY='your_key_here'")
         print("[!] On Windows (Command Prompt): set BRAVE_API_KEY=your_key_here")
     else:
-        test_brave_api(SUBSCRIPTION_KEY, ENDPOINT, SEARCH_TERM)
+        brave_api_test(SUBSCRIPTION_KEY, ENDPOINT, SEARCH_TERM)
