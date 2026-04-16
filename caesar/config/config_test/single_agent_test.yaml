@@ -32,9 +32,10 @@ ArtifactSynthesizer:
 # ============================================================================
 LLMHandler:
   cost_limit: 300.0
-  model: gpt-4o
+  model: gpt-5.4-mini
   reasoning_effort: low
   temperature: 0.1
+  max_completion_tokens: 50000
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
