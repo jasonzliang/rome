@@ -79,9 +79,6 @@ class LLMHandler:
         "gemini-3.1-pro-preview": {"input": 2.0, "output": 12.0},
         "gemini-3-flash-preview": {"input": 0.50, "output": 3.0},
         "gemini-3.1-flash-lite-preview": {"input": 0.25, "output": 1.50},
-        "gemini-2.5-pro": {"input": 1.25, "output": 10.0},
-        "gemini-2.5-flash": {"input": 0.30, "output": 2.50},
-        "gemini-2.5-flash-lite": {"input": 0.10, "output": 0.40},
     }
 
     MODEL_CONTEXT_SIZE = {
@@ -119,9 +116,6 @@ class LLMHandler:
         "gemini-3.1-pro-preview": 1048576,
         "gemini-3-flash-preview": 1048576,
         "gemini-3.1-flash-lite-preview": 1048576,
-        "gemini-2.5-pro": 1048576,
-        "gemini-2.5-flash": 1048576,
-        "gemini-2.5-flash-lite": 1048576,
     }
 
     # Models that support reasoning_effort or equivalent thinking parameters
