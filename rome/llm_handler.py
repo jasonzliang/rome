@@ -466,12 +466,6 @@ class LLMHandler:
             kwargs["seed"] = self.seed
         if response_format:
             kwargs["response_format"] = response_format
-            # OpenAI requires 'json' in messages when using json_object response format
-            if response_format.get("type") == "json_object":
-                has_json = any("json" in str(m.get("content", "")).lower() for m in messages)
-                if not has_json:
-                    messages.append({"role": "system", "content": "Respond in JSON format."})
-                    kwargs["messages"] = messages
 
         # Handle reasoning parameters
         # For OpenAI: only apply reasoning_effort to known reasoning models

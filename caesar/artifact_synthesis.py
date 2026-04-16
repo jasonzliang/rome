@@ -46,6 +46,9 @@ class ArtifactSynthesizer:
                   retries: int = NUM_SYNTHESIS_RETRIES,
                   reasoning: str = None, label: str = "LLM") -> Optional[Dict]:
         """LLM call with JSON parsing, key validation, and retries."""
+        # Ensure prompt mentions JSON (required by OpenAI for json_object response format)
+        if "json" not in prompt.lower():
+            prompt = f"{prompt}\n\nRespond in JSON format."
         override = {"reasoning_effort": reasoning} if reasoning else {}
         for attempt in range(1, retries + 1):
             try:
