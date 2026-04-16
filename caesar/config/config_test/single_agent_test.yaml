@@ -20,22 +20,37 @@ CaesarAgent:
   draw_graph: true
   max_iterations: 5
 
+  exploration_llm_config:
+    model: claude-haiku-4-5-20251001
+    reasoning_effort: low
+    temperature: 0.9
+    max_completion_tokens: 8192
+    timeout: 120
+
   overwrite_role_file: config/role/self_transcend_role_v1.txt
   adapt_role: false
   adapt_role_file: config/role/self_transcend_insights_v1.txt
 
 ArtifactSynthesizer:
   synthesis_iterations: 5
+  synthesis_drafts: 2
+  synthesis_merge_artifacts: true
+  synthesis_eli5: false
+  synthesis_eli5_length: [null, 450]
+  synthesis_human_eval: false
+  synthesis_max_length: null
+  synthesis_iteration_filter: null
 
 # ============================================================================
 # LLM CONFIGURATION
 # ============================================================================
 LLMHandler:
+  provider: anthropic
   cost_limit: 300.0
-  model: gpt-5.4-mini
+  model: claude-haiku-4-5-20251001
   reasoning_effort: low
   temperature: 0.1
-  max_completion_tokens: 50000
+  max_completion_tokens: 8192
 
 # ============================================================================
 # KNOWLEDGE BASE CONFIGURATION
