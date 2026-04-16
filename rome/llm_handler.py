@@ -34,7 +34,7 @@ PROVIDER_KEY_MAP = {
 
 # Reasoning effort to Anthropic thinking budget mapping
 ANTHROPIC_THINKING_BUDGET = {
-    # "minimal": 8000,
+    # "minimal": 1000,
     "low": 8000,
     "medium": 16000,
     "high": 32000,
@@ -384,7 +384,7 @@ class LLMHandler:
             return kwargs
 
         if self.provider == "openai":
-            if reasoning_effort == "minimal" and self._get_base_model(kwargs.get("model")).startswith("o"):
+            if reasoning_effort == "minimal":
                 reasoning_effort = "low"
             kwargs["reasoning_effort"] = reasoning_effort
         elif self.provider == "anthropic":
