@@ -15,7 +15,7 @@ ArtifactSynthesizer:
   synthesis_iterations: 1
   synthesis_drafts: 1
 
-OpenAIHandler:
+LLMHandler:
   cost_limit: 1.0
   model: gpt-4o-mini
   reasoning_effort: low

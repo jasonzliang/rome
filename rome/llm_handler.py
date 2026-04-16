@@ -8,8 +8,9 @@ from typing import Dict, Optional, Any, Union, List
 from .logger import get_logger
 from .config import set_attributes_from_config, DEFAULT_CONFIG
 
-# Suppress litellm's verbose logging
+# Suppress litellm's verbose logging and drop unsupported params gracefully
 litellm.suppress_debug_info = True
+litellm.drop_params = True
 
 
 class CostLimitExceededException(Exception):

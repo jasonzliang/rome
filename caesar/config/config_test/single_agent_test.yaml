@@ -30,7 +30,7 @@ ArtifactSynthesizer:
 # ============================================================================
 # LLM CONFIGURATION
 # ============================================================================
-OpenAIHandler:
+LLMHandler:
   cost_limit: 300.0
   model: gpt-4o
   reasoning_effort: low

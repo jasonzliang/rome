@@ -1,6 +1,6 @@
 # HumanEval Benchmark Configuration - Fancy
 
-OpenAIHandler:
+LLMHandler:
   cost_limit: 200.0
 
 Agent:

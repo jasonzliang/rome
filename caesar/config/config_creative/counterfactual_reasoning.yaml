@@ -43,7 +43,7 @@ ArtifactSynthesizer:
 # ============================================================================
 # LLM CONFIGURATION
 # ============================================================================
-OpenAIHandler:
+LLMHandler:
   model: gpt-5.2
   reasoning_effort: low
 
