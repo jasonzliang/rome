@@ -40,7 +40,7 @@ def get_test_logger():
 
 
 # Now import the actual modules
-from rome.llm_handler import LLMHandler, CostLimitExceededException, OpenAIHandler
+from rome.llm_handler import LLMHandler, CostLimitExceededException
 
 
 class TestLLMHandler:
@@ -119,9 +119,6 @@ class TestLLMHandler:
             except RuntimeError:
                 pass
 
-    def test_backward_compat_alias(self):
-        """Test that OpenAIHandler is an alias for LLMHandler"""
-        assert OpenAIHandler is LLMHandler
 
     def test_initialization(self, handler, basic_config):
         """Test proper initialization with configuration"""

@@ -85,11 +85,6 @@ class BaseAgent:
         self.llm_handler = LLMHandler(config=llm_config)
         self.logger.debug("LLM handler initialized")
 
-    @property
-    def openai_handler(self):
-        """Backward compatibility alias for llm_handler."""
-        return self.llm_handler
-
     def _setup_agent_memory(self) -> None:
         """Initialize agent memory system"""
         memory_config = self.config.get('AgentMemory', {})

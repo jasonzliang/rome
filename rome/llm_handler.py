@@ -1,6 +1,5 @@
 from functools import lru_cache
 import json
-import logging
 import litellm
 import os
 from typing import Dict, Optional, Any, Union, List
@@ -541,7 +540,3 @@ class LLMHandler:
             "pricing_per_1m_tokens": True,
             "cost_history": self.cost_history[-10:]
         }
-
-
-# Backward compatibility alias
-OpenAIHandler = LLMHandler
