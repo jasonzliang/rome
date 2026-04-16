@@ -124,7 +124,7 @@ class LLMHandler:
     }
 
     # Unique identifier for chat completion requests
-    USER_ID = "cognizant-ai-labs-jason"
+    USER_ID = "tzeentch-nietzsche"
 
     def __init__(self, config: Dict = None):
         self.config = config or {}
