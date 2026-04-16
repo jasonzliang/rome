@@ -7,7 +7,7 @@ NEIGHBORHOOD_DISTANCE = 3
 # Maximum number of neighboring nodes to use for related insights in think
 MAX_NUM_NEIGHBORS = 30
 # Maximum number of past nodes to use for past insights in think
-MAX_NUM_ANCESTORS = 5
+MAX_NUM_ANCESTORS = 10
 # Maximum length (characters) of text to extract from a webpage
 MAX_TEXT_LENGTH = 100000
 # Timeout for fetching webpage html using requests
