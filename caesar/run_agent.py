@@ -225,6 +225,7 @@ def write_experiment_summary(agent, artifact, start_time, logger):
         "output_tokens": output_tokens,
         "token_cost": round(agent.llm_handler.accumulated_cost, 6),
         "api_calls": agent.llm_handler.call_count,
+        "iterations_elapsed": agent.current_iteration,
         "webpages_visited": len(agent.visited_urls),
         "artifact_dir": artifact_info.get("artifact_dir"),
         "num_drafts": artifact_info.get("num_drafts"),
