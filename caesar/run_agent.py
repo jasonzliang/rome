@@ -154,12 +154,11 @@ JSONL format (one JSON object per line, "config" is required):
 # Display helpers
 # =============================================================================
 
-def print_config_summary(agent, logger):
-    """Print configuration summary before starting."""
+def build_config_summary(agent):
+    """Build configuration summary dict (used for display and JSON export)."""
     memory = agent.agent_memory
     synth = agent.synthesizer
-
-    summary = {
+    return {
         "Agent Configuration": {
             "Name": agent.name,
             "Repository": agent.repository,
@@ -193,12 +192,52 @@ def print_config_summary(agent, logger):
         }
     }
 
+
+def print_config_summary(agent, logger):
+    """Print configuration summary before starting."""
+    summary = build_config_summary(agent)
     logger.info("="*80)
     logger.info("CAESAR AGENT CONFIGURATION")
     logger.info("="*80)
     for line in format_yaml_like(summary):
         logger.info(line)
     logger.info("="*80)
+
+
+def write_experiment_summary(agent, artifact, start_time, logger):
+    """Write a JSON summary of the experiment to the repo directory."""
+    repo = Path(agent.get_repo())
+    exp_id = agent.get_id()
+    wall_time = time.time() - start_time
+
+    # Aggregate token usage from llm_handler.cost_history
+    history = getattr(agent.llm_handler, 'cost_history', []) or []
+    input_tokens = sum(h.get('input_tokens', 0) for h in history)
+    output_tokens = sum(h.get('output_tokens', 0) for h in history)
+
+    artifact_info = artifact if isinstance(artifact, dict) else {}
+
+    summary = {
+        "timestamp": datetime.now().isoformat(),
+        "wall_time": round(wall_time, 2),
+        "tokens_used": input_tokens + output_tokens,
+        "input_tokens": input_tokens,
+        "output_tokens": output_tokens,
+        "token_cost": round(agent.llm_handler.accumulated_cost, 6),
+        "api_calls": agent.llm_handler.call_count,
+        "webpages_visited": len(agent.visited_urls),
+        "artifact_dir": artifact_info.get("artifact_dir"),
+        "num_drafts": artifact_info.get("num_drafts"),
+        "config_summary": build_config_summary(agent),
+    }
+
+    path = repo / f"{exp_id}.experiment_summary.json"
+    try:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(summary, f, indent=2, ensure_ascii=False, default=str)
+        logger.info(f"Experiment summary saved to: {path}")
+    except Exception as e:
+        logger.error(f"Failed to write experiment summary: {e}")
 
 
 def print_final_summary(agent, artifact, logger):
@@ -276,10 +315,12 @@ def run_single(config_path, logger, repository=None, query=None, max_iterations=
 
         # Run exploration
         logger.info("Starting exploration...\n")
+        start_time = time.time()
         artifact = agent.explore()
 
-        # Print final summary
+        # Print final summary + persist JSON summary
         print_final_summary(agent, artifact, logger)
+        write_experiment_summary(agent, artifact, start_time, logger)
 
         agent.shutdown()
         return 0

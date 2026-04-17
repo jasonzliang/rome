@@ -1,4 +1,5 @@
 # knowledge_base.py
+from concurrent.futures import ThreadPoolExecutor
 import json
 import hashlib
 from typing import Optional, List, Dict
@@ -359,6 +360,127 @@ class ChromaClientManager:
             filters=filters)
         question = f"{question}\n\nIMPORTANT: Keep your response under {self.response_max_length} tokens!" if self.response_max_length else question
         return str(engine.query(question))
+
+    def multi_query(self, question, n_queries=3, top_k=None, top_n=None,
+                    return_sources=False, return_all=False, filters=None):
+        """Run N diverse rewrites of the question and fuse the answers.
+
+        Uses the agent's chat_completion to paraphrase the question into
+        semantically varied rewrites, reuses self.query() for each rewrite,
+        then fuses the per-rewrite answers into a single response.
+
+        If return_all=True, skip fusion and return the per-rewrite answers as
+        a list (or a list of (answer, sources) tuples when return_sources=True).
+        """
+        try:
+            if self.size() == 0:
+                if return_all:
+                    return []
+                return ("", []) if return_sources else ""
+
+            n_queries = max(int(n_queries), 1)
+
+            # 1. Ask the agent's LLM for diverse rewrites
+            queries = [question]
+            n_rewrites = n_queries - 1
+            if n_rewrites > 0:
+                example = ", ".join(['"..."'] * n_rewrites)
+                rewrite_prompt = (
+                    f"Rewrite the following question in {n_rewrites} diverse way(s). "
+                    f"Preserve the original intent, but vary wording, angle, and emphasis "
+                    f"so that each rewrite surfaces different relevant context when used "
+                    f"for retrieval.\n\n"
+                    f"Question: {question}\n\n"
+                    f'Respond as JSON: {{"rewrites": [{example}]}}'
+                )
+                try:
+                    raw = self.agent.chat_completion(
+                        prompt=rewrite_prompt,
+                        response_format={"type": "json_object"})
+                    parsed = parse_json_response(raw) or {}
+                    rewrites = parsed.get("rewrites") if isinstance(parsed, dict) else None
+                    if isinstance(rewrites, list):
+                        for r in rewrites:
+                            if isinstance(r, str) and r.strip() and r not in queries:
+                                queries.append(r.strip())
+                            if len(queries) >= n_queries:
+                                break
+                except Exception as e:
+                    self.logger.warning(f"multi_query rewrite failed, using original only: {e}")
+
+            # 2. Reuse self.query() for each rewrite (in parallel — I/O bound)
+            with ThreadPoolExecutor(max_workers=len(queries)) as ex:
+                results = list(ex.map(
+                    lambda q: self.query(q, top_k=top_k, top_n=top_n,
+                                         return_sources=True, filters=filters),
+                    queries))
+
+            answers, per_query_sources, all_sources = [], [], []
+            for resp, srcs in results:
+                if resp:
+                    answers.append(resp)
+                    per_query_sources.append(srcs)
+                    all_sources.extend(srcs)
+
+            if not answers:
+                if return_all:
+                    return []
+                return ("", []) if return_sources else ""
+
+            # Early return: caller wants raw per-rewrite answers, skip fusion
+            if return_all:
+                if self.log_db:
+                    with open(os.path.join(self.agent.get_log_dir(),
+                        self.agent.get_id() + ".db-query.log"), "a") as f:
+                        f.write("=" * 80)
+                        f.write(f"\n\nMULTI_QUERY (return_all): {question}\n\nREWRITES: {queries}\n\nANSWERS: {answers}\n\n")
+                if return_sources:
+                    return list(zip(answers, per_query_sources))
+                return answers
+
+            # 3. Fuse per-rewrite answers into a single response
+            if len(answers) == 1:
+                fused = answers[0]
+            else:
+                joined = "\n\n---\n\n".join(
+                    f"Answer {i + 1}: {a}" for i, a in enumerate(answers))
+                fuse_prompt = (
+                    f"Question: {question}\n\n"
+                    f"Below are {len(answers)} answers produced from diverse "
+                    f"retrievals. Synthesize a single coherent answer that integrates "
+                    f"the most useful and non-redundant information across them.\n\n"
+                    f"{joined}"
+                )
+                if self.response_max_length:
+                    fuse_prompt += f"\n\nIMPORTANT: Keep your response under {self.response_max_length} words!"
+                try:
+                    fused = self.agent.chat_completion(prompt=fuse_prompt) or answers[0]
+                except Exception as e:
+                    self.logger.warning(f"multi_query fusion failed, returning first answer: {e}")
+                    fused = answers[0]
+
+            if self.log_db:
+                with open(os.path.join(self.agent.get_log_dir(),
+                    self.agent.get_id() + ".db-query.log"), "a") as f:
+                    f.write("=" * 80)
+                    f.write(f"\n\nMULTI_QUERY: {question}\n\nREWRITES: {queries}\n\nRESPONSE: {fused}\n\n")
+
+            if return_sources:
+                seen, dedup = set(), []
+                for s in all_sources:
+                    url = s.get('url')
+                    if url and url not in seen:
+                        seen.add(url)
+                        dedup.append(s)
+                return fused, dedup
+            return fused
+
+        except Exception as e:
+            self.logger.error(f"KB multi_query error: {e}")
+            self.logger.error(traceback.format_exc())
+            if return_all:
+                return []
+            return ("", []) if return_sources else ""
 
     def info(self):
         """Get knowledge base information"""

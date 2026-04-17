@@ -28,6 +28,10 @@ class ArtifactSynthesizer:
         # Shortcuts to KB resources
         self.kb_manager = self.agent.kb_manager; self.filters = None
 
+        # Tracks files written by _save_synthesis during the most recent
+        # synthesize_artifact() call (reset at the start of each call)
+        self.saved_artifact_files = []
+
         # Setup maximum of iterations to filter for when querying
         if self.synthesis_iteration_filter:
             self.logger.assert_true(
@@ -110,15 +114,26 @@ class ArtifactSynthesizer:
     # ── Main synthesis entry point ────────────────────────────────────────
 
     def synthesize_artifact(self, num_drafts: int = None) -> None:
-        """Generate final synthesis with optional multi-draft refinement"""
+        """Generate final synthesis with optional multi-draft refinement.
+
+        Returns the final result dict. In addition to the synthesis fields
+        (abstract/artifact/sources/metadata), the dict includes:
+          - artifact_dir: directory where synthesis files were written
+          - artifact_files: list of full paths written during this call
+          - num_drafts: how many drafts were produced
+        """
         if not num_drafts: num_drafts = self.synthesis_drafts
         num_drafts = max(num_drafts, 1)
+
+        # Reset per-call tracking of files written by _save_synthesis
+        self.saved_artifact_files = []
 
         mode = f"iterative (n={self.synthesis_iterations})" if not self.synthesis_classic_mode else "classic"
         self.logger.info(f"[SYNTHESIS] Using {mode} mode with {num_drafts} draft(s)")
 
         if self.kb_manager.size() == 0:
-            return {"abstract": "", "artifact": "No insights collected during exploration."}
+            return {"abstract": "", "artifact": "No insights collected during exploration.",
+                    "artifact_dir": None, "artifact_files": [], "num_drafts": 0}
 
         # Multi-draft synthesis loop
         current_query = self.agent.starting_query
@@ -126,6 +141,7 @@ class ArtifactSynthesizer:
         if num_drafts > 1:
             base_dir = os.path.join(self.agent.get_repo(),
                 f"{self.agent.get_id()}.synthesis.{datetime.now().strftime("%m%d%H%M")}")
+        artifact_dir = base_dir if base_dir else self.agent.get_repo()
 
         self._num_drafts = num_drafts
         for draft_num in range(1, num_drafts + 1):
@@ -153,6 +169,7 @@ class ArtifactSynthesizer:
             self.logger.error(f"Artifact synthesis ended early at draft: {len(all_drafts)}/{num_drafts}")
 
         # Merge artifacts if requested and multiple drafts exist
+        final = None
         if self.synthesis_merge_artifacts and len(all_drafts) > 1:
             self.logger.info(f"\n{'='*80}\n[MERGING {len(all_drafts)} ARTIFACTS]\n{'='*80}")
             merged_result = self._merge_artifacts(all_drafts)
@@ -161,8 +178,13 @@ class ArtifactSynthesizer:
                 self._post_process_eli5(merged_result, base_dir, suffix=f'merged-eli5-{len(all_drafts)}')
                 self._post_process_human_eval(
                     merged_result, base_dir, suffix=f'merged-human-eval-{len(all_drafts)}')
-                return merged_result
-        return all_drafts[-1]
+                final = merged_result
+        if final is None:
+            final = all_drafts[-1]
+        final["artifact_dir"] = artifact_dir
+        final["artifact_files"] = list(self.saved_artifact_files)
+        final["num_drafts"] = len(all_drafts)
+        return final
 
     # ── Single draft synthesis ────────────────────────────────────────────
 
@@ -528,6 +550,7 @@ Respond with JSON:
             if SYNTHESIS_SAVE_JSON:
                 with open(f"{base_path}.json", 'w', encoding='utf-8') as f:
                     json.dump(result, f, ensure_ascii=False, indent=4, sort_keys=True)
+                self.saved_artifact_files.append(f"{base_path}.json")
 
             with open(f"{base_path}.txt", 'w', encoding='utf-8') as f:
                 if abstract := result.get('abstract'):
@@ -537,6 +560,7 @@ Respond with JSON:
 
                 if sources := result.get('sources'):
                     f.write(f"SOURCES:\n{self._format_source_list(sources)}\n\n")
+            self.saved_artifact_files.append(f"{base_path}.txt")
 
             if metadata := result.get('metadata'):
                 with open(meta_path, 'a', encoding='utf-8') as f:
