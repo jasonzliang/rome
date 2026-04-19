@@ -20,6 +20,8 @@
 
 If you're looking for an **agentic RAG system that goes beyond retrieval** (graph-based exploration, adversarial verification, and multi-draft synthesis), this is it.
 
+> 📄 **Read the paper:** [*Caesar: Deep Agentic Web Exploration for Creative Answer Synthesis*](https://www.researchgate.net/publication/402554537_Caesar_Deep_Agentic_Web_Exploration_for_Creative_Answer_Synthesis) (Liang, Meyerson, Miikkulainen, 2026) · [DOI: 10.13140/RG.2.2.15118.22088](https://doi.org/10.13140/RG.2.2.15118.22088) · [PDF](caesar/paper/caesar.pdf)
+
 ## Quickstart
 
 ```bash
