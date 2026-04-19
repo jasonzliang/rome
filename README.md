@@ -37,6 +37,8 @@ python run_agent.py config/config_preset/regular.yaml -q "your research question
 
 Agent explores the web, builds a knowledge graph on disk, synthesizes a final artifact, and emits `<id>.experiment_summary.json` with tokens, cost, wall-time, pages visited, and paths to generated artifacts.
 
+For detailed configuration, exploration modes, synthesis options, and advanced usage, see the **[Caesar module docs](caesar/README.md)**.
+
 ## What It's Good For
 
 Caesar shines on **open-ended, creative, cross-disciplinary** research, where retrieval alone won't work:
@@ -127,13 +129,13 @@ Caesar is built on **Rome**, a Finite State Machine framework for stateful AI ag
 
 ```
 caesar-agent/
-├── caesar/          # Caesar: the research agent (start here)
+├── caesar/          # Caesar agent (see caesar/README.md for full usage)
 │   ├── caesar_agent.py
 │   ├── artifact_synthesis.py
 │   ├── run_agent.py
 │   ├── config/      # YAML configs and creativity benchmarks
 │   └── paper/       # Caesar paper (PDF)
-└── rome/            # Rome framework: FSM, memory, LLM handlers, knowledge base client
+└── rome/            # Rome framework (see rome/README.md): FSM, memory, LLM handlers, KB client
 ```
 
 ## FAQ
