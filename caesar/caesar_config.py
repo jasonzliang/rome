@@ -11,15 +11,19 @@ MAX_NUM_ANCESTORS = 5
 # Maximum length (characters) of text to extract from a webpage
 MAX_TEXT_LENGTH = 100000
 # Timeout for fetching webpage html using requests
-REQUESTS_TIMEOUT = 10
-# Headers to use for requests when fetching html
+# 25s accommodates slow academic/gov sites (arxiv, springer, nih) that
+# regularly take 15+s on first load. 10s caused false failures.
+REQUESTS_TIMEOUT = 25
+# Static headers for requests when fetching html.
+# Referer and Sec-Fetch-Site are NOT included here — they depend on the
+# previous URL and are computed per-request by _compute_nav_headers().
 REQUESTS_HEADERS = {
     # 1. Standard Chrome Accept Header
     # Must include image formats (avif, webp, apng) because real Chrome always requests them.
     # Missing these is a high-confidence bot signal when impersonating a browser.
     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
 
-    # 2. Accept-Encoding (CRITICAL FIX)
+    # 2. Accept-Encoding (CRITICAL)
     # You MUST include 'br' (Brotli) and 'zstd'.
     # Because you use impersonate="chrome", your TLS fingerprint claims you support these.
     # If you remove them here, the server sees a "TLS vs Header Mismatch" and blocks you instantly.
@@ -30,17 +34,9 @@ REQUESTS_HEADERS = {
     'Accept-Language': 'en-US,en;q=0.9',
     'Cache-Control': 'max-age=0',
 
-    # 4. Referer Strategy
-    # Sets the "Previous Page" to Google. This bypasses simple "direct traffic" blocks.
-    'Referer': 'https://www.google.com/',
-
-    # 5. Fetch Metadata (CRITICAL FIX)
+    # 4. Fetch Metadata (Sec-Fetch-Site is computed per-request)
     'Sec-Fetch-Dest': 'document',
     'Sec-Fetch-Mode': 'navigate',
-    # Changed from 'none' to 'cross-site'.
-    # 'none' implies direct entry (typing URL). You cannot use 'none' if you send a Referer.
-    # 'cross-site' correctly tells the server "I clicked a link from Google to get here."
-    'Sec-Fetch-Site': 'cross-site',
     'Sec-Fetch-User': '?1',
     'Upgrade-Insecure-Requests': '1',
 }

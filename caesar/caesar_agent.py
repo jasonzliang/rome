@@ -432,8 +432,32 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
         parsed = urlparse(url)
         return any(domain in parsed.netloc for domain in self.allowed_domains)
 
-    def _fetch_html(self, url: str) -> Optional[str]:
-        """Fetch HTML or PDF content from URL or local file"""
+    def _compute_nav_headers(self, url: str, referer_url: Optional[str] = None) -> Dict[str, str]:
+        """Compute Referer + Sec-Fetch-Site based on the previous URL.
+
+        If referer_url is given, use it (for parallel callers that know the
+        logical previous URL). Otherwise fall back to self._last_fetched_url.
+
+        First fetch: simulate arriving from Google.
+        Same host as previous: same-origin navigation.
+        Different host: cross-site navigation (also used for same-site —
+        we under-report rather than risk a wrong same-origin label).
+        """
+        prev = referer_url if referer_url is not None else getattr(self, '_last_fetched_url', None)
+        if not prev:
+            return {'Referer': 'https://www.google.com/', 'Sec-Fetch-Site': 'cross-site'}
+        prev_host = urlparse(prev).netloc
+        curr_host = urlparse(url).netloc
+        site = 'same-origin' if prev_host and prev_host == curr_host else 'cross-site'
+        return {'Referer': prev, 'Sec-Fetch-Site': site}
+
+    def _fetch_html(self, url: str, referer_url: Optional[str] = None) -> Optional[str]:
+        """Fetch HTML or PDF content from URL or local file.
+
+        referer_url: optional explicit Referer. Set by parallel callers to
+        avoid racing on self._last_fetched_url. When provided, shared state
+        is NOT updated (this request isn't part of the sequential navigation).
+        """
         try:
             # Local file handling
             if url.startswith('file://'):
@@ -445,15 +469,18 @@ IMPORATNT: Your response must start with "Your role:" followed by the adapted ro
                 with open(file_path, 'r', encoding='utf-8') as f:
                     return f.read()
 
-            # Remote URL handling
+            # Remote URL handling — merge static headers with per-request nav headers
+            headers = {**REQUESTS_HEADERS, **self._compute_nav_headers(url, referer_url)}
             response = requests.get(
                 url,
                 impersonate="chrome",  # Matches a modern Chrome browser
                 timeout=REQUESTS_TIMEOUT,
-                headers=REQUESTS_HEADERS,
+                headers=headers,
                 allow_redirects=True
             )
             response.raise_for_status()
+            if referer_url is None:
+                self._last_fetched_url = url
 
             # PDF detection and extraction
             is_pdf = ('application/pdf' in response.headers.get('content-type', '').lower() or
@@ -1079,7 +1106,9 @@ Your response must be valid JSON only, nothing else."""
         """Fetch content from URL and generate insights. Thread-safe for the
         IO-bound portions (fetch + LLM call). Returns insights or None."""
         try:
-            html = self._fetch_html(url)
+            # Parallel workers all navigate from the search results page —
+            # pass it explicitly to avoid racing on self._last_fetched_url.
+            html = self._fetch_html(url, referer_url=self.starting_url)
             if not html:
                 self.failed_urls.add(url)
                 return None
