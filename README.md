@@ -23,7 +23,7 @@ If you're looking for an agentic RAG system that goes beyond retrieval to actual
 
 ```bash
 git clone https://github.com/jasonzliang/caesar-agent.git
-cd rome
+cd caesar-agent
 pip install -e .
 
 export OPENAI_API_KEY=your_key
@@ -51,10 +51,6 @@ Caesar is different:
 | Episodic memory + backtracking | ✅ | ❌ | ❌ | ❌ |
 | Pluggable LLM backend (OpenAI / Anthropic / local) | ✅ | ❌ | ❌ | ✅ |
 | Reproducible experiment JSON | ✅ | ❌ | ❌ | Partial |
-
-<p align="center">
-  <img src="caesar/paper/caesar.png" alt="Caesar architecture diagram showing the Perceive-Think-Act exploration loop feeding a vector knowledge base, and the Generator-Verifier synthesis loop with adversarial query refinement" width="720"/>
-</p>
 
 ## How It Works
 
@@ -88,7 +84,7 @@ Rome is the **Finite State Machine infrastructure** underneath Caesar — the st
 ## Project Layout
 
 ```
-rome/
+caesar-agent/
 ├── caesar/          # Caesar: deep web exploration agent (this is where most users start)
 │   ├── caesar_agent.py
 │   ├── artifact_synthesis.py
@@ -120,11 +116,15 @@ Yes — configs, judge rubrics, and evaluation scripts are in `caesar/config/` a
 If you use Rome or Caesar in your research, please cite:
 
 ```bibtex
-@misc{caesar2026,
-  title        = {Caesar: Deep Agentic Web Exploration for Creative Answer Synthesis},
-  author       = {Liang, Jason},
-  year         = {2026},
-  howpublished = {\url{https://github.com/jasonzliang/caesar-agent}}
+@techreport{liang26caesar,
+  title       = "Caesar: Deep Agentic Web Exploration for Creative Answer Synthesis",
+  author      = "Jason Liang and Elliot Meyerson and Risto Miikkulainen",
+  year        = 2026,
+  month       = mar,
+  institution = "Cognizant AI Lab",
+  number      = "2026-02",
+  url         = "https://www.researchgate.net/publication/402554537_Caesar_Deep_Agentic_Web_Exploration_for_Creative_Answer_Synthesis",
+  doi         = "10.13140/RG.2.2.15118.22088"
 }
 ```
 
