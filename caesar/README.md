@@ -47,37 +47,13 @@ Caesar operates as an "Insight Hunter" rather than a traditional search engine. 
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         CaesarAgent                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐         │
-│  │   PERCEIVE   │ → │    THINK     │ → │     ACT      │         │
-│  │              │   │              │   │              │         │
-│  │ Fetch HTML   │   │ Analyze with │   │ Select next  │         │
-│  │ Extract text │   │ LLM          │   │ link         │         │
-│  │ Parse links  │   │ Extract      │   │ Navigate or  │         │
-│  │              │   │ insights     │   │ backtrack    │         │
-│  └──────────────┘   └──────────────┘   └──────────────┘         │
-│         │                  │                  │                 │
-│         └──────────────────┼──────────────────┘                 │
-│                            ▼                                    │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                    Knowledge Base                           ││
-│  │  ┌─────────────────┐  ┌─────────────────┐                   ││
-│  │  │  Vector Store   │  │ Knowledge Graph │                   ││
-│  │  │  (ChromaDB)     │  │  (NetworkX)     │                   ││
-│  │  └─────────────────┘  └─────────────────┘                   ││
-│  └─────────────────────────────────────────────────────────────┘│
-│                            │                                    │
-│                            ▼                                    │
-│  ┌─────────────────────────────────────────────────────────────┐│
-│  │                 ArtifactSynthesizer                         ││
-│  │  Q&A chain → draft → adversarial refine → merge → ELI5     ││
-│  └─────────────────────────────────────────────────────────────┘│
-└─────────────────────────────────────────────────────────────────┘
-```
+<p align="center">
+  <img src="paper/caesar.png" alt="Caesar architecture: Perceive-Think-Act exploration loop feeding a vector knowledge base, and Generator-Verifier adversarial synthesis loop with draft merging and ELI5 post-processing" width="720"/>
+</p>
+
+**Phase 1 (left): Deep Web Exploration.** A dynamic exploration policy controls a three-stage loop (Perceive, Think, Act) to traverse the web and build a knowledge graph + knowledge base from insights.
+
+**Phase 2 (right): Adversarial Artifact Synthesis.** Insights are retrieved to synthesize an initial draft. The agent then enters a recursive cycle, critiquing the current draft to generate adversarial queries for refinement, before consolidating all versions via a generative merge and ELI5 summary.
 
 ## Installation
 
