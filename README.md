@@ -1,11 +1,11 @@
 <p align="center">
-  <img src="caesar/paper/caesar.png" alt="Caesar autonomous research agent architecture — Perceive-Think-Act exploration loop and Generator-Verifier adversarial synthesis" width="720"/>
+  <img src="caesar/paper/caesar.png" alt="Caesar autonomous research agent architecture: Perceive-Think-Act exploration loop and Generator-Verifier adversarial synthesis" width="720"/>
 </p>
 
-<h1 align="center">Caesar — Autonomous AI Research Agent</h1>
+<h1 align="center">Caesar: Autonomous AI Research Agent</h1>
 
 <p align="center">
-  <strong>Deep web exploration and creative answer synthesis — the open-source alternative to ChatGPT Deep Research and Perplexity</strong>
+  <strong>Deep web exploration and creative answer synthesis. The open-source alternative to ChatGPT Deep Research and Perplexity.</strong>
 </p>
 
 <p align="center">
@@ -16,9 +16,9 @@
   <a href="https://github.com/jasonzliang/caesar-agent/commits/main"><img alt="Last commit" src="https://img.shields.io/github/last-commit/jasonzliang/caesar-agent"></a>
 </p>
 
-**Caesar** is an autonomous AI research agent that navigates the web, reasons over a dynamic knowledge graph, and synthesizes novel, grounded answers. In blinded LLM-as-a-Judge creativity evaluations, Caesar scored **25.29 / 30** — beating the runner-up (Gemini 3 Deep Research, 22.27) by **3.02 points**, and doubling the score of GPT-5.2 Deep Research (15.40). Significant across every setting at **p < 0.001**.
+**Caesar** is an autonomous AI research agent that navigates the web, reasons over a dynamic knowledge graph, and synthesizes novel, grounded answers. In blinded LLM-as-a-Judge creativity evaluations, Caesar scored **25.29 / 30**, beating the runner-up (Gemini 3 Deep Research, 22.27) by **3.02 points**, and outscoring GPT-5.2 Deep Research (15.40) by nearly **10 points**. Statistically significant at **p < 0.001**.
 
-If you're looking for an **agentic RAG system that goes beyond retrieval** — graph-based exploration, adversarial verification, and multi-draft synthesis — this is it.
+If you're looking for an **agentic RAG system that goes beyond retrieval** (graph-based exploration, adversarial verification, and multi-draft synthesis), this is it.
 
 ## Quickstart
 
@@ -39,15 +39,15 @@ Agent explores the web, builds a knowledge graph on disk, synthesizes a final ar
 
 ## What It's Good For
 
-Caesar shines on **open-ended, creative, cross-disciplinary** research — problems where retrieval alone won't work:
+Caesar shines on **open-ended, creative, cross-disciplinary** research, where retrieval alone won't work:
 
-- **Hypothesis generation** — novel cross-domain connections (e.g., bridging materials science and biology)
-- **Literature synthesis** — graph-grounded review that spots tensions and gaps between papers
-- **Competitive intelligence** — deep mapping of a technical or market landscape
-- **Counterfactual & meta-creative reasoning** — "what if X was different?" style inquiry
-- **Novel solution ideation** — e.g., ARC-AGI–style problem exploration
+- **Hypothesis generation**: novel cross-domain connections (e.g., bridging materials science and biology)
+- **Literature synthesis**: graph-grounded review that spots tensions and gaps between papers
+- **Competitive intelligence**: deep mapping of a technical or market landscape
+- **Counterfactual & meta-creative reasoning**: "what if X was different?" style inquiry
+- **Novel solution ideation**: e.g., ARC-AGI–style problem exploration
 
-It's **not** the right tool for quick factual lookups or latency-sensitive apps — Caesar is designed for depth, not speed.
+It's **not** the right tool for quick factual lookups or latency-sensitive apps. Caesar is designed for depth, not speed.
 
 ## Why Caesar?
 
@@ -71,24 +71,24 @@ Caesar is different:
 
 Caesar operates in two cognitive phases:
 
-### 1. Deep Web Exploration — stateful graph traversal
+### 1. Deep Web Exploration: stateful graph traversal
 
-A recursive **Perceive–Think–Act** loop performs topological traversal of information spaces. Rather than isolating summaries, Caesar generates context-aware insights conditioned on the **local structure of the exploration graph** — analyzing how new content builds upon or contradicts neighboring nodes. A dynamic policy, informed by a vector knowledge base and episodic memory, autonomously switches between depth-first expansion, strategic backtracking, and targeted web search.
+A recursive **Perceive–Think–Act** loop performs topological traversal of information spaces. Rather than isolating summaries, Caesar generates context-aware insights conditioned on the **local structure of the exploration graph**, analyzing how new content builds upon or contradicts neighboring nodes. A dynamic policy, informed by a vector knowledge base and episodic memory, autonomously switches between depth-first expansion, strategic backtracking, and targeted web search.
 
-### 2. Adversarial Artifact Synthesis — Generator–Verifier loop
+### 2. Adversarial Artifact Synthesis: Generator–Verifier loop
 
-Rather than a single-pass summary, Caesar runs as a recursive self-correction environment. An independent adversarial module formulates **orthogonal queries** targeting logical weaknesses, missing citations, and contradictions in the current belief state. Multiple drafts are produced iteratively and merged — forcing the agent out of the consensus basin that traps single-pass LLMs.
+Rather than a single-pass summary, Caesar runs as a recursive self-correction environment. An independent adversarial module formulates **orthogonal queries** targeting logical weaknesses, missing citations, and contradictions in the current belief state. Multiple drafts are produced iteratively and merged, forcing the agent out of the consensus basin that traps single-pass LLMs.
 
 ## Architectural Innovations
 
-- **Domain-Specific Role Adaptation** — the agent rewrites its own system prompt per task, overriding the safety-biased generic responses typical of RLHF models.
-- **Graph-Augmented Insight Generation** — insights are conditioned on the exploration graph neighborhood, enabling online associative reasoning.
-- **Knowledge-Guided Exploration Policy** — detects navigational stagnation via episodic memory and forces backtracking.
-- **Adversarial Query Refinement** — orthogonal queries push the agent out of generic LLM consensus toward novel, grounded facts.
+- **Domain-Specific Role Adaptation**: the agent rewrites its own system prompt per task, overriding the safety-biased generic responses typical of RLHF models.
+- **Graph-Augmented Insight Generation**: insights are conditioned on the exploration graph neighborhood, enabling online associative reasoning.
+- **Knowledge-Guided Exploration Policy**: detects navigational stagnation via episodic memory and forces backtracking.
+- **Adversarial Query Refinement**: orthogonal queries push the agent out of generic LLM consensus toward novel, grounded facts.
 
 ## Benchmark Results
 
-Evaluated with a blinded **3-model LLM-as-a-Judge panel** (Claude Sonnet 4.5, GPT-5.2, Gemini 3 Pro) across three creativity dimensions — **New**, **Useful**, **Surprising** — scored 0–10 each:
+Evaluated with a blinded **3-model LLM-as-a-Judge panel** (Claude Sonnet 4.5, GPT-5.2, Gemini 3 Pro) across three creativity dimensions (**New**, **Useful**, **Surprising**), scored 0–10 each:
 
 | Agent | New | Useful | Surprising | **Total** |
 |---|:-:|:-:|:-:|:-:|
@@ -97,7 +97,7 @@ Evaluated with a blinded **3-model LLM-as-a-Judge panel** (Claude Sonnet 4.5, GP
 | Sonnet 4.5 Deep Research | 6.96 | 7.20 | 6.73 | 20.89 |
 | GPT-5.2 Deep Research | 5.02 | 6.02 | 4.36 | 15.40 |
 
-Mann–Whitney U, **p < 0.001** across all settings. Ablations confirm both graph exploration and the adversarial verifier loop are independently necessary — see the [paper](caesar/paper/caesar.pdf) for full methodology, exploration-budget ablation, and judge bias analysis.
+Mann–Whitney U, **p < 0.001** across all settings. Ablations confirm both graph exploration and the adversarial verifier loop are independently necessary. See the [paper](caesar/paper/caesar.pdf) for full methodology, exploration-budget ablation, and judge bias analysis.
 
 ## Example Output
 
@@ -121,7 +121,7 @@ The `artifact_dir` contains one `.txt` per synthesis draft, a final merged artif
 
 ## Built on Rome
 
-Caesar is built on **Rome**, a Finite State Machine framework for stateful AI agents — providing Generator–Verifier–Reviser topologies, episodic memory, dynamic policy routing, and verifiable code execution. See the [Rome framework docs](rome/README.md) if you want to build your own agent on top.
+Caesar is built on **Rome**, a Finite State Machine framework for stateful AI agents that provides Generator–Verifier–Reviser topologies, episodic memory, dynamic policy routing, and verifiable code execution. See the [Rome framework docs](rome/README.md) if you want to build your own agent on top.
 
 ## Project Layout
 
@@ -133,13 +133,13 @@ caesar-agent/
 │   ├── run_agent.py
 │   ├── config/      # YAML configs and creativity benchmarks
 │   └── paper/       # Caesar paper (PDF)
-└── rome/            # Rome framework: FSM, memory, LLM handlers, KB client
+└── rome/            # Rome framework: FSM, memory, LLM handlers, knowledge base client
 ```
 
 ## FAQ
 
 **How is this different from LangGraph / CrewAI / AutoGen?**
-Those are orchestration frameworks — they help you wire up agents. Rome is an opinionated runtime for *how* agents should reason (graph-structured exploration, adversarial verification, episodic memory). Caesar is a concrete research agent built on it.
+Those are orchestration frameworks: they help you wire up agents. Rome is an opinionated runtime for *how* agents should reason (graph-structured exploration, adversarial verification, episodic memory). Caesar is a concrete research agent built on it.
 
 **Do I need GPUs?**
 No. Caesar uses hosted LLM APIs (OpenAI, Anthropic). A local ChromaDB instance handles the vector store. Runs on a laptop.
@@ -151,14 +151,14 @@ OpenAI (GPT-5 family, o-series reasoning models), Anthropic (Claude 4.5 / 4.6 / 
 A 5-iteration exploration with Claude Haiku 4.5 runs at roughly $0.30 and 10 minutes. A 250-iteration deep run with GPT-5.4-mini is typically $5–$10.
 
 **Can I reproduce the benchmarks?**
-Yes — configs, judge rubrics, and evaluation scripts are in `caesar/config/` and `caesar/analysis/`.
+Yes. Configs, judge rubrics, and evaluation scripts are in `caesar/config/` and `caesar/analysis/`.
 
 ## Contributing & Community
 
 - ⭐ **Star the repo** if Caesar is useful for your research
 - 💬 **[Open a Discussion](https://github.com/jasonzliang/caesar-agent/discussions)** for ideas, questions, or use cases
 - 🐛 **[File an Issue](https://github.com/jasonzliang/caesar-agent/issues)** for bugs or feature requests
-- 🔧 **PRs welcome** — especially new exploration policies, synthesis strategies, and benchmark domains
+- 🔧 **PRs welcome**, especially new exploration policies, synthesis strategies, and benchmark domains
 
 ## Citation
 
@@ -179,4 +179,4 @@ If you use Caesar in your research, please cite:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
