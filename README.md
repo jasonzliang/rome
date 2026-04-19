@@ -12,7 +12,7 @@
   <a href="#quickstart"><img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-blue"></a>
   <a href="caesar/paper/caesar.pdf"><img alt="Paper" src="https://img.shields.io/badge/paper-PDF-red"></a>
   <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-green"></a>
-  <a href="https://github.com/jasonzliang/rome/commits/main"><img alt="Commits" src="https://img.shields.io/github/last-commit/jasonzliang/rome"></a>
+  <a href="https://github.com/jasonzliang/caesar-agent/commits/main"><img alt="Commits" src="https://img.shields.io/github/last-commit/jasonzliang/caesar-agent"></a>
 </p>
 
 **Rome** is an open-source framework for building autonomous AI research agents — LLM agents that navigate the web, reason over a knowledge graph, and synthesize novel, grounded answers. Its flagship agent **Caesar** significantly outperforms the native deep-research modes of state-of-the-art frontier models on creative reasoning benchmarks (Mann–Whitney U, p < 0.001).
@@ -22,7 +22,7 @@ If you're looking for an agentic RAG system that goes beyond retrieval to actual
 ## Quickstart
 
 ```bash
-git clone https://github.com/jasonzliang/rome.git
+git clone https://github.com/jasonzliang/caesar-agent.git
 cd rome
 pip install -e .
 
@@ -124,7 +124,7 @@ If you use Rome or Caesar in your research, please cite:
   title        = {Caesar: Deep Agentic Web Exploration for Creative Answer Synthesis},
   author       = {Liang, Jason},
   year         = {2026},
-  howpublished = {\url{https://github.com/jasonzliang/rome}}
+  howpublished = {\url{https://github.com/jasonzliang/caesar-agent}}
 }
 ```
 
