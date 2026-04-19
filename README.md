@@ -106,7 +106,7 @@ No. Caesar uses hosted LLM APIs (OpenAI, Anthropic). A local ChromaDB instance h
 OpenAI (GPT-5 family, o-series reasoning models), Anthropic (Claude 4.5, 4.6, 4.7), and any OpenAI-compatible endpoint. Model selection is per-subsystem (exploration, synthesis, judging) via YAML config.
 
 **How much does a typical run cost?**
-A 5-iteration exploration with Claude Haiku 4.5 runs at roughly $0.30 and 10 minutes. A 50-iteration deep run with GPT-5 is typically $5–15.
+A 5-iteration exploration with Claude Haiku 4.5 runs at roughly $0.30 and 10 minutes. A 250-iteration deep run with GPT-5.4-mini is typically $5–$10.
 
 **Can I reproduce the benchmarks?**
 Yes — configs, judge rubrics, and evaluation scripts are in `caesar/config/` and `caesar/analysis/`.
