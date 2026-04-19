@@ -3,28 +3,45 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "rome"
-version = "0.3.3"
-authors = [{name = "Augustus Caesar", email = "augustus.caesar@gmail.com"}]
-description = "Rome - An AI agent framework for code analysis and execution"
+name = "caesar-agent"
+version = "0.3.0"
+authors = [
+    {name = "Jason Liang", email = "jason.liang@cognizant.com"},
+    {name = "Elliot Meyerson"},
+    {name = "Risto Miikkulainen"},
+]
+description = "Caesar: autonomous AI research agent with graph-based deep web exploration and adversarial answer synthesis."
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.11,<3.14"
+requires-python = ">=3.10,<3.14"
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
 ]
-keywords = ["ai", "agent", "llm", "machine-learning"]
+keywords = [
+    "ai-agents", "llm", "rag", "agentic-rag", "agentic-ai",
+    "autonomous-agents", "deep-research", "research-agent", "knowledge-graph",
+    "retrieval-augmented-generation", "scientific-discovery", "web-exploration",
+    "generator-verifier", "llm-agents", "openai", "anthropic", "chromadb",
+    "llama-index", "ai-research",
+]
 dynamic = ["dependencies"]
 
 [project.urls]
-Repository = "https://github.com/jasonzliang/rome"
-Issues = "https://github.com/jasonzliang/rome/issues"
+Homepage = "https://github.com/jasonzliang/caesar-agent"
+Repository = "https://github.com/jasonzliang/caesar-agent"
+Issues = "https://github.com/jasonzliang/caesar-agent/issues"
+Paper = "https://doi.org/10.13140/RG.2.2.15118.22088"
+Changelog = "https://github.com/jasonzliang/caesar-agent/releases"
 
 [project.optional-dependencies]
 dev = [
@@ -40,33 +57,33 @@ test = [
 ]
 
 [project.scripts]
-rome = "rome.cli:main"
-caesar = "rome.caesar_agent:cli_main"
+caesar = "caesar.run_agent:main"
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["rome", "rome.*"]
+include = ["rome", "rome.*", "caesar", "caesar.*"]
 exclude = [
-    "test*", "benchmark*", "ecology*", "monitor*", "web_app*",
+    "test*", "benchmark*", "monitor*", "web_app*",
     "__pycache__*", "*.egg-info", ".git*", ".mypy_cache*",
     "rome.action.obsolete*",
 ]
 
 [tool.setuptools.package-data]
 rome = ["py.typed", "*.json", "*.yaml", "*.yml", "*.txt", "**/*.json", "**/*.yaml"]
+caesar = ["*.yaml", "*.yml", "*.txt", "**/*.yaml", "**/*.yml", "**/*.txt", "paper/*.pdf"]
 
 [tool.black]
 line-length = 88
-target-version = ['py311', 'py312', 'py313']
-extend-exclude = 'benchmark|test|ecology|monitor|web_app'
+target-version = ['py310', 'py311', 'py312', 'py313']
+extend-exclude = 'benchmark|test|monitor|web_app'
 
 [tool.isort]
 profile = "black"
 line_length = 88
-skip_glob = ["*/benchmark/*", "*/test/*", "*/ecology/*"]
+skip_glob = ["*/benchmark/*", "*/test/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["test"]
@@ -75,7 +92,7 @@ addopts = ["-ra", "--strict-markers"]
 markers = ["slow: slow tests", "integration: integration tests"]
 
 [tool.coverage.run]
-source = ["rome"]
+source = ["rome", "caesar"]
 omit = ["*/test/*", "*/__init__.py"]
 
 [tool.coverage.report]
@@ -86,7 +103,7 @@ exclude_lines = [
 ]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.10"
 check_untyped_defs = true
 no_implicit_optional = true
 warn_return_any = true
@@ -95,5 +112,6 @@ warn_return_any = true
 module = [
     "graphviz.*", "ribs.*", "xxhash.*", "llmlingua.*", "mem0ai.*",
     "evalplus.*", "portalocker.*", "tinydb.*", "pygraphviz.*", "PyPDF2.*",
+    "curl_cffi.*", "chromadb.*", "llama_index.*",
 ]
 ignore_missing_imports = true
