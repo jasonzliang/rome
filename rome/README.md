@@ -6,7 +6,7 @@
 
 Rome is a Python library for building intelligent AI agents with Finite State Machine (FSM) architecture. This library provides a structured framework for creating AI-powered agents that can analyze, edit, test, and execute code with LLM assistance, specifically designed for automated software development workflows.
 
-> **Rome is the framework behind [Caesar](../caesar/README.md)**, a published autonomous research agent. See the Caesar paper: [*"Caesar: Deep Agentic Web Exploration for Creative Answer Synthesis"*](https://www.researchgate.net/publication/402554537_Caesar_Deep_Agentic_Web_Exploration_for_Creative_Answer_Synthesis) (Liang, Meyerson, Miikkulainen, 2026). For the project overview, start at the [repo root README](../README.md).
+> For the project overview and the Caesar research agent built on Rome, see the [repo root README](../README.md).
 
 ## Overview
 
